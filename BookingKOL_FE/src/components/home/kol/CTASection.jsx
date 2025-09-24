@@ -49,7 +49,7 @@ const CTASection = () => {
                 lineHeight: 1.2,
               }}
             >
-              Ready to Cooperate with KOL?
+              Bạn muốn hợp tác với KOLs hàng đầu?
             </Typography>
             <Typography
               variant="h5"
@@ -61,8 +61,8 @@ const CTASection = () => {
                 lineHeight: 1.4,
               }}
             >
-              Start your influencer marketing journey today and connect with the
-              perfect content creators for your brand.
+              Bắt đầu hành trình của bạn với chúng tôi và tiếp cận hàng triệu
+              khách hàng tiềm năng ngay hôm nay.
             </Typography>
           </Box>
         </Box>
@@ -83,13 +83,14 @@ const CTASection = () => {
               boxShadow: 3,
             }}
           >
-            Book Now
+            Liên Hệ Ngay
           </Button>
         </Box>
 
         <Box component={motion.div} {...fadeUp(0.4)}>
           <Typography variant="body2" sx={{ color: "#e2e8f0", mt: 3 }}>
-            Join 10,000+ brands already working with our KOLs
+            Chào mừng bạn đến với Nexus Social - Nơi kết nối thương hiệu và KOLs
+            hàng đầu.
           </Typography>
         </Box>
       </Container>

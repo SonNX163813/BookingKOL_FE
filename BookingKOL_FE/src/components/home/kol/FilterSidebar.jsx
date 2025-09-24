@@ -9,69 +9,75 @@ import {
   FormControlLabel,
   Checkbox,
   Button,
+  Stack,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import StarIcon from "@mui/icons-material/Star";
 
+const filterSections = [
+  {
+    id: "price",
+    title: "Price Range",
+    options: ["Under $500", "$500 - $1,000", "$1,000 - $5,000", "$5,000+"],
+  },
+  {
+    id: "field",
+    title: "Field",
+    options: [
+      "Fashion",
+      "Tech",
+      "Gaming",
+      "Beauty",
+      "Lifestyle",
+      "Food",
+      "Travel",
+      "Fitness",
+    ],
+  },
+  {
+    id: "gender",
+    title: "Gender",
+    options: ["Male", "Female", "Non-binary"],
+  },
+  {
+    id: "rating",
+    title: "Rating",
+    options: ["5 Stars", "4+ Stars", "3+ Stars", "All Ratings"],
+  },
+];
+
 const FilterSidebar = () => {
   const [expanded, setExpanded] = useState(["price", "field"]);
 
-  const filterSections = [
-    {
-      id: "price",
-      title: "Price Range",
-      options: ["Under $500", "$500 - $1,000", "$1,000 - $5,000", "$5,000+"],
-    },
-    {
-      id: "field",
-      title: "Field",
-      options: [
-        "Fashion",
-        "Tech",
-        "Gaming",
-        "Beauty",
-        "Lifestyle",
-        "Food",
-        "Travel",
-        "Fitness",
-      ],
-    },
-    {
-      id: "gender",
-      title: "Gender",
-      options: ["Male", "Female", "Non-binary"],
-    },
-    {
-      id: "rating",
-      title: "Rating",
-      options: ["5 Stars", "4+ Stars", "3+ Stars", "All Ratings"],
-    },
-  ];
-
-  const handleChange = (panel) => (event, isExpanded) => {
-    setExpanded(
-      isExpanded ? [...expanded, panel] : expanded.filter((p) => p !== panel)
+  const handleChange = (panel) => (_event, isExpanded) => {
+    setExpanded((prev) =>
+      isExpanded ? [...prev, panel] : prev.filter((item) => item !== panel)
     );
   };
 
   return (
     <Paper
       sx={{
-        p: 3,
+        p: { xs: 2.5, md: 3 },
         borderRadius: 3,
-        boxShadow: 1,
-        border: "1px solid #e5e7eb",
-        position: "sticky",
-        top: 96,
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 20px 40px rgba(15, 23, 42, 0.06)",
+        backgroundColor: "white",
+        position: { md: "sticky" },
+        top: { md: 88 },
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        minHeight: 0,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+      <Stack direction="row" spacing={1} alignItems="center">
         <FilterListIcon sx={{ color: "#c026d3" }} />
-        <Typography variant="h6" sx={{ fontWeight: "bold", color: "#1e293b" }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#1e293b" }}>
           Filters
         </Typography>
-      </Box>
+      </Stack>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {filterSections.map((section) => (
@@ -79,9 +85,13 @@ const FilterSidebar = () => {
             key={section.id}
             expanded={expanded.includes(section.id)}
             onChange={handleChange(section.id)}
+            disableGutters
+            elevation={0}
+            square={false}
             sx={{
-              boxShadow: "none",
               border: "none",
+              boxShadow: "none",
+              backgroundColor: "transparent",
               "&:before": { display: "none" },
             }}
           >
@@ -93,15 +103,15 @@ const FilterSidebar = () => {
                 "& .MuiAccordionSummary-content": { my: 1 },
               }}
             >
-              <Typography sx={{ fontWeight: "semibold", color: "#1e293b" }}>
+              <Typography sx={{ fontWeight: 600, color: "#1e293b" }}>
                 {section.title}
               </Typography>
             </AccordionSummary>
             <AccordionDetails sx={{ px: 0, pt: 0 }}>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {section.options.map((option, index) => (
+                {section.options.map((option) => (
                   <FormControlLabel
-                    key={index}
+                    key={option}
                     control={
                       <Checkbox
                         sx={{
@@ -112,21 +122,17 @@ const FilterSidebar = () => {
                     }
                     label={
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
                       >
-                        {section.id === "rating" &&
-                          option !== "All Ratings" && (
-                            <StarIcon sx={{ fontSize: 14, color: "#fbbf24" }} />
-                          )}
+                        {section.id === "rating" && option !== "All Ratings" && (
+                          <StarIcon sx={{ fontSize: 14, color: "#fbbf24" }} />
+                        )}
                         <Typography variant="body2" sx={{ color: "#475569" }}>
                           {option}
                         </Typography>
                       </Box>
                     }
-                    sx={{
-                      m: 0,
-                      "& .MuiFormControlLabel-label": { fontSize: "0.875rem" },
-                    }}
+                    sx={{ m: 0 }}
                   />
                 ))}
               </Box>
@@ -139,10 +145,11 @@ const FilterSidebar = () => {
         variant="contained"
         fullWidth
         sx={{
-          mt: 3,
+          mt: "auto",
           backgroundColor: "#c026d3",
           "&:hover": { backgroundColor: "#a21caf" },
-          fontWeight: "semibold",
+          fontWeight: 600,
+          textTransform: "none",
         }}
       >
         Apply Filters

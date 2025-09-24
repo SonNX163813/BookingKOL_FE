@@ -14,9 +14,9 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
-
+import logoweb from "../../../assets/logoweb.png";
 const Navbar = () => {
-  const [anchorEl, setAnchorEl] = (useState < null) | (HTMLElement > null);
+  const [anchorEl, setAnchorEl] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -36,7 +36,11 @@ const Navbar = () => {
           component="div"
           sx={{ fontWeight: "bold", color: "#c026d3" }}
         >
-          KOLBook
+          <img
+            src={logoweb}
+            alt="KOLBook Logo"
+            style={{ height: 40, marginRight: 8, verticalAlign: "middle" }}
+          />
         </Typography>
 
         {/* Desktop Navigation */}

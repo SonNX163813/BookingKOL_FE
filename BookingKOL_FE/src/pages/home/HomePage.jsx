@@ -1,5 +1,5 @@
 import React from "react";
-import { Container, Grid, Box } from "@mui/material";
+import { Container, Box } from "@mui/material";
 import Navbar from "../../components/home/kol/Navbar";
 import HeroSection from "../../components/home/kol/HeroSection";
 import FilterSidebar from "../../components/home/kol/FilterSidebar";
@@ -16,18 +16,25 @@ const HomePage = () => {
         <Navbar />
         <HeroSection />
 
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Grid container spacing={3}>
+        <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 } }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "320px minmax(0, 1fr)",
+              },
+              gap: { xs: 3, md: 4 },
+              alignItems: "start",
+              "& > *": { minWidth: 0 },
+            }}
+          >
             {/* Filter Sidebar */}
-            <Grid item xs={12} lg={3}>
-              <FilterSidebar />
-            </Grid>
+            <FilterSidebar />
 
-            {/* Main Content */}
-            <Grid item xs={12} lg={9}>
-              <HottestKOLs />
-            </Grid>
-          </Grid>
+            {/* Hot KOL carousel */}
+            <HottestKOLs />
+          </Box>
         </Container>
 
         <PartnerLogos />

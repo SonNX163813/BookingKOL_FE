@@ -173,7 +173,7 @@ const Footer = () => {
           }}
         >
           <Typography variant="body2" sx={{ color: "#9ca3af" }}>
-            © {new Date().getFullYear()} KOLBook. All rights reserved.
+            © {new Date().getFullYear()} NexusSocial. All rights reserved.
           </Typography>
           <Typography
             variant="body2"
@@ -181,7 +181,6 @@ const Footer = () => {
           >
             Built with ❤️ by{" "}
             <Link
-              href="https://meku.dev"
               target="_blank"
               rel="nofollow"
               sx={{
@@ -190,7 +189,7 @@ const Footer = () => {
                 "&:hover": { color: "#d946ef" },
               }}
             >
-              Meku.dev
+              FE.dev
             </Link>
           </Typography>
         </Box>

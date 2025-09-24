@@ -1,246 +1,386 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
-  Container,
   Typography,
   Box,
+  Paper,
+  Stack,
   IconButton,
-  Grid,
-  useMediaQuery,
   useTheme,
+  useMediaQuery,
+  Chip,
+  Tooltip,
 } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "@mui/icons-material";
+import { motion } from "framer-motion";
 import KOLCard from "./KOLCard";
+import hotkolimg from "../../../assets/hotkol.png";
 
 const HottestKOLs = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
   const theme = useTheme();
-  const reduce = useReducedMotion();
+  const isLg = useMediaQuery(theme.breakpoints.up("lg"));
+  const isMd = useMediaQuery(theme.breakpoints.up("md"));
+  const isSm = useMediaQuery(theme.breakpoints.up("sm"));
 
-  // Breakpoints → items per page
-  const isXs = useMediaQuery(theme.breakpoints.only("xs"));
-  const isSm = useMediaQuery(theme.breakpoints.only("sm"));
-  const isMd = useMediaQuery(theme.breakpoints.only("md"));
-  const itemsPerPage = isXs ? 1 : isSm ? 2 : isMd ? 3 : 4;
+  const visibleCount = isLg ? 4 : isMd ? 3 : isSm ? 2 : 1;
 
-  const hottestKOLs = useMemo(
+  // Dữ liệu: field giữ English, các chi tiết khác dùng tiếng Việt có dấu
+  const hottestKOLsData = useMemo(
     () => [
       {
         id: "1",
-        name: "Sarah Chen",
-        field: "Fashion & Lifestyle",
-        price: "$2,500",
-        rating: 5,
-        image:
-          "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+        name: "Vanh >.<",
+        field: "Host Streamer",
+        price: "250.000đ/giờ",
+        originalPrice: "280.000đ/giờ",
+        rating: 4.95,
+        reviewCount: 355,
+        image: hotkolimg,
+        isOnline: true,
+        isHot: true,
       },
       {
         id: "2",
-        name: "Alex Rodriguez",
-        field: "Tech & Gaming",
-        price: "$3,200",
-        rating: 5,
-        image:
-          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+        name: "Minh Anh",
+        field: "Host Stream",
+        price: "320.000đ/giờ",
+        originalPrice: "360.000đ/giờ",
+        rating: 4.87,
+        reviewCount: 421,
+        image: hotkolimg,
+        isOnline: false,
+        isHot: false,
       },
       {
         id: "3",
-        name: "Emma Thompson",
-        field: "Beauty & Wellness",
-        price: "$1,800",
-        rating: 5,
-        image:
-          "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+        name: "Kiara",
+        field: "Beauty Reviewer",
+        price: "280.000đ/giờ",
+        originalPrice: "315.000đ/giờ",
+        rating: 4.9,
+        reviewCount: 298,
+        image: hotkolimg,
+        isOnline: true,
+        isHot: true,
       },
       {
         id: "4",
-        name: "Marcus Johnson",
-        field: "Fitness & Health",
-        price: "$2,100",
-        rating: 5,
-        image:
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+        name: "Linh",
+        field: "Twitch Streamer",
+        price: "260.000đ/giờ",
+        originalPrice: "290.000đ/giờ",
+        rating: 4.92,
+        reviewCount: 374,
+        image: hotkolimg,
+        isOnline: true,
+        isHot: false,
       },
       {
         id: "5",
-        name: "Lily Wang",
-        field: "Food & Travel",
-        price: "$2,800",
-        rating: 5,
-        image:
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+        name: "Haru",
+        field: "Gaming Creator",
+        price: "300.000đ/giờ",
+        originalPrice: "340.000đ/giờ",
+        rating: 4.85,
+        reviewCount: 212,
+        image: hotkolimg,
+        isOnline: false,
+        isHot: true,
       },
     ],
     []
   );
 
-  // Nhân đôi mảng để slice qua ranh giới
-  const extended = useMemo(
-    () => [...hottestKOLs, ...hottestKOLs],
-    [hottestKOLs]
+  const hottestKOLs = useMemo(
+    () =>
+      [...hottestKOLsData].sort(
+        (a, b) => Number(b.rating ?? 0) - Number(a.rating ?? 0)
+      ),
+    [hottestKOLsData]
   );
 
-  const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % hottestKOLs.length);
-  }, [hottestKOLs.length]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const prevSlide = useCallback(() => {
-    setCurrentIndex(
-      (prev) => (prev - 1 + hottestKOLs.length) % hottestKOLs.length
-    );
-  }, [hottestKOLs.length]);
-
-  // Auto-slide mỗi 4s, tắt nếu paused hoặc reduce motion
   useEffect(() => {
-    if (paused || reduce) return;
-    const interval = setInterval(nextSlide, 4000);
-    return () => clearInterval(interval);
-  }, [paused, reduce, nextSlide]);
+    const maxIndexForViewport = Math.max(hottestKOLs.length - visibleCount, 0);
+    setCurrentIndex((prev) => Math.min(prev, maxIndexForViewport));
+  }, [hottestKOLs.length, visibleCount]);
 
-  // Lấy danh sách card hiển thị đủ itemsPerPage
-  const visible = useMemo(() => {
-    const start = currentIndex;
-    const end = start + itemsPerPage;
-    // slice trên extended, nhưng key mỗi phần tử nên ổn định → thêm index phụ
-    return extended
-      .slice(start, end)
-      .map((item, i) => ({ ...item, _k: `${item.id}-${start + i}` }));
-  }, [extended, currentIndex, itemsPerPage]);
+  const maxIndex = Math.max(hottestKOLs.length - visibleCount, 0);
+  const itemBasis = `${(1 / visibleCount) * 100}%`;
+  const translatePercentage = (100 / visibleCount) * currentIndex;
 
-  // Kéo (drag) để chuyển slide
-  const handleDragEnd = (_e, info) => {
-    const offsetX = info.offset.x;
-    const velocityX = info.velocity.x;
-    const threshold = 60; // px
-    if (offsetX < -threshold || velocityX < -300) nextSlide();
-    else if (offsetX > threshold || velocityX > 300) prevSlide();
+  const handlePrev = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex));
   };
 
   return (
-    <Box sx={{ py: 8, backgroundColor: "#f9fafb" }}>
-      <Container maxWidth="lg">
-        <Box sx={{ textAlign: "center", mb: 6 }}>
-          <motion.div
-            initial={{ opacity: 0, y: reduce ? 0 : 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true, amount: 0.2 }}
-          >
-            <Typography
-              variant="h3"
-              sx={{ fontWeight: "bold", color: "#1e293b", mb: 2 }}
-            >
-              🔥 Hottest KOLs
-            </Typography>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: reduce ? 0 : 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            viewport={{ once: true, amount: 0.2 }}
-          >
-            <Typography
-              variant="h5"
-              sx={{ color: "#475569", maxWidth: "42rem", mx: "auto" }}
-            >
-              Discover the most popular and trending influencers on our platform
-            </Typography>
-          </motion.div>
-        </Box>
+    <Paper
+      sx={{
+        p: { xs: 3, md: 4 },
+        borderRadius: 4,
+        border: "1px solid #e2e8f0",
+        boxShadow:
+          "0 2px 8px rgba(15, 23, 42, 0.04), 0 20px 40px rgba(15, 23, 42, 0.06)",
+        background:
+          "linear-gradient(180deg, #ffffff 0%, #fcfcff 35%, #f8fbff 100%)",
+        display: "flex",
+        flexDirection: "column",
+        gap: { xs: 3, md: 4 },
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Accent gradient blur */}
+      <Box
+        sx={{
+          position: "absolute",
+          inset: "-40% -10% auto -10%",
+          height: 240,
+          background:
+            "radial-gradient(60% 60% at 50% 40%, rgba(202,84,202,0.16) 0%, rgba(202,84,202,0.06) 60%, transparent 100%)",
+          filter: "blur(30px)",
+          pointerEvents: "none",
+        }}
+      />
 
+      <Stack spacing={1.25} sx={{ position: "relative", zIndex: 1 }}>
         <Box
-          sx={{ position: "relative" }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
         >
-          {/* Navigation buttons */}
-          <IconButton
-            onClick={prevSlide}
-            sx={{
-              position: "absolute",
-              left: 0,
-              top: "50%",
-              transform: "translateY(-50%) translateX(-16px)",
-              zIndex: 10,
-              backgroundColor: "white",
-              "&:hover": { backgroundColor: "#f9fafb" },
-              boxShadow: 2,
-              border: "1px solid #e5e7eb",
-            }}
-            aria-label="Previous KOLs"
-          >
-            <ChevronLeftIcon sx={{ color: "#475569" }} />
-          </IconButton>
-
-          <IconButton
-            onClick={nextSlide}
-            sx={{
-              position: "absolute",
-              right: 0,
-              top: "50%",
-              transform: "translateY(-50%) translateX(16px)",
-              zIndex: 10,
-              backgroundColor: "white",
-              "&:hover": { backgroundColor: "#f9fafb" },
-              boxShadow: 2,
-              border: "1px solid #e5e7eb",
-            }}
-            aria-label="Next KOLs"
-          >
-            <ChevronRightIcon sx={{ color: "#475569" }} />
-          </IconButton>
-
-          {/* Carousel container */}
-          <Box sx={{ overflow: "hidden" }}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`${currentIndex}-${itemsPerPage}`}
-                initial={{ opacity: 0, x: reduce ? 0 : 100 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: reduce ? 0 : -100 }}
-                transition={{ duration: 0.45 }}
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                onDragEnd={handleDragEnd}
-                style={{ cursor: "grab" }}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Chip
+              label="Tuần này"
+              size="small"
+              sx={{
+                borderRadius: 2,
+                fontWeight: 700,
+                letterSpacing: 0.2,
+                bgcolor: "rgba(202,84,202,0.12)",
+                color: "#8b5cf6",
+                border: "1px solid rgba(139,92,246,0.18)",
+                ".MuiChip-label": { px: 1.25 },
+              }}
+            />
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                color: "#0f172a",
+                display: "flex",
+                alignItems: "baseline",
+                gap: 1,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Hot KOLs
+              <Typography
+                component="span"
+                variant="h6"
+                sx={{ color: "#64748b", fontWeight: 600 }}
               >
-                <Grid container spacing={3}>
-                  {visible.map((kol) => (
-                    <Grid item xs={12} sm={6} md={4} lg={3} key={kol._k}>
-                      <KOLCard {...kol} isHot />
-                    </Grid>
-                  ))}
-                </Grid>
-              </motion.div>
-            </AnimatePresence>
+                — Bảng xếp hạng nổi bật
+              </Typography>
+            </Typography>
           </Box>
 
-          {/* Dots indicator (bước = 1 phần tử, nên để số dot = tổng item) */}
-          <Box
-            sx={{ display: "flex", justifyContent: "center", gap: 1, mt: 4 }}
-          >
-            {hottestKOLs.map((_, index) => (
-              <Box
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  backgroundColor:
-                    index === currentIndex ? "#c026d3" : "#d1d5db",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s ease",
-                }}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Tooltip title="Trước">
+              <span>
+                <IconButton
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0}
+                  sx={{
+                    border: "1px solid #e2e8f0",
+                    backgroundColor: "white",
+                    "&:hover": { backgroundColor: "#f8fafc" },
+                    "&.Mui-disabled": { opacity: 0.5 },
+                  }}
+                >
+                  <ChevronLeft />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Tiếp theo">
+              <span>
+                <IconButton
+                  onClick={handleNext}
+                  disabled={currentIndex === maxIndex}
+                  sx={{
+                    border: "1px solid #e2e8f0",
+                    backgroundColor: "white",
+                    "&:hover": { backgroundColor: "#f8fafc" },
+                    "&.Mui-disabled": { opacity: 0.5 },
+                  }}
+                >
+                  <ChevronRight />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
         </Box>
-      </Container>
-    </Box>
+
+        <Typography variant="body1" sx={{ color: "#475569" }}>
+          Khám phá bảng xếp hạng KOLs hot nhất tuần này. Đặt lịch nhanh, theo
+          dõi đánh giá thực tế và chọn gói phù hợp nhu cầu của bạn.
+        </Typography>
+      </Stack>
+
+      <Box
+        sx={{
+          position: "relative",
+          overflow: "hidden",
+          pt: { xs: 3.5, md: 4.5 },
+          mx: { xs: -1, sm: -1.5 },
+        }}
+      >
+        <Box
+          component={motion.div}
+          animate={{ transform: `translateX(-${translatePercentage}%)` }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          sx={{
+            display: "flex",
+            width: "100%",
+          }}
+        >
+          {hottestKOLs.map((kol, index) => {
+            const rank = index + 1;
+            const isTopOne = rank === 1;
+
+            return (
+              <Box
+                key={kol.id}
+                sx={{
+                  flex: `0 0 ${itemBasis}`,
+                  maxWidth: itemBasis,
+                  px: { xs: 1, sm: 1.5 },
+                  boxSizing: "border-box",
+                }}
+              >
+                <Box
+                  component={motion.div}
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  transition={{ type: "spring", stiffness: 220, damping: 18 }}
+                  sx={{ position: "relative", height: "100%" }}
+                >
+                  {/* Viền ánh lửa cho TOP 1 */}
+                  {isTopOne && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        inset: { xs: -8, sm: -12 },
+                        borderRadius: 5,
+                        background:
+                          "conic-gradient(from 180deg, rgba(255, 78, 0, 0.8), rgba(255, 196, 0, 0.65), rgba(255, 78, 0, 0.8))",
+                        filter: "blur(12px)",
+                        opacity: 0.9,
+                        zIndex: 0,
+                        animation: "flameSpin 6s linear infinite",
+                        "@keyframes flameSpin": {
+                          from: { transform: "rotate(0deg)" },
+                          to: { transform: "rotate(360deg)" },
+                        },
+                      }}
+                    />
+                  )}
+
+                  {/* Huy hiệu thứ hạng */}
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: { xs: -18, md: -24 },
+                      right: { xs: 16, md: 24 },
+                      width: { xs: 48, md: 56 },
+                      height: { xs: 48, md: 56 },
+                      borderRadius: "50%",
+                      background: isTopOne
+                        ? "linear-gradient(135deg, #fb923c, #facc15)"
+                        : "rgba(15, 23, 42, 0.92)",
+                      color: isTopOne ? "#1f2937" : "#f8fafc",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 800,
+                      fontSize: { xs: "1.125rem", md: "1.25rem" },
+                      boxShadow: isTopOne
+                        ? "0 18px 35px rgba(251, 146, 60, 0.45)"
+                        : "0 14px 28px rgba(15, 23, 42, 0.25)",
+                      zIndex: 2,
+                      border: isTopOne
+                        ? "2px solid rgba(255,255,255,0.6)"
+                        : "1px solid rgba(255,255,255,0.18)",
+                      backdropFilter: isTopOne ? "none" : "blur(2px)",
+                    }}
+                  >
+                    {rank}
+                  </Box>
+
+                  {/* Thân thẻ */}
+                  <Box sx={{ position: "relative", zIndex: 1 }}>
+                    {/* Truyền props sang KOLCard:
+                        - field giữ nguyên English
+                        - các text hiển thị khác đã chuẩn hoá tiếng Việt có dấu */}
+                    <KOLCard
+                      {...kol}
+                      isHot={kol.isHot}
+                      // Gợi ý: nếu KOLCard có props phụ đề/mô tả, bạn có thể truyền:
+                      // subtitle={`${kol.rating} ★ • ${kol.reviewCount} đánh giá • ${kol.price}`}
+                      // Nếu chưa có, logic tiếng Việt đã nằm trong dữ liệu ở trên.
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+
+        {/* Chỉ báo trang */}
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            mt: 2.5,
+            justifyContent: "center",
+            alignItems: "center",
+            userSelect: "none",
+          }}
+        >
+          {Array.from({ length: maxIndex + 1 }).map((_, i) => {
+            const active = i === currentIndex;
+            return (
+              <Box
+                key={i}
+                onClick={() => setCurrentIndex(i)}
+                component={motion.div}
+                initial={false}
+                animate={{
+                  opacity: active ? 1 : 0.35,
+                  scale: active ? 1 : 0.9,
+                }}
+                transition={{ duration: 0.25 }}
+                sx={{
+                  width: active ? 24 : 8,
+                  height: 8,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  bgcolor: active ? "#0ea5e9" : "#cbd5e1",
+                }}
+              />
+            );
+          })}
+        </Stack>
+      </Box>
+    </Paper>
   );
 };
 
