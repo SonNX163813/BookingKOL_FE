@@ -1,165 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   AppBar,
-  Box,
   Toolbar,
-  IconButton,
   Typography,
-  Menu,
-  Container,
-  Avatar,
   Button,
-  Tooltip,
+  IconButton,
+  Menu,
   MenuItem,
-} from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import { Link } from 'react-router-dom';
+  Box,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import SearchIcon from "@mui/icons-material/Search";
+import PersonIcon from "@mui/icons-material/Person";
 
-const pages = ['Home', 'Services', 'About', 'Contact'];
-const settings = ['Profile', 'Dashboard', 'Settings', 'Logout'];
+const Navbar = () => {
+  const [anchorEl, setAnchorEl] = (useState < null) | (HTMLElement > null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-function Navbar() {
-  const [anchorElNav, setAnchorElNav] = useState(null);
-  const [anchorElUser, setAnchorElUser] = useState(null);
-
-  const handleOpenNavMenu = (event) => {
-    setAnchorElNav(event.currentTarget);
-  };
-  const handleOpenUserMenu = (event) => {
-    setAnchorElUser(event.currentTarget);
-  };
-
-  const handleCloseNavMenu = () => {
-    setAnchorElNav(null);
-  };
-
-  const handleCloseUserMenu = () => {
-    setAnchorElUser(null);
+  const handleClose = () => {
+    setAnchorEl(null);
   };
 
   return (
-    <AppBar position="static">
-      <Container maxWidth="xl">
-        <Toolbar disableGutters>
-          {/* Logo for larger screens */}
-          <Typography
-            variant="h6"
-            noWrap
-            component={Link}
-            to="/"
-            sx={{
-              mr: 2,
-              display: { xs: 'none', md: 'flex' },
-              fontWeight: 700,
-              color: 'inherit',
-              textDecoration: 'none',
-            }}
-          >
-            LOGO
-          </Typography>
+    <AppBar
+      position="sticky"
+      sx={{ backgroundColor: "white", color: "#1e293b", boxShadow: 1 }}
+    >
+      <Toolbar sx={{ justifyContent: "space-between" }}>
+        {/* Logo */}
+        <Typography
+          variant="h4"
+          component="div"
+          sx={{ fontWeight: "bold", color: "#c026d3" }}
+        >
+          KOLBook
+        </Typography>
 
-          {/* Mobile menu */}
-          <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-            <IconButton
-              size="large"
-              aria-controls="menu-appbar"
-              aria-haspopup="true"
-              onClick={handleOpenNavMenu}
-              color="inherit"
-            >
-              <MenuIcon />
-            </IconButton>
-            <Menu
-              id="menu-appbar"
-              anchorEl={anchorElNav}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'left',
-              }}
-              open={Boolean(anchorElNav)}
-              onClose={handleCloseNavMenu}
-              sx={{
-                display: { xs: 'block', md: 'none' },
-              }}
-            >
-              {pages.map((page) => (
-                <MenuItem key={page} onClick={handleCloseNavMenu}>
-                  <Typography textAlign="center">{page}</Typography>
-                </MenuItem>
-              ))}
-            </Menu>
-          </Box>
-
-          {/* Logo for mobile screens */}
-          <Typography
-            variant="h5"
-            noWrap
-            component={Link}
-            to="/"
-            sx={{
-              mr: 2,
-              display: { xs: 'flex', md: 'none' },
-              flexGrow: 1,
-              fontWeight: 700,
-              color: 'inherit',
-              textDecoration: 'none',
-            }}
-          >
-            LOGO
-          </Typography>
-
-          {/* Desktop menu */}
-          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
-            {pages.map((page) => (
-              <Button
-                key={page}
-                onClick={handleCloseNavMenu}
-                sx={{ my: 2, color: 'white', display: 'block' }}
-              >
-                {page}
+        {/* Desktop Navigation */}
+        {!isMobile && (
+          <Box sx={{ display: "flex", gap: 4 }}>
+            {["Home", "KOLs", "Categories", "About"].map((item) => (
+              <Button key={item} color="inherit" sx={{ fontWeight: "medium" }}>
+                {item}
               </Button>
             ))}
           </Box>
+        )}
 
-          {/* User menu */}
-          <Box sx={{ flexGrow: 0 }}>
-            <Tooltip title="Open settings">
-              <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                <Avatar alt="User Avatar" src="/static/images/avatar/2.jpg" />
-              </IconButton>
-            </Tooltip>
-            <Menu
-              sx={{ mt: '45px' }}
-              id="menu-appbar"
-              anchorEl={anchorElUser}
-              anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
+        {/* Desktop Actions */}
+        {!isMobile && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <IconButton color="inherit">
+              <SearchIcon />
+            </IconButton>
+            <IconButton color="inherit">
+              <PersonIcon />
+            </IconButton>
+            <Button
+              variant="contained"
+              sx={{
+                backgroundColor: "#c026d3",
+                "&:hover": { backgroundColor: "#a21caf" },
               }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              open={Boolean(anchorElUser)}
-              onClose={handleCloseUserMenu}
             >
-              {settings.map((setting) => (
-                <MenuItem key={setting} onClick={handleCloseUserMenu}>
-                  <Typography textAlign="center">{setting}</Typography>
-                </MenuItem>
-              ))}
-            </Menu>
+              Sign In
+            </Button>
           </Box>
-        </Toolbar>
-      </Container>
+        )}
+
+        {/* Mobile menu button */}
+        {isMobile && (
+          <IconButton
+            size="large"
+            edge="start"
+            color="inherit"
+            aria-label="menu"
+          >
+            <MenuIcon />
+          </IconButton>
+        )}
+
+        {/* Mobile Menu */}
+        <Menu
+          id="menu-appbar"
+          anchorEl={anchorEl}
+          anchorOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          keepMounted
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          open={Boolean(anchorEl)}
+          onClose={handleClose}
+        >
+          {["Home", "KOLs", "Categories", "About"].map((item) => (
+            <MenuItem key={item} onClick={handleClose}>
+              {item}
+            </MenuItem>
+          ))}
+          <MenuItem onClick={handleClose}>
+            <SearchIcon sx={{ mr: 1 }} />
+            Search
+          </MenuItem>
+          <MenuItem onClick={handleClose}>
+            <PersonIcon sx={{ mr: 1 }} />
+            Account
+          </MenuItem>
+          <MenuItem onClick={handleClose}>
+            <Button
+              variant="contained"
+              fullWidth
+              sx={{
+                backgroundColor: "#c026d3",
+                "&:hover": { backgroundColor: "#a21caf" },
+              }}
+            >
+              Sign In
+            </Button>
+          </MenuItem>
+        </Menu>
+      </Toolbar>
     </AppBar>
   );
-}
+};
 
 export default Navbar;
