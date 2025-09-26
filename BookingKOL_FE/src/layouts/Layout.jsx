@@ -9,9 +9,9 @@ const Layout = () => {
 
   return (
     <>
-      {/* <Navbar /> */}
+      <Navbar />
       <Routers />
-      {/* <Footer /> */}
+      <Footer />
     </>
   );
 };

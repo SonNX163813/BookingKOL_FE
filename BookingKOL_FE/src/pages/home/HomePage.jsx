@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Container, Box } from "@mui/material";
 import Navbar from "../../components/home/kol/Navbar";
 import HeroSection from "../../components/home/kol/HeroSection";
@@ -13,7 +13,7 @@ const HomePage = () => {
   return (
     <>
       <Box sx={{ minHeight: "100vh", backgroundColor: "white" }}>
-        <Navbar />
+        {/* <Navbar /> */}
         <HeroSection />
 
         <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 } }}>
@@ -40,7 +40,7 @@ const HomePage = () => {
         <PartnerLogos />
         <PopularKOLs />
         <CTASection />
-        <Footer />
+        {/* <Footer /> */}
       </Box>
     </>
   );

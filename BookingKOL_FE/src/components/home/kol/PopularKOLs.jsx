@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, Container, Typography, Grid } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import KOLCard from "./KOLCard";
 import hotkolimg from "../../../assets/hotkol.png";
@@ -63,11 +64,16 @@ const popularKOLs = [
 ];
 
 const PopularKOLs = () => {
+  const navigate = useNavigate();
   const items = useMemo(() => popularKOLs, []);
 
   return (
     <Box sx={{ py: 10, backgroundColor: "#f8fafc" }}>
-      <Container maxWidth="lg">
+      <Container
+        sx={{
+          maxWidth: { xs: 400, sm: 900, md: 1500 },
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -100,16 +106,32 @@ const PopularKOLs = () => {
           </Typography> */}
         </motion.div>
 
-        <Grid container spacing={4} sx={{ mt: 4 }}>
+        <Grid container spacing={4} justifyContent="center" sx={{ mt: 4 }}>
           {items.map((kol, index) => (
-            <Grid item xs={12} sm={6} md={4} key={kol.id}>
+            <Grid
+              item
+              xs={12}
+              sm={6}
+              md={4}
+              lg={3}
+              key={kol.id}
+              sx={{ display: "flex" }}
+            >
               <motion.div
                 initial={{ opacity: 0, y: 32 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.08 }}
                 viewport={{ once: true, amount: 0.3 }}
+                style={{ width: "100%", height: "100%" }}
               >
-                <KOLCard {...kol} />
+                <KOLCard
+                  {...kol}
+                  onClick={() => navigate(`/kols/${kol.id}`)}
+                  mediaContainerSx={{
+                    minHeight: { xs: 220, sm: 240, md: 260 },
+                    height: "auto",
+                  }}
+                />
               </motion.div>
             </Grid>
           ))}

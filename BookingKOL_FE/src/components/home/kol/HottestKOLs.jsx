@@ -12,18 +12,22 @@ import {
 } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import KOLCard from "./KOLCard";
 import hotkolimg from "../../../assets/hotkol.png";
+import ElectricBorder from "../../UI/electricBorder/ElectricBorder";
 
 const HottestKOLs = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isLg = useMediaQuery(theme.breakpoints.up("lg"));
   const isMd = useMediaQuery(theme.breakpoints.up("md"));
   const isSm = useMediaQuery(theme.breakpoints.up("sm"));
 
+  /** Hiển thị 1/2/3/4 card theo breakpoint */
   const visibleCount = isLg ? 4 : isMd ? 3 : isSm ? 2 : 1;
 
-  // Dữ liệu: field giữ English, các chi tiết khác dùng tiếng Việt có dấu
+  /** Data demo */
   const hottestKOLsData = useMemo(
     () => [
       {
@@ -35,8 +39,6 @@ const HottestKOLs = () => {
         rating: 4.95,
         reviewCount: 355,
         image: hotkolimg,
-        isOnline: true,
-        isHot: true,
       },
       {
         id: "2",
@@ -47,8 +49,6 @@ const HottestKOLs = () => {
         rating: 4.87,
         reviewCount: 421,
         image: hotkolimg,
-        isOnline: false,
-        isHot: false,
       },
       {
         id: "3",
@@ -59,8 +59,6 @@ const HottestKOLs = () => {
         rating: 4.9,
         reviewCount: 298,
         image: hotkolimg,
-        isOnline: true,
-        isHot: true,
       },
       {
         id: "4",
@@ -71,8 +69,6 @@ const HottestKOLs = () => {
         rating: 4.92,
         reviewCount: 374,
         image: hotkolimg,
-        isOnline: true,
-        isHot: false,
       },
       {
         id: "5",
@@ -83,13 +79,12 @@ const HottestKOLs = () => {
         rating: 4.85,
         reviewCount: 212,
         image: hotkolimg,
-        isOnline: false,
-        isHot: true,
       },
     ],
     []
   );
 
+  /** Sort theo rating (desc) */
   const hottestKOLs = useMemo(
     () =>
       [...hottestKOLsData].sort(
@@ -100,6 +95,7 @@ const HottestKOLs = () => {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  /** Giữ currentIndex hợp lệ khi thay đổi viewport */
   useEffect(() => {
     const maxIndexForViewport = Math.max(hottestKOLs.length - visibleCount, 0);
     setCurrentIndex((prev) => Math.min(prev, maxIndexForViewport));
@@ -109,18 +105,14 @@ const HottestKOLs = () => {
   const itemBasis = `${(1 / visibleCount) * 100}%`;
   const translatePercentage = (100 / visibleCount) * currentIndex;
 
-  const handlePrev = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0));
-  };
-
-  const handleNext = () => {
+  const handlePrev = () => setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  const handleNext = () =>
     setCurrentIndex((prev) => Math.min(prev + 1, maxIndex));
-  };
 
   return (
     <Paper
       sx={{
-        p: { xs: 3, md: 4 },
+        p: { xs: 2.5, md: 4 },
         borderRadius: 4,
         border: "1px solid #e2e8f0",
         boxShadow:
@@ -129,7 +121,7 @@ const HottestKOLs = () => {
           "linear-gradient(180deg, #ffffff 0%, #fcfcff 35%, #f8fbff 100%)",
         display: "flex",
         flexDirection: "column",
-        gap: { xs: 3, md: 4 },
+        gap: { xs: 2.25, md: 4 },
         height: "100%",
         position: "relative",
         overflow: "hidden",
@@ -140,7 +132,7 @@ const HottestKOLs = () => {
         sx={{
           position: "absolute",
           inset: "-40% -10% auto -10%",
-          height: 240,
+          height: { xs: 180, md: 240 },
           background:
             "radial-gradient(60% 60% at 50% 40%, rgba(202,84,202,0.16) 0%, rgba(202,84,202,0.06) 60%, transparent 100%)",
           filter: "blur(30px)",
@@ -148,6 +140,7 @@ const HottestKOLs = () => {
         }}
       />
 
+      {/* Header */}
       <Stack spacing={1.25} sx={{ position: "relative", zIndex: 1 }}>
         <Box
           sx={{
@@ -181,13 +174,18 @@ const HottestKOLs = () => {
                 alignItems: "baseline",
                 gap: 1,
                 letterSpacing: "-0.02em",
+                fontSize: { xs: "1.6rem", md: "2rem" },
               }}
             >
               Hot KOLs
               <Typography
                 component="span"
                 variant="h6"
-                sx={{ color: "#64748b", fontWeight: 600 }}
+                sx={{
+                  color: "#64748b",
+                  fontWeight: 600,
+                  fontSize: { xs: "1rem", md: "1.125rem" },
+                }}
               >
                 — Bảng xếp hạng nổi bật
               </Typography>
@@ -198,13 +196,14 @@ const HottestKOLs = () => {
             <Tooltip title="Trước">
               <span>
                 <IconButton
+                  aria-label="Trước"
                   onClick={handlePrev}
                   disabled={currentIndex === 0}
                   sx={{
                     border: "1px solid #e2e8f0",
                     backgroundColor: "white",
                     "&:hover": { backgroundColor: "#f8fafc" },
-                    "&.Mui-disabled": { opacity: 0.5 },
+                    "&.Mui-disabled": { opacity: 0.45, cursor: "not-allowed" },
                   }}
                 >
                   <ChevronLeft />
@@ -214,13 +213,14 @@ const HottestKOLs = () => {
             <Tooltip title="Tiếp theo">
               <span>
                 <IconButton
+                  aria-label="Tiếp theo"
                   onClick={handleNext}
                   disabled={currentIndex === maxIndex}
                   sx={{
                     border: "1px solid #e2e8f0",
                     backgroundColor: "white",
                     "&:hover": { backgroundColor: "#f8fafc" },
-                    "&.Mui-disabled": { opacity: 0.5 },
+                    "&.Mui-disabled": { opacity: 0.45, cursor: "not-allowed" },
                   }}
                 >
                   <ChevronRight />
@@ -230,18 +230,22 @@ const HottestKOLs = () => {
           </Box>
         </Box>
 
-        <Typography variant="body1" sx={{ color: "#475569" }}>
+        <Typography
+          variant="body1"
+          sx={{ color: "#475569", fontSize: { xs: "0.95rem", md: "1rem" } }}
+        >
           Khám phá bảng xếp hạng KOLs hot nhất tuần này. Đặt lịch nhanh, theo
           dõi đánh giá thực tế và chọn gói phù hợp nhu cầu của bạn.
         </Typography>
       </Stack>
 
+      {/* Slider */}
       <Box
         sx={{
           position: "relative",
           overflow: "hidden",
-          pt: { xs: 3.5, md: 4.5 },
-          mx: { xs: -1, sm: -1.5 },
+          pt: { xs: 3, md: 4.5 },
+          mx: { xs: -0.5, sm: -1.5 },
         }}
       >
         <Box
@@ -252,18 +256,30 @@ const HottestKOLs = () => {
             display: "flex",
             width: "100%",
           }}
+          role="list"
+          aria-label="Danh sách Hot KOLs"
         >
           {hottestKOLs.map((kol, index) => {
             const rank = index + 1;
             const isTopOne = rank === 1;
 
+            /** Nội dung card: bọc ElectricBorder nếu là Top 1 */
+            const handleCardClick = () => navigate(`/kols/${kol.id}`);
+
+            const CardContent = (
+              <Box sx={{ position: "relative", zIndex: 1 }}>
+                <KOLCard {...kol} isHot={kol.isHot} onClick={handleCardClick} />
+              </Box>
+            );
+
             return (
               <Box
                 key={kol.id}
+                role="listitem"
                 sx={{
                   flex: `0 0 ${itemBasis}`,
                   maxWidth: itemBasis,
-                  px: { xs: 1, sm: 1.5 },
+                  px: { xs: 0.75, sm: 1.25, md: 1.5 },
                   boxSizing: "border-box",
                 }}
               >
@@ -271,37 +287,20 @@ const HottestKOLs = () => {
                   component={motion.div}
                   whileHover={{ y: -4, scale: 1.01 }}
                   transition={{ type: "spring", stiffness: 220, damping: 18 }}
-                  sx={{ position: "relative", height: "100%" }}
+                  sx={{
+                    position: "relative",
+                    height: "100%",
+                    overflow: "visible", // đừng cắt hiệu ứng border
+                  }}
                 >
-                  {/* Viền ánh lửa cho TOP 1 */}
-                  {isTopOne && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        inset: { xs: -8, sm: -12 },
-                        borderRadius: 5,
-                        background:
-                          "conic-gradient(from 180deg, rgba(255, 78, 0, 0.8), rgba(255, 196, 0, 0.65), rgba(255, 78, 0, 0.8))",
-                        filter: "blur(12px)",
-                        opacity: 0.9,
-                        zIndex: 0,
-                        animation: "flameSpin 6s linear infinite",
-                        "@keyframes flameSpin": {
-                          from: { transform: "rotate(0deg)" },
-                          to: { transform: "rotate(360deg)" },
-                        },
-                      }}
-                    />
-                  )}
-
                   {/* Huy hiệu thứ hạng */}
                   <Box
                     sx={{
                       position: "absolute",
-                      top: { xs: -18, md: -24 },
-                      right: { xs: 16, md: 24 },
-                      width: { xs: 48, md: 56 },
-                      height: { xs: 48, md: 56 },
+                      top: { xs: -16, md: -22 },
+                      right: { xs: 12, md: 20 },
+                      width: { xs: 42, md: 52 },
+                      height: { xs: 42, md: 52 },
                       borderRadius: "50%",
                       background: isTopOne
                         ? "linear-gradient(135deg, #fb923c, #facc15)"
@@ -311,7 +310,7 @@ const HottestKOLs = () => {
                       alignItems: "center",
                       justifyContent: "center",
                       fontWeight: 800,
-                      fontSize: { xs: "1.125rem", md: "1.25rem" },
+                      fontSize: { xs: "1rem", md: "1.2rem" },
                       boxShadow: isTopOne
                         ? "0 18px 35px rgba(251, 146, 60, 0.45)"
                         : "0 14px 28px rgba(15, 23, 42, 0.25)",
@@ -321,30 +320,41 @@ const HottestKOLs = () => {
                         : "1px solid rgba(255,255,255,0.18)",
                       backdropFilter: isTopOne ? "none" : "blur(2px)",
                     }}
+                    aria-label={`Hạng ${rank}`}
                   >
                     {rank}
                   </Box>
 
                   {/* Thân thẻ */}
-                  <Box sx={{ position: "relative", zIndex: 1 }}>
-                    {/* Truyền props sang KOLCard:
-                        - field giữ nguyên English
-                        - các text hiển thị khác đã chuẩn hoá tiếng Việt có dấu */}
-                    <KOLCard
-                      {...kol}
-                      isHot={kol.isHot}
-                      // Gợi ý: nếu KOLCard có props phụ đề/mô tả, bạn có thể truyền:
-                      // subtitle={`${kol.rating} ★ • ${kol.reviewCount} đánh giá • ${kol.price}`}
-                      // Nếu chưa có, logic tiếng Việt đã nằm trong dữ liệu ở trên.
-                    />
-                  </Box>
+                  {isTopOne ? (
+                    <ElectricBorder
+                      color="#ff4500" // đổi "#CA54CA" nếu muốn theo brand
+                      speed={1}
+                      chaos={0.5}
+                      thickness={2}
+                      style={{ borderRadius: 16 }}
+                    >
+                      <Box
+                        sx={{
+                          position: "relative",
+                          zIndex: 1,
+                          borderRadius: 2,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <KOLCard {...kol} isHot={kol.isHot} onClick={handleCardClick} />
+                      </Box>
+                    </ElectricBorder>
+                  ) : (
+                    CardContent
+                  )}
                 </Box>
               </Box>
             );
           })}
         </Box>
 
-        {/* Chỉ báo trang */}
+        {/* Dots */}
         <Stack
           direction="row"
           spacing={1}
@@ -353,6 +363,7 @@ const HottestKOLs = () => {
             justifyContent: "center",
             alignItems: "center",
             userSelect: "none",
+            px: 1,
           }}
         >
           {Array.from({ length: maxIndex + 1 }).map((_, i) => {
@@ -365,7 +376,7 @@ const HottestKOLs = () => {
                 initial={false}
                 animate={{
                   opacity: active ? 1 : 0.35,
-                  scale: active ? 1 : 0.9,
+                  scale: active ? 1 : 0.95,
                 }}
                 transition={{ duration: 0.25 }}
                 sx={{
@@ -374,6 +385,12 @@ const HottestKOLs = () => {
                   borderRadius: 8,
                   cursor: "pointer",
                   bgcolor: active ? "#0ea5e9" : "#cbd5e1",
+                }}
+                aria-label={`Trang ${i + 1}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setCurrentIndex(i);
                 }}
               />
             );

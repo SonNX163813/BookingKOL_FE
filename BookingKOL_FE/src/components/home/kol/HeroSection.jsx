@@ -7,6 +7,8 @@ import {
   IconButton,
   Stack,
   Chip,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -15,22 +17,16 @@ import StarIcon from "@mui/icons-material/Star";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { motion, AnimatePresence } from "framer-motion";
 
+/** Animations tối giản hơn */
 const textVariants = {
-  initial: { opacity: 0, y: 30, x: -20 },
-  animate: { opacity: 1, y: 0, x: 0 },
-  exit: { opacity: 0, y: -30, x: 20 },
-};
-
-const imageVariants = {
-  initial: { opacity: 0, scale: 0.9, rotate: -2 },
-  animate: { opacity: 1, scale: 1, rotate: 0 },
-  exit: { opacity: 0, scale: 0.9, rotate: 2 },
-};
-
-const cardVariants = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 },
+  exit: { opacity: 0, y: -12 },
+};
+const imageVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.98 },
 };
 
 const HeroSection = () => {
@@ -38,7 +34,6 @@ const HeroSection = () => {
     () => [
       {
         id: "nexus-01",
-        badge: "🔥 HOT TREND",
         title: "Thế Giới Livestream Trong Tay Bạn",
         description:
           "Nexus Social giúp thương hiệu kết nối với người xem qua livestream chuyên nghiệp, giúp tăng trưởng doanh thu và trải nghiệm thật.",
@@ -50,7 +45,6 @@ const HeroSection = () => {
       },
       {
         id: "nexus-02",
-        badge: "⚡ AI POWERED",
         title: "Xây Dựng Chiến Dịch KOC Đa Nền Tảng",
         description:
           "Từ sáng tạo nội dung, quản lý KOL đến tổng hợp dữ liệu, chúng tôi đồng hành để bạn tập trung chốt đơn.",
@@ -62,7 +56,6 @@ const HeroSection = () => {
       },
       {
         id: "nexus-03",
-        badge: "🚀 GROWTH",
         title: "Tối Ưu Đường Đại Cho Thương Hiệu",
         description:
           "Hệ sinh thái partner của Nexus Social giúp bạn tìm đúng giọng nói cho từng nhóm khách hàng mục tiêu.",
@@ -77,6 +70,11 @@ const HeroSection = () => {
   );
 
   const [currentSlide, setCurrentSlide] = useState(0);
+  const theme = useTheme();
+  const upLg = useMediaQuery(theme.breakpoints.up("lg"));
+  const prefersReducedMotion = useMediaQuery(
+    "(prefers-reduced-motion: reduce)"
+  ); // responsive: tôn trọng reduce motion
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -88,7 +86,6 @@ const HeroSection = () => {
   const handlePrev = () => {
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
   };
-
   const handleNext = () => {
     setCurrentSlide((prev) => (prev + 1) % slides.length);
   };
@@ -96,73 +93,65 @@ const HeroSection = () => {
   const slide = slides[currentSlide];
 
   return (
+    // <Box
+    //   sx={{
+    //     position: "relative",
+    //     // responsive: dùng minHeight + clamp thay vì fixed height
+    //     minHeight: { xs: 520, sm: 560, md: 620 },
+    //     display: "flex",
+    //     alignItems: "center",
+    //     overflow: "hidden",
+    //     bgcolor:
+    //       "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
+    //     background:
+    //       "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
+    //     borderRadius: { xs: 3, md: 4 },
+    //     mx: { xs: 2, md: 4 },
+    //     my: { xs: 3, md: 6 },
+    //     boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+    //   }}
+    // >
     <Box
       sx={{
         position: "relative",
-        minHeight: "100vh",
+        // responsive: dùng minHeight + clamp thay vì fixed height
+        minHeight: { xs: 520, sm: 560, md: 620 },
         display: "flex",
         alignItems: "center",
         overflow: "hidden",
+        bgcolor:
+          "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
         background:
           "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
+        borderRadius: { xs: 3, md: 4 },
+        maxWidth: { xs: 500, sm: 900, md: 1500 },
+        mx: "auto", // 👈 Căn giữa ngang
+        my: { xs: 3, md: 3 },
+        px: { xs: 2, md: 4 }, // 👈 padding ngang thay vì margin ngang
+        boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
       }}
     >
-      {/* Animated Background */}
+      {/* Nền động nhẹ nhàng */}
       <Box
         component={motion.div}
-        style={{
-          position: "absolute",
-          inset: 0,
+        style={{ position: "absolute", inset: 0 }}
+        animate={prefersReducedMotion ? {} : { opacity: [0.9, 1, 0.9] }} // responsive
+        transition={
+          prefersReducedMotion
+            ? { duration: 0 }
+            : { duration: 10, repeat: Infinity, ease: "easeInOut" }
+        }
+        sx={{
           background:
-            "radial-gradient(circle at 30% 40%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.15), transparent 50%), radial-gradient(circle at 40% 80%, rgba(132, 90, 223, 0.3), transparent 50%)",
-          willChange: "transform",
+            "radial-gradient(circle at 30% 40%, rgba(255,255,255,0.15), transparent 45%), radial-gradient(circle at 75% 20%, rgba(255,255,255,0.08), transparent 45%)",
         }}
-        animate={{
-          scale: [1, 1.05, 1],
-          rotate: [0, 1, 0],
-        }}
-        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-      />
-
-      {/* Floating Elements */}
-      <Box
-        component={motion.div}
-        sx={{
-          position: "absolute",
-          top: "20%",
-          right: "10%",
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          background: "rgba(255, 255, 255, 0.1)",
-          backdropFilter: "blur(10px)",
-          display: { xs: "none", md: "block" },
-        }}
-        animate={{ y: [-10, 10, -10], rotate: [0, 180, 360] }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-      />
-
-      <Box
-        component={motion.div}
-        sx={{
-          position: "absolute",
-          top: "60%",
-          left: "5%",
-          width: 60,
-          height: 60,
-          borderRadius: "30% 70% 70% 30% / 30% 30% 70% 70%",
-          background: "rgba(251, 146, 60, 0.2)",
-          display: { xs: "none", lg: "block" },
-        }}
-        animate={{ x: [-5, 5, -5], scale: [1, 1.2, 1] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
 
       <Container
         maxWidth="xl"
         sx={{
           position: "relative",
-          py: { xs: 6, md: 10 },
+          py: { xs: 4, md: 6 },
           height: "100%",
           display: "flex",
           alignItems: "center",
@@ -170,24 +159,15 @@ const HeroSection = () => {
       >
         <Box
           sx={{
-            display: "flex",
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", lg: "1.1fr 1fr" },
             alignItems: "center",
-            minHeight: "80vh",
-            gap: { xs: 4, md: 6, lg: 8 },
-            flexDirection: { xs: "column", lg: "row" },
+            gap: { xs: 3, sm: 4, md: 6 }, // responsive: gap mềm hơn
+            width: "100%",
           }}
         >
-          {/* Content Section */}
-          <Box
-            sx={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              maxWidth: { xs: "100%", lg: "50%" },
-              pr: { lg: 4 },
-            }}
-          >
+          {/* Content */}
+          <Box sx={{ maxWidth: { xs: 800, xl: 760 } }}>
             <AnimatePresence mode="wait">
               <Stack
                 key={slide.id}
@@ -196,140 +176,115 @@ const HeroSection = () => {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                spacing={4}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.5 }} // responsive
+                spacing={{ xs: 2.25, md: 3 }} // responsive
               >
-                {/* Badge */}
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.2, duration: 0.5 }}
-                >
-                  <Chip
-                    label={slide.badge}
-                    sx={{
-                      alignSelf: "flex-start",
-                      background:
-                        "linear-gradient(45deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))",
-                      backdropFilter: "blur(10px)",
-                      color: "white",
-                      fontWeight: 600,
-                      fontSize: "0.9rem",
-                      px: 2,
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      "& .MuiChip-label": {
-                        px: 1,
-                      },
-                    }}
-                  />
-                </motion.div>
+                {/* <Chip
+                  label={slide.badge}
+                  sx={{
+                    alignSelf: "flex-start",
+                    background: "rgba(255,255,255,0.18)",
+                    backdropFilter: "blur(8px)",
+                    color: "white",
+                    fontWeight: 600,
+                    fontSize: { xs: "0.8rem", md: "0.85rem" }, // responsive
+                    px: 1,
+                    border: "1px solid rgba(255,255,255,0.25)",
+                  }}
+                /> */}
 
-                {/* Title */}
                 <Typography
                   variant="h1"
                   sx={{
                     fontWeight: 800,
-                    fontSize: {
-                      xs: "2.5rem",
-                      sm: "3.2rem",
-                      md: "4rem",
-                      lg: "4.5rem",
-                      xl: "5rem",
-                    },
-                    lineHeight: { xs: 1.1, md: 1.05 },
+                    // responsive: clamp để tiêu đề xuống dòng đẹp hơn
+                    fontSize: "clamp(1.75rem, 3.8vw + 0.5rem, 3.6rem)",
+                    lineHeight: { xs: 1.15, md: 1.1 },
                     background:
-                      "linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%)",
+                      "linear-gradient(135deg, #ffffff 0%, #f3f5f8 60%, #dfe6ee 100%)",
                     backgroundClip: "text",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
-                    letterSpacing: "-0.02em",
-                    textShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    letterSpacing: "-0.01em",
+                    textShadow: "0 3px 14px rgba(0,0,0,0.08)",
+                    wordBreak: "break-word", // responsive
                   }}
                 >
                   {slide.title}
                 </Typography>
 
-                {/* Description */}
                 <Typography
                   variant="h6"
                   sx={{
-                    color: "rgba(255,255,255,0.9)",
-                    fontSize: { xs: "1.15rem", md: "1.3rem" },
+                    color: "rgba(255,255,255,0.92)",
+                    fontSize: { xs: "0.95rem", md: "1.1rem" }, // responsive
                     lineHeight: 1.7,
-                    maxWidth: { xs: "100%", lg: "85%" },
+                    maxWidth: 680,
                     fontWeight: 400,
                   }}
                 >
                   {slide.description}
                 </Typography>
 
-                {/* Stats Card */}
-                <motion.div
-                  variants={cardVariants}
-                  initial="initial"
-                  animate="animate"
-                  transition={{ delay: 0.4, duration: 0.6 }}
+                <Box
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 1.25,
+                    // responsive: bỏ width cứng 32%
+                    width: "fit-content",
+                    maxWidth: { xs: "100%", sm: "unset" },
+                    background: "rgba(255,255,255,0.12)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    backdropFilter: "blur(10px)",
+                    borderRadius: 2,
+                    px: 2.25,
+                    py: 1.1,
+                  }}
                 >
-                  <Box
+                  <TrendingUpIcon
+                    sx={{ color: "#4ade80", fontSize: { xs: 20, md: 24 } }}
+                  />
+                  <Typography
+                    variant="subtitle1"
                     sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 2,
-                      background: "rgba(255,255,255,0.15)",
-                      backdropFilter: "blur(15px)",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      borderRadius: "20px",
-                      px: 3,
-                      py: 2,
-                      mb: 2,
+                      color: "white",
+                      fontWeight: 700,
+                      fontSize: { xs: "0.95rem", md: "1rem" },
                     }}
                   >
-                    <TrendingUpIcon sx={{ color: "#4ade80", fontSize: 28 }} />
-                    <Box>
-                      <Typography
-                        variant="h5"
-                        sx={{ color: "white", fontWeight: 700 }}
-                      >
-                        {slide.stats.value}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "rgba(255,255,255,0.8)" }}
-                      >
-                        {slide.stats.label}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </motion.div>
+                    {slide.stats.value}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "rgba(255,255,255,0.85)" }}
+                  >
+                    {slide.stats.label}
+                  </Typography>
+                </Box>
 
-                {/* CTA Buttons */}
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
-                  spacing={3}
-                  sx={{ pt: 2 }}
+                  spacing={2}
+                  sx={{ pt: 1 }}
                 >
                   <Button
                     variant="contained"
                     size="large"
                     sx={{
                       background:
-                        "linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 50%, #ffa8a8 100%)",
-                      borderRadius: "50px",
-                      px: { xs: 4, md: 6 },
-                      py: { xs: 2, md: 2.5 },
-                      fontSize: { xs: "1.1rem", md: "1.2rem" },
+                        "linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 80%)",
+                      borderRadius: 999,
+                      // responsive: full width trên mobile
+                      width: { xs: "100%", sm: "auto" },
+                      px: { xs: 3, md: 5 },
+                      py: { xs: 1.25, md: 1.75 },
+                      fontSize: { xs: "0.95rem", md: "1.05rem" },
                       fontWeight: 700,
                       textTransform: "none",
-                      boxShadow: "0 8px 32px rgba(255, 107, 107, 0.4)",
-                      border: "2px solid rgba(255,255,255,0.2)",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(135deg, #ff5252 0%, #ff7979 50%, #ff9ff3 100%)",
-                        transform: "translateY(-3px)",
-                        boxShadow: "0 12px 40px rgba(255, 107, 107, 0.6)",
-                      },
-                      transition:
-                        "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+                      boxShadow: "0 8px 24px rgba(255, 107, 107, 0.35)",
+                      "&:hover": { transform: "translateY(-2px)" },
+                      transition: "all .25s ease",
                     }}
                   >
                     <StarIcon sx={{ mr: 1 }} />
@@ -341,119 +296,105 @@ const HeroSection = () => {
                     size="large"
                     sx={{
                       color: "white",
-                      borderColor: "rgba(255,255,255,0.3)",
-                      borderRadius: "50px",
-                      px: { xs: 4, md: 5 },
-                      py: { xs: 2, md: 2.5 },
-                      fontSize: { xs: "1rem", md: "1.1rem" },
+                      borderColor: "rgba(255,255,255,0.35)",
+                      borderRadius: 999,
+                      width: { xs: "100%", sm: "auto" }, // responsive
+                      px: { xs: 3, md: 4.25 },
+                      py: { xs: 1.25, md: 1.75 },
+                      fontSize: { xs: "0.95rem", md: "1rem" },
                       fontWeight: 600,
                       textTransform: "none",
                       background: "rgba(255,255,255,0.05)",
-                      backdropFilter: "blur(10px)",
+                      backdropFilter: "blur(8px)",
                       "&:hover": {
                         borderColor: "rgba(255,255,255,0.6)",
-                        background: "rgba(255,255,255,0.15)",
+                        background: "rgba(255,255,255,0.12)",
                         transform: "translateY(-2px)",
                       },
-                      transition: "all 0.3s ease",
+                      transition: "all .25s ease",
                     }}
                   >
                     <PlayArrowIcon sx={{ mr: 1 }} />
                     {slide.secondaryLabel}
                   </Button>
                 </Stack>
+
+                {/* Navigation + Indicators */}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={2}
+                  sx={{ pt: { xs: 2, md: 3 }, flexWrap: "wrap", rowGap: 1.5 }} // responsive
+                >
+                  <IconButton
+                    onClick={handlePrev}
+                    sx={{
+                      color: "white",
+                      background: "rgba(255,255,255,0.12)",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      width: 44,
+                      height: 44,
+                      "&:hover": { background: "rgba(255,255,255,0.2)" },
+                      transition: "all .2s",
+                    }}
+                    aria-label="Previous slide" // a11y
+                  >
+                    <ChevronLeftIcon />
+                  </IconButton>
+
+                  <IconButton
+                    onClick={handleNext}
+                    sx={{
+                      color: "white",
+                      background: "rgba(255,255,255,0.12)",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      width: 44,
+                      height: 44,
+                      "&:hover": { background: "rgba(255,255,255,0.2)" },
+                      transition: "all .2s",
+                    }}
+                    aria-label="Next slide" // a11y
+                  >
+                    <ChevronRightIcon />
+                  </IconButton>
+
+                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    {" "}
+                    {/* responsive */}
+                    {slides.map((item, index) => {
+                      const active = index === currentSlide;
+                      return (
+                        <Box
+                          key={item.id}
+                          onClick={() => setCurrentSlide(index)}
+                          role="button"
+                          aria-label={`Go to slide ${index + 1}`}
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ")
+                              setCurrentSlide(index);
+                          }}
+                          sx={{
+                            width: active ? 28 : 10,
+                            height: 8,
+                            borderRadius: 999,
+                            cursor: "pointer",
+                            background: active
+                              ? "linear-gradient(90deg, #ff6b6b, #4ecdc4)"
+                              : "rgba(255,255,255,0.55)",
+                            transition: "all .3s cubic-bezier(.4,0,.2,1)",
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                </Stack>
               </Stack>
             </AnimatePresence>
+          </Box>
 
-            {/* Navigation */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                mt: { xs: 6, md: 8 },
-              }}
-            >
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <IconButton
-                  onClick={handlePrev}
-                  sx={{
-                    color: "white",
-                    background: "rgba(255,255,255,0.1)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    width: 50,
-                    height: 50,
-                    "&:hover": {
-                      background: "rgba(255,255,255,0.2)",
-                      transform: "scale(1.1)",
-                    },
-                    transition: "all 0.3s ease",
-                  }}
-                >
-                  <ChevronLeftIcon fontSize="large" />
-                </IconButton>
-
-                <IconButton
-                  onClick={handleNext}
-                  sx={{
-                    color: "white",
-                    background: "rgba(255,255,255,0.1)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    width: 50,
-                    height: 50,
-                    "&:hover": {
-                      background: "rgba(255,255,255,0.2)",
-                      transform: "scale(1.1)",
-                    },
-                    transition: "all 0.3s ease",
-                  }}
-                >
-                  <ChevronRightIcon fontSize="large" />
-                </IconButton>
-              </Box>
-
-              {/* Slide Indicators */}
-              <Box sx={{ display: "flex", gap: 2 }}>
-                {slides.map((item, index) => (
-                  <Box
-                    key={item.id}
-                    onClick={() => setCurrentSlide(index)}
-                    sx={{
-                      width: index === currentSlide ? 40 : 12,
-                      height: 12,
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      background:
-                        index === currentSlide
-                          ? "linear-gradient(90deg, #ff6b6b, #4ecdc4)"
-                          : "rgba(255,255,255,0.4)",
-                      transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-                      "&:hover": {
-                        background:
-                          index === currentSlide
-                            ? "linear-gradient(90deg, #ff6b6b, #4ecdc4)"
-                            : "rgba(255,255,255,0.7)",
-                        transform: "scale(1.2)",
-                      },
-                    }}
-                  />
-                ))}
-              </Box>
-            </Box>
-          </Box>{" "}
-          {/* <-- đúng: đóng Content Box */}
-          {/* Image Section */}
-          <Box
-            sx={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-            }}
-          >
+          {/* Image */}
+          <Box sx={{ position: "relative", width: "100%" }}>
             <AnimatePresence mode="wait">
               <Box
                 key={slide.image}
@@ -462,129 +403,69 @@ const HeroSection = () => {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                transition={{
-                  duration: 1,
-                  ease: [0.25, 0.46, 0.45, 0.94],
-                }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.6 }} // responsive
                 sx={{
                   position: "relative",
                   width: "100%",
-                  maxWidth: 600,
-                  height: { xs: 400, md: 500, lg: 600 },
+                  maxWidth: { xs: "100%", lg: 620 }, // responsive
+                  ml: { lg: "auto" },
+                  // responsive: áp tỷ lệ ảnh để tránh nhảy layout
+                  aspectRatio: { xs: "4 / 3", sm: "16 / 10", md: "16 / 9" },
                 }}
               >
-                {/* Main Image */}
                 <Box
                   component="img"
                   src={slide.image}
                   alt={slide.title}
+                  loading="lazy" // responsive: hiệu năng
+                  srcSet={`${slide.image} 1x`}
+                  sizes="(max-width: 600px) 100vw, 50vw"
                   sx={{
                     width: "100%",
                     height: "100%",
                     objectFit: "cover",
-                    borderRadius: "30px",
-                    boxShadow: "0 25px 60px rgba(0,0,0,0.3)",
-                    border: "3px solid rgba(255,255,255,0.2)",
+                    display: "block",
+                    borderRadius: 4,
+                    boxShadow: "0 18px 48px rgba(0,0,0,0.28)",
+                    border: "2px solid rgba(255,255,255,0.18)",
                   }}
                 />
-
-                {/* Overlay */}
-                <Box
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: "30px",
-                    background:
-                      "linear-gradient(to top, rgba(0,0,0,0.4), transparent 60%)",
-                  }}
-                />
-
-                {/* Floating Cards */}
-                <motion.div
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.8, duration: 0.6 }}
-                  style={{
-                    position: "absolute",
-                    top: "20%",
-                    right: "-15%",
-                    display: window.innerWidth > 1200 ? "block" : "none",
-                  }}
-                >
+                {/* Card nhỏ – chỉ hiển thị ở lg trở lên để gọn gàng */}
+                {upLg && (
                   <Box
                     sx={{
+                      position: "absolute",
+                      right: { lg: -20, xl: -10 }, // responsive
+                      top: "12%",
                       background: "rgba(255,255,255,0.95)",
-                      backdropFilter: "blur(20px)",
-                      borderRadius: "20px",
-                      p: 3,
-                      boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      minWidth: 200,
-                    }}
-                  >
-                    <Typography
-                      variant="h6"
-                      sx={{ color: "#333", fontWeight: 700 }}
-                    >
-                      Live Views
-                    </Typography>
-                    <Typography
-                      variant="h4"
-                      sx={{ color: "#ff6b6b", fontWeight: 800 }}
-                    >
-                      2.5M
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: "#666" }}>
-                      Đang xem trực tiếp
-                    </Typography>
-                  </Box>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, x: -50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 1, duration: 0.6 }}
-                  style={{
-                    position: "absolute",
-                    bottom: "15%",
-                    left: "-12%",
-                    display: window.innerWidth > 1200 ? "block" : "none",
-                  }}
-                >
-                  <Box
-                    sx={{
-                      background: "rgba(255,255,255,0.95)",
-                      backdropFilter: "blur(20px)",
-                      borderRadius: "20px",
-                      p: 3,
-                      boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-                      border: "1px solid rgba(255,255,255,0.2)",
+                      border: "1px solid rgba(0,0,0,0.06)",
+                      borderRadius: 2,
+                      p: { lg: 1.75, xl: 2 }, // responsive
+                      boxShadow: "0 12px 28px rgba(0,0,0,0.12)",
                       minWidth: 180,
                     }}
                   >
                     <Typography
-                      variant="h6"
-                      sx={{ color: "#333", fontWeight: 700 }}
+                      variant="subtitle2"
+                      sx={{ color: "#444", fontWeight: 700 }}
                     >
-                      Revenue
+                      Live Views
                     </Typography>
                     <Typography
-                      variant="h4"
-                      sx={{ color: "#4ecdc4", fontWeight: 800 }}
+                      variant="h5"
+                      sx={{ color: "#ff6b6b", fontWeight: 800 }}
                     >
-                      +150%
+                      2.5M
                     </Typography>
-                    <Typography variant="body2" sx={{ color: "#666" }}>
-                      Tăng trưởng tháng này
+                    <Typography variant="caption" sx={{ color: "#666" }}>
+                      Đang xem trực tiếp
                     </Typography>
                   </Box>
-                </motion.div>
+                )}
               </Box>
             </AnimatePresence>
-          </Box>{" "}
-          {/* <-- đúng: đóng Image Section Box */}
-        </Box>{" "}
-        {/* <-- đóng khối flex container */}
+          </Box>
+        </Box>
       </Container>
     </Box>
   );
