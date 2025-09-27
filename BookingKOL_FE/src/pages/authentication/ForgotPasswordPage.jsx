@@ -1,48 +1,25 @@
 import { useState } from "react";
-import "./login.css"; // style chung (login + register)
-import "./register.css"; // style riêng cho Register
+import "./login.css"; // tái dùng toàn bộ style hiện có
 import logo from "../../assets/logocty.png";
-import googleLogo from "../../assets/google_logo.svg.png";
+import googleLogo from "../../assets/google_logo.svg.png"; // không dùng, nhưng để sẵn nếu muốn SSO khôi phục
 
-export default function RegisterPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [agree, setAgree] = useState(true);
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const next = {};
-    if (!fullName.trim()) next.fullName = "Vui lòng nhập họ tên";
-    if (!email.trim()) next.email = "Vui lòng nhập email";
-
-    const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
-    if (!strong.test(password)) {
-      next.password =
-        "Mật khẩu ≥ 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt";
-    }
-    if (confirm !== password) next.confirm = "Mật khẩu nhập lại không khớp";
-    if (!agree) next.agree = "Bạn cần đồng ý Điều khoản & Riêng tư";
-
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  };
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!validate()) return;
-    alert(
-      `UI-only: Đăng ký tài khoản cho ${fullName} (${email}). Hãy gắn API register tại đây.`
-    );
-  };
-
-  const handleGoogleSignup = () => {
-    alert("UI-only: Gắn đăng ký với Google sau.");
+    // UI-only demo
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setSent(true);
+    }, 800);
   };
 
   return (
-    <div className="login-wrap register-page">
+    <div className="login-wrap forgot-page">
       {/* LEFT */}
       <section className="left-hero">
         <div className="brand">
@@ -53,6 +30,7 @@ export default function RegisterPage() {
           THẾ GIỚI LIVESTREAM <br /> TRONG TAY BẠN <br />
           <span className="highlight">HÃY TẬN HƯỞNG</span>
         </h1>
+
         <div className="stats">
           <div>
             <b>20 Triệu</b>
@@ -72,6 +50,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
+        {/* Wave giữ nguyên */}
         <svg
           className="hero-wave"
           width="100%"
@@ -132,91 +111,53 @@ export default function RegisterPage() {
       </section>
 
       {/* RIGHT */}
-      <section className="right-card register">
+      <section className="right-card">
         <div className="login-header">
           <img src={logo} alt="Logo" className="login-logo-top" />
-          <h2 className="login-title">Đăng ký</h2>
-          <p className="login-sub">Tạo tài khoản để bắt đầu khám phá.</p>
+          <h2 className="login-title">Quên mật khẩu</h2>
+          <p className="login-sub">
+            Nhập email đã đăng ký. Chúng tôi sẽ gửi liên kết đặt lại mật khẩu.
+          </p>
         </div>
 
-        <form className="form" onSubmit={handleSubmit} noValidate>
-          <label className="lbl">Họ và tên</label>
-          <input
-            className={`input ${errors.fullName ? "input-error" : ""}`}
-            type="text"
-            placeholder="Họ và Tên của bạn"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
-          {errors.fullName && <p className="err-msg">{errors.fullName}</p>}
-
-          <label className="lbl">Email</label>
-          <input
-            className={`input ${errors.email ? "input-error" : ""}`}
-            type="email"
-            placeholder="Email của bạn"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          {errors.email && <p className="err-msg">{errors.email}</p>}
-
-          <label className="lbl">Mật khẩu</label>
-          <input
-            className={`input ${errors.password ? "input-error" : ""}`}
-            type="password"
-            placeholder="Tạo mật khẩu mạnh"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          {errors.password && <p className="err-msg">{errors.password}</p>}
-
-          <label className="lbl">Nhập lại mật khẩu</label>
-          <input
-            className={`input ${errors.confirm ? "input-error" : ""}`}
-            type="password"
-            placeholder="Nhập lại mật khẩu"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            required
-          />
-          {errors.confirm && <p className="err-msg">{errors.confirm}</p>}
-
-          <div className="remember-forgot">
-            <label>
-              <input
-                type="checkbox"
-                checked={agree}
-                onChange={(e) => setAgree(e.target.checked)}
-              />
-              Tôi đồng ý <a href="#">Điều Khoản Dịch Vụ</a> và{" "}
-              <a href="#">Thoả Thuận Riêng Tư</a>
-            </label>
+        {sent ? (
+          <div className="form" style={{ maxWidth: "420px", margin: "0 auto" }}>
+            <div className="alert alert-success">
+              ✅ Liên kết đặt lại đã được gửi tới <b>{email}</b> (nếu email tồn
+              tại).
+              <div className="muted-note">
+                Vui lòng kiểm tra hộp thư đến hoặc thư mục Spam/Promotions.
+              </div>
+            </div>
+            <a className="primary-btn" href="/login">
+              Quay lại đăng nhập
+            </a>
           </div>
-          {errors.agree && <p className="err-msg">{errors.agree}</p>}
+        ) : (
+          <form className="form" onSubmit={handleSubmit}>
+            <label className="lbl">Email</label>
+            <input
+              className="input"
+              type="email"
+              placeholder="Email của bạn"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
 
-          <button className="primary-btn" type="submit">
-            Tạo tài khoản
-          </button>
+            <button className="primary-btn" type="submit" disabled={loading}>
+              {loading ? "Đang gửi..." : "Gửi liên kết đặt lại"}
+            </button>
 
-          <div className="divider">
-            <span>Hoặc</span>
-          </div>
+            <div className="divider">
+              <span>Hoặc</span>
+            </div>
 
-          <button
-            type="button"
-            className="google-btn"
-            onClick={handleGoogleSignup}
-          >
-            <img src={googleLogo} alt="Google" className="gicon-img" />
-            Đăng ký bằng Google
-          </button>
-
-          <div className="register-link">
-            Đã có tài khoản? <a href="login">Đăng nhập</a>
-          </div>
-        </form>
+            <div className="register-link">
+              Nhớ mật khẩu rồi? <a href="/login">Đăng nhập</a>
+            </div>
+          </form>
+        )}
       </section>
     </div>
   );

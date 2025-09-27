@@ -120,6 +120,7 @@ body {
   flex-direction: column;
   justify-content: center;
   position: relative;
+  margin-top: -150px;
 }
 
 /* Header form: logo + tiêu đề căn giữa */
@@ -131,14 +132,13 @@ body {
   width: 190px;
   height: 190px;
   object-fit: contain;
-  margin: 5px auto 10px;
+  margin: 0px auto -20px;
 }
 .login-title {
   margin: 0;
   font-weight: 700;
   font-size: 26px;
   color: #0f172a;
-  margin-top: 80px;
 }
 .login-sub {
   margin: 6px 0 18px;
@@ -269,7 +269,7 @@ input[type="checkbox"] {
 }
 
 .remember-forgot a {
-  color: var(--blue);
+  color: #37a25a;
   text-decoration: none;
   font-weight: 500;
 }
@@ -338,6 +338,26 @@ input[type="checkbox"] {
   /* PNG có nền thừa → cắt bớt viền */
   clip-path: inset(6% 6% 6% 6%);
 }
+.alert {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.alert-success {
+  background: #f0fdf4; /* xanh nhạt */
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
+.muted-note {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
 
 /* {---- mobile ------} */
 
@@ -390,8 +410,8 @@ input[type="checkbox"] {
   }
   .logo,
   .login-logo-top {
-    width: 120px;
-    height: 120px;
+    width: 140px;
+    height: 140px;
   }
   .hero-wave {
     max-height: 22%;
@@ -427,8 +447,8 @@ input[type="checkbox"] {
 
   /* thu nhỏ header/logo */
   .login-logo-top {
-    width: 120px;
-    height: 120px;
+    width: 140px;
+    height: 140px;
   }
   .login-title {
     font-size: 22px;
@@ -494,8 +514,8 @@ input[type="checkbox"] {
   }
 
   .login-logo-top {
-    width: 96px;
-    height: 96px;
+    width: 140px;
+    height: 140px;
   }
   .login-title {
     font-size: 20px;
@@ -600,5 +620,73 @@ input[type="checkbox"] {
 @media (min-width: 768px) and (max-width: 1024px) {
   .left-hero h1 {
     margin-top: 400px; /* đẩy chữ xuống thêm */
+  }
+}
+
+/* ===== Chỉ áp cho trang Forgot Password ===== */
+@media (min-width: 1024px) {
+  /* Dịch cụm bên phải (form) lên 50px trên desktop */
+  .forgot-page .right-card {
+    /* Chọn 1 trong 2: margin-top âm (thay đổi layout) hoặc translate (không đổi flow) */
+
+    /* Cách 1 - Dễ hiểu, thay đổi layout: */
+    margin-top: -200px;
+
+    /* Cách 2 - Không đổi flow, chỉ dịch thị giác: */
+    /* transform: translateY(-50px); */
+  }
+}
+
+/* Tablet (768–1023px): dịch nhẹ hơn 30px cho cân */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .forgot-page .right-card {
+    margin-top: -30px; /* hoặc translateY(-30px) nếu bạn chọn cách 2 */
+  }
+}
+
+/* Mobile ≤ 767px: giữ nguyên để không đè logo/tiêu đề */
+@media (max-width: 767px) {
+  .forgot-page .right-card {
+    margin-top: 0; /* hoặc remove translate */
+    transform: none;
+  }
+}
+/* ==== Overrides theo yêu cầu ==== */
+
+/* ≤1000px: chỉ còn 1 cột, ẩn left-hero, logo top cách 30px */
+@media (max-width: 1000px) {
+  .login-wrap {
+    grid-template-columns: 1fr;
+    min-height: 100dvh;
+  }
+
+  .left-hero {
+    display: none !important;
+  }
+
+  .right-card {
+    padding: 28px 20px;
+    justify-content: flex-start;
+    margin-top: 0; /* reset âm margin trên mobile nếu có */
+  }
+
+  .login-logo-top {
+    margin-top: 30px; /* logo trên mobile cách trên 30px */
+  }
+}
+
+/* >1000px: hiển thị 2 cột như desktop */
+@media (min-width: 1001px) {
+  .login-wrap {
+    grid-template-columns: 50% 50%;
+  }
+  .left-hero {
+    display: block;
+  }
+}
+/* Mobile rất nhỏ (≤500px): logo không có khoảng cách trên */
+@media (max-width: 500px) {
+  .login-logo-top {
+    margin-top: -20px !important;
   }
 }

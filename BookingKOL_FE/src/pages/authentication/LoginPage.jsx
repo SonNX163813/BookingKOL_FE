@@ -32,20 +32,20 @@ export default function LoginPage() {
 
         <div className="stats">
           <div>
-            <b>200Tr+</b>
-            <span>Dữ liệu sản phẩm</span>
+            <b>20 Triệu</b>
+            <span>Số lượng quảng cáo trung bình hàng năm</span>
           </div>
           <div>
-            <b>250Tr+</b>
-            <span>Dữ liệu nhà sáng tạo</span>
+            <b>10 Triệu</b>
+            <span>Số người theo dõi của người sáng tạo độc quyền</span>
           </div>
           <div>
-            <b>400Tr+</b>
-            <span>Dữ liệu Video & Livestream</span>
+            <b>100 tài khoản</b>
+            <span>Quản lý tài khoản thương hiệu và idol</span>
           </div>
           <div>
-            <b>1000 ngày</b>
-            <span>Dữ liệu lịch sử</span>
+            <b>500 Triệu </b>
+            <span>Lượt xem quảng cáo đang chạy</span>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export default function LoginPage() {
               />
               Giữ tôi luôn đăng nhập
             </label>
-            <a href="#" className="forgot-link">
+            <a href="forgotpassword" className="forgot-link">
               Quên mật khẩu?
             </a>
           </div>
@@ -173,7 +173,7 @@ export default function LoginPage() {
             Đăng nhập bằng Google
           </button>
           <div className="register-link">
-            Bạn chưa có tài khoản? <a href="#">Đăng ký</a>
+            Bạn chưa có tài khoản? <a href="register">Đăng ký</a>
           </div>
 
           <div className="terms">
