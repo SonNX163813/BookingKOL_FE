@@ -9,7 +9,7 @@ const Routers = () => {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/kols/:kolId" element={<KOLDetail />} />
+      <Route path="/kols/:kolId/:kolName" element={<KOLDetail />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* <Route path="/infomation" element={<Infomation />} />
@@ -19,3 +19,4 @@ const Routers = () => {
 };
 
 export default Routers;
+

@@ -14,6 +14,7 @@ import {
   useScrollTrigger,
   ListItemIcon,
 } from "@mui/material";
+import { Link } from "react-router-dom";
 import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
@@ -73,11 +74,22 @@ const Navbar = () => {
             {/* Logo */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Box
-                component="img"
-                src={logoweb}
-                alt="KOLBook Logo"
-                sx={{ height: 40, width: "auto" }}
-              />
+                component={Link}
+                to="/"
+                aria-label="Về trang chủ"
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <Box
+                  component="img"
+                  src={logoweb}
+                  alt="KOLBook Logo"
+                  sx={{ height: 40, width: "auto", display: "block" }}
+                />
+              </Box>
             </Box>
 
             {/* Nav desktop */}

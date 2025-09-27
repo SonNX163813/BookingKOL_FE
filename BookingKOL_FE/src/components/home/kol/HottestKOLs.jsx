@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import KOLCard from "./KOLCard";
 import hotkolimg from "../../../assets/hotkol.png";
 import ElectricBorder from "../../UI/electricBorder/ElectricBorder";
+import { slugify } from "../../../utils/slugify";
 
 const HottestKOLs = () => {
   const theme = useTheme();
@@ -264,7 +265,10 @@ const HottestKOLs = () => {
             const isTopOne = rank === 1;
 
             /** Nội dung card: bọc ElectricBorder nếu là Top 1 */
-            const handleCardClick = () => navigate(`/kols/${kol.id}`);
+            const handleCardClick = () => {
+              const slug = slugify(kol.name) || kol.id;
+              navigate(`/kols/${kol.id}/${slug}`);
+            };
 
             const CardContent = (
               <Box sx={{ position: "relative", zIndex: 1 }}>
@@ -402,3 +406,4 @@ const HottestKOLs = () => {
 };
 
 export default HottestKOLs;
+

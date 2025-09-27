@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import KOLCard from "./KOLCard";
 import hotkolimg from "../../../assets/hotkol.png";
+import { slugify } from "../../../utils/slugify";
 
 const popularKOLs = [
   {
@@ -126,7 +127,10 @@ const PopularKOLs = () => {
               >
                 <KOLCard
                   {...kol}
-                  onClick={() => navigate(`/kols/${kol.id}`)}
+                  onClick={() => {
+                    const slug = slugify(kol.name) || kol.id;
+                    navigate(`/kols/${kol.id}/${slug}`);
+                  }}
                   mediaContainerSx={{
                     minHeight: { xs: 220, sm: 240, md: 260 },
                     height: "auto",
@@ -142,3 +146,4 @@ const PopularKOLs = () => {
 };
 
 export default PopularKOLs;
+
