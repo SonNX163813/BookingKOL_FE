@@ -1,0 +1,703 @@
+:root {
+  --blue: #0f78ff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --bg: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: "Montserrat", Inter, system-ui, -apple-system, Segoe UI, Roboto,
+    sans-serif;
+  color: var(--text);
+}
+.error-text {
+  color: #e53935; /* đỏ */
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+/* layout 2 cột */
+.login-wrap {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* LEFT HERO */
+.left-hero {
+  padding: 56px 56px 0;
+  background: linear-gradient(to bottom, #ffffff 0%, #ffffff 40%);
+  color: #000;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Logo trái trên trong left hero */
+.brand {
+  position: absolute;
+  top: 16px;
+  left: 32px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  z-index: 2;
+}
+.logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+}
+
+/* Wave */
+.hero-wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: auto; /* thay vì fix 280px */
+  max-height: 30%; /* để tỉ lệ ổn định */
+  z-index: 0; /* nằm dưới content */
+}
+
+/* Tiêu đề lớn bên trái: gradient xanh */
+.left-hero h1 {
+  font-size: 48px;
+  line-height: 1.2;
+  margin: 160px auto 28px;
+  text-align: center;
+  font-weight: 700;
+  max-width: 100%;
+  text-transform: none;
+  background: linear-gradient(90deg, #145829, #37a25a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.left-hero h1 .highlight {
+  background: linear-gradient(90deg, #145829, #37a25a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  max-width: 980px;
+  margin: 0 20px 24px;
+  text-align: center;
+  z-index: 5;
+  position: relative;
+}
+/* Input có lỗi: border đỏ + outline đỏ khi focus */
+.input-error {
+  border-color: #dc2626 !important;
+  outline-color: rgba(220, 38, 38, 0.35) !important;
+}
+
+.stats b {
+  font-size: 22px; /* nhỏ hơn so với 22px cũ */
+  margin-bottom: 4px; /* tạo khoảng cách giữa số và chữ mô tả */
+}
+
+.stats span {
+  font-size: 14px; /* chữ mô tả nhỏ gọn lại */
+  line-height: 1.4;
+}
+
+.stats b {
+  display: block;
+  font-size: 24px;
+}
+.stats span {
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+/* RIGHT CARD */
+.right-card {
+  background: #fff;
+  padding: 56px 56px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  margin-top: -150px;
+}
+
+/* Header form: logo + tiêu đề căn giữa */
+.login-header {
+  text-align: center;
+  margin-bottom: 1px;
+}
+.login-logo-top {
+  width: 190px;
+  height: 190px;
+  object-fit: contain;
+  margin: 0px auto -20px;
+}
+.login-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 26px;
+  color: #0f172a;
+}
+.login-sub {
+  margin: 6px 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.lang {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.register-link {
+  text-align: center;
+
+  font-size: 14px;
+  margin-top: 16px;
+  color: var(--muted);
+}
+
+.register-link a {
+  color: #37a25a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+}
+
+.terms {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.terms a {
+  color: #37a25a;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.terms a:hover {
+  text-decoration: underline;
+}
+
+/* FORM */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 100%; /* giới hạn chiều rộng form để gọn mắt */
+  width: 100%;
+  margin: 0 auto;
+}
+.lbl {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.pw-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+/* Mặc định */
+.forgot-link {
+  color: #145829 !important; /* màu luôn hiển thị */
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none; /* bỏ gạch chân */
+  transition: color 0.2s ease;
+}
+
+/* Khi hover */
+.forgot-link:hover {
+  color: #37a25a !important; /* đổi sang xanh sáng hơn */
+  text-decoration: underline;
+}
+
+.input {
+  width: 100%; /* <- thay vì 620px */
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px 12px;
+  outline: none;
+  background: #fff;
+  font-size: 16px;
+}
+.input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(15, 120, 255, 0.15);
+}
+
+.input::placeholder {
+  text-align: left; /* luôn căn trái */
+  padding-left: 6px; /* thêm chút khoảng cách nhỏ để không dính sát viền */
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.remember-forgot {
+  display: flex;
+  justify-content: space-between; /* trái & phải */
+  align-items: center;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.remember-forgot label {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* khoảng cách giữa checkbox và text */
+  color: var(--muted);
+}
+input[type="checkbox"] {
+  accent-color: #37a25a;
+}
+
+.remember-forgot a {
+  color: #37a25a;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* Nút Đăng nhập: gradient xanh */
+.primary-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #37a25a, #145829);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  border: 0;
+  cursor: pointer;
+  transition: transform 0.06s ease, filter 0.2s ease;
+  margin-top: 8px;
+}
+.primary-btn:hover {
+  filter: brightness(0.97);
+  transform: translateY(-1px);
+}
+.primary-btn:active {
+  transform: translateY(0);
+}
+
+/* Divider */
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  background: var(--border);
+  display: block;
+}
+
+/* Nút Google: chuẩn hoá, căn giữa icon + chữ, không viền */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 0;
+  background: #f8fafc;
+  font-weight: 600;
+}
+.google-btn:hover {
+  background: #f1f5f9;
+}
+.gicon-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+  margin-left: -5px; /* bạn muốn đẩy trái 5px */
+  /* PNG có nền thừa → cắt bớt viền */
+  clip-path: inset(6% 6% 6% 6%);
+}
+.alert {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.alert-success {
+  background: #f0fdf4; /* xanh nhạt */
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
+.muted-note {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* {---- mobile ------} */
+
+/* ========== Mobile-first tweaks ========== */
+
+/* 1) Chữ lớn mượt hơn trên mọi màn hình */
+.left-hero h1 {
+  /* thay size cứng bằng clamp để tự co giãn */
+  font-size: clamp(26px, 6vw, 48px);
+  margin: clamp(80px, 18vh, 160px) auto 20px;
+}
+
+/* 2) Giới hạn độ rộng nội dung form cho đỡ “tràn” */
+.right-card .form,
+.right-card .login-header,
+.register-link,
+.terms {
+  max-width: 420px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 3) Ẩn bớt chi tiết rườm rà khi hẹp */
+.stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 768px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr); /* 2 cột thay vì 4 */
+  }
+  .stats b {
+    font-size: 16px;
+  }
+  .stats span {
+    font-size: 12px;
+  }
+}
+
+/* ====== Breakpoint: tablet trở xuống (≤ 1024px) ====== */
+@media (max-width: 1024px) {
+  .left-hero,
+  .right-card {
+    padding: 36px 28px 0;
+  }
+  .brand {
+    top: 12px;
+    left: 16px;
+  }
+  .logo,
+  .login-logo-top {
+    width: 140px;
+    height: 140px;
+  }
+  .hero-wave {
+    max-height: 22%;
+  }
+  .input {
+    padding: 14px 14px;
+    font-size: 15px;
+  }
+  .primary-btn,
+  .google-btn {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+}
+
+/* ====== Breakpoint: mobile lớn (≤ 768px) ====== */
+/* Chuyển 2 cột -> 1 cột, đưa form lên trước (UX tốt hơn) */
+@media (max-width: 768px) {
+  .login-wrap {
+    grid-template-columns: 1fr; /* 1 cột */
+    min-height: 100dvh; /* cao trọn màn */
+  }
+
+  /* sắp xếp: form ở trên, hero ở dưới */
+  .right-card {
+    order: 1;
+    padding: 28px 20px 20px;
+  }
+  .left-hero {
+    order: 2;
+    padding: 24px 20px 0;
+  }
+
+  /* thu nhỏ header/logo */
+  .login-logo-top {
+    width: 140px;
+    height: 140px;
+  }
+  .login-title {
+    font-size: 22px;
+  }
+  .login-sub {
+    font-size: 13px;
+  }
+
+  /* thống kê: 2 cột, chữ nhỏ hơn */
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stats b {
+    font-size: 18px;
+  }
+  .stats span {
+    font-size: 12px;
+  }
+
+  /* hero wave thấp hơn để không che nội dung */
+  .hero-wave {
+    max-height: 18%;
+  }
+
+  /* brand/logo góc trái gọn lại */
+  .brand {
+    gap: 8px;
+  }
+  .logo {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+/* ====== Breakpoint: mobile nhỏ (≤ 480px) ====== */
+@media (max-width: 480px) {
+  .left-hero {
+    padding: 18px 16px 0;
+  }
+  .right-card {
+    padding: 20px 16px 16px;
+  }
+
+  .left-hero h1 {
+    font-size: clamp(22px, 7.5vw, 26px);
+    margin: 64px auto 16px;
+  }
+
+  /* ẩn stats nếu màn quá nhỏ cho thoáng mắt */
+  .stats {
+    display: none;
+  }
+
+  .brand {
+    top: 8px;
+    left: 12px;
+  }
+  .logo {
+    width: 80px;
+    height: 80px;
+  }
+
+  .login-logo-top {
+    width: 140px;
+    height: 140px;
+  }
+  .login-title {
+    font-size: 20px;
+  }
+  .login-sub {
+    font-size: 12px;
+  }
+
+  .input {
+    padding: 12px 12px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+  .primary-btn,
+  .google-btn {
+    padding: 12px 14px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .divider {
+    margin: 8px 0;
+    font-size: 12px;
+  }
+  .remember-forgot {
+    font-size: 13px;
+  }
+  .forgot-link {
+    font-size: 13px;
+  }
+  .terms,
+  .register-link {
+    font-size: 12px;
+  }
+
+  /* wave rất thấp để không đè chữ */
+  .hero-wave {
+    max-height: 14%;
+  }
+}
+
+/* ====== Breakpoint: siêu nhỏ (≤ 360px) ====== */
+@media (max-width: 360px) {
+  .left-hero h1 {
+    font-size: 20px;
+  }
+  .login-title {
+    font-size: 18px;
+  }
+  .input {
+    font-size: 13px;
+  }
+  .primary-btn,
+  .google-btn {
+    font-size: 13px;
+  }
+}
+
+/* ===== Điện thoại nhỏ (≤ 576px): ẩn hẳn left hero, chỉ còn form ===== */
+@media (max-width: 576px) {
+  .login-wrap {
+    grid-template-columns: 1fr; /* 1 cột */
+    min-height: 100dvh;
+  }
+  .left-hero {
+    display: none !important; /* ẩn hero bên trái */
+  }
+  .right-card {
+    padding: 28px 20px;
+    min-height: 100dvh; /* full cao màn */
+    justify-content: flex-start; /* form bắt đầu từ trên */
+  }
+}
+
+/* ===== Tablet (577–1023px): xếp 1 cột, vẫn hiển thị left hero bên dưới form (tùy chọn) ===== */
+@media (min-width: 577px) and (max-width: 1023px) {
+  .login-wrap {
+    grid-template-columns: 1fr; /* 1 cột */
+  }
+  .right-card {
+    order: 1;
+  }
+  .left-hero {
+    order: 2;
+  } /* hero dưới form, không chiếm chỗ quá nhiều */
+}
+
+/* ===== Màn lớn (≥ 1024px): hiển thị 2 cột như desktop ===== */
+@media (min-width: 1024px) {
+  .login-wrap {
+    grid-template-columns: 50% 50%;
+  }
+  .left-hero {
+    display: block;
+  }
+}
+
+@media (max-width: 1024px) {
+}
+
+/* iPad / Tablet ngang (768px – 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .left-hero h1 {
+    margin-top: 400px; /* đẩy chữ xuống thêm */
+  }
+}
+
+/* ===== Chỉ áp cho trang Forgot Password ===== */
+@media (min-width: 1024px) {
+  /* Dịch cụm bên phải (form) lên 50px trên desktop */
+  .forgot-page .right-card {
+    /* Chọn 1 trong 2: margin-top âm (thay đổi layout) hoặc translate (không đổi flow) */
+
+    /* Cách 1 - Dễ hiểu, thay đổi layout: */
+    margin-top: -200px;
+
+    /* Cách 2 - Không đổi flow, chỉ dịch thị giác: */
+    /* transform: translateY(-50px); */
+  }
+}
+
+/* Tablet (768–1023px): dịch nhẹ hơn 30px cho cân */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .forgot-page .right-card {
+    margin-top: -30px; /* hoặc translateY(-30px) nếu bạn chọn cách 2 */
+  }
+}
+
+/* Mobile ≤ 767px: giữ nguyên để không đè logo/tiêu đề */
+@media (max-width: 767px) {
+  .forgot-page .right-card {
+    margin-top: 0; /* hoặc remove translate */
+    transform: none;
+  }
+}
+/* ==== Overrides theo yêu cầu ==== */
+
+/* ≤1000px: chỉ còn 1 cột, ẩn left-hero, logo top cách 30px */
+@media (max-width: 1000px) {
+  .login-wrap {
+    grid-template-columns: 1fr;
+    min-height: 100dvh;
+  }
+
+  .left-hero {
+    display: none !important;
+  }
+
+  .right-card {
+    padding: 28px 20px;
+    justify-content: flex-start;
+    margin-top: 0; /* reset âm margin trên mobile nếu có */
+  }
+
+  .login-logo-top {
+    margin-top: 30px; /* logo trên mobile cách trên 30px */
+  }
+}
+
+/* >1000px: hiển thị 2 cột như desktop */
+@media (min-width: 1001px) {
+  .login-wrap {
+    grid-template-columns: 50% 50%;
+  }
+  .left-hero {
+    display: block;
+  }
+}
+/* Mobile rất nhỏ (≤500px): logo không có khoảng cách trên */
+@media (max-width: 500px) {
+  .login-logo-top {
+    margin-top: -20px !important;
+  }
+}

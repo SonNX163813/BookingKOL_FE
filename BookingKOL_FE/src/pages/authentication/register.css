@@ -1,0 +1,53 @@
+/* ======= Chỉ áp dụng cho trang Đăng ký ======= */
+
+/* form và header rộng hơn */
+.register-page .right-card .login-header,
+.register-page .right-card .form,
+.register-page .register-link,
+.register-page .terms {
+  max-width: 640px; /* bạn chỉnh 560/680/720 tùy ý */
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* cột phải đẩy lên 40px và padding ngang rộng hơn */
+.right-card.register {
+  padding-left: 56px;
+  padding-right: 56px;
+  margin-top: -90px;
+}
+
+/* input và button full ngang */
+.register-page .right-card .input,
+.register-page .right-card .primary-btn,
+.register-page .right-card .google-btn {
+  max-width: 100%;
+}
+
+/* cột phải rộng hơn chút ở màn lớn */
+@media (min-width: 1200px) {
+  .register-page .login-wrap {
+    grid-template-columns: 45% 55%;
+  }
+}
+
+/* chỉnh khoảng cách nhỏ */
+.register-page .login-header {
+  margin-bottom: 8px;
+}
+.register-page .divider {
+  margin: 14px 0;
+}
+.register-page .primary-btn {
+  margin-top: 10px;
+}
+
+/* mobile: bỏ top:-40 để không đụng mép */
+@media (max-width: 768px) {
+  .right-card.register {
+    padding-left: 24px;
+    padding-right: 24px;
+    top: 0;
+  }
+}

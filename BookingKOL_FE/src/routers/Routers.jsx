@@ -1,7 +1,14 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import HomePage from "../pages/home/HomePage";
+
 import KOLDetail from "../pages/home/kol/KOLDetail";
+
+import LoginPage from "../pages/authentication/LoginPage";
+import RegisterPage from "../pages/authentication/RegisterPage";
+import ForgotPasswordPage from "../pages/authentication/ForgotPasswordPage";
+import UserProfile from "../pages/home/userProfileDetail/UserProflie";
+
 // import Infomation from "../pages/profile/owner/infomation";
 // import About from "../pages/About";
 
@@ -12,6 +19,10 @@ const Routers = () => {
       <Route path="/kols/:kolId/:kolName" element={<KOLDetail />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
+      <Route path="/userprofile" element={<UserProfile />} />
       {/* <Route path="/infomation" element={<Infomation />} />
       <Route path="/about" element={<About />} /> */}
     </Routes>
@@ -19,4 +30,3 @@ const Routers = () => {
 };
 
 export default Routers;
-
