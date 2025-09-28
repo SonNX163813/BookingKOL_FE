@@ -7,10 +7,71 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault(); // UI-only
-    alert(`UI-only: Login bằng Email ${email}`);
+  // URL gốc backend: đặt trong .env => VITE_API_BASE_URL=http://localhost:8080
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // BE yêu cầu "identifier" + "password"
+        body: JSON.stringify({
+          identifier: email,
+          password: password,
+        }),
+      });
+
+      // đọc body (kể cả khi !ok) để lấy message từ BE
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = "Email hoặc mật khẩu không đúng !";
+        data?.message ||
+          data?.error ||
+          `Đăng nhập thất bại (HTTP ${res.status})`;
+        throw new Error(msg);
+      }
+
+      // tuỳ response của BE, đổi key cho đúng:
+      const token =
+        data?.token ||
+        data?.accessToken ||
+        data?.data?.token ||
+        data?.data?.accessToken;
+      const user = data?.user || data?.data?.user || { email: email, id: null };
+
+      if (!token) {
+        // Nếu BE trả khác cấu trúc, ném lỗi để bạn chỉnh key ở trên
+        throw new Error("Không tìm thấy token trong phản hồi từ server.");
+      }
+
+      // Lưu token: nhớ tôi = localStorage, không nhớ = sessionStorage
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem("auth_token", token);
+      storage.setItem("auth_user", JSON.stringify(user));
+
+      // TODO: nếu bạn có AuthContext, dispatch LOGIN_SUCCESS tại đây
+
+      // Điều hướng sau khi login (đổi tuỳ router của bạn)
+      // Nếu dùng react-router:
+      // navigate("/");
+      // Tạm thời dùng redirect đơn giản:
+      window.location.href = "/";
+    } catch (err) {
+      setErrorMsg(err.message || "Có lỗi xảy ra khi đăng nhập.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -49,8 +110,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Wave */}
-        {/* WAVE SVG ANIMATION từ bạn */}
+        {/* Wave SVG animation giữ nguyên */}
+        {/* ... (phần SVG của bạn) ... */}
         <svg
           className="hero-wave"
           width="100%"
@@ -121,6 +182,8 @@ export default function LoginPage() {
         </div>
 
         <form className="form" onSubmit={handleSubmit}>
+          {errorMsg && <p className="error-text">{errorMsg}</p>}
+
           <label className="lbl">Email</label>
           <input
             className="input"
@@ -129,6 +192,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
 
           <label className="lbl">Mật khẩu</label>
@@ -139,15 +203,16 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
 
-          {/* Remember + Forgot cùng hàng */}
           <div className="remember-forgot">
             <label>
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
+                disabled={loading}
               />
               Giữ tôi luôn đăng nhập
             </label>
@@ -156,8 +221,8 @@ export default function LoginPage() {
             </a>
           </div>
 
-          <button className="primary-btn" type="submit">
-            Đăng nhập
+          <button className="primary-btn" type="submit" disabled={loading}>
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
 
           <div className="divider">
@@ -168,17 +233,19 @@ export default function LoginPage() {
             type="button"
             className="google-btn"
             onClick={handleGoogleLogin}
+            disabled={loading}
           >
             <img src={googleLogo} alt="Google" className="gicon-img" />
             Đăng nhập bằng Google
           </button>
+
           <div className="register-link">
             Bạn chưa có tài khoản? <a href="register">Đăng ký</a>
           </div>
 
           <div className="terms">
             <label>
-              <input type="checkbox" defaultChecked />
+              <input type="checkbox" defaultChecked disabled={loading} />
               Tôi đồng ý <a href="#">Điều Khoản Dịch Vụ</a> và{" "}
               <a href="#">Thoả Thuận Riêng Tư</a>
             </label>

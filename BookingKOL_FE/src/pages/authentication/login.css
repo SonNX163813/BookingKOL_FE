@@ -15,6 +15,12 @@ body {
     sans-serif;
   color: var(--text);
 }
+.error-text {
+  color: #e53935; /* đỏ */
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-align: left;
+}
 
 /* layout 2 cột */
 .login-wrap {
@@ -91,6 +97,11 @@ body {
   text-align: center;
   z-index: 5;
   position: relative;
+}
+/* Input có lỗi: border đỏ + outline đỏ khi focus */
+.input-error {
+  border-color: #dc2626 !important;
+  outline-color: rgba(220, 38, 38, 0.35) !important;
 }
 
 .stats b {

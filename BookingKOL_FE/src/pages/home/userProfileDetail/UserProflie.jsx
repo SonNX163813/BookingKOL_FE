@@ -7,14 +7,14 @@ export default function UserProfile() {
 
   // Demo state – sau này bind API/user context
   const [form, setForm] = useState({
-    fullName: "Võ Tuấn Anh",
+    fullName: "",
     ngaySinh: "", // Ngày sinh (sẽ bị đẩy xuống cuối grid)
     gender: "",
     country: "",
     soDienThoai: "",
 
-    email: "anhvthe173544@fpt.edu.vn", // dùng làm Gmail (readonly trong form)
-    bio: "Fashion & lifestyle creator. Tôi thích livestream dài và kể chuyện sản phẩm.",
+    email: "", // dùng làm Gmail (readonly trong form)
+    bio: "",
   });
 
   const onChange = (e) => {
