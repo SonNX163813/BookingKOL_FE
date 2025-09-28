@@ -1,6 +1,16 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Box, Typography, Button, Grid, Stack, Chip } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Button,
+  Grid,
+  Stack,
+  Chip,
+  Dialog,
+  DialogContent,
+  IconButton,
+} from "@mui/material";
 import FemaleRoundedIcon from "@mui/icons-material/FemaleRounded";
 import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
 import CircleIcon from "@mui/icons-material/Circle";
@@ -12,6 +22,7 @@ import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PricingPanel from "./PricingPanel";
 
 const statsConfig = [
@@ -47,13 +58,88 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
     kol.tagline ||
     kol.bio ||
     kol.description ||
-    "Creator về thời trang & lifestyle, livestream tương tác cao, kể chuyện thương hiệu thuyết phục, chuyển đổi tốt trên nhiều nền tảng.";
+    "Sáng tạo nội dung về thời trang & lifestyle, livestream tương tác cao, kể chuyện thương hiệu thuyết phục, chuyển đổi tốt trên nhiều nền tảng.";
 
-  const thumbnails = Array.isArray(kol.thumbnails) ? kol.thumbnails : [];
   const achievements = Array.isArray(kol.achievements) ? kol.achievements : [];
   const stats = kol.stats ?? {};
   const kolName = kol.name || "KOL nổi bật";
   const kolIdLabel = kol.id ? `ID: ${kol.id}` : null;
+  const thumbnails = useMemo(() => {
+    if (!Array.isArray(kol.thumbnails)) {
+      return [];
+    }
+
+    return kol.thumbnails
+      .map((item) => {
+        if (!item) {
+          return null;
+        }
+
+        if (typeof item === "string") {
+          return {
+            id: item,
+            type: "IMAGE",
+            sourceUrl: item,
+            displayUrl: item,
+            name: "",
+            isCover: false,
+          };
+        }
+
+        const type =
+          typeof item.type === "string" && item.type.toUpperCase() === "VIDEO"
+            ? "VIDEO"
+            : "IMAGE";
+        const sourceUrl = item.url ?? item.sourceUrl ?? "";
+        if (!sourceUrl) {
+          return null;
+        }
+
+        const displayUrl = item.previewUrl ?? item.displayUrl ?? sourceUrl;
+
+        return {
+          id: item.id ?? sourceUrl,
+          type,
+          sourceUrl,
+          displayUrl,
+          name: item.name ?? "",
+          isCover: Boolean(item.isCover),
+        };
+      })
+      .filter(Boolean);
+  }, [kol.thumbnails]);
+
+  const [activeAvatar, setActiveAvatar] = useState(() => kol.avatar);
+  const [videoModal, setVideoModal] = useState(null);
+
+  useEffect(() => {
+    setActiveAvatar(kol.avatar);
+  }, [kol.avatar]);
+
+  const handleThumbnailSelect = useCallback((thumb) => {
+    if (!thumb) {
+      return;
+    }
+    if (thumb.type === "VIDEO") {
+      setVideoModal(thumb);
+      return;
+    }
+    setActiveAvatar(thumb.sourceUrl);
+  }, []);
+
+  const handleThumbnailKeyDown = useCallback(
+    (event, thumb) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleThumbnailSelect(thumb);
+      }
+    },
+    [handleThumbnailSelect]
+  );
+
+  const handleCloseVideo = useCallback(() => {
+    setVideoModal(null);
+  }, []);
 
   return (
     <motion.div
@@ -128,7 +214,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
               >
                 <Box
                   component="img"
-                  src={kol.avatar}
+                  src={activeAvatar}
                   alt={`Chân dung ${kolName}`}
                   sx={{
                     width: "100%",
@@ -185,27 +271,117 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                       borderRadius: 999,
                     },
                   }}
-                  aria-label="Thư viện ảnh nhỏ"
+                  aria-label="Thư viện ảnh thu nhỏ"
                   {...fadeUpProps(0.14)}
                 >
-                  {thumbnails.map((thumb, index) => (
-                    <Box
-                      key={`${thumb}-${index}`}
-                      component="img"
-                      src={thumb}
-                      alt={`Ảnh nhỏ ${index + 1} của ${kolName}`}
-                      sx={{
-                        width: 64,
-                        height: 64,
-                        flex: "0 0 auto",
-                        borderRadius: "18px",
-                        objectFit: "cover",
-                        objectPosition: "center top",
-                        border: "1px solid rgba(0, 227, 159, 0.28)",
-                        boxShadow: "0 10px 20px rgba(0, 0, 0, 0.35)",
-                      }}
-                    />
-                  ))}
+                  {thumbnails.map((thumb, index) => {
+                    const isVideo = thumb.type === "VIDEO";
+                    const isActive =
+                      !isVideo && activeAvatar === thumb.sourceUrl;
+                    const label = isVideo
+                      ? `Mở video ${thumb.name || index + 1}`
+                      : `Chọn ảnh ${index + 1}`;
+
+                    return (
+                      <Box
+                        key={thumb.id ?? `${thumb.sourceUrl}-${index}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleThumbnailSelect(thumb)}
+                        onKeyDown={(event) =>
+                          handleThumbnailKeyDown(event, thumb)
+                        }
+                        sx={{
+                          position: "relative",
+                          width: 64,
+                          height: 64,
+                          flex: "0 0 auto",
+                          borderRadius: "18px",
+                          overflow: "hidden",
+                          cursor: "pointer",
+                          border: isActive
+                            ? "2px solid rgba(0, 227, 159, 0.7)"
+                            : "1px solid rgba(0, 227, 159, 0.28)",
+                          boxShadow: isActive
+                            ? "0 12px 24px rgba(0, 227, 159, 0.25)"
+                            : "0 10px 20px rgba(0, 0, 0, 0.35)",
+                          transition:
+                            "transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease",
+                          transform: isActive ? "translateY(-2px)" : "none",
+                          backgroundColor: "#101715",
+                          "&:hover": {
+                            transform: "translateY(-2px)",
+                            borderColor: "rgba(0, 227, 159, 0.6)",
+                            boxShadow: "0 14px 24px rgba(0, 227, 159, 0.2)",
+                          },
+                          "&:focus-visible": {
+                            outline: "2px solid rgba(0, 227, 159, 0.75)",
+                            outlineOffset: 3,
+                          },
+                        }}
+                        aria-label={label}
+                      >
+                        {isVideo ? (
+                          <>
+                            {thumb.displayUrl &&
+                            thumb.displayUrl !== thumb.sourceUrl ? (
+                              <Box
+                                component="img"
+                                src={thumb.displayUrl}
+                                alt="Ảnh xem trước video"
+                                sx={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  filter: "brightness(0.75)",
+                                }}
+                              />
+                            ) : (
+                              <Box
+                                sx={{
+                                  width: "100%",
+                                  height: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background:
+                                    "linear-gradient(135deg, rgba(0, 199, 118, 0.35), rgba(3, 20, 18, 0.9))",
+                                }}
+                                aria-hidden
+                              />
+                            )}
+                            <Box
+                              sx={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: "rgba(0, 0, 0, 0.35)",
+                              }}
+                              aria-hidden
+                            >
+                              <PlayArrowRoundedIcon
+                                sx={{ color: "#E6F4EF", fontSize: 28 }}
+                              />
+                            </Box>
+                          </>
+                        ) : (
+                          <Box
+                            component="img"
+                            src={thumb.displayUrl}
+                            alt={`Ảnh thu nhỏ ${index + 1} của ${kolName}`}
+                            sx={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              objectPosition: "center top",
+                            }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })}
                 </MotionStack>
               )}
             </MotionStack>
@@ -513,6 +689,60 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
           </Box>
         </Box>
       </Box>
+      <Dialog
+        open={Boolean(videoModal)}
+        onClose={handleCloseVideo}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: "transparent",
+            boxShadow: "none",
+          },
+        }}
+      >
+        <DialogContent
+          sx={{
+            p: 0,
+            position: "relative",
+            backgroundColor: "#000",
+            borderRadius: "16px",
+            overflow: "hidden",
+          }}
+        >
+          <IconButton
+            onClick={handleCloseVideo}
+            sx={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              zIndex: 1,
+              color: "#E6F4EF",
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              "&:hover": {
+                backgroundColor: "rgba(0, 0, 0, 0.6)",
+              },
+            }}
+            aria-label="Đóng video"
+          >
+            <CloseRoundedIcon />
+          </IconButton>
+          {videoModal && (
+            <Box
+              component="video"
+              src={videoModal.sourceUrl}
+              controls
+              autoPlay
+              sx={{
+                width: "100%",
+                height: "auto",
+                maxHeight: "80vh",
+                display: "block",
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };
