@@ -34,3 +34,22 @@ footer {
       rgba(22, 249, 138, 0.18) 100%
     ) !important;
 } */
+
+.dot {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.delay-150 {
+  animation-delay: 0.15s;
+}
+.delay-300 {
+  animation-delay: 0.3s;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE, Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}

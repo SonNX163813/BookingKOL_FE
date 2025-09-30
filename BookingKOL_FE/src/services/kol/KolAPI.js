@@ -1,7 +1,7 @@
 import { BASE_URL } from "../../utils/config";
 
 const KOL_PROFILES_BASE = `${BASE_URL}/kol-profiles`;
-const KOL_PROFILES_ENDPOINT = `${KOL_PROFILES_BASE}/all`;
+const KOL_PROFILES_ENDPOINT = `${KOL_PROFILES_BASE}/all-available`;
 
 const parseJsonSafely = async (response) => {
   const rawText = await response.text();

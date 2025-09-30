@@ -14,19 +14,20 @@ import {
   useScrollTrigger,
   ListItemIcon,
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import MenuIcon from "@mui/icons-material/Menu";
 import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import logoweb from "../../../assets/logoweb.png";
+import logoweb from "../../assets/logoweb.png";
 
+// ✅ Thêm route cho từng item
 const navItems = [
-  "Trang chủ",
-  "Về chúng tôi",
-  "Các gói dịch vụ",
-  "Blog",
-  "Quy trình hoàn thiện",
+  { label: "Trang chủ", to: "/" },
+  { label: "Về chúng tôi", to: "/ve-chung-toi" },
+  { label: "Các gói dịch vụ", to: "/goi-dich-vu" },
+  { label: "Blog", to: "/blog" },
+  { label: "Quy trình hoàn thiện", to: "/quy-trinh" },
 ];
 
 const Navbar = () => {
@@ -53,7 +54,7 @@ const Navbar = () => {
       }}
     >
       <Toolbar sx={{ py: { xs: 0.5, md: 1 } }}>
-        {/* Wrapper: giới hạn 1536px và căn giữa */}
+        {/* Wrapper */}
         <Box
           sx={{
             maxWidth: "1536px",
@@ -96,42 +97,56 @@ const Navbar = () => {
             {!isMobile && (
               <Box
                 component="nav"
-                sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 1.5,
-                }}
+                sx={{ display: "flex", justifyContent: "center", gap: 1.5 }}
               >
-                {navItems.map((item) => (
+                {navItems.map(({ label, to }) => (
                   <Button
-                    key={item}
+                    key={to}
+                    component={NavLink}
+                    to={to}
                     color="inherit"
                     disableRipple
+                    className={({ isActive }) =>
+                      isActive ? "active" : undefined
+                    }
                     sx={{
                       px: 1.5,
                       fontWeight: 600,
                       textTransform: "none",
                       fontSize: "0.975rem",
                       borderRadius: 2,
-                      "&::after": {
-                        content: '""',
-                        display: "block",
-                        height: 2,
-                        width: 0,
-                        bgcolor: "#c026d3",
-                        transition: "width 180ms ease",
-                        mt: 0.75,
-                        borderRadius: 2,
-                      },
-                      "&:hover": {
-                        bgcolor: "rgba(192,38,211,0.06)",
-                      },
-                      // "&:hover::after": {
-                      //   width: "100%",
-                      // },
+                      // bỏ underline cũ trên Button để tránh full-width
+                      "&:hover": { bgcolor: "rgba(192,38,211,0.06)" },
+                      // khi active: chỉ underline dưới chữ (span.nav-label)
+                      "&.active .nav-label::after": { width: "100%" },
+                      // khi hover: cũng cho chạy underline đẹp
+                      "&:hover .nav-label::after": { width: "100%" },
                     }}
                   >
-                    {item}
+                    <Box
+                      component="span"
+                      className="nav-label"
+                      sx={{
+                        position: "relative",
+                        display: "inline-block",
+                        lineHeight: 1.6,
+                        "&::after": {
+                          content: '""',
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: -6, // khoảng cách gạch với chữ
+                          height: 2,
+                          width: 0, // mặc định 0, active/hover sẽ 100%
+                          bgcolor: "#c026d3",
+                          transition: "width 180ms ease",
+                          borderRadius: 2,
+                          margin: "0 auto",
+                        },
+                      }}
+                    >
+                      {label}
+                    </Box>
                   </Button>
                 ))}
               </Box>
@@ -159,6 +174,8 @@ const Navbar = () => {
                   <PersonIcon />
                 </IconButton>
                 <Button
+                  component={Link}
+                  to="/dang-nhap"
                   variant="contained"
                   endIcon={<ArrowForwardRoundedIcon />}
                   sx={{
@@ -194,7 +211,7 @@ const Navbar = () => {
             )}
           </Box>
 
-          {/* Gạch phân tách rất nhẹ dưới thanh (đẹp hơn, dễ nhìn) */}
+          {/* Divider nhẹ */}
           {!trigger && (
             <Divider
               sx={{ mt: 1.25, opacity: 0.6, borderColor: "rgba(2,6,23,0.06)" }}
@@ -222,9 +239,15 @@ const Navbar = () => {
           },
         }}
       >
-        {navItems.map((item) => (
-          <MenuItem key={item} onClick={handleClose} sx={{ py: 1.25 }}>
-            {item}
+        {navItems.map(({ label, to }) => (
+          <MenuItem
+            key={to}
+            onClick={handleClose}
+            component={Link}
+            to={to}
+            sx={{ py: 1.25 }}
+          >
+            {label}
           </MenuItem>
         ))}
         <Divider sx={{ my: 0.5 }} />
@@ -245,6 +268,8 @@ const Navbar = () => {
             fullWidth
             variant="contained"
             endIcon={<ArrowForwardRoundedIcon />}
+            component={Link}
+            to="/dang-nhap"
             sx={{
               textTransform: "none",
               fontWeight: 700,

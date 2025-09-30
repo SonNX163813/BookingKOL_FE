@@ -1,10 +1,9 @@
 import React, { useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import Navbar from "../components/home/kol/Navbar";
-import Footer from "../components/home/kol/Footer";
-import Routers from "../routers/Routers";
+import { Outlet, useLocation } from "react-router-dom";
+import Navbar from "../components/home/Navbar";
+import Footer from "../components/home/Footer";
 
-const Layout = () => {
+const MainLayout = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -16,10 +15,10 @@ const Layout = () => {
   return (
     <>
       <Navbar />
-      <Routers />
+      <Outlet />
       <Footer />
     </>
   );
 };
 
-export default Layout;
+export default MainLayout;

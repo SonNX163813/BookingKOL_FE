@@ -1,14 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
+// import {
+//   Box,
+//   Container,
+//   Typography,
+//   CircularProgress,
+//   Stack,
+//   Alert,
+//   Snackbar,
+//   IconButton,
+// } from "@mui/material";
 import {
   Box,
   Container,
   Typography,
   CircularProgress,
   Stack,
-  Alert,
-  Snackbar,
-  IconButton,
 } from "@mui/material";
+import AppSnackbar from "../../../components/UI/AppSnackbar";
+import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import { useParams } from "react-router-dom";
 import ProfileHeader from "../../../components/home/kol-detail/ProfileHeader";
@@ -331,7 +340,7 @@ const KOLDetail = () => {
         )}
 
         {/* Thông báo lỗi */}
-        <Snackbar
+        {/* <Snackbar
           open={showErrorSnackbar}
           autoHideDuration={6000}
           onClose={handleCloseErrorSnackbar}
@@ -382,10 +391,33 @@ const KOLDetail = () => {
           >
             {error}
           </Alert>
-        </Snackbar>
+        </Snackbar> */}
+
+        <AppSnackbar
+          open={showErrorSnackbar}
+          onClose={handleCloseErrorSnackbar}
+          autoHideDuration={6000}
+          severity="error"
+          message={error}
+          action={
+            <>
+              <IconButton
+                size="small"
+                aria-label="retry"
+                color="inherit"
+                onClick={handleRetry}
+                sx={{ mr: 1 }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Thử lại
+                </Typography>
+              </IconButton>
+            </>
+          }
+        />
 
         {/* Thông báo không tìm thấy */}
-        <Snackbar
+        {/* <Snackbar
           open={showNotFoundSnackbar}
           autoHideDuration={4000}
           onClose={handleCloseNotFoundSnackbar}
@@ -413,7 +445,15 @@ const KOLDetail = () => {
           >
             Không tìm thấy thông tin KOL.
           </Alert>
-        </Snackbar>
+        </Snackbar> */}
+
+        <AppSnackbar
+          open={showNotFoundSnackbar}
+          onClose={handleCloseNotFoundSnackbar}
+          autoHideDuration={4000}
+          severity="info"
+          message="Không tìm thấy thông tin KOL."
+        />
       </Container>
     </Box>
   );

@@ -98,8 +98,8 @@ const KOLCard = ({
             mediaContainerSx,
             {
               position: "relative",
-              width: { xs: 240, sm: 260, md: 300, lg: 320 },
-              height: { xs: 240, sm: 260, md: 300, lg: 420 },
+              width: { xs: 240, sm: 238, md: 240, lg: 240 },
+              height: { xs: 240, sm: 340, md: 300, lg: 360 },
               overflow: "hidden",
               flexShrink: 0,
               // "--media-w": 3,
@@ -156,7 +156,7 @@ const KOLCard = ({
           sx={{
             display: "flex",
             flexDirection: "column",
-            gap: { xs: 1, sm: 1.25, md: 1.5 },
+            gap: { xs: 0.5, sm: 0.5, md: "10px" },
             py: { xs: 2, sm: 2.5 },
             px: { xs: 2, sm: 2.5 },
             flexGrow: 1,
