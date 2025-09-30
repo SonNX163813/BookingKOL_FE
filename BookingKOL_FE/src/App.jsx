@@ -1,17 +1,15 @@
 // src/App.jsx
-import { BrowserRouter as Router } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext"; // <— thêm dòng này
-import Layout from "./layouts/Layout";
 import "./App.css";
+import { BrowserRouter } from "react-router-dom";
+import AppRouter from "./routers/AppRouter";
+import { AuthProvider } from "./context/AuthContext";
 
 export default function App() {
   return (
     <AuthProvider>
-      {" "}
-      {/* <— BỌC TOÀN BỘ ỨNG DỤNG */}
-      <Router>
-        <Layout />
-      </Router>
+      <BrowserRouter>
+        <AppRouter />
+      </BrowserRouter>
     </AuthProvider>
   );
 }

@@ -1,19 +1,14 @@
 import React from "react";
-// import { useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom"; // ✅ thêm Outlet
 import Navbar from "../components/home/kol/Navbar";
 import Footer from "../components/home/kol/Footer";
-import Routers from "../routers/Routers";
 
-const Layout = () => {
-  //   const location = useLocation();
-
+export default function Layout() {
   return (
     <>
       {/* <Navbar /> */}
-      <Routers />
+      <Outlet /> {/* ✅ nơi page con hiển thị */}
       {/* <Footer /> */}
     </>
   );
-};
-
-export default Layout;
+}
