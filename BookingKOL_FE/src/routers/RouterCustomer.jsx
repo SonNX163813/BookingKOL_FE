@@ -1,35 +1,63 @@
 import { Navigate } from "react-router-dom";
+
+import Layout from "../layouts/Layout";
+
+// Pages (public)
 import HomePage from "../pages/home/HomePage";
 import KOLDetail from "../pages/home/kol/KOLDetail";
-import UserProfile from "../pages/home/userProfileDetail/UserProflie";
 import RankingPage from "../pages/rank/RankingPage";
 import ChatAIPage from "../pages/ai/ChatAIPage";
-import ForgotPasswordPage from "../pages/authentication/ForgotPasswordPage";
-import RegisterPage from "../pages/authentication/RegisterPage";
-import LoginPage from "../pages/authentication/LoginPage";
-import MainLayout from "../layouts/MainLayout";
 import CourseLivesteam from "../pages/home/course-live/CourseLivesteam";
 
+// Pages (private)
+import UserProfile from "../pages/home/userProfileDetail/UserProfile";
+
+// Auth pages
+import LoginPage from "../pages/authentication/LoginPage.jsx";
+import RegisterPage from "../pages/authentication/RegisterPage.jsx";
+import ForgotPasswordPage from "../pages/authentication/ForgotPasswordPage.jsx";
+import VerifyEmailNotice from "../pages/authentication/VerifyEmailNotice.jsx";
+
+// Guards
+import GuestOnly, { RequireAuth } from "./RouterGuards";
+
 export const routerCustomer = [
-  { path: "*", element: <Navigate to="/" /> },
-
-  // Auth layout: không có header/footer
-
-  { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <RegisterPage /> },
-  { path: "/forgotpassword", element: <ForgotPasswordPage /> },
-
-  // Main layout: có header/footer
+  // NHÓM AUTH: chỉ cho khách, không render Layout để tránh lóe
   {
-    element: <MainLayout />,
+    element: <GuestOnly />,
     children: [
-      // Home & Cart
+      { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
+      { path: "/forgotpassword", element: <ForgotPasswordPage /> },
+      { path: "/verify-email", element: <VerifyEmailNotice /> },
+    ],
+  },
+
+  // PUBLIC (có layout)
+  {
+    element: <Layout />,
+    children: [
       { path: "/", element: <HomePage /> },
       { path: "/kols/:kolId/:kolName", element: <KOLDetail /> },
-      { path: "/userprofile", element: <UserProfile /> },
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
       { path: "/goi-dich-vu", element: <CourseLivesteam /> },
     ],
   },
+
+  // PRIVATE (RequireAuth bọc ngoài Layout để Layout/ Navbar không render trước)
+  {
+    element: <RequireAuth />,
+    children: [
+      {
+        element: <Layout />,
+        children: [{ path: "/userprofile", element: <UserProfile /> }],
+      },
+    ],
+  },
+
+  // 404 → về trang chủ
+  { path: "*", element: <Navigate to="/" /> },
 ];
+
+export default routerCustomer;
