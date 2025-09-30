@@ -1,8 +1,12 @@
+// src/pages/auth/RegisterPage.jsx
 import { useState } from "react";
 import "./login.css"; // style chung (login + register)
 import "./register.css"; // style riêng cho Register
 import logo from "../../assets/logocty.png";
 import googleLogo from "../../assets/google_logo.svg.png";
+
+// Nếu bạn đang dùng utils/config.js thì bật dòng dưới và bỏ biến API_BASE phía dưới.
+// import { API_BASE } from "../../utils/config";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -12,19 +16,24 @@ export default function RegisterPage() {
   const [agree, setAgree] = useState(true);
 
   const [errors, setErrors] = useState({});
-  const [serverErr, setServerErr] = useState(""); // lỗi tổng từ server (hiển thị trên Email)
+  const [serverErr, setServerErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const validate = () => {
     const next = {};
-    if (!fullName.trim()) next.fullName = "Vui lòng nhập họ tên";
-    if (!email.trim()) next.email = "Vui lòng nhập email";
 
+    if (!fullName.trim()) next.fullName = "Vui lòng nhập họ tên";
+
+    if (!email.trim()) next.email = "Vui lòng nhập email";
+    else if (!/\S+@\S+\.\S+/.test(email)) next.email = "Email không hợp lệ";
+
+    // Mật khẩu mạnh: >=8 ký tự, có hoa, thường, số, ký tự đặc biệt
     const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
     if (!strong.test(password)) {
       next.password =
         "Mật khẩu ≥ 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt";
     }
+
     if (confirm !== password) next.confirm = "Mật khẩu nhập lại không khớp";
     if (!agree) next.agree = "Bạn cần đồng ý Điều khoản & Riêng tư";
 
@@ -39,17 +48,12 @@ export default function RegisterPage() {
 
     setSubmitting(true);
 
-    const url =
-      (import.meta.env.VITE_API_BASE || "http://localhost:8080") +
-      "/api/v1/register/brand";
+    // Nếu dùng utils/config: const url = `${API_BASE}/api/v1/register/brand`;
+    const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+    const url = `${API_BASE}/api/v1/register/brand`;
 
-    // NOTE: Đổi key theo BE nếu cần (vd: brandName, phone,...)
-    const payload = {
-      fullName,
-      email,
-      password,
-      confirmPassword: confirm, // đổi thành key mà BE yêu cầu
-    };
+    // Payload đúng theo API bạn đã cho: { email, password, fullName }
+    const payload = { email, password, fullName };
 
     try {
       const res = await fetch(url, {
@@ -59,26 +63,28 @@ export default function RegisterPage() {
         body: JSON.stringify(payload),
       });
 
+      // một số back-end trả body JSON { status, message: [...] }
       let data = null;
       try {
         data = await res.json();
       } catch {
-        // có thể 201 Created không có body
-        data = null;
+        data = null; // phòng trường hợp không có body
       }
 
       if (!res.ok) {
-        let msg =
+        const msgRaw =
           (data && (data.message || data.error || data.detail)) ||
           `Đăng ký thất bại (HTTP ${res.status})`;
+        const msg = Array.isArray(msgRaw) ? msgRaw.join(", ") : String(msgRaw);
 
-        // Trường hợp Spring Security chặn:
-        if (msg.includes("Full authentication is required")) {
-          msg =
-            "Endpoint /api/v1/register/brand cần permitAll() trong Spring Security, hoặc kiểm tra cấu hình auth/token.";
-        }
+        // Trường hợp Spring Security chặn
+        const finalMsg = msg.includes("Full authentication is required")
+          ? "Endpoint /api/v1/register/brand cần permitAll() trong Spring Security, hoặc kiểm tra cấu hình auth/token."
+          : msg;
 
-        setServerErr(msg);
+        setServerErr(finalMsg);
+
+        // Nếu BE trả lỗi theo field
         const fieldErr =
           (data &&
             (data.errors || data.fieldErrors || data.validationErrors)) ||
@@ -90,11 +96,11 @@ export default function RegisterPage() {
         return;
       }
 
-      alert("Đăng ký thành công! Hãy đăng nhập.");
-      window.location.href = "/login";
+      // Thành công → chuyển sang trang hướng dẫn xác nhận email
+      const search = new URLSearchParams({ email });
+      window.location.href = `/verify-email?${search.toString()}`;
     } catch (err) {
       setServerErr("Không thể kết nối server. Kiểm tra API đang chạy & CORS.");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -130,12 +136,12 @@ export default function RegisterPage() {
             <span>Quản lý tài khoản thương hiệu và idol</span>
           </div>
           <div>
-            <b>500 Triệu </b>
+            <b>500 Triệu</b>
             <span>Lượt xem quảng cáo đang chạy</span>
           </div>
         </div>
 
-        {/* SVG wave giữ nguyên */}
+        {/* === SVG wave: nếu trước bạn có block SVG, giữ nguyên ở đây === */}
         <svg
           className="hero-wave"
           width="100%"
@@ -152,7 +158,7 @@ export default function RegisterPage() {
               25%{ d: path("M 0,600 L 0,0 C 54.0226726210924,104.15527310202678 108.0453452421848,208.31054620405357 172,212 C 235.9546547578152,215.68945379594643 309.84129165235316,118.91308828581245 386,115 C 462.15870834764684,111.08691171418755 540.5894881484026,200.03710065269667 623,200 C 705.4105118515974,199.96289934730333 791.8007557540365,110.93850910340088 855,92 C 918.1992442459635,73.06149089659912 958.2074888354518,124.20886293369978 1028,135 C 1097.7925111645482,145.79113706630022 1197.3692889041565,116.22603916180006 1271,87 C 1344.6307110958435,57.77396083819993 1392.3153555479216,28.886980419099967 1440,0 L 1440,600 L 0,600 Z");}
               50%{ d: path("M 0,600 L 0,0 C 78.82583304706287,42.93163861216077 157.65166609412574,85.86327722432154 222,115 C 286.34833390587426,144.13672277567846 336.21916867055995,159.4785297148746 391,182 C 445.78083132944005,204.5214702851254 505.47165922363456,234.22260391618 588,214 C 670.5283407763654,193.77739608382 775.8941944349023,123.63105462040535 848,100 C 920.1058055650977,76.36894537959465 958.9515630367571,99.25317760219858 1022,109 C 1085.048436963243,118.74682239780142 1172.2995534180695,115.35623497080041 1246,95 C 1319.7004465819305,74.64376502919959 1379.8502232909652,37.32188251459979 1440,0 L 1440,600 L 0,600 Z");}
               75%{ d: path("M 0,600 L 0,0 C 53.92373754723462,82.33734111989007 107.84747509446925,164.67468223978014 181,188 C 254.15252490553075,211.32531776021986 346.5338371693576,175.63861216076947 416,142 C 485.4661628306424,108.36138783923053 532.0171762281002,76.77086911714188 589,99 C 645.9828237718998,121.22913088285812 713.3974579182412,197.27791137066302 798,216 C 882.6025420817588,234.72208862933698 984.3929920989349,196.11748540020614 1051,189 C 1117.6070079010651,181.88251459979386 1149.0305736860187,206.25214702851252 1208,180 C 1266.9694263139813,153.74785297148748 1353.4847131569907,76.87392648574374 1440,0 L 1440,600 L 0,600 Z");}
-              100%{ d: path("M 0,600 L 0,0 C 66.97560975609755,96.7887323943662 133.9512195121951,193.5774647887324 208,204 C 282.0487804878049,214.4225352112676 363.1707317073171,138.4788732394366 424,109 C 484.8292682926829,79.52112676056339 525.3658536585365,96.50704225352112 582,114 C 638.6341463414635,131.49295774647888 711.3658536585366,149.49295774647885 795,145 C 878.6341463414634,140.50704225352115 973.1707317073171,113.52112676056342 1042,131 C 1110.8292682926829,148.47887323943658 1153.9512195121952,210.4225352112676 1216,196 C 1278.0487804878048,181.5774647887324 1359.0243902439024,90.7887323943662 1440,0 L 1440,600 L 0,600 Z");}
+              100%{ d: path("M 0,600 L 0,0 C 88.38131226382686,186.81277911370665 176.7626245276537,373.6255582274133 233,419 C 289.2373754723463,464.3744417725867 313.3308141532119,368.3105462040536 382,337 C 450.6691858467881,305.6894537959464 563.9141188594984,339.13225695637243 635,365 C 706.0858811405016,390.86774304362757 735.0127104087943,409.16042597045686 796,410 C 856.9872895912057,410.83957402954314 950.0350395053244,394.2260391618001 1022,397 C 1093.9649604946756,399.7739608381999 1144.8471315699073,421.93541738234285 1211,359 C 1277.1528684300927,296.06458261765715 1358.5764342150464,148.03229130882858 1440,0 L 1440,600 L 0,600 Z");}
             }
 
             .path-1{ animation: pathAnim-1 4s linear infinite; }
@@ -198,6 +204,14 @@ export default function RegisterPage() {
           <h2 className="login-title">Đăng ký</h2>
           <p className="login-sub">Tạo tài khoản để bắt đầu khám phá.</p>
         </div>
+        {errors.fullName && <p className="err-msg">{errors.fullName}</p>}
+
+        {/* Lỗi tổng từ server */}
+        {serverErr && (
+          <p className="err-msg" style={{ marginTop: 8, marginLeft: 100 }}>
+            {serverErr}
+          </p>
+        )}
 
         <form className="form" onSubmit={handleSubmit} noValidate>
           <label className="lbl">Họ và tên</label>
@@ -208,14 +222,6 @@ export default function RegisterPage() {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
           />
-          {errors.fullName && <p className="err-msg">{errors.fullName}</p>}
-
-          {/* General server error HIỂN THỊ TRÊN EMAIL */}
-          {serverErr && (
-            <p className="err-msg" style={{ marginTop: 8 }}>
-              {serverErr}
-            </p>
-          )}
 
           <label className="lbl">Email</label>
           <input
@@ -282,7 +288,7 @@ export default function RegisterPage() {
           </button>
 
           <div className="register-link">
-            Đã có tài khoản? <a href="login">Đăng nhập</a>
+            Đã có tài khoản? <a href="/login">Đăng nhập</a>
           </div>
         </form>
       </section>

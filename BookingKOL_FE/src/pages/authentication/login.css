@@ -122,7 +122,15 @@ body {
   opacity: 0.9;
   font-size: 14px;
 }
-
+.error-text,
+.err-msg {
+  color: #e53935; /* đỏ */
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 6px 0 8px;
+  text-align: left;
+  font-weight: 500; /* đồng bộ “kiểu chữ” với các lỗi khác nếu bạn đang dùng 500 */
+}
 /* RIGHT CARD */
 .right-card {
   background: #fff;

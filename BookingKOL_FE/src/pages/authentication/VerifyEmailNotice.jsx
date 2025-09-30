@@ -1,95 +1,29 @@
-// src/pages/auth/LoginPage.jsx
-import { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useMemo } from "react";
 import "./login.css";
+import "./register.css";
 import logo from "../../assets/logocty.png";
-import googleLogo from "../../assets/google_logo.svg.png";
-import { API_BASE } from "../../utils/config";
-import { useAuth } from "../../context/AuthContext";
 
-export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
+function maskEmail(raw) {
+  if (!raw || !raw.includes("@")) return raw || "";
+  const [name, domain] = raw.split("@");
+  const head = name.slice(0, 2);
+  const tail = name.slice(-1);
+  return `${head}${"*".repeat(Math.max(3, name.length - 3))}${tail}@${domain}`;
+}
 
-  const { dispatch, loading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const backTo = location.state?.from?.pathname || "/";
+export default function VerifyEmailNotice() {
+  const params = new URLSearchParams(window.location.search);
+  const email = params.get("email") || "";
+  const masked = useMemo(() => maskEmail(email), [email]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMsg("");
-
-    // validate nhanh
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setErrorMsg("Email không hợp lệ.");
-      return;
-    }
-    if (!password) {
-      setErrorMsg("Vui lòng nhập mật khẩu.");
-      return;
-    }
-
-    dispatch({ type: "LOGIN_START" });
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: email, password }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg =
-          (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
-          data?.error ||
-          `Đăng nhập thất bại (HTTP ${res.status})`;
-        throw new Error(msg);
-      }
-
-      // Response mẫu của bạn:
-      // { status, message, data: { accessToken, type, id, roles }, timestamp }
-      const token =
-        data?.accessToken ||
-        data?.data?.accessToken ||
-        data?.token ||
-        data?.data?.token;
-
-      if (!token)
-        throw new Error("Không tìm thấy token trong phản hồi từ server.");
-
-      const user = {
-        id: data?.data?.id ?? null,
-        email,
-        roles: data?.data?.roles ?? [],
-      };
-
-      // QUAN TRỌNG: truyền remember để context lưu localStorage (true) hoặc sessionStorage (false)
-      dispatch({
-        type: "LOGIN_SUCCESS",
-        payload: { user, token, roles: user.roles, remember },
-      });
-
-      // Điều hướng về trang trước (nếu có) hoặc "/"
-      navigate(backTo, { replace: true });
-    } catch (err) {
-      dispatch({
-        type: "LOGIN_FAILURE",
-        payload: err.message || "Có lỗi xảy ra khi đăng nhập.",
-      });
-      setErrorMsg(err.message || "Có lỗi xảy ra khi đăng nhập.");
-    }
-  };
-
-  const handleGoogleLogin = () => {
-    alert("UI-only: Gắn đăng nhập Google sau.");
+  const openMail = () => {
+    // mở app mail phổ biến
+    window.open("https://mail.google.com", "_blank", "noopener,noreferrer");
   };
 
   return (
-    <div className="login-wrap">
-      {/* LEFT HERO */}
+    <div className="login-wrap register-page">
+      {/* LEFT giữ nguyên look của Register */}
       <section className="left-hero">
         <div className="brand">
           <img src={logo} alt="Logo" className="logo" />
@@ -99,7 +33,6 @@ export default function LoginPage() {
           THẾ GIỚI LIVESTREAM <br /> TRONG TAY BẠN <br />
           <span className="highlight">HÃY TẬN HƯỞNG</span>
         </h1>
-
         <div className="stats">
           <div>
             <b>20 Triệu</b>
@@ -114,12 +47,12 @@ export default function LoginPage() {
             <span>Quản lý tài khoản thương hiệu và idol</span>
           </div>
           <div>
-            <b>500 Triệu </b>
+            <b>500 Triệu</b>
             <span>Lượt xem quảng cáo đang chạy</span>
           </div>
         </div>
 
-        {/* SVG wave giữ nguyên */}
+        {/* có thể giữ stats & svg wave giống Register nếu muốn */}
         <svg
           className="hero-wave"
           width="100%"
@@ -175,85 +108,42 @@ export default function LoginPage() {
         </svg>
       </section>
 
-      {/* RIGHT CARD */}
-      <section className="right-card">
+      {/* RIGHT */}
+      <section className="right-card register">
         <div className="login-header">
           <img src={logo} alt="Logo" className="login-logo-top" />
-          <h2 className="login-title">Đăng nhập</h2>
+          <h2 className="login-title">Xác nhận email của bạn</h2>
+          <p className="login-sub">
+            Chúng tôi đã gửi email xác thực tới:
+            <br />
+            <b style={{ wordBreak: "break-all" }}>
+              {masked || "Email của bạn"}
+            </b>
+          </p>
         </div>
 
-        <form className="form" onSubmit={handleSubmit} noValidate>
-          {errorMsg && <p className="error-text">{errorMsg}</p>}
+        <div className="form">
+          <p className="info-msg">
+            Hãy mở hộp thư đến và nhấp vào liên kết xác nhận để kích hoạt tài
+            khoản. Nếu bạn không thấy email, vui lòng kiểm tra mục{" "}
+            <b>Spam/Quảng cáo</b>.
+          </p>
 
-          <label className="lbl">Email</label>
-          <input
-            className="input"
-            type="email"
-            placeholder="Email của bạn"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={loading}
-            autoComplete="username"
-          />
-
-          <label className="lbl">Mật khẩu</label>
-          <input
-            className="input"
-            type="password"
-            placeholder="Mật khẩu của bạn"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={loading}
-            autoComplete="current-password"
-          />
-
-          <div className="remember-forgot">
-            <label>
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                disabled={loading}
-              />
-              Giữ tôi luôn đăng nhập
-            </label>
-            <Link to="/forgotpassword" className="forgot-link">
-              Quên mật khẩu?
-            </Link>
-          </div>
-
-          <button className="primary-btn" type="submit" disabled={loading}>
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          <button className="primary-btn" onClick={openMail}>
+            Mở Gmail
           </button>
 
           <div className="divider">
             <span>Hoặc</span>
           </div>
 
-          <button
-            type="button"
-            className="google-btn"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-          >
-            <img src={googleLogo} alt="Google" className="gicon-img" />
-            Đăng nhập bằng Google
-          </button>
+          <a className="google-btn" href="/login">
+            Quay về Đăng nhập
+          </a>
 
-          <div className="register-link">
-            Bạn chưa có tài khoản? <Link to="/register">Đăng ký</Link>
-          </div>
-
-          <div className="terms">
-            <label>
-              <input type="checkbox" defaultChecked disabled={loading} />
-              Tôi đồng ý <a href="#">Điều Khoản Dịch Vụ</a> và{" "}
-              <a href="#">Thoả Thuận Riêng Tư</a>
-            </label>
-          </div>
-        </form>
+          {/* (Tùy chọn) Resend – nếu BE có endpoint resend, gắn vào đây */}
+          {/* <button className="link-btn" onClick={handleResend}>Gửi lại email xác nhận</button> */}
+        </div>
       </section>
     </div>
   );
