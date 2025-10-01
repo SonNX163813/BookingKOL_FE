@@ -8,6 +8,7 @@ import KOLDetail from "../pages/home/kol/KOLDetail";
 import RankingPage from "../pages/rank/RankingPage";
 import ChatAIPage from "../pages/ai/ChatAIPage";
 import CourseLivesteam from "../pages/home/course-live/CourseLivesteam";
+import CourseLivesteamDetail from "../pages/home/course-live/CourseLivesteamDetail";
 
 // Pages (private)
 import UserProfile from "../pages/home/userProfileDetail/UserProfile";
@@ -20,6 +21,11 @@ import VerifyEmailNotice from "../pages/authentication/VerifyEmailNotice.jsx";
 
 // Guards
 import GuestOnly, { RequireAuth } from "./RouterGuards";
+
+const courseRoutes = [
+  { path: "/goi-dich-vu", element: <CourseLivesteam /> },
+  { path: "/goi-dich-vu/:courseId/:courseName", element: <CourseLivesteamDetail /> },
+];
 
 export const routerCustomer = [
   // NHÓM AUTH: chỉ cho khách, không render Layout để tránh lóe
@@ -41,7 +47,7 @@ export const routerCustomer = [
       { path: "/kols/:kolId/:kolName", element: <KOLDetail /> },
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
-      { path: "/goi-dich-vu", element: <CourseLivesteam /> },
+      ...courseRoutes,
     ],
   },
 
