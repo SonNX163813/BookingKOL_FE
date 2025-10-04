@@ -22,8 +22,8 @@ const TikTokIcon = (props) => (
   </SvgIcon>
 );
 
-const textPrimary = "#E6F4EF";
-const textSecondary = "#AABBB5";
+const textPrimary = "#ffffff";
+const textSecondary = "#ffffff";
 
 const getPlatformIcon = (iconName) => {
   switch (iconName) {
@@ -74,13 +74,12 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
           position: "relative",
           overflow: "hidden",
           borderRadius: "22px",
+
           background:
-            "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-   radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-   linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-          border: "1px solid rgba(0, 227, 159, 0.24)",
+            "linear-gradient(135deg, #93cef6 0%, #4a74da 50%, #582baf 100%)",
+          border: "1px solid rgba(74, 116, 218, 0.22)",
           boxShadow:
-            "0 26px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+            "0 26px 60px rgba(74, 116, 218, 0.18), inset 0 1px 0 rgba(147, 206, 246, 0.45)",
           px: { xs: 2.75, md: 3 },
           py: { xs: 2.75, md: 3.25 },
           color: textPrimary,
@@ -93,7 +92,7 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
             width: 180,
             height: 180,
             background:
-              "radial-gradient(60% 60% at 50% 30%, rgba(0,227,159,0.35) 0%, rgba(0,227,159,0) 75%)",
+              "radial-gradient(60% 60% at 50% 30%, rgba(141, 226, 237, 0.4) 0%, rgba(147, 206, 246, 0) 75%)",
             opacity: 0.65,
             pointerEvents: "none",
           },
@@ -118,10 +117,10 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
                     label="Bảo chứng"
                     size="small"
                     sx={{
-                      background: "rgba(0, 227, 159, 0.16)",
+                      background: "rgba(147, 206, 246, 0.18)",
                       color: textPrimary,
                       borderRadius: "999px",
-                      border: "1px solid rgba(0, 227, 159, 0.4)",
+                      border: "1px solid rgba(74, 116, 218, 0.32)",
                       fontWeight: 600,
                       letterSpacing: "0.02em",
                       px: 1,
@@ -149,7 +148,7 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
                 <Typography
                   variant="body2"
                   sx={{
-                    color: "rgba(166, 182, 174, 0.7)",
+                    color: "rgba(47, 60, 140, 0.5)",
                     textDecoration: "line-through",
                   }}
                   aria-label="Giá gốc"
@@ -160,10 +159,10 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
                   label="Giảm giá"
                   size="small"
                   sx={{
-                    background: "rgba(0, 227, 159, 0.18)",
+                    background: "rgba(147, 206, 246, 0.2)",
                     color: textPrimary,
                     borderRadius: "999px",
-                    border: "1px solid rgba(0, 227, 159, 0.4)",
+                    border: "1px solid rgba(74, 116, 218, 0.32)",
                     fontWeight: 600,
                   }}
                 /> */}
@@ -171,7 +170,7 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
             )}
           </Stack>
 
-          <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+          <Divider sx={{ borderColor: "rgba(74, 116, 218, 0.12)" }} />
 
           {/* <Stack spacing={1.5}>
             <Typography
@@ -193,14 +192,14 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
                     label={platform.name}
                     variant="outlined"
                     sx={{
-                      borderColor: "rgba(0, 227, 159, 0.28)",
+                      borderColor: "rgba(74, 116, 218, 0.28)",
                       borderRadius: "999px",
                       px: 1.5,
                       color: textPrimary,
-                      background: "rgba(17, 23, 23, 0.88)",
+                      background: "rgba(147, 206, 246, 0.12)",
                       ".MuiChip-icon": { color: textPrimary, mr: 0.75 },
                       boxShadow: platform.verified
-                        ? "0 0 0 1px rgba(0, 227, 159, 0.35)"
+                        ? "0 0 0 1px rgba(147, 206, 246, 0.4)"
                         : "none",
                     }}
                     aria-label={`Nền tảng ${platform.name} ${
@@ -217,8 +216,8 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
               sx={{
                 borderRadius: "18px",
                 background:
-                  "linear-gradient(135deg, rgba(0,199,118,0.28), rgba(0,227,159,0.36))",
-                border: "1px solid rgba(0, 227, 159, 0.45)",
+                  "linear-gradient(135deg, rgba(141, 226, 237, 0.35), rgba(88, 43, 175, 0.42))",
+                border: "1px solid rgba(74, 116, 218, 0.35)",
                 display: "flex",
                 alignItems: "center",
                 gap: 1.5,
@@ -227,11 +226,11 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
               }}
               aria-label="Bảo chứng doanh thu"
             >
-              <ShieldRoundedIcon sx={{ color: "#031412" }} />
+              <ShieldRoundedIcon sx={{ color: "#2f3c8c" }} />
               <Typography
                 variant="body1"
                 sx={{
-                  color: "#031412",
+                  color: "#2f3c8c",
                   fontWeight: 600,
                   letterSpacing: "0.04em",
                 }}

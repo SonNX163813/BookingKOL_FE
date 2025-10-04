@@ -28,6 +28,7 @@ const navItems = [
   { label: "Các gói dịch vụ", to: "/goi-dich-vu" },
   { label: "Blog", to: "/blog" },
   { label: "Quy trình hoàn thiện", to: "/quy-trinh" },
+  { label: "Trợ lý ảo AI", to: "/chat-AI" },
 ];
 
 const Navbar = () => {

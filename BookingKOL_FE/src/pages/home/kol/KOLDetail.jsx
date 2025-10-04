@@ -41,9 +41,9 @@ const buildHeaderData = (kol) => {
   if (location) {
     achievements.push(`Khu vực hoạt động: ${location}`);
   }
-  if (kol?.rateCardNote) {
-    achievements.push(`Lưu ý: ${kol.rateCardNote}`);
-  }
+  // if (kol?.rateCardNote) {
+  //   achievements.push(`Lưu ý: ${kol.rateCardNote}`);
+  // }
   const fallbackAvatar =
     kol?.avatarUrl ||
     kol?.profileImage ||
@@ -263,12 +263,16 @@ const KOLDetail = () => {
   );
   const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
   const shouldShowContent = !isLoading && !error && headerData;
-
+  const bgcolor = `
+    radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.45) 0%, rgba(147, 206, 246, 0.1) 60%, rgba(147, 206, 246, 0) 80%),
+    radial-gradient(90% 90% at 85% 50%, rgba(74, 116, 218, 0.45) 0%, rgba(147, 206, 246, 0.1) 60%, rgba(147, 206, 246, 0) 80%),
+    linear-gradient(180deg, rgba(147, 206, 246, 0.18) 0%, rgba(255, 255, 255, 1) 48%, rgba(147, 206, 246, 0.18) 100%)
+  `;
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        bgcolor: "#0B0F0E",
+        bgcolor: "#ffffff",
         position: "relative",
         overflow: "hidden",
         py: { xs: 4, md: 6 },
@@ -279,8 +283,7 @@ const KOLDetail = () => {
         sx={{
           position: "absolute",
           inset: 0,
-          background:
-            "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
+          // background: bgcolor,
         }}
       />
       <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
@@ -294,8 +297,8 @@ const KOLDetail = () => {
             }}
           >
             <Stack spacing={2} alignItems="center">
-              <CircularProgress color="success" />
-              <Typography sx={{ color: "#E6F4EF" }}>
+              <CircularProgress sx={{ color: "#4a74da" }} />
+              <Typography sx={{ color: "#2f3c8c" }}>
                 Đang tải thông tin KOL...
               </Typography>
             </Stack>
@@ -311,7 +314,7 @@ const KOLDetail = () => {
               justifyContent: "center",
             }}
           >
-            <Typography sx={{ color: "#E6F4EF", fontWeight: 600 }}>
+            <Typography sx={{ color: "#2f3c8c", fontWeight: 600 }}>
               Không có dữ liệu hiển thị.
             </Typography>
           </Box>

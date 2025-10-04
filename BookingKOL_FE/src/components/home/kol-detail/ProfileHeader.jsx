@@ -32,10 +32,10 @@ const statsConfig = [
   { key: "rating", label: "Đánh giá", icon: StarRoundedIcon },
 ];
 
-const textPrimary = "#E6F4EF";
-const textSecondary = "#AABBB5";
+const textPrimary = "#2f3c8c";
+const textSecondary = "rgba(47, 60, 140, 0.72)";
 const gradientBorder =
-  "linear-gradient(135deg, rgba(0,199,118,0.4), rgba(0,227,159,0.2))";
+  "linear-gradient(135deg, rgba(141, 226, 237, 0.7), rgba(147, 206, 246, 0.52), rgba(88, 43, 175, 0.38))";
 const fontFamily = "'Montserrat', sans-serif";
 
 const MotionBox = motion(Box);
@@ -154,13 +154,13 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
           borderRadius: "24px",
           px: { xs: 2.5, md: 3.5 },
           py: { xs: 3, md: 4 },
-          background:
-            "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-   radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-   linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-          border: "1px solid rgba(0, 227, 159, 0.12)",
+          backgroundColor: "#ffffff",
+          border: "1px solid rgba(74, 116, 218, 0.18)",
           boxShadow:
-            "0 30px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+            "0 6px 12px rgba(141, 226, 237, 0.36), \
+     0 12px 24px rgba(147, 206, 246, 0.32), \
+     0 18px 32px rgba(74, 116, 218, 0.38), \
+     0 2px 6px rgba(255, 255, 255, 0.18)",
           fontFamily,
         }}
       >
@@ -170,8 +170,9 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
             position: "absolute",
             inset: 0,
             background:
-              "radial-gradient(58% 60% at 15% 22%, rgba(0,227,159,0.18) 0%, rgba(11,15,14,0) 70%)",
-            opacity: 0.75,
+              "radial-gradient(55% 55% at 90% 0%, rgba(147, 206, 246, 0.35) 0%, rgba(147, 206, 246, 0) 70%), radial-gradient(60% 60% at 0% 100%, rgba(255, 161, 218, 0.28) 0%, rgba(88, 43, 175, 0) 70%)",
+            opacity: 0.9,
+            pointerEvents: "none",
           }}
         />
 
@@ -206,10 +207,11 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                   aspectRatio: "4 / 5",
                   borderRadius: "22px",
                   overflow: "hidden",
-                  border: "1px solid rgba(0, 227, 159, 0.18)",
+                  border: "1px solid rgba(74, 116, 218, 0.16)",
                   boxShadow:
-                    "0 24px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.05)",
-                  background: "rgba(17, 23, 23, 0.92)",
+                    "0 24px 48px rgba(74, 116, 218, 0.16), 0 0 0 1px rgba(147, 206, 246, 0.38)",
+                  background:
+                    "linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(147, 206, 246, 0.32) 55%, rgba(255, 161, 218, 0.28) 100%)",
                 }}
               >
                 <Box
@@ -230,10 +232,10 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                     position: "absolute",
                     inset: 0,
                     background:
-                      "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%)",
+                      "linear-gradient(180deg, rgba(255,255,255,0) 45%, rgba(74, 116, 218, 0.28) 100%)",
                   }}
                 />
-                {kol.isOnline && (
+                {/* {kol.isOnline && (
                   <Chip
                     icon={<CircleIcon sx={{ fontSize: 10 }} />}
                     label="Trực tuyến"
@@ -242,19 +244,19 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                       position: "absolute",
                       top: 16,
                       right: 16,
-                      background: "rgba(0, 227, 159, 0.18)",
+                      background: "rgba(141, 226, 237, 0.22)",
                       color: textPrimary,
                       fontWeight: 600,
                       borderRadius: "999px",
-                      border: "1px solid rgba(0, 227, 159, 0.35)",
+                      border: "1px solid rgba(74, 116, 218, 0.3)",
                       ".MuiChip-icon": {
-                        color: "#00E39F",
+                        color: "#ffffff",
                         marginLeft: 0.5,
                       },
                     }}
                     aria-label="KOL đang trực tuyến"
                   />
-                )}
+                )} */}
               </MotionBox>
 
               {thumbnails.length > 0 && (
@@ -267,7 +269,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                     px: 0.5,
                     "&::-webkit-scrollbar": { height: 6 },
                     "&::-webkit-scrollbar-thumb": {
-                      background: "rgba(0, 227, 159, 0.3)",
+                      background: "rgba(147, 206, 246, 0.35)",
                       borderRadius: 999,
                     },
                   }}
@@ -300,22 +302,22 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                           overflow: "hidden",
                           cursor: "pointer",
                           border: isActive
-                            ? "2px solid rgba(0, 227, 159, 0.7)"
-                            : "1px solid rgba(0, 227, 159, 0.28)",
+                            ? "2px solid rgba(74, 116, 218, 0.55)"
+                            : "1px solid rgba(74, 116, 218, 0.2)",
                           boxShadow: isActive
-                            ? "0 12px 24px rgba(0, 227, 159, 0.25)"
-                            : "0 10px 20px rgba(0, 0, 0, 0.35)",
+                            ? "0 12px 26px rgba(74, 116, 218, 0.28)"
+                            : "0 10px 20px rgba(74, 116, 218, 0.12)",
                           transition:
                             "transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease",
                           transform: isActive ? "translateY(-2px)" : "none",
-                          backgroundColor: "#101715",
+                          backgroundColor: "rgba(147, 206, 246, 0.12)",
                           "&:hover": {
                             transform: "translateY(-2px)",
-                            borderColor: "rgba(0, 227, 159, 0.6)",
-                            boxShadow: "0 14px 24px rgba(0, 227, 159, 0.2)",
+                            borderColor: "rgba(74, 116, 218, 0.45)",
+                            boxShadow: "0 16px 28px rgba(74, 116, 218, 0.18)",
                           },
                           "&:focus-visible": {
-                            outline: "2px solid rgba(0, 227, 159, 0.75)",
+                            outline: "2px solid rgba(88, 43, 175, 0.55)",
                             outlineOffset: 3,
                           },
                         }}
@@ -345,7 +347,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   background:
-                                    "linear-gradient(135deg, rgba(0, 199, 118, 0.35), rgba(3, 20, 18, 0.9))",
+                                    "linear-gradient(135deg, rgba(141, 226, 237, 0.48), rgba(88, 43, 175, 0.6))",
                                 }}
                                 aria-hidden
                               />
@@ -357,12 +359,12 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                backgroundColor: "rgba(0, 0, 0, 0.35)",
+                                backgroundColor: "rgba(88, 43, 175, 0.28)",
                               }}
                               aria-hidden
                             >
                               <PlayArrowRoundedIcon
-                                sx={{ color: "#E6F4EF", fontSize: 28 }}
+                                sx={{ color: textPrimary, fontSize: 28 }}
                               />
                             </Box>
                           </>
@@ -434,15 +436,15 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                             label={genderLabel}
                             size="small"
                             sx={{
-                              background: "rgba(0, 227, 159, 0.16)",
+                              background: "rgba(147, 206, 246, 0.18)",
                               color: textPrimary,
                               borderRadius: "999px",
                               fontWeight: 600,
-                              border: "1px solid rgba(0, 227, 159, 0.32)",
+                              border: "1px solid rgba(74, 116, 218, 0.24)",
                             }}
                           />
                         )}
-                        {kolIdLabel && (
+                        {/* {kolIdLabel && (
                           <Chip
                             label={kolIdLabel}
                             size="small"
@@ -450,10 +452,10 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                               background: "rgba(17, 23, 23, 0.82)",
                               color: textSecondary,
                               borderRadius: "999px",
-                              border: "1px solid rgba(0, 227, 159, 0.18)",
+                              border: "1px solid rgba(74, 116, 218, 0.18)",
                             }}
                           />
-                        )}
+                        )} */}
                       </Stack>
                     </MotionStack>
 
@@ -517,9 +519,9 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                         borderRadius: "20px",
                         px: 2.5,
                         py: 2,
-                        bgcolor: "rgba(18, 26, 25, 0.82)",
-                        border: "1px solid rgba(0, 227, 159, 0.16)",
-                        backdropFilter: "blur(12px)",
+                        bgcolor: "rgba(147, 206, 246, 0.12)",
+                        border: "1px solid rgba(74, 116, 218, 0.18)",
+                        backdropFilter: "blur(10px)",
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,
@@ -529,24 +531,24 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                     >
                       <Box
                         sx={{
-                          width: 36,
-                          height: 36,
+                          width: 40,
+                          height: 40,
                           borderRadius: "12px",
                           background: gradientBorder,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#00E39F",
+                          color: "#4a74da",
                         }}
                       >
-                        <IconComponent sx={{ fontSize: 20 }} />
+                        <IconComponent sx={{ fontSize: 24 }} />
                       </Box>
                       <Typography
                         variant="body2"
                         sx={{
                           color: textSecondary,
                           letterSpacing: "0.04em",
-                          fontSize: "0.85rem",
+                          fontSize: "0.95rem",
                         }}
                       >
                         {label}
@@ -579,7 +581,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                   sx={{
                     flex: 1,
                     borderRadius: "18px",
-                    border: "1.5px solid rgba(0, 227, 159, 0.4)",
+                    border: "1.5px solid rgba(74, 116, 218, 0.35)",
                     color: textPrimary,
                     textTransform: "none",
                     px: 4,
@@ -588,11 +590,11 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                     gap: 1,
                     fontSize: "1.1rem",
                     "&:hover": {
-                      borderColor: "rgba(0, 227, 159, 0.6)",
-                      background: "rgba(0, 227, 159, 0.08)",
+                      borderColor: "rgba(74, 116, 218, 0.5)",
+                      background: "rgba(147, 206, 246, 0.16)",
                     },
                     "&:focus-visible": {
-                      outline: "2px solid rgba(0, 227, 159, 0.6)",
+                      outline: "2px solid rgba(88, 43, 175, 0.55)",
                       outlineOffset: 3,
                     },
                   }}
@@ -607,23 +609,23 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                   sx={{
                     flex: 1,
                     background:
-                      "linear-gradient(135deg, #00C776 0%, #00E39F 100%)",
-                    color: "#031412",
+                      "linear-gradient(135deg, #93cef6 0%, #4a74da 50%, #582baf 100%)",
+                    color: "#ffffff",
                     fontWeight: 700,
                     textTransform: "none",
                     px: 4,
                     py: 2,
                     borderRadius: "18px",
-                    boxShadow: "0 18px 40px rgba(0, 227, 159, 0.25)",
+                    boxShadow: "0 18px 40px rgba(74, 116, 218, 0.25)",
                     gap: 1,
                     fontSize: "1.1rem",
                     "&:hover": {
                       background:
-                        "linear-gradient(135deg, #00D584 0%, #00F4B0 100%)",
-                      boxShadow: "0 20px 46px rgba(0, 227, 159, 0.32)",
+                        "linear-gradient(135deg, #8de2ed 0%, #4a74da 55%, #582baf 100%)",
+                      boxShadow: "0 20px 46px rgba(88, 43, 175, 0.3)",
                     },
                     "&:focus-visible": {
-                      outline: "2px solid rgba(0, 227, 159, 0.6)",
+                      outline: "2px solid rgba(88, 43, 175, 0.55)",
                       outlineOffset: 3,
                     },
                   }}
@@ -640,8 +642,9 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                   {...fadeUpProps(0.5)}
                   sx={{
                     borderRadius: "20px",
-                    background: "rgba(18, 26, 25, 0.84)",
-                    border: "1px solid rgba(0, 227, 159, 0.16)",
+                    background:
+                      "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(147, 206, 246, 0.25) 55%, rgba(255, 161, 218, 0.22) 100%)",
+                    border: "1px solid rgba(74, 116, 218, 0.16)",
                     px: { xs: 2.5, md: 3 },
                     py: { xs: 2, md: 2.5 },
                   }}
@@ -652,7 +655,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                     alignItems="center"
                     mb={1.5}
                   >
-                    <EmojiEventsRoundedIcon sx={{ color: "#FFD166" }} />
+                    <EmojiEventsRoundedIcon sx={{ color: "#ffa1da" }} />
                     <Typography
                       variant="h6"
                       sx={{ color: textPrimary, fontWeight: 600 }}
@@ -670,7 +673,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                       >
                         <CheckCircleRoundedIcon
                           sx={{
-                            color: "#00E39F",
+                            color: "#4a74da",
                             fontSize: 18,
                             opacity: 0.9,
                           }}
@@ -717,7 +720,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
               top: 12,
               right: 12,
               zIndex: 1,
-              color: "#E6F4EF",
+              color: textPrimary,
               backgroundColor: "rgba(0, 0, 0, 0.4)",
               "&:hover": {
                 backgroundColor: "rgba(0, 0, 0, 0.6)",

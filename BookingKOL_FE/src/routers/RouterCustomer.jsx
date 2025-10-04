@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 
-import Layout from "../layouts/Layout";
+import MainLayout from "../layouts/MainLayout";
 
 // Pages (public)
 import HomePage from "../pages/home/HomePage";
@@ -24,7 +24,10 @@ import GuestOnly, { RequireAuth } from "./RouterGuards";
 
 const courseRoutes = [
   { path: "/goi-dich-vu", element: <CourseLivesteam /> },
-  { path: "/goi-dich-vu/:courseId/:courseName", element: <CourseLivesteamDetail /> },
+  {
+    path: "/goi-dich-vu/:courseId/:courseName",
+    element: <CourseLivesteamDetail />,
+  },
 ];
 
 export const routerCustomer = [
@@ -41,7 +44,7 @@ export const routerCustomer = [
 
   // PUBLIC (có layout)
   {
-    element: <Layout />,
+    element: <MainLayout />,
     children: [
       { path: "/", element: <HomePage /> },
       { path: "/kols/:kolId/:kolName", element: <KOLDetail /> },
@@ -56,7 +59,7 @@ export const routerCustomer = [
     element: <RequireAuth />,
     children: [
       {
-        element: <Layout />,
+        element: <MainLayout />,
         children: [{ path: "/userprofile", element: <UserProfile /> }],
       },
     ],
