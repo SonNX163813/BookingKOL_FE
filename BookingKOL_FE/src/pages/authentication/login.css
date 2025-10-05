@@ -1,11 +1,25 @@
+/* ===================== THEME / TOKENS ===================== */
 :root {
-  --blue: #0f78ff;
+  /* Base */
   --text: #0f172a;
   --muted: #64748b;
   --border: #e2e8f0;
-  --bg: #f8fafc;
+  --bg: #ffffff;
+
+  /* Brand palette (bạn chọn) */
+  --g1: #8de2ed; /* nhạt */
+  --g2: #93cef6; /* trung bình */
+  --g3: #4a74da; /* đậm */
+
+  /* Alias tiện dùng */
+  --primary: var(--g3); /* chính: xanh đậm */
+  --primary-2: var(--g2); /* phụ: xanh trung */
+  --primary-3: var(--g1); /* phụ: xanh nhạt */
+  --on-primary: #ffffff; /* chữ trên nền nút */
+  --ring: 34, 92, 218; /* rgb của --g3 để tái dùng (focus ring) */
 }
 
+/* Reset */
 * {
   box-sizing: border-box;
 }
@@ -14,15 +28,20 @@ body {
   font-family: "Montserrat", Inter, system-ui, -apple-system, Segoe UI, Roboto,
     sans-serif;
   color: var(--text);
-}
-.error-text {
-  color: #e53935; /* đỏ */
-  font-size: 14px;
-  margin-bottom: 8px;
-  text-align: left;
+  background: var(--bg);
 }
 
-/* layout 2 cột */
+.error-text,
+.err-msg {
+  color: #e53935;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 6px 0 8px;
+  text-align: left;
+  font-weight: 500;
+}
+
+/* ===================== LAYOUT ===================== */
 .login-wrap {
   display: grid;
   grid-template-columns: 50% 50%;
@@ -39,7 +58,7 @@ body {
   overflow: hidden;
 }
 
-/* Logo trái trên trong left hero */
+/* Logo trái trên */
 .brand {
   position: absolute;
   top: 16px;
@@ -56,38 +75,39 @@ body {
   object-fit: contain;
 }
 
-/* Wave */
+/* Wave (ẩn riêng ở trang forgot bên dưới) */
 .hero-wave {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: auto; /* thay vì fix 280px */
-  max-height: 30%; /* để tỉ lệ ổn định */
-  z-index: 0; /* nằm dưới content */
+  height: auto;
+  max-height: 30%;
+  z-index: 0;
 }
 
-/* Tiêu đề lớn bên trái: gradient xanh */
+/* ===================== TYPO / HEADINGS ===================== */
+/* Tiêu đề lớn: chuyển sang gradient xanh (g3 -> g1) */
 .left-hero h1 {
-  font-size: 48px;
+  font-size: clamp(26px, 6vw, 48px);
   line-height: 1.2;
-  margin: 160px auto 28px;
+  margin: clamp(80px, 18vh, 160px) auto 20px;
   text-align: center;
   font-weight: 700;
   max-width: 100%;
   text-transform: none;
-  background: linear-gradient(90deg, #145829, #37a25a);
+  background: linear-gradient(90deg, var(--g3), var(--g2), var(--g1));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 .left-hero h1 .highlight {
-  background: linear-gradient(90deg, #145829, #37a25a);
+  background: linear-gradient(90deg, var(--g3), var(--g2), var(--g1));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
 }
 
-/* Stats */
+/* ===================== STATS ===================== */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -98,22 +118,6 @@ body {
   z-index: 5;
   position: relative;
 }
-/* Input có lỗi: border đỏ + outline đỏ khi focus */
-.input-error {
-  border-color: #dc2626 !important;
-  outline-color: rgba(220, 38, 38, 0.35) !important;
-}
-
-.stats b {
-  font-size: 22px; /* nhỏ hơn so với 22px cũ */
-  margin-bottom: 4px; /* tạo khoảng cách giữa số và chữ mô tả */
-}
-
-.stats span {
-  font-size: 14px; /* chữ mô tả nhỏ gọn lại */
-  line-height: 1.4;
-}
-
 .stats b {
   display: block;
   font-size: 24px;
@@ -122,16 +126,8 @@ body {
   opacity: 0.9;
   font-size: 14px;
 }
-.error-text,
-.err-msg {
-  color: #e53935; /* đỏ */
-  font-size: 14px;
-  line-height: 1.45;
-  margin: 6px 0 8px;
-  text-align: left;
-  font-weight: 500; /* đồng bộ “kiểu chữ” với các lỗi khác nếu bạn đang dùng 500 */
-}
-/* RIGHT CARD */
+
+/* ===================== RIGHT CARD ===================== */
 .right-card {
   background: #fff;
   padding: 56px 56px 0;
@@ -142,7 +138,7 @@ body {
   margin-top: -150px;
 }
 
-/* Header form: logo + tiêu đề căn giữa */
+/* Header form */
 .login-header {
   text-align: center;
   margin-bottom: 1px;
@@ -151,7 +147,7 @@ body {
   width: 190px;
   height: 190px;
   object-fit: contain;
-  margin: 0px auto -20px;
+  margin: 0 auto -20px;
 }
 .login-title {
   margin: 0;
@@ -171,48 +167,34 @@ body {
   color: var(--muted);
   font-size: 14px;
 }
+
+/* Links chuyển sang tông xanh mới */
 .register-link {
   text-align: center;
-
   font-size: 14px;
   margin-top: 16px;
   color: var(--muted);
 }
-
-.register-link a {
-  color: #37a25a;
+.register-link a,
+.terms a,
+.forgot-link {
+  color: var(--primary);
   font-weight: 600;
   text-decoration: none;
 }
-
-.register-link a:hover {
+.register-link a:hover,
+.terms a:hover,
+.forgot-link:hover {
+  color: var(--primary-2);
   text-decoration: underline;
 }
 
-.terms {
-  margin-top: 12px;
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.4;
-  text-align: center;
-}
-
-.terms a {
-  color: #37a25a;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.terms a:hover {
-  text-decoration: underline;
-}
-
-/* FORM */
+/* ===================== FORM ===================== */
 .form {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 100%; /* giới hạn chiều rộng form để gọn mắt */
+  max-width: 100%;
   width: 100%;
   margin: 0 auto;
 }
@@ -221,29 +203,18 @@ body {
   font-weight: 600;
   color: #0f172a;
 }
-.pw-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 6px;
-}
-/* Mặc định */
-.forgot-link {
-  color: #145829 !important; /* màu luôn hiển thị */
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none; /* bỏ gạch chân */
-  transition: color 0.2s ease;
-}
-
-/* Khi hover */
-.forgot-link:hover {
-  color: #37a25a !important; /* đổi sang xanh sáng hơn */
-  text-decoration: underline;
+.right-card .form,
+.right-card .login-header,
+.register-link,
+.terms {
+  max-width: 700px; /* <-- kích thước form “như cũ” */
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .input {
-  width: 100%; /* <- thay vì 620px */
+  width: 100%;
   max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -253,15 +224,22 @@ body {
   font-size: 16px;
 }
 .input:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(15, 120, 255, 0.15);
+  border-color: var(--primary);
+  /* ring màu theo g3 */
+  box-shadow: 0 0 0 3px rgba(var(--ring), 0.18);
 }
-
 .input::placeholder {
-  text-align: left; /* luôn căn trái */
-  padding-left: 6px; /* thêm chút khoảng cách nhỏ để không dính sát viền */
+  text-align: left;
+  padding-left: 6px;
 }
 
+/* Input error giữ nguyên đỏ */
+.input-error {
+  border-color: #dc2626 !important;
+  outline-color: rgba(220, 38, 38, 0.35) !important;
+}
+
+/* Remember / Checkbox */
 .remember {
   display: flex;
   align-items: center;
@@ -271,45 +249,40 @@ body {
 }
 .remember-forgot {
   display: flex;
-  justify-content: space-between; /* trái & phải */
+  justify-content: space-between;
   align-items: center;
   font-size: 14px;
   margin-top: 8px;
 }
-
 .remember-forgot label {
   display: flex;
+
   align-items: center;
-  gap: 6px; /* khoảng cách giữa checkbox và text */
+  gap: 6px;
   color: var(--muted);
 }
 input[type="checkbox"] {
-  accent-color: #37a25a;
+  accent-color: var(--primary);
 }
 
-.remember-forgot a {
-  color: #37a25a;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-/* Nút Đăng nhập: gradient xanh */
+/* Primary button: gradient xanh mới (đậm → trung) */
 .primary-btn {
   width: 100%;
   padding: 14px 18px;
   border-radius: 10px;
-  background: linear-gradient(90deg, #37a25a, #145829);
-  color: #fff;
+  background: linear-gradient(90deg, var(--g3), var(--g2));
+  color: var(--on-primary);
   font-weight: 700;
   font-size: 16px;
   border: 0;
   cursor: pointer;
-  transition: transform 0.06s ease, filter 0.2s ease;
+  transition: transform 0.06s ease, filter 0.2s ease, box-shadow 0.2s ease;
   margin-top: 8px;
 }
 .primary-btn:hover {
-  filter: brightness(0.97);
+  filter: brightness(0.98);
   transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(var(--ring), 0.22);
 }
 .primary-btn:active {
   transform: translateY(0);
@@ -333,7 +306,7 @@ input[type="checkbox"] {
   display: block;
 }
 
-/* Nút Google: chuẩn hoá, căn giữa icon + chữ, không viền */
+/* Google btn giữ trung tính */
 .google-btn {
   display: flex;
   align-items: center;
@@ -353,10 +326,10 @@ input[type="checkbox"] {
   height: 22px;
   object-fit: contain;
   display: block;
-  margin-left: -5px; /* bạn muốn đẩy trái 5px */
-  /* PNG có nền thừa → cắt bớt viền */
+  margin-left: -5px;
   clip-path: inset(6% 6% 6% 6%);
 }
+
 .alert {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -365,59 +338,124 @@ input[type="checkbox"] {
   line-height: 1.45;
   margin-bottom: 12px;
 }
-
 .alert-success {
-  background: #f0fdf4; /* xanh nhạt */
-  border-color: #bbf7d0;
-  color: #14532d;
+  background: #eef7ff; /* xanh dương rất nhạt thay vì xanh lá */
+  border-color: rgba(var(--ring), 0.28); /* viền theo g3 */
+  color: #0b3a99; /* chữ xanh đậm dễ đọc */
 }
-
 .muted-note {
   margin-top: 6px;
   color: var(--muted);
   font-size: 13px;
 }
 
-/* {---- mobile ------} */
-
-/* ========== Mobile-first tweaks ========== */
-
-/* 1) Chữ lớn mượt hơn trên mọi màn hình */
-.left-hero h1 {
-  /* thay size cứng bằng clamp để tự co giãn */
-  font-size: clamp(26px, 6vw, 48px);
-  margin: clamp(80px, 18vh, 160px) auto 20px;
+/* ===================== DECOR GRADIENT (FORGOT PAGE ONLY) ===================== */
+.forgot-page {
+  background: #fff !important;
+  position: relative;
+  overflow: hidden;
 }
 
-/* 2) Giới hạn độ rộng nội dung form cho đỡ “tràn” */
-.right-card .form,
-.right-card .login-header,
-.register-link,
-.terms {
-  max-width: 420px;
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+/* Góc trái-trên */
+.forgot-page::before {
+  content: "";
+  position: absolute;
+  top: -96px;
+  left: -96px;
+  width: 520px;
+  height: 520px;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(24px);
+  opacity: 0.7;
+  background-image: radial-gradient(
+      ellipse 260px 260px at 35% 35%,
+      var(--g1) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 220px 220px at 70% 30%,
+      var(--g2) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 180px 180px at 20% 80%,
+      var(--g3) 0%,
+      transparent 60%
+    );
 }
 
-/* 3) Ẩn bớt chi tiết rườm rà khi hẹp */
-.stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+/* Góc phải-dưới */
+.forgot-page::after {
+  content: "";
+  position: absolute;
+  right: -80px;
+  bottom: -112px;
+  width: 520px;
+  height: 520px;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(24px);
+  opacity: 0.7;
+  background-image: radial-gradient(
+      ellipse 260px 260px at 65% 65%,
+      var(--g3) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 220px 220px at 35% 70%,
+      var(--g2) 0%,
+      transparent 62%
+    );
 }
-@media (max-width: 768px) {
-  .stats {
-    grid-template-columns: repeat(2, 1fr); /* 2 cột thay vì 4 */
+@media (min-width: 768px) {
+  .forgot-page::after {
+    background-image: radial-gradient(
+        ellipse 260px 260px at 65% 65%,
+        var(--g3) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 220px 220px at 35% 70%,
+        var(--g2) 0%,
+        transparent 62%
+      ),
+      radial-gradient(
+        ellipse 180px 180px at 80% 30%,
+        var(--g1) 0%,
+        transparent 60%
+      );
   }
-  .stats b {
-    font-size: 16px;
-  }
-  .stats span {
-    font-size: 12px;
-  }
 }
 
-/* ====== Breakpoint: tablet trở xuống (≤ 1024px) ====== */
+/* Điểm xuyết phải-trên của card phải */
+.forgot-page .right-card::before {
+  content: "";
+  position: absolute;
+  right: 96px;
+  top: -40px;
+  width: 260px;
+  height: 260px;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(18px);
+  opacity: 0.6;
+  background-image: radial-gradient(
+      circle 140px at 60% 40%,
+      var(--g1) 0%,
+      transparent 60%
+    ),
+    radial-gradient(circle 100px at 30% 70%, var(--g2) 0%, transparent 58%);
+}
+
+/* Bảo đảm nội dung nằm trên các shape */
+.left-hero,
+.right-card {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===================== RESPONSIVE (giữ nguyên logic cũ) ===================== */
 @media (max-width: 1024px) {
   .left-hero,
   .right-card {
@@ -446,15 +484,12 @@ input[type="checkbox"] {
   }
 }
 
-/* ====== Breakpoint: mobile lớn (≤ 768px) ====== */
-/* Chuyển 2 cột -> 1 cột, đưa form lên trước (UX tốt hơn) */
+/* 2 cột -> 1 cột */
 @media (max-width: 768px) {
   .login-wrap {
-    grid-template-columns: 1fr; /* 1 cột */
-    min-height: 100dvh; /* cao trọn màn */
+    grid-template-columns: 1fr;
+    min-height: 100dvh;
   }
-
-  /* sắp xếp: form ở trên, hero ở dưới */
   .right-card {
     order: 1;
     padding: 28px 20px 20px;
@@ -463,8 +498,6 @@ input[type="checkbox"] {
     order: 2;
     padding: 24px 20px 0;
   }
-
-  /* thu nhỏ header/logo */
   .login-logo-top {
     width: 140px;
     height: 140px;
@@ -475,8 +508,6 @@ input[type="checkbox"] {
   .login-sub {
     font-size: 13px;
   }
-
-  /* thống kê: 2 cột, chữ nhỏ hơn */
   .stats {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
@@ -488,13 +519,9 @@ input[type="checkbox"] {
   .stats span {
     font-size: 12px;
   }
-
-  /* hero wave thấp hơn để không che nội dung */
   .hero-wave {
     max-height: 18%;
   }
-
-  /* brand/logo góc trái gọn lại */
   .brand {
     gap: 8px;
   }
@@ -504,7 +531,6 @@ input[type="checkbox"] {
   }
 }
 
-/* ====== Breakpoint: mobile nhỏ (≤ 480px) ====== */
 @media (max-width: 480px) {
   .left-hero {
     padding: 18px 16px 0;
@@ -512,17 +538,13 @@ input[type="checkbox"] {
   .right-card {
     padding: 20px 16px 16px;
   }
-
   .left-hero h1 {
     font-size: clamp(22px, 7.5vw, 26px);
     margin: 64px auto 16px;
   }
-
-  /* ẩn stats nếu màn quá nhỏ cho thoáng mắt */
   .stats {
     display: none;
   }
-
   .brand {
     top: 8px;
     left: 12px;
@@ -531,7 +553,6 @@ input[type="checkbox"] {
     width: 80px;
     height: 80px;
   }
-
   .login-logo-top {
     width: 140px;
     height: 140px;
@@ -542,7 +563,6 @@ input[type="checkbox"] {
   .login-sub {
     font-size: 12px;
   }
-
   .input {
     padding: 12px 12px;
     font-size: 14px;
@@ -554,7 +574,6 @@ input[type="checkbox"] {
     font-size: 14px;
     border-radius: 10px;
   }
-
   .divider {
     margin: 8px 0;
     font-size: 12px;
@@ -569,60 +588,41 @@ input[type="checkbox"] {
   .register-link {
     font-size: 12px;
   }
-
-  /* wave rất thấp để không đè chữ */
   .hero-wave {
     max-height: 14%;
   }
 }
 
-/* ====== Breakpoint: siêu nhỏ (≤ 360px) ====== */
-@media (max-width: 360px) {
-  .left-hero h1 {
-    font-size: 20px;
-  }
-  .login-title {
-    font-size: 18px;
-  }
-  .input {
-    font-size: 13px;
-  }
-  .primary-btn,
-  .google-btn {
-    font-size: 13px;
-  }
-}
-
-/* ===== Điện thoại nhỏ (≤ 576px): ẩn hẳn left hero, chỉ còn form ===== */
+/* ≤ 576px: ẩn hẳn hero trái, chỉ còn form */
 @media (max-width: 576px) {
   .login-wrap {
-    grid-template-columns: 1fr; /* 1 cột */
+    grid-template-columns: 1fr;
     min-height: 100dvh;
   }
   .left-hero {
-    display: none !important; /* ẩn hero bên trái */
+    display: none !important;
   }
   .right-card {
     padding: 28px 20px;
-    min-height: 100dvh; /* full cao màn */
-    justify-content: flex-start; /* form bắt đầu từ trên */
+    min-height: 100dvh;
+    justify-content: flex-start;
   }
 }
 
-/* ===== Tablet (577–1023px): xếp 1 cột, vẫn hiển thị left hero bên dưới form (tùy chọn) ===== */
+/* Tablet dọc: 1 cột, hero dưới */
 @media (min-width: 577px) and (max-width: 1023px) {
   .login-wrap {
-    grid-template-columns: 1fr; /* 1 cột */
+    grid-template-columns: 1fr;
   }
   .right-card {
     order: 1;
   }
   .left-hero {
     order: 2;
-  } /* hero dưới form, không chiếm chỗ quá nhiều */
+  }
 }
 
-/* ===== Màn lớn (≥ 1024px): hiển thị 2 cột như desktop ===== */
+/* Desktop */
 @media (min-width: 1024px) {
   .login-wrap {
     grid-template-columns: 50% 50%;
@@ -632,69 +632,51 @@ input[type="checkbox"] {
   }
 }
 
-@media (max-width: 1024px) {
-}
-
-/* iPad / Tablet ngang (768px – 1024px) */
+/* iPad ngang: đẩy chữ xuống thêm nếu bạn cần */
 @media (min-width: 768px) and (max-width: 1024px) {
   .left-hero h1 {
-    margin-top: 400px; /* đẩy chữ xuống thêm */
+    margin-top: 400px;
   }
 }
 
-/* ===== Chỉ áp cho trang Forgot Password ===== */
+/* Chỉ áp cho trang Forgot: dịch form lên desktop */
 @media (min-width: 1024px) {
-  /* Dịch cụm bên phải (form) lên 50px trên desktop */
   .forgot-page .right-card {
-    /* Chọn 1 trong 2: margin-top âm (thay đổi layout) hoặc translate (không đổi flow) */
-
-    /* Cách 1 - Dễ hiểu, thay đổi layout: */
     margin-top: -200px;
-
-    /* Cách 2 - Không đổi flow, chỉ dịch thị giác: */
-    /* transform: translateY(-50px); */
   }
 }
-
-/* Tablet (768–1023px): dịch nhẹ hơn 30px cho cân */
 @media (min-width: 768px) and (max-width: 1023px) {
   .forgot-page .right-card {
-    margin-top: -30px; /* hoặc translateY(-30px) nếu bạn chọn cách 2 */
+    margin-top: -30px;
   }
 }
-
-/* Mobile ≤ 767px: giữ nguyên để không đè logo/tiêu đề */
 @media (max-width: 767px) {
   .forgot-page .right-card {
-    margin-top: 0; /* hoặc remove translate */
+    margin-top: 0;
     transform: none;
   }
 }
-/* ==== Overrides theo yêu cầu ==== */
 
-/* ≤1000px: chỉ còn 1 cột, ẩn left-hero, logo top cách 30px */
+/* ≤1000px: 1 cột */
 @media (max-width: 1000px) {
   .login-wrap {
     grid-template-columns: 1fr;
     min-height: 100dvh;
   }
-
   .left-hero {
     display: none !important;
   }
-
   .right-card {
     padding: 28px 20px;
     justify-content: flex-start;
-    margin-top: 0; /* reset âm margin trên mobile nếu có */
+    margin-top: 0;
   }
-
   .login-logo-top {
-    margin-top: 30px; /* logo trên mobile cách trên 30px */
+    margin-top: 30px;
   }
 }
 
-/* >1000px: hiển thị 2 cột như desktop */
+/* >1000px: 2 cột */
 @media (min-width: 1001px) {
   .login-wrap {
     grid-template-columns: 50% 50%;
@@ -703,9 +685,274 @@ input[type="checkbox"] {
     display: block;
   }
 }
-/* Mobile rất nhỏ (≤500px): logo không có khoảng cách trên */
+
+/* Mobile rất nhỏ */
 @media (max-width: 500px) {
   .login-logo-top {
     margin-top: -20px !important;
   }
+}
+/* ====== Viền gradient mảnh cho right-card (accent nhẹ) ====== */
+.forgot-page .right-card.accented {
+  position: relative;
+  background: #fff; /* giữ trắng */
+  border-radius: 16px; /* bo mềm để viền sáng đẹp */
+  /* đẩy card tách nền 1 chút (tùy chọn) */
+  box-shadow: 0 8px 24px rgba(12, 50, 120, 0.06);
+}
+
+/* Lớp viền gradient 1.5px bằng mask để không đổ đầy */
+.forgot-page .right-card.accented::after {
+  content: "";
+  position: absolute;
+  inset: -1px; /* viền ôm sát */
+  border-radius: 18px; /* lớn hơn 2px so với card để không “cắt” */
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(135deg, var(--g3), var(--g2), var(--g1));
+  /* Khoét rỗng giữa để chỉ còn “viền” */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1.5px; /* độ dày viền */
+  opacity: 0.9; /* giảm mạnh nếu muốn siêu nhẹ */
+}
+
+/* Bảo đảm nội dung nằm trên viền */
+.forgot-page .right-card.accented > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ====== “Dots” gradient điểm xuyết bên trong vùng right-card ====== */
+.forgot-page .right-card.accented::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* vài chấm/đuôi sáng rất nhẹ, không phủ toàn bộ */
+  background-image: radial-gradient(
+      110px 110px at 88% 8%,
+      rgba(141, 226, 237, 0.35) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      90px 90px at 92% 24%,
+      rgba(147, 206, 246, 0.28) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      120px 120px at 6% 88%,
+      rgba(74, 116, 218, 0.18) 0%,
+      transparent 62%
+    );
+  filter: blur(10px);
+  opacity: 0.8;
+}
+
+/* Màn nhỏ: giảm bớt dot để đỡ rối */
+@media (max-width: 768px) {
+  .forgot-page .right-card.accented::before {
+    background-image: radial-gradient(
+      100px 100px at 86% 10%,
+      rgba(141, 226, 237, 0.32) 0%,
+      transparent 60%
+    );
+    opacity: 0.7;
+  }
+}
+
+/* Nếu bạn muốn viền nổi hơn khi hover (tuỳ chọn) */
+.forgot-page .right-card.accented:hover::after {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+/* Canh giữa cả cụm */
+.terms {
+  display: flex;
+  justify-content: center;
+  text-align: left; /* để nội dung trong label căn trái, không bị dàn đều */
+}
+
+/* Đặt checkbox và chữ trên cùng một hàng, khoảng cách đúng 2px */
+.terms-consent {
+  display: inline-flex;
+  align-items: flex-start; /* căn theo đỉnh để checkbox thẳng hàng với dòng đầu */
+  gap: 2px; /* <-- khoảng cách ô checkbox và chữ = 2px */
+  line-height: 1.45;
+  font-size: 22px; /* theo style hiện có của .terms */
+}
+
+/* Xoá margin mặc định của checkbox để không phá gap=2px */
+.terms-consent input[type="checkbox"] {
+  margin: 0; /* nhiều trình duyệt có margin mặc định */
+
+  transform: translateY(
+    1px
+  ); /* tinh chỉnh rất nhẹ nếu muốn thẳng baseline hơn */
+}
+
+/* Link màu theo palette bạn đã chọn */
+.terms-consent a {
+  color: var(--g3);
+  font-weight: 600;
+  text-decoration: none;
+}
+.terms-consent a:hover {
+  color: var(--g2);
+  text-decoration: underline;
+}
+/* Giữ kích thước form “như cũ” cho trang Login */
+.login-page .right-card .form,
+.login-page .right-card .login-header,
+.login-page .register-link,
+.login-page .terms {
+  max-width: 420px; /* <-- size cũ */
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Viền gradient mảnh + dots cho right-card (cross-browser, không dùng mask) */
+.login-page .right-card.accented {
+  position: relative;
+  border-radius: 16px;
+  border: 1.5px solid transparent;
+  background: linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(135deg, var(--g3), var(--g2), var(--g1)) border-box;
+  box-shadow: 0 8px 24px rgba(12, 50, 120, 0.06);
+}
+.login-page .right-card.accented::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-repeat: no-repeat;
+  background-image: radial-gradient(
+      110px 110px at 88% 8%,
+      rgba(141, 226, 237, 0.45) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      90px 90px at 92% 24%,
+      rgba(147, 206, 246, 0.38) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      120px 120px at 6% 88%,
+      rgba(74, 116, 218, 0.28) 0%,
+      transparent 62%
+    );
+}
+.login-page .right-card.accented > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .login-page .right-card.accented::before {
+    background-image: radial-gradient(
+      100px 100px at 86% 10%,
+      rgba(141, 226, 237, 0.38) 0%,
+      transparent 60%
+    );
+  }
+}
+
+/* Điều khoản: canh giữa + checkbox cách chữ 2px */
+.terms {
+  display: flex;
+  justify-content: center;
+  text-align: left;
+}
+.terms-consent {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 2px; /* <-- đúng yêu cầu */
+  line-height: 1.45;
+  font-size: 13px;
+}
+.terms-consent input[type="checkbox"] {
+  margin: 0;
+  margin-right: 5px;
+  transform: translateY(1px);
+}
+.terms-consent a {
+  color: var(--g3);
+  font-weight: 600;
+  text-decoration: none;
+}
+.terms-consent a:hover {
+  color: var(--g2);
+  text-decoration: underline;
+}
+/* Desktop: 2 cột -> bỏ viền bên trái của right-card để không còn vạch giữa */
+@media (min-width: 1001px) {
+  .login-page .right-card.accented,
+  .forgot-page .right-card.accented {
+    border-left: 0 !important; /* bỏ cạnh trái */
+    /* vẫn giữ viền gradient 3 cạnh còn lại như cũ */
+    border-top: 1.5px solid transparent;
+    border-right: 1.5px solid transparent;
+    border-bottom: 1.5px solid transparent;
+    background: linear-gradient(#fff, #fff) padding-box,
+      linear-gradient(135deg, var(--g3), var(--g2), var(--g1)) border-box;
+  }
+}
+
+/* Mobile / tablet (1 cột): vẫn để viền 4 cạnh như cũ */
+@media (max-width: 1000px) {
+  .login-page .right-card.accented,
+  .forgot-page .right-card.accented {
+    border: 1.5px solid transparent;
+    background: linear-gradient(#fff, #fff) padding-box,
+      linear-gradient(135deg, var(--g3), var(--g2), var(--g1)) border-box;
+  }
+}
+/* ==== FORM WIDTH: dùng biến để điều chỉnh, không fix cứng ==== */
+/* Giá trị mặc định (có thể đổi ở :root hoặc inline style) */
+.login-page {
+  --form-min: 380px; /* tối thiểu */
+  --form-ideal: 48vw; /* lý tưởng theo viewport */
+  --form-max: 650px; /* tối đa */
+}
+
+/* Gỡ các giới hạn cũ và thay bằng clamp theo biến */
+.login-page .right-card .form,
+.login-page .right-card .login-header,
+.login-page .register-link,
+.login-page .terms {
+  max-width: clamp(
+    var(--form-min),
+    var(--form-ideal),
+    var(--form-max)
+  ) !important;
+  width: min(100%, var(--form-max)) !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Đảm bảo input/btn chiếm full chiều ngang khối form */
+.login-page .input,
+.login-page .primary-btn,
+.login-page .google-btn {
+  width: 100%;
+}
+
+/* Mobile vẫn full width gọn gàng */
+@media (max-width: 768px) {
+  .login-page {
+    --form-min: 100%;
+    --form-ideal: 100%;
+    --form-max: 100%;
+  }
+}
+.login-page .terms-consent {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.login-page .terms-consent input[type="checkbox"] {
+  transform: translateY(2px); /* canh lại cho thẳng hàng khi chữ to hơn */
 }
