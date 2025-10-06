@@ -1,20 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./userProfile.css";
 import avt from "../../../assets/prf.jpg";
-
-/* ==== MUI DatePicker ==== */
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs from "dayjs";
+import { DatePicker as AntDatePicker } from "antd";
 
 export default function UserProfile() {
   const [editing, setEditing] = useState(false);
+
+  // Ảnh đại diện (preview)
+  const [avatarUrl, setAvatarUrl] = useState(avt);
+  useEffect(() => {
+    // cleanup objectURL khi unmount (nếu có)
+    return () => {
+      if (avatarUrl && avatarUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarUrl);
+      }
+    };
+  }, [avatarUrl]);
 
   // Demo state – sau này bind API/user context
   const [form, setForm] = useState({
     fullName: "",
     brandName: "",
-    ngaySinh: null, // dùng dayjs object để tương thích DatePicker
+    ngaySinh: "", // input[type="date"] — "YYYY-MM-DD"
     gender: "",
     country: "",
     soDienThoai: "",
@@ -31,22 +39,77 @@ export default function UserProfile() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    // Khi submit, nếu cần gửi về BE dạng ISO:
-    // const payload = {
-    //   ...form,
-    //   ngaySinh: form.ngaySinh ? form.ngaySinh.toDate().toISOString().slice(0, 10) : null, // "YYYY-MM-DD"
-    // };
+    // const payload = { ...form, ngaySinh: form.ngaySinh || null };
+    // await fetch(...)
     setEditing(false);
     alert("UI-only: Đã lưu hồ sơ!");
+  };
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  // Chọn ảnh đại diện
+  const onAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const nextUrl = URL.createObjectURL(file);
+    // thu hồi URL cũ nếu là blob
+    if (avatarUrl?.startsWith("blob:")) URL.revokeObjectURL(avatarUrl);
+    setAvatarUrl(nextUrl);
+    // TODO: nếu cần upload lên BE, bạn có thể lưu file vào state khác hoặc call API ở đây
   };
 
   return (
     <div className="upf-wrap">
       <div className="upf-card">
-        {/* hàng trên: avatar + tên/email + nút */}
+        {/* Hàng trên: avatar + tên/email + nút */}
         <div className="upf-top">
           <div className="upf-avatar">
-            <img src={avt} alt="Ảnh đại diện" className="avatar" />
+            <img src={avatarUrl} alt="Ảnh đại diện" className="avatar" />
+
+            {editing && (
+              <>
+                <input
+                  id="avatarUpload"
+                  type="file"
+                  accept="image/*"
+                  onChange={onAvatarChange}
+                  hidden
+                />
+                <label
+                  className="upf-avatar-overlay"
+                  htmlFor="avatarUpload"
+                  title="Tải ảnh đại diện"
+                  role="button"
+                  aria-label="Tải ảnh đại diện"
+                >
+                  {/* Icon upload (SVG inline) */}
+                  <svg
+                    className="upf-upload-icon"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 16V8m0 0l-3 3m3-3l3 3"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M20 16.5v1a3.5 3.5 0 01-3.5 3.5h-9A3.5 3.5 0 014 17.5v-1"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="upf-upload-text">Upload</span>
+                </label>
+              </>
+            )}
           </div>
 
           <div className="upf-identity">
@@ -68,7 +131,7 @@ export default function UserProfile() {
           </div>
         </div>
 
-        {/* form */}
+        {/* Form */}
         <form className="upf-form" onSubmit={onSubmit}>
           <div className="upf-grid">
             {/* 1) Họ và tên */}
@@ -82,10 +145,9 @@ export default function UserProfile() {
                 disabled={!editing}
               />
             </div>
-
             {/* 2) Tên brand */}
             <div className="upf-field">
-              <label>Tên brand</label>
+              <label>Tên công ty</label>
               <input
                 name="brandName"
                 placeholder=""
@@ -94,7 +156,6 @@ export default function UserProfile() {
                 disabled={!editing}
               />
             </div>
-
             {/* 3) Gmail */}
             <div className="upf-field">
               <label>Gmail</label>
@@ -106,7 +167,6 @@ export default function UserProfile() {
                 readOnly
               />
             </div>
-
             {/* 4) Giới tính */}
             <div className="upf-field">
               <label>Giới tính</label>
@@ -125,7 +185,6 @@ export default function UserProfile() {
                 </select>
               </div>
             </div>
-
             {/* 5) Quốc gia */}
             <div className="upf-field">
               <label>Quốc gia</label>
@@ -137,7 +196,6 @@ export default function UserProfile() {
                 disabled={!editing}
               />
             </div>
-
             {/* 6) Số điện thoại */}
             <div className="upf-field">
               <label>Số điện thoại</label>
@@ -150,71 +208,29 @@ export default function UserProfile() {
                 disabled={!editing}
               />
             </div>
-
-            {/* 7) Ngày sinh (MUI DatePicker, đồng bộ style với input thường) */}
+            {/* 7) Ngày sinh */}
             <div className="upf-field">
               <label>Ngày sinh</label>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  value={form.ngaySinh}
-                  onChange={(newValue) =>
-                    setForm((s) => ({ ...s, ngaySinh: newValue }))
-                  }
-                  format="DD/MM/YYYY"
-                  // Gợi ý: khoá tương tác khi chưa bật "Sửa" nhưng vẫn nền trắng
-
-                  slotProps={{
-                    textField: {
-                      fullWidth: true,
-                      size: "small",
-                      placeholder: "dd/mm/yyyy",
-                      // ĐỒNG BỘ STYLE TẠI ĐÂY
-                      sx: {
-                        // Root ô nhập (OutlinedInput)
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: "8px",
-                          backgroundColor: "#fff", // nền trắng như các input khác
-                        },
-                        // Viền mặc định / hover / focus
-                        "& .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "var(--border, #e2e8f0)",
-                        },
-                        "&:hover .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#cbd5e1",
-                        },
-                        "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":
-                          {
-                            borderColor: "#10b981",
-                            boxShadow: "0 0 0 3px rgba(16,185,129,0.30)",
-                          },
-                        // Chữ bên trong ô
-                        "& .MuiOutlinedInput-input": {
-                          padding: "10px 14px",
-                          fontSize: "14.5px",
-                          fontFamily:
-                            "Montserrat, Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-                          color: "var(--text, #0f172a)",
-                        },
-                        "& .MuiOutlinedInput-input::placeholder": {
-                          color: "#94a3b8",
-                          opacity: 1,
-                        },
-                        // Trạng thái disabled (trường hợp bạn vẫn dùng disabled)
-                        "& .MuiOutlinedInput-root.Mui-disabled": {
-                          backgroundColor: "#fff", // vẫn trắng
-                        },
-                        "& .MuiOutlinedInput-input.Mui-disabled": {
-                          WebkitTextFillColor: "var(--muted, #ffffffff)",
-                        },
-                        // Icon lịch
-                        "& .MuiSvgIcon-root": { opacity: 0.85 },
-                      },
-                      // Khi chưa bật "Sửa": chỉ đọc, nhìn vẫn trắng
-                      inputProps: { readOnly: !editing },
-                    },
-                  }}
-                />
-              </LocalizationProvider>
+              <AntDatePicker
+                className="upf-antd-date"
+                format="DD/MM/YYYY"
+                placeholder="dd/mm/yyyy"
+                value={
+                  form.ngaySinh ? dayjs(form.ngaySinh, "YYYY-MM-DD") : null
+                }
+                disabled={!editing}
+                disabledDate={(current) =>
+                  (current && current > dayjs()) ||
+                  (current && current < dayjs("1900-01-01"))
+                }
+                onChange={(d) =>
+                  setForm((s) => ({
+                    ...s,
+                    ngaySinh: d ? d.toDate().toISOString().slice(0, 10) : "",
+                  }))
+                }
+                allowClear
+              />
             </div>
           </div>
 
