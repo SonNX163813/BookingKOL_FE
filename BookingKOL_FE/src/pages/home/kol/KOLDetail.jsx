@@ -142,7 +142,7 @@ const buildIntroductionData = (kol) => {
     ? kol.categories.map((category) => category?.name).filter(Boolean)
     : [];
   const location = [kol?.city, kol?.country].filter(Boolean).join(", ");
-  const strengths = [kol?.bio, kol?.rateCardNote, location]
+  const strengths = [kol?.bio, location]
     .flatMap((value) => {
       if (!value) {
         return [];

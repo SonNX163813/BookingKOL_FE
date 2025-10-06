@@ -1,7 +1,4 @@
-﻿export const heroBadges = [
-  "Realtime KPI",
-  "ROI-driven",
-];
+﻿export const heroBadges = ["Realtime KPI", "ROI-driven"];
 
 export const introHighlights = [
   "Thực chiến TMĐT, kinh nghiệm đa ngành.",
@@ -57,7 +54,7 @@ export const servicesTabs = [
   },
   {
     key: "affiliate",
-    title: "Affiliate & MCN (Hybrid TAP+MCN)",
+    title: "Affiliate & MCN",
     description:
       "Mở rộng doanh thu qua mạng lưới affiliate đa kênh, kết nối creator làm đại sứ.",
     bullets: [
@@ -142,14 +139,12 @@ export const whyChooseCards = [
   },
   {
     title: "All-in-One – Full Service",
-    description:
-      "Booking, Setup, Đào tạo, Vận hành, Affiliate/MCN.",
+    description: "Booking, Setup, Đào tạo, Vận hành, Affiliate/MCN.",
     metric: ">20 ngành",
   },
   {
     title: "Network chất lượng",
-    description:
-      "KOL/KOC phân tầng (nano→mega), kiểm duyệt thương hiệu.",
+    description: "KOL/KOC phân tầng (nano→mega), kiểm duyệt thương hiệu.",
     metric: "5K+ KOL/KOC",
   },
   {

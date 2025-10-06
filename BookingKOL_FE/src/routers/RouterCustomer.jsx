@@ -22,6 +22,9 @@ import VerifyEmailNotice from "../pages/authentication/VerifyEmailNotice.jsx";
 // Guards
 import GuestOnly, { RequireAuth } from "./RouterGuards";
 
+//NotFound
+import NotFound from "../pages/NotFound.jsx";
+
 const courseRoutes = [
   { path: "/goi-dich-vu", element: <CourseLivesteam /> },
   {
@@ -66,7 +69,7 @@ export const routerCustomer = [
   },
 
   // 404 → về trang chủ
-  { path: "*", element: <Navigate to="/" /> },
+  { path: "*", element: <NotFound /> },
 ];
 
 export default routerCustomer;

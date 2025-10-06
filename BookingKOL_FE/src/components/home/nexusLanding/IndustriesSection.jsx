@@ -86,14 +86,18 @@ const IndustriesSection = () => {
 
   return (
     <Box component="section" id="industries" sx={sectionSx}>
-      <Container maxWidth="lg" sx={{ py: { xs: 8, md: 10 } }}>
+      <Container maxWidth="1300px" sx={{ py: { xs: 8, md: 10 } }}>
         <Stack
           spacing={3}
           sx={{ alignItems: "center", textAlign: "center", color: "#0f172a" }}
         >
           <Typography
             variant="overline"
-            sx={{ letterSpacing: 2, color: "rgba(15, 23, 42, 0.55)" }}
+            sx={{
+              fontSize: "1rem",
+              letterSpacing: 2,
+              color: "rgba(15, 23, 42, 0.55)",
+            }}
           >
             Ngành hàng & lĩnh vực
           </Typography>

@@ -30,58 +30,50 @@ const sectionSx = {
 const stepsGridSx = {
   display: "grid",
   gridTemplateColumns: {
-    xs: "repeat(1, minmax(0, 1fr))",
-    sm: "repeat(2, minmax(0, 1fr))",
-    md: "repeat(auto-fit, minmax(260px, 1fr))",
+    xs: "repeat(1, minmax(0, 1fr))", // 1 cột trên mobile
+    sm: "repeat(2, minmax(0, 1fr))", // 2 cột tablet
+    md: "repeat(5, minmax(0, 1fr))", // 5 cột ngang hàng cho desktop
   },
   gap: { xs: 2.5, md: 3.5 },
   alignItems: "stretch",
   justifyItems: "stretch",
-  // Center the fifth step when there are 5 items
-  "& > :nth-child(5)": {
-    gridColumn: {
-      md: "2 / 4", // Centers the fifth step in a 4-column grid on medium screens and up
-    },
-    justifySelf: "center",
-    maxWidth: { xs: "auto", md: "270px" }, // Optional: limit width for better centering
-  },
 };
 
 const stepCardSx = {
-  backgroundColor: "rgba(255, 255, 255, 0.9)",
+  backgroundColor: "rgba(255, 255, 255, 0.96)",
   backgroundImage:
-    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.93))",
+    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.25), rgba(255, 255, 255, 0.96))",
   borderRadius: 4,
   p: { xs: 2.5, md: 3 },
-  border: "1px solid rgba(147, 206, 246, 0.4)",
-  boxShadow: "0 12px 28px rgba(74, 116, 218, 0.12)",
+  border: "1px solid rgba(147, 206, 246, 0.35)",
+  boxShadow: "0 8px 24px rgba(74, 116, 218, 0.12)",
   display: "flex",
-  flexDirection: "row",
-  alignItems: "flex-start",
-  gap: { xs: 2, md: 2.25 },
-  minHeight: { xs: 160, md: 180 },
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "space-between",
+  textAlign: "center",
+  minHeight: { xs: 200, md: 220 },
   height: "100%",
   transition:
     "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
   "&:hover": {
-    transform: "translateY(-2px)",
-    boxShadow: "0 18px 36px rgba(74, 116, 218, 0.18)",
+    transform: "translateY(-4px)",
+    boxShadow: "0 16px 40px rgba(74, 116, 218, 0.18)",
     borderColor: "rgba(74, 116, 218, 0.5)",
   },
 };
 
 const iconBoxSx = {
-  width: 56,
-  height: 56,
-  minWidth: 56,
-  borderRadius: 3,
+  width: 64,
+  height: 64,
+  borderRadius: "16px",
   backgroundImage:
-    "radial-gradient(circle at 50% 50%, rgba(141, 226, 237, 0.7), rgba(147, 206, 246, 0.2))",
-  display: "grid",
-  placeItems: "center",
+    "radial-gradient(circle at 50% 50%, rgba(141, 226, 237, 0.75), rgba(147, 206, 246, 0.25))",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   color: "#4a74da",
-  fontWeight: 700,
-  flexShrink: 0,
+  mb: 2,
 };
 
 const ProcessSection = () => {
@@ -95,7 +87,11 @@ const ProcessSection = () => {
         >
           <Typography
             variant="overline"
-            sx={{ letterSpacing: 2, color: "rgba(15, 23, 42, 0.55)" }}
+            sx={{
+              fontSize: "1rem",
+              letterSpacing: 2,
+              color: "rgba(15, 23, 42, 0.55)",
+            }}
           >
             Quy trình 5 bước
           </Typography>

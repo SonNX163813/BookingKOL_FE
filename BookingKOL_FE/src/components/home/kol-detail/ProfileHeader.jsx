@@ -27,7 +27,7 @@ import PricingPanel from "./PricingPanel";
 
 const statsConfig = [
   { key: "followers", label: "Người theo dõi", icon: PeopleAltRoundedIcon },
-  { key: "fans", label: "Người hâm mộ", icon: FavoriteRoundedIcon },
+  { key: "fans", label: "Lượt xem TikTok", icon: FavoriteRoundedIcon },
   { key: "orders", label: "Đơn hàng", icon: ShoppingBagRoundedIcon },
   { key: "rating", label: "Đánh giá", icon: StarRoundedIcon },
 ];

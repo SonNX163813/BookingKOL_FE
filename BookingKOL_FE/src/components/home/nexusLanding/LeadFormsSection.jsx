@@ -222,7 +222,11 @@ const LeadFormsSection = () => {
         >
           <Typography
             variant="overline"
-            sx={{ letterSpacing: 2, color: "rgba(15, 23, 42, 0.55)" }}
+            sx={{
+              fontSize: "1rem",
+              letterSpacing: 2,
+              color: "rgba(15, 23, 42, 0.55)",
+            }}
           >
             Lead & CRM Hub
           </Typography>
