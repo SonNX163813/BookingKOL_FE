@@ -1,3 +1,4 @@
+// src/pages/authentication/LoginPage.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import "./login.css";
@@ -12,17 +13,27 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Fallback nếu thiếu Provider
+  // Fallback tránh crash nếu thiếu Provider
   const auth = useAuth?.() || {};
-  const { dispatch = () => {}, loading = false, token = null } = auth;
+  const {
+    dispatch = () => {},
+    loading = false,
+    token = null,
+    error: ctxError,
+  } = auth;
 
   const navigate = useNavigate();
   const location = useLocation();
   const backTo = location.state?.from?.pathname || "/";
 
+  // Nếu đã đăng nhập thì điều hướng
   useEffect(() => {
     if (token) navigate(backTo, { replace: true });
   }, [token, backTo, navigate]);
+
+  useEffect(() => {
+    if (ctxError) setErrorMsg(ctxError);
+  }, [ctxError]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,22 +56,33 @@ export default function LoginPage() {
         body: JSON.stringify({ identifier: email, password }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      let data = null;
+      let raw = "";
+      try {
+        raw = await res.text();
+        data = raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        data = null;
+      }
+
       if (!res.ok) {
         const msg =
           (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
           data?.error ||
-          `Đăng nhập thất bại (HTTP ${res.status})`;
+          (raw && raw.includes("<html")
+            ? "Máy chủ trả HTML/redirect. Hãy trả JSON 401/403 thay vì 302."
+            : "") ||
+          `Đăng nhập thất bại (HTTP ${res.status}).`;
         throw new Error(msg);
       }
 
-      const token =
+      const accessToken =
         data?.accessToken ||
         data?.data?.accessToken ||
         data?.token ||
         data?.data?.token;
 
-      if (!token)
+      if (!accessToken)
         throw new Error("Không tìm thấy token trong phản hồi từ server.");
 
       const user = {
@@ -71,16 +93,14 @@ export default function LoginPage() {
 
       dispatch({
         type: "LOGIN_SUCCESS",
-        payload: { user, token, roles: user.roles, remember },
+        payload: { user, token: accessToken, roles: user.roles, remember },
       });
 
       navigate(backTo, { replace: true });
     } catch (err) {
-      dispatch({
-        type: "LOGIN_FAILURE",
-        payload: err.message || "Có lỗi xảy ra khi đăng nhập.",
-      });
-      setErrorMsg(err.message || "Có lỗi xảy ra khi đăng nhập.");
+      const msg = err?.message || "Có lỗi xảy ra khi đăng nhập.";
+      dispatch({ type: "LOGIN_FAILURE", payload: msg }); // ❗ không mất token/user
+      setErrorMsg(msg);
     }
   };
 
@@ -89,8 +109,8 @@ export default function LoginPage() {
   };
 
   return (
-    // ✅ thêm login-page để CSS chọn đúng trang
-    <div className="login-wrap login-page">
+    <div className="login-wrap">
+      {/* LEFT HERO giữ nguyên như bạn đang dùng */}
       <section className="left-hero">
         <div className="brand">
           <img src={logo} alt="Logo" className="logo" />
@@ -120,7 +140,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Wave SVG giữ nguyên */}
+        {/* SVG wave của bạn (rút gọn ở đây nếu cần) */}
         <svg
           className="hero-wave transition duration-300 ease-in-out delay-150"
           width="100%"
@@ -204,8 +224,7 @@ export default function LoginPage() {
       </section>
 
       {/* RIGHT CARD */}
-      {/* ✅ thêm accented để bật viền gradient + dots theo CSS */}
-      <section className="right-card accented">
+      <section className="right-card">
         <div className="login-header">
           <img src={logo} alt="Logo" className="login-logo-top" />
           <h2 className="login-title">Đăng nhập</h2>
@@ -275,14 +294,11 @@ export default function LoginPage() {
             Bạn chưa có tài khoản? <Link to="/register">Đăng ký</Link>
           </div>
 
-          {/* ✅ điều khoản: canh giữa, checkbox cách chữ 2px */}
           <div className="terms">
-            <label className="terms-consent">
+            <label>
               <input type="checkbox" defaultChecked disabled={loading} />
-              <span>
-                Tôi đồng ý <a href="#">Điều Khoản Dịch Vụ</a> và{" "}
-                <a href="#">Thoả Thuận Riêng Tư</a>
-              </span>
+              Tôi đồng ý <a href="#">Điều Khoản Dịch Vụ</a> và{" "}
+              <a href="#">Thoả Thuận Riêng Tư</a>
             </label>
           </div>
         </form>

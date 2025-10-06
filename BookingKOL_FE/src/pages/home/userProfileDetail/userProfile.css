@@ -1,69 +1,41 @@
 :root {
-  /* ==== PALETTE (theo ProfileHeader) ==== */
-  --bg: #0b0f0e; /* nền tối xanh đen */
-  --card: rgba(18, 26, 25, 0.84); /* glass tối trong suốt */
-  --text: #e6f4ef; /* chữ sáng chính */
-  --muted: #aabbb5; /* chữ phụ */
-  --line: rgba(0, 227, 159, 0.16); /* viền glass xanh ngọc nhạt */
-
-  /* Accent xanh ngọc/neon */
-  --primary: #00c776;
-  --primary-600: #00e39f;
-  --ring: rgba(0, 227, 159, 0.35);
-
+  --bg: #ffffff;
+  --card-line: #e5e7eb;
+  --text: #0f172a;
+  --muted: #64748b;
+  --ring: rgba(0, 227, 159, 0.25);
   --radius: 18px;
+
+  /* Chiều cao thống nhất cho input/select/AntD DatePicker */
+  --field-h: 48px;
 }
 
-/* ======== WRAP & OVERLAYS ======== */
+/* ===== Reset nhỏ ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ===== Wrap + radial background (ngoài card) ===== */
 .upf-wrap {
   min-height: 100vh;
   background: var(--bg);
   position: relative;
   overflow: hidden;
-  padding: 24px;
+  padding: 2px;
+  color-scheme: only light;
 }
-
-/* lớp nền giống ProfileHeader */
 .upf-wrap::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-      60% 60% at 20% 20%,
-      rgba(22, 249, 138, 0.18) 0%,
-      rgba(5, 34, 11, 0) 70%
-    ),
-    radial-gradient(
-      50% 50% at 80% 10%,
-      rgba(19, 67, 56, 0.22) 0%,
-      rgba(5, 34, 11, 0) 65%
-    ),
-    linear-gradient(
-      160deg,
-      rgba(5, 34, 11, 1) 0%,
-      rgba(19, 67, 56, 0.92) 55%,
-      rgba(22, 249, 138, 0.18) 100%
-    );
   z-index: 0;
+
+  pointer-events: none;
 }
 
-/* lớp glow sáng xanh ngọc */
-.upf-wrap::after {
-  content: "";
-  position: absolute;
-  inset: -10%;
-  background: radial-gradient(
-    58% 60% at 15% 22%,
-    rgba(0, 227, 159, 0.22) 0%,
-    rgba(11, 15, 14, 0) 70%
-  );
-  opacity: 0.85;
-  filter: blur(48px);
-  mix-blend-mode: screen; /* tạo hiệu ứng phát sáng */
-  z-index: 0;
-}
-
-/* ======== CARD (GLASS) ======== */
+/* ===== Card (gradient 3 màu) ===== */
 .upf-card {
   position: relative;
   z-index: 1;
@@ -72,22 +44,20 @@
   margin: 48px auto 32px;
   border-radius: 24px;
   padding: 28px;
-
-  /* glass đồng vibe ProfileHeader */
-  background: linear-gradient(
-    180deg,
-    rgba(32, 58, 49, 0.65),
-    rgba(20, 32, 28, 0.55)
-  );
-  border: 1px solid rgba(0, 227, 159, 0.12);
-  backdrop-filter: saturate(120%) blur(6px);
-  -webkit-backdrop-filter: saturate(120%) blur(6px);
+  background: linear-gradient(135deg, #8de2ed 0%, #93cef6 45%, #4a74da 100%);
+  border: 1px solid var(--card-line);
   color: var(--text);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.06), 0 8px 24px rgba(2, 6, 23, 0.08),
+    0 20px 48px rgba(2, 6, 23, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.upf-card:hover {
+  box-shadow: 0 2px 4px rgba(2, 6, 23, 0.06), 0 12px 28px rgba(2, 6, 23, 0.1),
+    0 28px 56px rgba(2, 6, 23, 0.08);
+  transform: translateY(-1px);
 }
 
-/* ======== TOP ROW ======== */
+/* ===== Top row ===== */
 .upf-top {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -96,24 +66,53 @@
   margin-bottom: 20px;
 }
 
-/* avatar có viền xanh ngọc nhẹ cho hợp tông */
+/* ===== Avatar + overlay upload ===== */
 .upf-avatar {
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
+  position: relative;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid rgba(0, 227, 159, 0.35);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(2, 6, 23, 0.1), 0 10px 24px rgba(2, 6, 23, 0.1);
 }
-.upf-avatar img {
+.upf-avatar .avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-/* tên & email chuyển sang tông sáng */
+.upf-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.45);
+  color: #fff;
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0.65;
+  backdrop-filter: blur(1px);
+  transition: opacity 0.18s ease;
+}
+.upf-avatar-overlay:hover {
+  opacity: 0.9;
+}
+
+.upf-upload-icon {
+  display: block;
+}
+.upf-upload-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin-top: 4px;
+  opacity: 0.95;
+}
+
+/* ===== Identity ===== */
 .upf-identity .upf-name {
-  margin: 0 0 4px 0;
+  margin: 0 0 4px;
   font-size: 22px;
   font-weight: 700;
   color: var(--text);
@@ -123,12 +122,11 @@
   color: var(--muted);
   font-size: 14px;
 }
-
 .upf-actions {
   justify-self: end;
 }
 
-/* ======== BUTTONS (xanh ngọc) ======== */
+/* ===== Buttons ===== */
 .upf-btn {
   appearance: none;
   border: none;
@@ -136,38 +134,64 @@
   padding: 10px 16px;
   border-radius: 12px;
   font-weight: 700;
-  transition: 0.18s ease;
   font-size: 14px;
+  transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s ease;
+  will-change: transform;
+}
+.upf-btn:active {
+  transform: translateY(1px);
 }
 
+/* Nút chính (Sửa / Lưu) */
 .upf-btn--primary {
-  /* gradient xanh ngọc giống nút trong ProfileHeader */
-  background: linear-gradient(
-    135deg,
-    var(--primary) 0%,
-    var(--primary-600) 100%
-  );
-  color: #031412;
-  box-shadow: 0 14px 28px rgba(0, 227, 159, 0.22);
+  padding: 12px 20px;
+  font-size: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #93cef6 0%, #4a74da 50%, #582baf 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(41, 140, 206, 0.25),
+    0 10px 24px rgba(88, 43, 175, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 .upf-btn--primary:hover {
-  background: linear-gradient(135deg, #00d584 0%, #00f4b0 100%);
-  box-shadow: 0 18px 36px rgba(0, 227, 159, 0.28);
+  background: linear-gradient(135deg, #a1d8fa 0%, #5a82e3 50%, #6833c5 100%);
+  box-shadow: 0 4px 10px rgba(74, 116, 218, 0.28),
+    0 14px 34px rgba(88, 43, 175, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+.upf-btn--primary:active {
+  box-shadow: 0 2px 8px rgba(88, 43, 175, 0.3),
+    0 8px 20px rgba(74, 116, 218, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  transform: translateY(0);
+}
+.upf-btn--primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(147, 206, 246, 0.35),
+    0 10px 28px rgba(88, 43, 175, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.upf-actions-save .upf-btn--primary {
+  padding: 13px 22px;
 }
 
+/* Nút Hủy */
 .upf-btn--gray {
-  background: rgba(18, 26, 25, 0.82);
+  background: #f1f5f9;
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.06), 0 6px 16px rgba(2, 6, 23, 0.06);
 }
 .upf-btn--gray:hover {
-  background: rgba(18, 26, 25, 0.9);
-  border-color: rgba(0, 227, 159, 0.28);
+  background: #eef2f7;
+  border-color: #dfe4ea;
+  box-shadow: 0 2px 4px rgba(2, 6, 23, 0.08), 0 10px 22px rgba(2, 6, 23, 0.08);
 }
 
-/* ======== FORM ======== */
+/* ===== Form ===== */
 .upf-form {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(2, 6, 23, 0.06);
   padding-top: 18px;
 }
 
@@ -183,57 +207,142 @@
   gap: 8px;
 }
 .upf-field label {
-  font-size: 18px;
+  font-size: 15px;
+  color: var(--text);
+  opacity: 0.95;
 }
 
-/* input vẫn nền sáng để dễ đọc, nhưng border/ring xanh ngọc */
+/* Inputs chung */
 .upf-field input,
 .upf-field select,
 .upf-section textarea {
   width: 100%;
-  border: 1px solid rgba(0, 227, 159, 0.18);
-  background: #f7f9fc;
+  height: var(--field-h);
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
   color: #111827;
   padding: 12px 14px;
   border-radius: 12px;
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.45;
   outline: none;
   transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+  font-family: Montserrat, Inter, system-ui, -apple-system, Segoe UI, Roboto,
+    sans-serif;
 }
+.upf-section textarea {
+  height: auto;
+  min-height: 140px;
+}
+
+/* Select: caret custom */
 .upf-field select {
-  background: #f7f9fc
+  background: #ffffff
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")
     no-repeat right 12px center/18px;
   appearance: none;
 }
 
-.upf-field input:focus,
-.upf-field select:focus,
-.upf-section textarea:focus {
-  border-color: var(--primary-600);
+.upf-field input:hover,
+.upf-field select:hover,
+.upf-section textarea:hover {
+  border-color: #d1d5db;
+}
+
+.upf-field input:focus-visible,
+.upf-field select:focus-visible,
+.upf-section textarea:focus-visible {
+  border-color: #00e39f;
   box-shadow: 0 0 0 3px var(--ring);
   background: #ffffff;
 }
 
+/* Disabled & placeholder */
 .upf-field input:disabled,
 .upf-field select:disabled,
 .upf-section textarea:disabled {
-  background: #f3f6fa;
+  background: #f8fafc;
   color: #6b7280;
   cursor: not-allowed;
 }
+.upf-field input::placeholder,
+.upf-section textarea::placeholder {
+  color: #9aa5b1;
+  opacity: 1;
+}
 
-/* ======== BIO ======== */
+/* ===== AntD DatePicker: đồng bộ với input thường ===== */
+.upf-antd-date {
+  width: 100%;
+}
+.upf-antd-date .ant-picker {
+  width: 100%;
+  height: var(--field-h);
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 15px;
+  padding: 0 12px;
+  box-shadow: none;
+  transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+}
+.upf-antd-date .ant-picker-input > input {
+  font-size: 16px;
+  line-height: calc(var(--field-h) - 2px);
+  color: #111827;
+}
+.upf-antd-date .ant-picker-input > input::placeholder {
+  color: #9aa5b1;
+  opacity: 1;
+}
+.upf-antd-date .ant-picker:hover {
+  border-color: #d1d5db;
+}
+.upf-antd-date .ant-picker-focused {
+  border-color: #00e39f !important;
+  box-shadow: 0 0 0 3px rgba(0, 227, 159, 0.25);
+}
+/* disabled */
+.upf-antd-date .ant-picker.ant-picker-disabled {
+  background: #f8fafc !important;
+  color: #6b7280 !important;
+}
+.upf-antd-date .ant-picker.ant-picker-disabled .ant-picker-input > input {
+  color: #6b7280 !important;
+}
+
+/* Panel (popup) theme theo palette */
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-selected
+  .ant-picker-cell-inner,
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-start
+  .ant-picker-cell-inner,
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-end
+  .ant-picker-cell-inner {
+  background: linear-gradient(135deg, #93cef6 0%, #4a74da 50%, #582baf 100%);
+  color: #fff;
+}
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-today
+  .ant-picker-cell-inner::before {
+  border-color: #93cef6;
+}
+.ant-picker-dropdown .ant-picker-cell:hover .ant-picker-cell-inner {
+  background: rgba(147, 206, 246, 0.18);
+}
+
+/* ===== Bio ===== */
 .upf-section {
   margin-top: 24px;
 }
 .upf-section h3 {
-  margin: 0 0 10px 0;
+  margin: 0 0 10px;
   font-size: 16px;
   color: var(--text);
 }
 
-/* ======== SAVE ACTIONS ======== */
+/* ===== Save actions ===== */
 .upf-actions-save {
   margin-top: 16px;
   display: flex;
@@ -241,7 +350,7 @@
   justify-content: flex-end;
 }
 
-/* ======== RESPONSIVE ======== */
+/* ===== Responsive ===== */
 @media (max-width: 900px) {
   .upf-card {
     padding: 20px;
@@ -258,4 +367,80 @@
     grid-column: 1 / -1;
     justify-self: start;
   }
+  .upf-btn--primary {
+    padding: 12px 18px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+}
+
+/* ===== Reduce motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .upf-btn {
+    transition: none;
+  }
+}
+/* Patch AntD DatePicker (size="large"): padding 4px 4px + bo góc 8px */
+.upf-antd-date .ant-picker.ant-picker-large {
+  padding: 4px 4px !important;
+  border-radius: 8px !important; /* bo góc */
+}
+
+/* đảm bảo mọi trạng thái đều giữ bo góc 8px */
+.upf-antd-date .ant-picker {
+  border-radius: 8px !important;
+}
+:root {
+  --field-h: 48px;
+} /* cao giống các input khác */
+
+.upf-antd-date {
+  width: 100%;
+}
+.upf-antd-date .ant-picker {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--field-h) !important;
+  min-height: var(--field-h) !important;
+  padding: 0 12px !important; /* KHÔNG cộng thêm chiều cao */
+  border-radius: 8px !important; /* bo góc theo yêu cầu */
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+/* căn giữa nội dung theo chiều cao mới */
+.upf-antd-date .ant-picker-input {
+  display: flex;
+  align-items: center;
+}
+.upf-antd-date .ant-picker-input > input {
+  height: calc(var(--field-h) - 2px) !important;
+  line-height: calc(var(--field-h) - 2px) !important;
+  font-size: 16px;
+  color: #111827;
+}
+
+/* icon & nút clear cũng bám giữa */
+.upf-antd-date .ant-picker-suffix,
+.upf-antd-date .ant-picker-clear {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  opacity: 0.9;
+}
+
+/* hover/focus/disabled đồng bộ */
+.upf-antd-date .ant-picker:hover {
+  border-color: #d1d5db;
+}
+.upf-antd-date .ant-picker-focused {
+  border-color: #00e39f !important;
+  box-shadow: 0 0 0 3px rgba(0, 227, 159, 0.25);
+}
+.upf-antd-date .ant-picker.ant-picker-disabled {
+  background: #f8fafc !important;
+  color: #6b7280 !important;
+}
+.upf-antd-date .ant-picker.ant-picker-disabled .ant-picker-input > input {
+  color: #6b7280 !important;
 }
