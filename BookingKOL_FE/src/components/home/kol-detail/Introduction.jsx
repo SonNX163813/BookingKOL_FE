@@ -6,8 +6,8 @@ import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRou
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 
-const textPrimary = "#E6F4EF";
-const textSecondary = "#AABBB5";
+const textPrimary = "#2f3c8c";
+const textSecondary = "rgba(47, 60, 140, 0.72)";
 
 const Introduction = ({ profile }) => {
   const infoItems = [
@@ -31,19 +31,31 @@ const Introduction = ({ profile }) => {
     >
       <Box
         sx={{
+          position: "relative",
+          overflow: "hidden",
           borderRadius: "24px",
-          background:
-            "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-   radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-   linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-
-          border: "1px solid rgba(0, 227, 159, 0.14)",
+          backgroundColor: "#ffffff",
+          border: "1px solid rgba(74, 116, 218, 0.18)",
           boxShadow:
-            "0 28px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.04)",
+            "0 6px 12px rgba(141, 226, 237, 0.36), \
+     0 12px 24px rgba(147, 206, 246, 0.32), \
+     0 18px 32px rgba(74, 116, 218, 0.38), \
+     0 2px 6px rgba(255, 255, 255, 0.18)",
           p: { xs: 3, md: 3.75 },
         }}
       >
-        <Stack spacing={3.5}>
+        <Box
+          aria-hidden
+          sx={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "radial-gradient(55% 55% at 90% 0%, rgba(147, 206, 246, 0.35) 0%, rgba(147, 206, 246, 0) 70%), radial-gradient(60% 60% at 0% 100%, rgba(255, 161, 218, 0.28) 0%, rgba(88, 43, 175, 0) 70%)",
+            opacity: 0.9,
+            pointerEvents: "none",
+          }}
+        />
+        <Stack spacing={3.5} sx={{ position: "relative", zIndex: 1 }}>
           <Typography
             variant="h5"
             sx={{
@@ -64,13 +76,15 @@ const Introduction = ({ profile }) => {
                       width: 40,
                       height: 40,
                       borderRadius: "14px",
-                      background: "rgba(0, 227, 159, 0.16)",
+                      background:
+                        "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(147, 206, 246, 0.35) 55%, rgba(255, 161, 218, 0.25) 100%)",
+                      border: "1px solid rgba(74, 116, 218, 0.22)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <Icon sx={{ color: "#00E39F", fontSize: 22 }} />
+                    <Icon sx={{ color: "#4a74da", fontSize: 22 }} />
                   </Box>
                   <Box>
                     <Typography variant="body2" sx={{ color: textSecondary }}>
@@ -88,7 +102,7 @@ const Introduction = ({ profile }) => {
           <Stack spacing={2.5}>
             <Stack spacing={1.5}>
               <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                <BoltRoundedIcon sx={{ color: "#00E39F", mt: 0.5 }} />
+                <BoltRoundedIcon sx={{ color: "#582baf", mt: 0.5 }} />
                 <Box>
                   <Typography
                     variant="subtitle1"
@@ -115,7 +129,7 @@ const Introduction = ({ profile }) => {
                             height: 8,
                             borderRadius: "50%",
                             background:
-                              "linear-gradient(135deg, #00C776, #00E39F)",
+                              "linear-gradient(135deg, #8de2ed, #4a74da)",
                           }}
                         />
                         <Typography
@@ -132,7 +146,7 @@ const Introduction = ({ profile }) => {
 
             <Stack spacing={1.5}>
               <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                <TrendingUpRoundedIcon sx={{ color: "#00E39F", mt: 0.5 }} />
+                <TrendingUpRoundedIcon sx={{ color: "#ffa1da", mt: 0.5 }} />
                 <Box sx={{ flex: 1 }}>
                   <Typography
                     variant="subtitle1"
@@ -151,24 +165,25 @@ const Introduction = ({ profile }) => {
                             borderRadius: "16px",
                             px: 1.75,
                             py: 1.2,
-                            background: "rgba(18, 26, 25, 0.86)",
-                            border: "1px solid rgba(0, 227, 159, 0.16)",
+                            background:
+                              "linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(147, 206, 246, 0.25) 55%, rgba(255, 161, 218, 0.22) 100%)",
+                            border: "1px solid rgba(74, 116, 218, 0.18)",
                           }}
                         >
                           <Typography sx={{ color: textSecondary }}>
                             {item.platform}
                           </Typography>
-                          <Chip
+                          {/* <Chip
                             label={item.level}
                             size="small"
                             sx={{
-                              background: "rgba(0, 227, 159, 0.14)",
+                              background: "rgba(147, 206, 246, 0.18)",
                               color: textPrimary,
                               borderRadius: "999px",
-                              border: "1px solid rgba(0, 227, 159, 0.28)",
+                              border: "1px solid rgba(74, 116, 218, 0.26)",
                               fontWeight: 600,
                             }}
-                          />
+                          /> */}
                         </Box>
                       </Grid>
                     ))}
