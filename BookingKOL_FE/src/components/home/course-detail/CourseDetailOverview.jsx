@@ -1,8 +1,18 @@
-﻿import React from "react";
+import React from "react";
 import { Grid, Stack, Typography, Divider, Box } from "@mui/material";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+
+const cardStyles = {
+  borderRadius: { xs: 4, md: 5 },
+  backgroundColor: "#ffffff",
+  border: "1px solid rgba(74, 116, 218, 0.16)",
+  boxShadow: "0 16px 40px rgba(74, 116, 218, 0.12)",
+  p: { xs: 3, md: 4 },
+};
+
+const textColor = "rgba(15, 23, 42, 0.75)";
 
 const CourseDetailOverview = ({
   descriptionBlocks,
@@ -17,34 +27,20 @@ const CourseDetailOverview = ({
     <Grid container spacing={4}>
       <Grid item xs={12} md={6}>
         <Stack spacing={3}>
-          {/* Nội dung chi tiết */}
-          <Stack
-            spacing={2}
-            sx={{
-              borderRadius: { xs: 4, md: 5 },
-              background:
-                "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-   radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-   linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-              border: "1px solid rgba(0, 227, 159, 0.16)",
-              p: { xs: 3, md: 4 },
-            }}
-          >
+          <Stack spacing={2} sx={cardStyles}>
             <Stack direction="row" spacing={2} alignItems="center">
-              <AutoAwesomeRoundedIcon sx={{ color: "#00E39F" }} />
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              <AutoAwesomeRoundedIcon sx={{ color: "#4a74da" }} />
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 700, color: "#0f172a" }}
+              >
                 Nội dung chi tiết
               </Typography>
             </Stack>
-            <Divider sx={{ borderColor: "rgba(0, 227, 159, 0.12)" }} />
+            <Divider sx={{ borderColor: "rgba(74, 116, 218, 0.12)" }} />
             <Stack
               spacing={3}
-              sx={{
-                color: "rgba(230, 244, 239, 0.82)",
-                lineHeight: 1.7,
-                flex: 1,
-                overflowY: "auto",
-              }}
+              sx={{ color: textColor, lineHeight: 1.7, flex: 1 }}
             >
               {descriptionBlocks.length === 0 ? (
                 <Typography>
@@ -60,29 +56,17 @@ const CourseDetailOverview = ({
             </Stack>
           </Stack>
 
-          {/* Giá trị chính */}
-          <Stack
-            spacing={2}
-            sx={{
-              borderRadius: { xs: 4, md: 5 },
-              background:
-                "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-   radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-   linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-              border: "1px solid rgba(0, 227, 159, 0.16)",
-              p: { xs: 3, md: 4 },
-            }}
-          >
+          <Stack spacing={2} sx={cardStyles}>
             <Stack direction="row" spacing={2} alignItems="center">
-              <CalendarMonthRoundedIcon sx={{ color: "#38BDF8" }} />
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              <CalendarMonthRoundedIcon sx={{ color: "#f59e0b" }} />
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 600, color: "#0f172a" }}
+              >
                 Giá trị chính của khoá học
               </Typography>
             </Stack>
-            <Stack
-              spacing={1.5}
-              sx={{ color: "rgba(230, 244, 239, 0.82)", lineHeight: 1.6 }}
-            >
+            <Stack spacing={1.5} sx={{ color: textColor, lineHeight: 1.6 }}>
               {keyTakeaways.length === 0 ? (
                 <Typography>
                   Khoá học giúp bạn xây dựng quy trình livestream chuyên nghiệp
@@ -97,7 +81,7 @@ const CourseDetailOverview = ({
                     alignItems="flex-start"
                   >
                     <CheckCircleRoundedIcon
-                      sx={{ color: "#00E39F", fontSize: 20, mt: "2px" }}
+                      sx={{ color: "#4a74da", fontSize: 20, mt: "2px" }}
                     />
                     <Typography>{item}</Typography>
                   </Stack>
@@ -106,20 +90,8 @@ const CourseDetailOverview = ({
             </Stack>
           </Stack>
 
-          {/* Thư viện ảnh */}
-          <Stack
-            spacing={2}
-            sx={{
-              borderRadius: { xs: 4, md: 5 },
-              background:
-                "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-   radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-   linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-              border: "1px solid rgba(0, 227, 159, 0.16)",
-              p: { xs: 3, md: 4 },
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Stack spacing={2} sx={cardStyles}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: "#0f172a" }}>
               Thư viện ảnh khoá học
             </Typography>
             <Stack direction="row" spacing={1.5} flexWrap="wrap">
@@ -131,7 +103,7 @@ const CourseDetailOverview = ({
                   sx={{
                     width: "100%",
                     borderRadius: 3,
-                    border: "1px solid rgba(0, 227, 159, 0.16)",
+                    border: "1px solid rgba(74, 116, 218, 0.16)",
                     objectFit: "cover",
                   }}
                 />
@@ -146,7 +118,7 @@ const CourseDetailOverview = ({
                       width: "calc(50% - 12px)",
                       minWidth: 140,
                       borderRadius: 3,
-                      border: "1px solid rgba(0, 227, 159, 0.14)",
+                      border: "1px solid rgba(74, 116, 218, 0.16)",
                       objectFit: "cover",
                     }}
                   />

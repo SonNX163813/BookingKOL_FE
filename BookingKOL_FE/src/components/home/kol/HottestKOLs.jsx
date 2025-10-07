@@ -306,7 +306,7 @@ const HottestKOLs = () => {
             const isTopOne = rank === 1;
             const handleCardClick = () => {
               const slug = slugify(kol.name) || kol.id;
-              navigate(`/kols/${kol.id}/${slug}`);
+              navigate(`/danh-sach-kol/${kol.id}/${slug}`);
             };
 
             return (

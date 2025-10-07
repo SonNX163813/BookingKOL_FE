@@ -8,13 +8,13 @@ export const LoadingState = () => (
     sx={{
       minHeight: 260,
       borderRadius: 4,
-      border: "1px dashed rgba(0, 227, 159, 0.3)",
-      bgcolor: "rgba(8, 20, 17, 0.7)",
+      border: "1px dashed rgba(74, 116, 218, 0.3)",
+      bgcolor: "rgba(74, 116, 218, 0.08)",
     }}
   >
-    <CircularProgress sx={{ color: "#00E39F" }} />
-    <Typography sx={{ mt: 2, color: "rgba(230, 244, 239, 0.64)" }}>
-      Đang tải danh sách khóa học livestream...
+    <CircularProgress sx={{ color: "#4a74da" }} />
+    <Typography sx={{ mt: 2, color: "rgba(15, 23, 42, 0.7)" }}>
+      Dang tai danh sach khoa hoc livestream...
     </Typography>
   </Stack>
 );
@@ -26,22 +26,22 @@ export const EmptyState = () => (
     sx={{
       py: 10,
       borderRadius: 4,
-      border: "1px solid rgba(0, 227, 159, 0.18)",
-      bgcolor: "rgba(8, 20, 17, 0.6)",
+      border: "1px solid rgba(74, 116, 218, 0.18)",
+      bgcolor: "rgba(226, 232, 240, 0.45)",
     }}
   >
-    <Typography variant="h5" sx={{ fontWeight: 600 }}>
-      Chưa có gói khóa học nào sẵn sàng
+    <Typography variant="h5" sx={{ fontWeight: 600, color: "#0f172a" }}>
+      Chua co goi khoa hoc nao san sang
     </Typography>
     <Typography
       sx={{
-        color: "rgba(230, 244, 239, 0.64)",
+        color: "rgba(15, 23, 42, 0.7)",
         maxWidth: 520,
         textAlign: "center",
       }}
     >
-      Vui lòng quay lại sau. Chúng tôi đang cập nhật các giải pháp đào tạo
-      livestream mới nhất.
+      Vui long quay lai sau. Chung toi dang cap nhat cac giai phap dao tao
+      livestream moi nhat.
     </Typography>
   </Stack>
 );

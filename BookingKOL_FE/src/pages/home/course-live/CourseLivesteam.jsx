@@ -4,7 +4,10 @@ import { useNavigate } from "react-router-dom";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import CourseHeroSection from "../../../components/home/course/CourseHeroSection";
 import CoursesGrid from "../../../components/home/course/CoursesGrid";
-import { LoadingState, EmptyState } from "../../../components/home/course/CourseListStates";
+import {
+  LoadingState,
+  EmptyState,
+} from "../../../components/home/course/CourseListStates";
 import hotkolimg from "../../../assets/hotkol.png";
 import {
   adaptCourseMedia,
@@ -82,7 +85,7 @@ const CourseLivesteam = () => {
         return;
       }
       const safeSlug = courseSlug || "khoa-hoc";
-      navigate(`/goi-dich-vu/${courseId}/${safeSlug}`);
+      navigate(`/danh-sach-khoa-hoc/${courseId}/${safeSlug}`);
     },
     [navigate]
   );
@@ -96,13 +99,31 @@ const CourseLivesteam = () => {
   return (
     <Box
       sx={{
-        background: "radial-gradient(circle at 20% 20%, #102821, #050908)",
         minHeight: "100vh",
+        position: "relative",
+        bgcolor: "#ffffff",
+        overflow: "hidden",
         py: { xs: 8, md: 12 },
-        color: "#E6F4EF",
       }}
     >
-      <Container maxWidth="xl">
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.24) 0%, rgba(147, 206, 246, 0.06) 60%, rgba(147, 206, 246, 0) 90%), radial-gradient(90% 90% at 85% 20%, rgba(255, 161, 218, 0.18) 0%, rgba(255, 161, 218, 0) 65%)",
+          opacity: 0.65,
+        }}
+      />
+      <Container
+        maxWidth="xl"
+        sx={{
+          position: "relative",
+          zIndex: 1,
+          color: "#0f172a",
+        }}
+      >
         <Stack spacing={6}>
           <CourseHeroSection
             onExploreTopCourse={() =>

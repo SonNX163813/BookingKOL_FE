@@ -34,7 +34,7 @@ const navItems = [
     hasDropdown: true,
     subItems: [
       { label: "Danh sách KOL", to: "/danh-sach-kol" },
-      { label: "Danh sách khóa đào tạo livestream", to: "/goi-dich-vu" },
+      { label: "Danh sách khóa đào tạo livestream", to: "/danh-sach-khoa-hoc" },
     ],
   },
   { label: "Blog", to: "/blog" },
