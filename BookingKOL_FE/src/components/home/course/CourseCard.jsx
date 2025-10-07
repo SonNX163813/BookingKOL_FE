@@ -27,14 +27,13 @@ const CourseCard = ({ course, onSelect }) => {
       onClick={handleCardClick}
       sx={{
         cursor: course.id ? "pointer" : "default",
-        background:
-          "linear-gradient(160deg, rgba(8, 20, 17, 0.92), rgba(6, 16, 14, 0.78))",
-        borderRadius: 3,
+        backgroundColor: "#ffffff",
+        borderRadius: { xs: 3, md: 4 },
         overflow: "hidden",
         transition:
           "transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
-        border: "1px solid rgba(0, 227, 159, 0.18)",
-        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.35)",
+        border: "1px solid rgba(74, 116, 218, 0.18)",
+        boxShadow: "0 24px 48px rgba(74, 116, 218, 0.12)",
         height: "100%",
         width: { xs: "100%", sm: "50%", md: 400 },
         display: "flex",
@@ -42,11 +41,11 @@ const CourseCard = ({ course, onSelect }) => {
         "&:hover": {
           transform: course.id ? "translateY(-4px)" : "none",
           boxShadow: course.id
-            ? "0 28px 62px rgba(0, 227, 159, 0.22)"
-            : "0 20px 40px rgba(0, 0, 0, 0.35)",
+            ? "0 32px 64px rgba(74, 116, 218, 0.22)"
+            : "0 24px 48px rgba(74, 116, 218, 0.12)",
           borderColor: course.id
-            ? "rgba(0, 227, 159, 0.34)"
-            : "rgba(0, 227, 159, 0.18)",
+            ? "rgba(74, 116, 218, 0.35)"
+            : "rgba(74, 116, 218, 0.18)",
         },
         "&:hover .course-card__media": {
           transform: course.id ? "scale(1.04)" : "scale(1)",
@@ -60,7 +59,7 @@ const CourseCard = ({ course, onSelect }) => {
           height: { xs: 220, sm: 220, md: 300 },
           aspectRatio: { xs: "16 / 11", sm: "16 / 10", md: "16 / 9" },
           overflow: "hidden",
-          backgroundColor: "rgba(0, 0, 0, 0.12)",
+          backgroundColor: "rgba(15, 23, 42, 0.06)",
         }}
       >
         <CardMedia
@@ -81,7 +80,7 @@ const CourseCard = ({ course, onSelect }) => {
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.4) 100%)",
+              "linear-gradient(180deg, rgba(15, 23, 42, 0) 60%, rgba(15, 23, 42, 0.18) 100%)",
             pointerEvents: "none",
           }}
         />
@@ -93,18 +92,17 @@ const CourseCard = ({ course, onSelect }) => {
           flexDirection: "column",
           gap: 1.75,
           p: 3,
-          backgroundColor: "rgba(4, 12, 10, 0.8)",
-          backdropFilter: "blur(6px)",
+          backgroundColor: "#ffffff",
         }}
       >
         <Stack spacing={1}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#E6F4EF" }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0f172a" }}>
             {course.name}
           </Typography>
           <Typography
             variant="body2"
             sx={{
-              color: "rgba(230, 244, 239, 0.75)",
+              color: "rgba(15, 23, 42, 0.7)",
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
@@ -124,7 +122,7 @@ const CourseCard = ({ course, onSelect }) => {
           <Stack spacing={0.5}>
             <Typography
               sx={{
-                color: "rgba(230, 244, 239, 0.6)",
+                color: "rgba(15, 23, 42, 0.6)",
                 fontSize: "0.75rem",
                 textTransform: "uppercase",
                 letterSpacing: 1.2,
@@ -132,7 +130,7 @@ const CourseCard = ({ course, onSelect }) => {
             >
               Học phí
             </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: "#00E39F" }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: "#4a74da" }}>
               {course.priceLabel}
             </Typography>
           </Stack>
@@ -145,14 +143,14 @@ const CourseCard = ({ course, onSelect }) => {
             sx={{
               textTransform: "none",
               fontWeight: 700,
-              bgcolor: "#00E39F",
-              color: "#062720",
+              bgcolor: "#4a74da",
+              color: "#ffffff",
               px: 2.5,
               borderRadius: 2,
-              boxShadow: "0 12px 28px rgba(0, 227, 159, 0.28)",
+              boxShadow: "0 12px 28px rgba(74, 116, 218, 0.18)",
               "&:hover": {
-                bgcolor: "#0BF2AE",
-                boxShadow: "0 16px 36px rgba(11, 242, 174, 0.34)",
+                bgcolor: "#3b5ec8",
+                boxShadow: "0 16px 36px rgba(59, 94, 200, 0.24)",
               },
             }}
           >

@@ -24,11 +24,12 @@ import GuestOnly, { RequireAuth } from "./RouterGuards";
 
 //NotFound
 import NotFound from "../pages/NotFound.jsx";
+import ListKOL from "../pages/home/kol/ListKOL.jsx";
 
 const courseRoutes = [
-  { path: "/goi-dich-vu", element: <CourseLivesteam /> },
+  { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
   {
-    path: "/goi-dich-vu/:courseId/:courseName",
+    path: "/danh-sach-khoa-hoc/:courseId/:courseName",
     element: <CourseLivesteamDetail />,
   },
 ];
@@ -50,7 +51,8 @@ export const routerCustomer = [
     element: <MainLayout />,
     children: [
       { path: "/", element: <HomePage /> },
-      { path: "/kols/:kolId/:kolName", element: <KOLDetail /> },
+      { path: "/danh-sach-kol", element: <ListKOL /> },
+      { path: "/danh-sach-kol/:kolId/:kolName", element: <KOLDetail /> },
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
       ...courseRoutes,

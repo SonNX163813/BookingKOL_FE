@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Stack, Typography, Chip, Button } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
@@ -17,27 +17,23 @@ const CourseDetailHero = ({
       position: "relative",
       borderRadius: { xs: 4, md: 6 },
       background:
-        "radial-gradient(60% 60% at 20% 20%, rgba(22, 249, 138, 0.18) 0%, rgba(5, 34, 11, 0) 70%), \
-         radial-gradient(50% 50% at 80% 10%, rgba(19, 67, 56, 0.22) 0%, rgba(5, 34, 11, 0) 65%), \
-         linear-gradient(160deg, rgba(5, 34, 11, 1) 0%, rgba(19, 67, 56, 0.92) 55%, rgba(22, 249, 138, 0.18) 100%)",
-      border: "1px solid rgba(0, 227, 159, 0.2)",
+        "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
+      border: "1px solid rgba(74, 116, 218, 0.16)",
       overflow: "hidden",
-      boxShadow: "0 40px 88px rgba(0, 0, 0, 0.42)",
+      boxShadow: "0 32px 80px rgba(74, 116, 218, 0.18)",
       px: { xs: 3, md: 5 },
       py: { xs: 4, md: 6 },
     }}
   >
-    {/* Stack Container chính - flexDirection: row trên màn to */}
     <Stack
       direction={{ xs: "column", md: "row" }}
       spacing={4}
       alignItems="center"
     >
-      {/* TRÁI: Ảnh bìa - chiếm 50% */}
       <Box
         sx={{
-          flex: { xs: "none", md: "0 0 50%" },
-          width: { xs: "100%", md: "50%" },
+          flex: { xs: "none", md: "0 0 48%" },
+          width: { xs: "100%", md: "48%" },
         }}
       >
         <Box
@@ -45,8 +41,8 @@ const CourseDetailHero = ({
             position: "relative",
             borderRadius: { xs: 4, md: 5 },
             overflow: "hidden",
-            border: "1px solid rgba(0, 227, 159, 0.18)",
-            boxShadow: "0 30px 70px rgba(0, 0, 0, 0.4)",
+            border: "1px solid rgba(74, 116, 218, 0.18)",
+            boxShadow: "0 24px 56px rgba(74, 116, 218, 0.18)",
           }}
         >
           <Box
@@ -63,22 +59,20 @@ const CourseDetailHero = ({
         </Box>
       </Box>
 
-      {/* PHẢI: Thông tin khóa học - chiếm 50% */}
       <Box
         sx={{
-          flex: { xs: "none", md: "0 0 50%" },
-          width: { xs: "100%", md: "50%" },
+          flex: { xs: "none", md: "0 0 52%" },
+          width: { xs: "100%", md: "52%" },
         }}
       >
         <Stack spacing={2.5}>
-          {/* Chip trạng thái và giảm giá */}
           <Stack direction="row" spacing={1.5} flexWrap="wrap">
             {!!statusChip && (
               <Chip
                 label={statusChip.label}
                 sx={{
-                  bgcolor: alpha(statusChip.color || "#00E39F", 0.18),
-                  color: statusChip.color || "#00E39F",
+                  bgcolor: alpha(statusChip.color || "#4a74da", 0.15),
+                  color: statusChip.color || "#2f3c8c",
                   fontWeight: 600,
                 }}
               />
@@ -87,31 +81,30 @@ const CourseDetailHero = ({
               <Chip
                 label={discountChip.label}
                 sx={{
-                  bgcolor: alpha(discountChip.color || "#38BDF8", 0.16),
-                  color: discountChip.color || "#38BDF8",
+                  bgcolor: alpha(discountChip.color || "#4a74da", 0.12),
+                  color: discountChip.color || "#4a74da",
                   fontWeight: 600,
                 }}
               />
             )}
           </Stack>
 
-          {/* Tiêu đề */}
           <Typography
             variant="h2"
             sx={{
               fontWeight: 700,
-              fontSize: { xs: "2.2rem", md: "3.2rem" },
+              fontSize: { xs: "2.2rem", md: "3.1rem" },
               lineHeight: 1.15,
+              color: "#0f172a",
             }}
           >
             {courseTitle}
           </Typography>
 
-          {/* Mô tả */}
           <Typography
             sx={{
-              color: "rgba(230, 244, 239, 0.78)",
-              fontSize: { xs: "1rem", md: "1.1rem" },
+              color: "rgba(15, 23, 42, 0.7)",
+              fontSize: { xs: "1rem", md: "1.08rem" },
               lineHeight: 1.7,
             }}
           >
@@ -120,7 +113,6 @@ const CourseDetailHero = ({
             livestream xây dựng thương hiệu.
           </Typography>
 
-          {/* Giá */}
           <Stack
             direction="row"
             spacing={3}
@@ -130,7 +122,7 @@ const CourseDetailHero = ({
             <Stack spacing={0.5}>
               <Typography
                 sx={{
-                  color: "rgba(230, 244, 239, 0.6)",
+                  color: "rgba(15, 23, 42, 0.6)",
                   textTransform: "uppercase",
                   letterSpacing: 1.4,
                   fontSize: "0.85rem",
@@ -140,19 +132,18 @@ const CourseDetailHero = ({
               </Typography>
               <Typography
                 variant="h3"
-                sx={{ fontWeight: 700, color: "#00E39F" }}
+                sx={{ fontWeight: 700, color: "#4a74da" }}
               >
                 {priceLabel}
               </Typography>
             </Stack>
             {!!discountChip && (
-              <Typography sx={{ color: "#38BDF8" }}>
+              <Typography sx={{ color: "#2f3c8c" }}>
                 Đã áp dụng mã giảm giá
               </Typography>
             )}
           </Stack>
 
-          {/* CTA */}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Button
               variant="contained"
@@ -161,15 +152,15 @@ const CourseDetailHero = ({
               sx={{
                 textTransform: "none",
                 fontWeight: 700,
-                bgcolor: "#00E39F",
-                color: "#062720",
+                bgcolor: "#4a74da",
+                color: "#ffffff",
                 px: { xs: 3.5, md: 4.5 },
                 py: 1.5,
                 borderRadius: 3,
-                boxShadow: "0 20px 54px rgba(0, 227, 159, 0.32)",
+                boxShadow: "0 20px 54px rgba(74, 116, 218, 0.24)",
                 "&:hover": {
-                  bgcolor: "#0BF2AE",
-                  boxShadow: "0 24px 64px rgba(11, 242, 174, 0.35)",
+                  bgcolor: "#3b5ec8",
+                  boxShadow: "0 24px 64px rgba(59, 94, 200, 0.26)",
                 },
               }}
             >
@@ -183,13 +174,13 @@ const CourseDetailHero = ({
               sx={{
                 textTransform: "none",
                 fontWeight: 600,
-                borderColor: "rgba(0, 227, 159, 0.35)",
-                color: "rgba(230, 244, 239, 0.92)",
+                borderColor: "rgba(74, 116, 218, 0.35)",
+                color: "rgba(15, 23, 42, 0.7)",
                 px: { xs: 3.5, md: 4.5 },
                 borderRadius: 3,
                 "&:hover": {
-                  borderColor: "rgba(0, 227, 159, 0.6)",
-                  bgcolor: "rgba(0, 227, 159, 0.08)",
+                  borderColor: "rgba(74, 116, 218, 0.55)",
+                  bgcolor: "rgba(74, 116, 218, 0.08)",
                 },
               }}
             >

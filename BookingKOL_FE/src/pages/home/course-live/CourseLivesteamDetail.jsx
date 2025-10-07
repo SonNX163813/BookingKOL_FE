@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -81,7 +81,7 @@ const CourseLivesteamDetail = () => {
   }, [loadCourseDetail]);
 
   const handleBack = useCallback(() => {
-    navigate("/goi-dich-vu");
+    navigate("/danh-sach-khoa-hoc");
   }, [navigate]);
 
   const handleSnackbarRetry = useCallback(() => {
@@ -131,27 +131,44 @@ const CourseLivesteamDetail = () => {
   }, [course]);
 
   const statusChip = course?.isAvailable
-    ? { label: "Đang mở đăng ký", color: "#00E39F" }
-    : { label: "Tạm dừng đăng ký", color: "#F59E0B" };
+    ? { label: "Đang mở đăng ký", color: "#4a74da" }
+    : { label: "Tạm dừng đăng ký", color: "#f59e0b" };
 
   const discountChip =
     Number(course?.discount) > 0
       ? {
           label: `Giảm ${Math.round(Number(course.discount))}%`,
-          color: "#38BDF8",
+          color: "#4a74da",
         }
       : null;
-
   return (
     <Box
       sx={{
-        background: "radial-gradient(circle at 15% 20%, #0C1E19, #040706)",
         minHeight: "100vh",
+        position: "relative",
+        bgcolor: "#ffffff",
+        overflow: "hidden",
         py: { xs: 8, md: 12 },
-        color: "#E6F4EF",
       }}
     >
-      <Container maxWidth="lg">
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(90% 90% at 12% 20%, rgba(74, 116, 218, 0.2) 0%, rgba(147, 206, 246, 0.05) 55%, rgba(147, 206, 246, 0) 85%), radial-gradient(90% 90% at 88% 15%, rgba(255, 161, 218, 0.16) 0%, rgba(255, 161, 218, 0) 70%)",
+          opacity: 0.8,
+        }}
+      />
+      <Container
+        maxWidth="lg"
+        sx={{
+          position: "relative",
+          zIndex: 1,
+          color: "#0f172a",
+        }}
+      >
         <Stack spacing={4}>
           <Button
             onClick={handleBack}
@@ -160,15 +177,15 @@ const CourseLivesteamDetail = () => {
               alignSelf: "flex-start",
               textTransform: "none",
               fontWeight: 600,
-              color: "rgba(230, 244, 239, 0.82)",
+              color: "#4a74da",
               borderRadius: 2,
-              border: "1px solid rgba(0, 227, 159, 0.14)",
+              border: "1px solid rgba(74, 116, 218, 0.24)",
               px: 2.5,
               py: 1,
-              bgcolor: "rgba(8, 20, 17, 0.6)",
+              bgcolor: "rgba(74, 116, 218, 0.08)",
               "&:hover": {
-                bgcolor: "rgba(0, 227, 159, 0.12)",
-                borderColor: "rgba(0, 227, 159, 0.32)",
+                bgcolor: "rgba(74, 116, 218, 0.16)",
+                borderColor: "rgba(74, 116, 218, 0.32)",
               },
             }}
           >

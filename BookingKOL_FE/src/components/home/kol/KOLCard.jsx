@@ -1,4 +1,3 @@
-// KOLCard.jsx - Equalized & Locked
 import React from "react";
 import {
   Card,
@@ -16,10 +15,29 @@ const clampRating = (v) => (Number.isNaN(v) ? 0 : Math.min(Math.max(v, 0), 5));
 const truncateText = (str, max = 36) => {
   if (!str) return str;
   const s = String(str).trim();
-  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}...` : s;
 };
 
 const MotionCard = motion(Card);
+
+const cardGradient =
+  "radial-gradient(55% 55% at 90% 0%, rgba(147, 206, 246, 0.35) 0%, rgba(147, 206, 246, 0) 70%),radial-gradient(60% 60% at 0% 100%, rgba(255, 161, 218, 0.28) 0%, rgba(88, 43, 175, 0) 70%)";
+const cardGlow =
+  "radial-gradient(68% 68% at 50% 8%, rgba(147,206,246,0.5) 0%, rgba(147,206,246,0) 100%)";
+const cardShadow =
+  "0 6px 12px rgba(141, 226, 237, 0.36),0 12px 24px rgba(147, 206, 246, 0.32),0 18px 32px rgba(74, 116, 218, 0.38),0 2px 6px rgba(255, 255, 255, 0.18)";
+const cardHoverShadow = "0 40px 96px rgba(88,43,175,0.28)";
+const borderColor = "rgba(74,116,218,0.22)";
+const primaryText = "#1e2767";
+const secondaryText = "rgba(30,39,103,0.72)";
+const subtleText = "rgba(30,39,103,0.5)";
+const chipGradient =
+  "linear-gradient(135deg, rgba(141,226,237,0.26) 0%, rgba(88,43,175,0.22) 100%)";
+const ratingSurface =
+  "linear-gradient(135deg, rgba(141,226,237,0.26) 0%, rgba(88,43,175,0.22) 100%)";
+const priceSurface =
+  "linear-gradient(135deg, rgba(255,255,255,0.84) 0%, rgba(255,161,218,0.34) 100%)";
+const fontFamily = "'Montserrat', sans-serif";
 
 const KOLCard = ({
   name,
@@ -55,8 +73,8 @@ const KOLCard = ({
 
   return (
     <motion.div
-      whileHover={{ y: -6 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      whileHover={{ y: -10 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
       style={{
         height: "100%",
         width: "100%",
@@ -67,61 +85,77 @@ const KOLCard = ({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={handleKeyDown}
-      aria-label={onClick ? `Mở chi tiết ${name}` : undefined}
+      aria-label={onClick ? `View details ${name}` : undefined}
     >
       <MotionCard
         whileHover={{
-          boxShadow: "0 24px 48px rgba(15,23,42,0.18)",
-          transition: { duration: 0.25 },
+          boxShadow: cardHoverShadow,
         }}
         elevation={0}
         sx={{
-          borderRadius: { xs: 3, sm: 4 },
+          position: "relative",
+          borderRadius: { xs: "22px", sm: "24px" },
           boxShadow: {
-            xs: "0 10px 24px rgba(148,163,184,0.16)",
-            md: "0 18px 42px rgba(148,163,184,0.18)",
+            xs: "0 22px 48px rgba(74,116,218,0.18)",
+            md: cardShadow,
           },
-          border: "1px solid #e2e8f0",
+          border: `1px solid ${borderColor}`,
           overflow: "hidden",
-          background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+          // background: cardGradient,
           display: "flex",
           flexDirection: "column",
           width: "100%",
           height: "100%",
-          minHeight: 420, // đồng bộ sườn card
+          minHeight: 420,
+          backdropFilter: "blur(14px)",
+          transition: "box-shadow 0.3s ease",
+          zIndex: 0,
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 55%, rgba(255,255,255,0) 100%)",
+            opacity: 0.55,
+            pointerEvents: "none",
+            zIndex: 0,
+          },
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            inset: "-18% -20% 60%",
+            background: cardGlow,
+            filter: "blur(32px)",
+            opacity: 0.55,
+            pointerEvents: "none",
+            zIndex: 0,
+          },
         }}
       >
-        {/* MEDIA: khoá tỉ lệ 3/4 + fallback; base style đặt SAU để không bị override */}
         <Box
           sx={[
-            // cho phép truyền thêm, nhưng không được phép thay đổi ratio/height
             mediaContainerSx,
             {
               position: "relative",
-              width: { xs: 240, sm: 238, md: 240, lg: 240 },
-              height: { xs: 240, sm: 340, md: 300, lg: 360 },
+              width: "100%",
+              aspectRatio: { xs: "1 / 1", sm: "2 / 3", md: "2 / 3" },
+              minHeight: { xs: 230, sm: 270, md: 290, lg: 310 },
               overflow: "hidden",
               flexShrink: 0,
-              // "--media-w": 3,
-              // "--media-h": 4,
-              // aspectRatio: "var(--media-w) / var(--media-h)",
-              // "@supports not (aspect-ratio: 1 / 1)": {
-              //   "&::before": {
-              //     content: '""',
-              //     display: "block",
-              //     paddingBottom: "calc(100% * var(--media-h) / var(--media-w))",
-              //   },
-              // },
+              borderBottom: "1px solid rgba(147,206,246,0.16)",
+              zIndex: 1,
             },
             mediaContainerSx && {
               ...mediaContainerSx,
+              width: undefined,
+              height: undefined,
               minHeight: undefined,
               maxHeight: undefined,
               aspectRatio: undefined,
             },
           ]}
         >
-          <Box sx={{ position: "absolute", inset: 0 }}>
+          <Box sx={{ position: "absolute", inset: 0, zIndex: 0 }}>
             <CardMedia
               component="img"
               image={image}
@@ -149,44 +183,69 @@ const KOLCard = ({
               draggable={false}
             />
           </Box>
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(180deg, rgba(15,23,42,0) 45%, rgba(15,23,42,0.45) 100%)",
+              opacity: 0.5,
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
+          />
+          <Box
+            sx={{
+              position: "absolute",
+              inset: "auto 18px 18px 18px",
+              height: "18%",
+              borderRadius: "16px",
+              background: "rgba(255,255,255,0.65)",
+              filter: "blur(28px)",
+              opacity: 0.6,
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
+          />
         </Box>
 
-        {/* CONTENT: cố định chiều cao các block, giá luôn ở đáy */}
         <CardContent
           sx={{
             display: "flex",
             flexDirection: "column",
-            gap: { xs: 0.5, sm: 0.5, md: "10px" },
-            py: { xs: 2, sm: 2.5 },
-            px: { xs: 2, sm: 2.5 },
+            gap: { xs: 1.6, sm: 1.9 },
+            py: { xs: 2.4, sm: 2.8 },
+            px: { xs: 2.4, sm: 2.8 },
             flexGrow: 1,
-            minHeight: 180,
+            minHeight: 200,
+            position: "relative",
+            zIndex: 2,
+            fontFamily,
+            color: primaryText,
           }}
         >
-          {/* Tên: 2 dòng cố định */}
           <Typography
             variant="h6"
             sx={{
               fontWeight: 700,
-              color: "#0f172a",
+              color: primaryText,
               letterSpacing: "-0.01em",
-              fontSize: { xs: "0.95rem", sm: "1rem", md: "1.05rem" },
-              lineHeight: 1.3,
+              fontSize: { xs: "1rem", sm: "1.05rem", md: "1.1rem" },
+              lineHeight: 1.32,
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              minHeight: "2.6em", // 2 dòng * 1.3
+              minHeight: "2.64em",
             }}
             title={name}
           >
             {name}
           </Typography>
 
-          {/* Chip lĩnh vực: chiều cao cố định */}
           <Box
             sx={{
-              minHeight: 26,
+              minHeight: 28,
               display: "flex",
               alignItems: "center",
             }}
@@ -203,15 +262,17 @@ const KOLCard = ({
                   size="small"
                   sx={{
                     alignSelf: "flex-start",
-                    backgroundColor: "rgba(79,70,229,0.1)",
-                    color: "#4f46e5",
+                    background: chipGradient,
+                    color: primaryText,
                     fontWeight: 600,
                     borderRadius: "9999px",
-                    px: { xs: 1, sm: 1.25 },
-                    height: 26,
-                    fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                    px: { xs: 1.25, sm: 1.5 },
+                    height: 28,
+                    fontSize: { xs: "0.72rem", sm: "0.78rem" },
+                    border: "1px solid rgba(74,116,218,0.24)",
+                    boxShadow: "0 12px 28px rgba(74,116,218,0.18)",
                     ".MuiChip-label": {
-                      maxWidth: 180,
+                      maxWidth: 200,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -222,13 +283,18 @@ const KOLCard = ({
             )}
           </Box>
 
-          {/* Rating: chiều cao cố định */}
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 1,
-              minHeight: 22,
+              gap: 1.25,
+              minHeight: 44,
+              borderRadius: "16px",
+              background: ratingSurface,
+              border: "1px solid rgba(147,206,246,0.28)",
+              boxShadow: "0 16px 32px rgba(147,206,246,0.18)",
+              px: { xs: 1.5, sm: 1.75 },
+              py: { xs: 0.85, sm: 1 },
             }}
           >
             <Rating
@@ -237,16 +303,20 @@ const KOLCard = ({
               readOnly
               sx={{
                 "& .MuiRating-iconFilled": { color: "#facc15" },
-                "& .MuiRating-iconEmpty": { color: "#e2e8f0" },
-                "& .MuiRating-icon": { fontSize: { xs: 16, sm: 18, md: 20 } },
+                "& .MuiRating-iconEmpty": { color: "rgba(255,255,255,0.6)" },
+                "& .MuiRating-icon": {
+                  fontSize: { xs: 18, sm: 19, md: 20 },
+                },
               }}
             />
             <Typography
               variant="body2"
               sx={{
-                color: "#475569",
+                color: primaryText,
                 fontWeight: 600,
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                fontSize: { xs: "0.78rem", sm: "0.82rem" },
+                display: "flex",
+                alignItems: "center",
               }}
             >
               {formattedRating}
@@ -255,10 +325,10 @@ const KOLCard = ({
                   component="span"
                   variant="body2"
                   sx={{
-                    color: "#94a3b8",
+                    color: secondaryText,
                     fontWeight: 500,
-                    ml: 0.5,
-                    fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                    ml: 0.6,
+                    fontSize: { xs: "0.72rem", sm: "0.76rem" },
                   }}
                 >
                   {formattedReviews}
@@ -267,25 +337,28 @@ const KOLCard = ({
             </Typography>
           </Box>
 
-          {/* spacer đẩy giá xuống đáy */}
           <Box sx={{ flexGrow: 1, minHeight: 8 }} />
 
-          {/* Giá: block cố định */}
-          <Box
+          {/* <Box
             sx={{
               display: "flex",
               flexDirection: "column",
-              gap: 0.25,
-              minHeight: { xs: 32, sm: 36, md: 40 },
+              gap: 0.35,
+              borderRadius: "18px",
+              background: priceSurface,
+              border: "1px solid rgba(255,255,255,0.55)",
+              boxShadow: "0 24px 48px rgba(88,43,175,0.2)",
+              px: { xs: 1.8, sm: 2 },
+              py: { xs: 1.4, sm: 1.6 },
             }}
           >
             <Typography
               variant="body2"
               sx={{
-                color: "#94a3b8",
+                color: subtleText,
                 textDecoration: "line-through",
                 fontWeight: 500,
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                fontSize: { xs: "0.76rem", sm: "0.8rem" },
                 lineHeight: 1.2,
                 opacity: originalPrice ? 1 : 0,
                 visibility: originalPrice ? "visible" : "hidden",
@@ -298,9 +371,9 @@ const KOLCard = ({
             <Typography
               variant="h5"
               sx={{
-                color: "#ef4444",
+                color: "#e11d48",
                 fontWeight: 700,
-                fontSize: { xs: "1.1rem", sm: "1.25rem", md: "1.35rem" },
+                fontSize: { xs: "1.16rem", sm: "1.3rem", md: "1.38rem" },
                 lineHeight: 1.2,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -310,7 +383,7 @@ const KOLCard = ({
             >
               {price}
             </Typography>
-          </Box>
+          </Box> */}
         </CardContent>
       </MotionCard>
     </motion.div>

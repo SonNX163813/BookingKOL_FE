@@ -176,7 +176,7 @@ const PopularKOLs = () => {
   const handleCardClick = (kol) => {
     if (!kol?.id) return;
     const slug = slugify(kol.name) || kol.id;
-    navigate(`/kols/${kol.id}/${slug}`);
+    navigate(`/danh-sach-kol/${kol.id}/${slug}`);
   };
 
   // Bạn đang để 1 skeleton — giữ nguyên theo ý bạn
