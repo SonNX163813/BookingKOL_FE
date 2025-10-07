@@ -387,7 +387,7 @@ const ListKOL = () => {
         return;
       }
       const safeSlug = kolSlug || "kol";
-      navigate(`/danh-sách-kol/${kolId}/${safeSlug}`);
+      navigate(`/danh-sach-kol/${kolId}/${safeSlug}`);
     },
     [navigate]
   );
