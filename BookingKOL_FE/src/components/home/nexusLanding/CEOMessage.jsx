@@ -29,8 +29,8 @@ const sectionSx = {
 const cardSx = {
   borderRadius: 5,
   backgroundColor: "rgba(255, 255, 255, 0.9)",
-  backgroundImage:
-    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.4), rgba(74, 116, 218, 0.16))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top left, rgba(147, 206, 246, 0.4), rgba(74, 116, 218, 0.16))",
   border: "1px solid rgba(147, 206, 246, 0.4)",
   backdropFilter: "blur(12px)",
 };

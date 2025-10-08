@@ -16,8 +16,8 @@ const CourseDetailHero = ({
     sx={{
       position: "relative",
       borderRadius: { xs: 4, md: 6 },
-      background:
-        "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
+      // background:
+      //   "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
       border: "1px solid rgba(74, 116, 218, 0.16)",
       overflow: "hidden",
       boxShadow: "0 32px 80px rgba(74, 116, 218, 0.18)",

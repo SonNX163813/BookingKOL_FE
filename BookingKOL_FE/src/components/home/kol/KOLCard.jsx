@@ -24,9 +24,10 @@ const cardGradient =
   "radial-gradient(55% 55% at 90% 0%, rgba(147, 206, 246, 0.35) 0%, rgba(147, 206, 246, 0) 70%),radial-gradient(60% 60% at 0% 100%, rgba(255, 161, 218, 0.28) 0%, rgba(88, 43, 175, 0) 70%)";
 const cardGlow =
   "radial-gradient(68% 68% at 50% 8%, rgba(147,206,246,0.5) 0%, rgba(147,206,246,0) 100%)";
-const cardShadow =
-  "0 6px 12px rgba(141, 226, 237, 0.36),0 12px 24px rgba(147, 206, 246, 0.32),0 18px 32px rgba(74, 116, 218, 0.38),0 2px 6px rgba(255, 255, 255, 0.18)";
-const cardHoverShadow = "0 40px 96px rgba(88,43,175,0.28)";
+// const cardShadow =
+//   "0 6px 16px rgba(141, 226, 237, 0.28),  0 12px 28px rgba(147, 206, 246, 0.25),  0 20px 50px rgba(74, 116, 218, 0.18),  0 2px 6px rgba(255, 255, 255, 0.12)";
+const cardShadow = "0 20px 50px rgba(74, 116, 218, 0.18)";
+const cardHoverShadow = "0 20px 80px rgba(88,43,175,0.28)";
 const borderColor = "rgba(74,116,218,0.22)";
 const primaryText = "#1e2767";
 const secondaryText = "rgba(30,39,103,0.72)";

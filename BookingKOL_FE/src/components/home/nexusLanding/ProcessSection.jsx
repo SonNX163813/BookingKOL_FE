@@ -41,8 +41,8 @@ const stepsGridSx = {
 
 const stepCardSx = {
   backgroundColor: "rgba(255, 255, 255, 0.96)",
-  backgroundImage:
-    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.25), rgba(255, 255, 255, 0.96))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top left, rgba(147, 206, 246, 0.25), rgba(255, 255, 255, 0.96))",
   borderRadius: 4,
   p: { xs: 2.5, md: 3 },
   border: "1px solid rgba(147, 206, 246, 0.35)",

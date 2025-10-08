@@ -2,6 +2,22 @@ import { BASE_URL } from "../../utils/config";
 
 const COURSE_BASE = `${BASE_URL}/courses`;
 const COURSE_LIST_ENDPOINT = `${COURSE_BASE}/all`;
+const COURSE_LIST_ALLOWED_PARAMS = new Set([
+  "minPrice",
+  "maxPrice",
+  "minDiscount",
+  "maxDiscount",
+  "page",
+  "size",
+  "sortBy",
+  "sortDir",
+]);
+const COURSE_LIST_DEFAULT_PARAMS = {
+  page: 0,
+  size: 10,
+  sortBy: "price",
+  sortDir: "asc",
+};
 
 const parseJsonSafely = async (response) => {
   const rawText = await response.text();
@@ -41,14 +57,44 @@ const ensureSuccess = async (response) => {
   throw new Error(message);
 };
 
-export const getCoursePackages = async ({ signal } = {}) => {
-  const response = await fetch(COURSE_LIST_ENDPOINT, { signal });
+const buildCourseListUrl = (params = {}) => {
+  const searchParams = new URLSearchParams();
+  const mergedParams = {
+    ...COURSE_LIST_DEFAULT_PARAMS,
+    ...params,
+  };
+
+  Object.entries(mergedParams).forEach(([key, value]) => {
+    if (!COURSE_LIST_ALLOWED_PARAMS.has(key)) {
+      return;
+    }
+
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+
+    searchParams.set(key, value);
+  });
+
+  const queryString = searchParams.toString();
+  return queryString
+    ? `${COURSE_LIST_ENDPOINT}?${queryString}`
+    : COURSE_LIST_ENDPOINT;
+};
+
+export const getCoursePackages = async ({ signal, params } = {}) => {
+  const response = await fetch(buildCourseListUrl(params), { signal });
   await ensureSuccess(response);
 
   const payload = await parseJsonSafely(response);
   const { data } = payload ?? {};
 
-  return Array.isArray(data) ? data : [];
+  if (!data) {
+    return { content: [] };
+  }
+
+  const content = Array.isArray(data.content) ? data.content : [];
+  return { ...data, content };
 };
 
 export const getCoursePackageById = async (courseId, { signal } = {}) => {
