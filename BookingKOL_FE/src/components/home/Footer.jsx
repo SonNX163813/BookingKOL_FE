@@ -1,256 +1,177 @@
 import React from "react";
-import {
-  Box,
-  Container,
-  Typography,
-  Grid,
-  Link,
-  IconButton,
-  Divider,
-  Stack,
-} from "@mui/material";
-import FacebookIcon from "@mui/icons-material/Facebook";
-import TwitterIcon from "@mui/icons-material/Twitter";
-import InstagramIcon from "@mui/icons-material/Instagram";
-import LinkedInIcon from "@mui/icons-material/LinkedIn";
-import YouTubeIcon from "@mui/icons-material/YouTube";
+import { Link } from "react-router-dom";
+import logoPng from "../../assets/logocty.png";
 
-const textMuted = "#9ca3af";
-const textLight = "#d1d5db";
-const brandAccent = "#e879f9";
+import email from "../../assets/email.png";
+import phone from "../../assets/phone.png";
+import instagram from "../../assets/instagram.png";
+import tiktok from "../../assets/tiktok.png";
+import clsx from "clsx";
+import { FaFacebook } from "react-icons/fa";
 
-const Footer = () => {
+const FooterLink = ({ to, children }) => (
+  <li>
+    <Link to={to} className="hover:text-blue-800 transition-colors !text-sm">
+      {children}
+    </Link>
+  </li>
+);
+
+function ScrollButton({
+  as: Component = "button",
+  className,
+  children,
+  ...props
+}) {
   return (
-    <Box
-      component="footer"
-      sx={{
-        background:
-          "radial-gradient(60% 100% at 0% 0%, rgba(147,206,246,0.08) 0%, rgba(147,206,246,0) 60%), \
-       radial-gradient(50% 100% at 100% 0%, rgba(255,161,218,0.06) 0%, rgba(255,161,218,0) 60%), \
-       linear-gradient(180deg, #0b1320, #111827)",
-        color: "white",
-        pt: { xs: 6, md: 8 },
-        pb: { xs: 6, md: 8 },
-        borderTop: "1px solid rgba(148, 163, 184, 0.18)",
-      }}
-    >
-      <Container
-        maxWidth={false}
-        sx={{
-          maxWidth: "1600px", // hoặc 1440px tùy layout
-          mx: "auto",
-          px: { xs: 3, md: 6 },
-        }}
+    <li>
+      <Component
+        className={clsx(
+          "cursor-pointer hover:text-blue-800 transition-colors !text-sm text-left",
+          className
+        )}
+        {...props}
       >
-        <Grid
-          container
-          spacing={{ xs: 4, md: 6 }}
-          justifyContent="space-between"
-          alignItems="flex-start"
-        >
-          {/* Cột 1: About / Brand */}
-          <Grid item xs={12} sm={6} md={4}>
-            <Typography
-              variant="h5"
-              sx={{ fontWeight: 800, color: brandAccent, mb: 1 }}
-            >
-              Nexus Agency
-            </Typography>
-            <Typography
-              variant="body1"
-              sx={{ color: textLight, mb: 3, maxWidth: 400, lineHeight: 1.7 }}
-            >
+        {children}
+      </Component>
+    </li>
+  );
+}
+
+function Footer() {
+  return (
+    // ✅ gradient phủ full width ở chính thẻ footer
+    <footer className="radial-bg-footer py-16 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+      {/* Nội dung vẫn nằm trong container để giữ max-width như trước */}
+      <div className="container mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+        {/* Cột 1: Logo + slogan (dịch trái nhẹ) */}
+        <div className="md:col-span-2 lg:col-span-1 lg:-ml-5 xl:-ml-8">
+          {/* thêm space-y để giãn đều 3 phần; leading để giãn dòng trong mỗi đoạn */}
+          <div className="flex flex-col items-start space-y-4 md:space-y-5">
+            <img src={logoPng} alt="Planier" className="h-12 w-auto" />
+
+            <p className="font-bold text-[#3658b8] text-[18px] md:text-[18px]">
+              NEXUS AGENCY - Livestream All-in-One
+            </p>
+
+            <p className="text-sm leading-[1.5] max-w-[520px]">
               Nền tảng dịch vụ livestream all-in-one: setup – đào tạo – booking
               – vận hành – affiliate/MCN.
-            </Typography>
+              <br />
+              Nexus Agency là đơn vị tiên phong cung cấp giải pháp KOL/KOC
+              Marketing &amp; Livestream Commerce trọn gói tại Việt Nam.
+            </p>
 
-            <Stack direction="row" spacing={1.5}>
-              {[
-                FacebookIcon,
-                TwitterIcon,
-                InstagramIcon,
-                LinkedInIcon,
-                YouTubeIcon,
-              ].map((Icon, i) => (
-                <IconButton
-                  key={i}
-                  component="a"
-                  href="#"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{ color: textMuted, "&:hover": { color: brandAccent } }}
-                >
-                  <Icon />
-                </IconButton>
-              ))}
-            </Stack>
-          </Grid>
+            <p className="text-sm leading-[1.15] -mt-1 max-w-[520px]"></p>
+          </div>
+        </div>
 
-          {/* Cột 2: Menu */}
-          <Grid item xs={12} sm={6} md={4}>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                mb: 2,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Menu
-            </Typography>
-            <Stack spacing={1.2}>
-              {[
-                { label: "Trang chủ", href: "#" },
-                { label: "Dịch vụ", href: "#" },
-                { label: "Case Study", href: "#" },
-                { label: "Blog", href: "#" },
-                { label: "Tuyển dụng", href: "#" },
-                { label: "Liên hệ", href: "#" },
-                { label: "Điều khoản & Bảo mật", href: "#" },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  underline="none"
-                  sx={{
-                    color: textLight,
-                    "&:hover": { color: "white" },
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 1,
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </Stack>
-          </Grid>
+        {/* Cột 2: Giới thiệu & CSKH */}
+        <div className="lg:ml-[110px]">
+          <h4 className="!mb-4 font-semibold text-[#3658b8]">Giới thiệu</h4>
+          <ul className="flex flex-col !space-y-3">
+            <FooterLink to="/home">Về Nexus Agency</FooterLink>
+            <li>
+              <p className="!text-sm">Đối tác</p>
+            </li>
+            <li>
+              <p className="!text-sm">Tuyển dụng</p>
+            </li>
+          </ul>
 
-          {/* Cột 3: Thông tin */}
-          <Grid item xs={12} md={4}>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                mb: 2,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-              }}
-            >
-              Thông tin
-            </Typography>
-            <Stack spacing={1.2} sx={{ color: textLight }}>
-              <Typography>
-                <strong style={{ color: "white" }}>Công ty:</strong> Nexus
-                Agency
-              </Typography>
-              <Typography>
-                <strong style={{ color: "white" }}>MST:</strong> Đang cập nhật
-              </Typography>
-              <Typography>
-                <strong style={{ color: "white" }}>Hotline:</strong>{" "}
-                <Link
-                  href="tel:0900000000"
-                  underline="hover"
-                  sx={{ color: textLight, "&:hover": { color: "white" } }}
-                >
-                  0900 000 000
-                </Link>
-              </Typography>
-              <Typography>
-                <strong style={{ color: "white" }}>Email:</strong>{" "}
-                <Link
-                  href="mailto:contact@nexus.agency"
-                  underline="hover"
-                  sx={{ color: textLight, "&:hover": { color: "white" } }}
-                >
-                  contact@nexus.agency
-                </Link>
-              </Typography>
-              <Typography>
-                <strong style={{ color: "white" }}>Địa chỉ:</strong> 123 Đường
-                ABC, Quận 1, TP. Hồ Chí Minh
-              </Typography>
-              <Typography>
-                <strong style={{ color: "white" }}>Social:</strong>{" "}
-                <Link
-                  href="#"
-                  underline="hover"
-                  sx={{ color: textLight, "&:hover": { color: "white" } }}
-                >
-                  Facebook
-                </Link>{" "}
-                ·{" "}
-                <Link
-                  href="#"
-                  underline="hover"
-                  sx={{ color: textLight, "&:hover": { color: "white" } }}
-                >
-                  LinkedIn
-                </Link>{" "}
-                ·{" "}
-                <Link
-                  href="#"
-                  underline="hover"
-                  sx={{ color: textLight, "&:hover": { color: "white" } }}
-                >
-                  YouTube
-                </Link>
-              </Typography>
-            </Stack>
-          </Grid>
-        </Grid>
+          <h4 className="!mb-4 !mt-6 font-semibold text-[#3658b8]">
+            Chăm sóc khách hàng
+          </h4>
 
-        <Divider sx={{ my: 4, borderColor: "rgba(55, 65, 81, 0.72)" }} />
+          <ul className="!space-y-3">
+            <ScrollButton as="a" href="#faq-container">
+              Câu hỏi thường gặp
+            </ScrollButton>
+            <FooterLink to="/terms-and-privacy">
+              Điều khoản & Chính sách
+            </FooterLink>
+          </ul>
+        </div>
 
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: { xs: "column", md: "row" },
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 1.5,
-          }}
-        >
-          <Typography variant="body2" sx={{ color: textMuted }}>
-            © {new Date().getFullYear()} Nexus Agency. All rights reserved.
-          </Typography>
+        {/* Cột 3: Các Gói Dịch Vụ */}
+        <div className="lg:ml-[90px]">
+          <h4 className="mb-4 font-semibold text-[#3658b8]">Các Gói Dịch Vụ</h4>
+          <ul className="space-y-3">
+            <ScrollButton as="a" href="#features-container">
+              Dịch vụ LiveStream chuyên nghiệp
+            </ScrollButton>
+            <ScrollButton as="a" href="#pricing-container">
+              Dịch vụ đào tạo LiveStream
+            </ScrollButton>
+            <ScrollButton as="a" href="#pricing-container">
+              Blog
+            </ScrollButton>
+            <ScrollButton as="a" href="#guide-container">
+              Trợ lý ảo AI
+            </ScrollButton>
+            <ScrollButton as="a" href="#guide-container">
+              Liên hệ tư vấn
+            </ScrollButton>
+          </ul>
+        </div>
 
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ color: textMuted, flexWrap: "wrap" }}
-          >
-            <Link
-              href="#"
-              underline="hover"
-              sx={{ color: textMuted, "&:hover": { color: "white" } }}
-            >
-              Điều khoản
-            </Link>
-            <Typography sx={{ opacity: 0.5 }}>•</Typography>
-            <Link
-              href="#"
-              underline="hover"
-              sx={{ color: textMuted, "&:hover": { color: "white" } }}
-            >
-              Bảo mật
-            </Link>
-            <Typography sx={{ opacity: 0.5 }}>•</Typography>
-            <Link
-              href="#"
-              underline="hover"
-              sx={{ color: textMuted, "&:hover": { color: "white" } }}
-            >
-              Chính sách Cookie
-            </Link>
-          </Stack>
-        </Box>
-      </Container>
-    </Box>
+        {/* Cột 4: Liên hệ */}
+        <div className="lg:ml-[90px]">
+          <h4 className="mb-4 font-semibold text-[#3658b8]">Liên hệ</h4>
+          <ul className="space-y-4">
+            <li className="flex items-center gap-3">
+              <img src={email} alt="email" className="!w-[20px]" />
+              <a
+                href="mailto:info.planier@gmail.com"
+                className="text-sm hover:text-blue-800"
+              >
+                Email: info.planier@gmail.com
+              </a>
+            </li>
+            <li className="flex items-center gap-3">
+              <img src={phone} alt="phone" className="!w-[20px]" />
+              <a href="tel:0702260606" className="text-sm hover:text-blue-800">
+                Hotline: 0379 642 539
+              </a>
+            </li>
+            <li className="flex items-center gap-3">
+              <FaFacebook size={21} className="mr-[1px]" />
+              <a
+                href="https://www.facebook.com/planier.vn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm hover:text-blue-800"
+              >
+                Facebook
+              </a>
+            </li>
+            <li className="flex items-center gap-3">
+              <img src={instagram} alt="instagram" className="!w-[20px]" />
+              <a
+                href="https://www.instagram.com/planier.vn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm hover:text-blue-800"
+              >
+                Instagram
+              </a>
+            </li>
+            <li className="flex items-center gap-3">
+              <img src={tiktok} alt="tiktok" className="!w-[18px]" />
+              <a
+                href="https://www.tiktok.com/@planier.vn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm hover:text-blue-800"
+              >
+                Tiktok
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </footer>
   );
-};
+}
 
 export default Footer;
