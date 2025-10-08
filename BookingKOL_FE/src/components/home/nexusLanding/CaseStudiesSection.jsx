@@ -41,8 +41,8 @@ const primaryCardSx = {
   height: "100%",
   borderRadius: 4,
   backgroundColor: "rgba(255, 255, 255, 0.92)",
-  backgroundImage:
-    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.95))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top left, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.95))",
   border: "1px solid rgba(147, 206, 246, 0.4)",
   boxShadow: "0 14px 32px rgba(74, 116, 218, 0.12)",
   display: "flex",
@@ -51,8 +51,8 @@ const primaryCardSx = {
 
 const highlightPrimaryCardSx = {
   backgroundColor: "#ffffff",
-  backgroundImage:
-    "linear-gradient(135deg, rgba(141, 226, 237, 0.65), rgba(147, 206, 246, 0.3))",
+  // backgroundImage:
+  //   "linear-gradient(135deg, rgba(141, 226, 237, 0.65), rgba(147, 206, 246, 0.3))",
   border: "1px solid rgba(74, 116, 218, 0.4)",
   boxShadow: "0 20px 44px rgba(74, 116, 218, 0.2)",
 };
@@ -67,8 +67,8 @@ const primaryCardContentSx = {
 const testimonialCardSx = {
   borderRadius: 4,
   backgroundColor: "rgba(255, 255, 255, 0.94)",
-  backgroundImage:
-    "radial-gradient(circle at top right, rgba(141, 226, 237, 0.38), rgba(255, 255, 255, 0.9))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top right, rgba(141, 226, 237, 0.38), rgba(255, 255, 255, 0.9))",
   border: "1px solid rgba(147, 206, 246, 0.4)",
   boxShadow: "0 16px 32px rgba(74, 116, 218, 0.12)",
   height: "100%",

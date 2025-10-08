@@ -54,8 +54,8 @@ const chipSx = {
   fontWeight: 500,
   fontSize: "0.95rem",
   backgroundColor: "rgba(255, 255, 255, 0.92)",
-  backgroundImage:
-    "radial-gradient(circle at top, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.9))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.9))",
   color: "#0f172a",
   border: "1px solid rgba(147, 206, 246, 0.45)",
   boxShadow: "0 10px 20px rgba(74, 116, 218, 0.12)",

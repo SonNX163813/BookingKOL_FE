@@ -13,11 +13,12 @@ const CourseHeroSection = ({
     sx={{
       p: { xs: 3, md: 5 },
       borderRadius: { xs: 4, md: 6 },
-      background:
-        "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
+      // background:
+      //   "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
       border: "1px solid rgba(74, 116, 218, 0.18)",
-      boxShadow: "0 30px 80px rgba(74, 116, 218, 0.18)",
+      boxShadow: "0 20px 50px rgba(74, 116, 218, 0.18)",
       backdropFilter: "blur(6px)",
+      background: "#ffffff",
     }}
   >
     <Stack spacing={2.5}>

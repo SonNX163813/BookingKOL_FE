@@ -35,8 +35,8 @@ const cardSx = {
   borderRadius: 4,
   p: 3,
   backgroundColor: "rgba(255, 255, 255, 0.92)",
-  backgroundImage:
-    "radial-gradient(circle at top, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.95))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.95))",
   border: "1px solid rgba(147, 206, 246, 0.4)",
   display: "flex",
   flexDirection: "column",

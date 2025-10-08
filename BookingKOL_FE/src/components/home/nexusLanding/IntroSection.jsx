@@ -28,8 +28,8 @@ const highlightCardSx = {
   py: 2.75,
   borderRadius: 3,
   backgroundColor: "rgba(255, 255, 255, 0.92)",
-  backgroundImage:
-    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.4), rgba(255, 255, 255, 0.95))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top left, rgba(147, 206, 246, 0.4), rgba(255, 255, 255, 0.95))",
   border: "1px solid rgba(147, 206, 246, 0.45)",
   color: "#0f172a",
   boxShadow: "0 12px 24px rgba(74, 116, 218, 0.12)",

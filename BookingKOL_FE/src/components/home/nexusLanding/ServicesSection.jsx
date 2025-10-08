@@ -66,8 +66,8 @@ const tabStyles = {
 const contentCardSx = {
   borderRadius: 4,
   backgroundColor: "rgba(255, 255, 255, 0.9)",
-  backgroundImage:
-    "radial-gradient(circle at top left, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.95))",
+  // backgroundImage:
+  //   "radial-gradient(circle at top left, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.95))",
   border: "1px solid rgba(147, 206, 246, 0.4)",
   boxShadow: "0 16px 32px rgba(74, 116, 218, 0.12)",
   p: { xs: 3, md: 4 },

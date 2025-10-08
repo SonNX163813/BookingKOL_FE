@@ -120,7 +120,7 @@ const KOLListHeroSection = ({
       // background:
       //   "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
       border: "1px solid rgba(74, 116, 218, 0.18)",
-      boxShadow: "0 30px 80px rgba(74, 116, 218, 0.18)",
+      boxShadow: "0 20px 50px rgba(74, 116, 218, 0.18)",
       backdropFilter: "blur(6px)",
     }}
   >
