@@ -84,27 +84,38 @@ const WhyChooseSection = () => {
             const IconComponent = iconMap[index] ?? InsightsIcon;
             return (
               <Paper key={card.title} elevation={0} sx={cardSx}>
-                <Box sx={iconWrapperSx}>
-                  <IconComponent />
+                {/* Wrapper giúp căn giữa nội dung */}
+                <Box
+                  sx={{
+                    textAlign: { xs: "center", md: "left" }, // căn giữa trên mobile, trái trên desktop
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: { xs: "center", md: "flex-start" }, // căn giữa icon và text
+                    height: "100%",
+                  }}
+                >
+                  <Box sx={iconWrapperSx}>
+                    <IconComponent />
+                  </Box>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 600, color: "#0f172a", mb: 1.2 }}
+                  >
+                    {card.title}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "rgba(15, 23, 42, 0.6)", mb: "auto", pb: 1.2 }}
+                  >
+                    {card.description}
+                  </Typography>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 600, color: "#4a74da" }}
+                  >
+                    {card.metric}
+                  </Typography>
                 </Box>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 600, color: "#0f172a", mb: 1.2 }}
-                >
-                  {card.title}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ color: "rgba(15, 23, 42, 0.6)", mb: "auto", pb: 1.2 }}
-                >
-                  {card.description}
-                </Typography>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 600, color: "#4a74da" }}
-                >
-                  {card.metric}
-                </Typography>
               </Paper>
             );
           })}
