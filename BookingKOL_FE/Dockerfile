@@ -1,27 +1,27 @@
-# ---------- Build stage ----------
-FROM node:22-alpine AS build
-WORKDIR /app
 
-# Cài đúng theo lockfile
+# Chỉ copy lockfile để cache npm ci
 COPY package.json package-lock.json ./
+
+# ĐẢM BẢO cài devDependencies (đừng set NODE_ENV=production ở đây)
 RUN npm ci
 
-# Copy source
+# Copy code
 COPY . .
 
-# Biến môi trường build cho Vite (mặc định /api để FE gọi cùng origin qua Nginx)
+# Biến môi trường cho Vite (tùy bạn)
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE=${VITE_API_BASE_URL}
 
+# Phòng ngừa quyền thực thi cho các bin script (bao gồm vite)
+RUN chmod +x node_modules/.bin/* || true
 
-# Build
-RUN node ./node_modules/vite/bin/vite.js build
+# Build FE
+RUN npm run build
 
 # ---------- Runtime (nginx) ----------
 FROM nginx:1.27-alpine
 
-# (nếu có file cấu hình nginx của bạn) copy vào:
+# (Nếu bạn mount default.conf bằng docker-compose, KHÔNG cần COPY file cấu hình vào image)
 # COPY nginx/default.conf /etc/nginx/conf.d/default.conf
-ENV NODE_ENV=production
-# Copy static build
+
 COPY --from=build /app/dist /usr/share/nginx/html
