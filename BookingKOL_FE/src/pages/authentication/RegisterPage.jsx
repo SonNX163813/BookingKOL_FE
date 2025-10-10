@@ -63,7 +63,7 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     // Nếu dùng utils/config: const url = `${API_BASE}/api/v1/register/brand`;
-    const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+    const API_BASE = import.meta.env.VITE_API_BASE;
     const url = `${API_BASE}/api/v1/register/brand`;
 
     const payload = { email, password, fullName };

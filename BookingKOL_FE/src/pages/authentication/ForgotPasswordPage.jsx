@@ -10,7 +10,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 export default function ForgotPasswordPage() {
   // ===== CONFIG =====
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+  const API_BASE = import.meta.env.VITE_API_BASE;
   const FORGOT_ENDPOINT = `${API_BASE}/api/v1/password/forgot`;
   const RESET_ENDPOINT = `${API_BASE}/api/v1/password/reset`;
 
