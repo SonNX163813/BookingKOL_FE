@@ -1,3 +1,6 @@
+# ---------- Build stage ----------
+FROM node:22-alpine AS build
+WORKDIR /app
 
 # Chỉ copy lockfile để cache npm ci
 COPY package.json package-lock.json ./
