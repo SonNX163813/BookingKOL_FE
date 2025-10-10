@@ -4,15 +4,12 @@ import "./login.css";
 import logo from "../../assets/logocty.png";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
-
-// Nếu bạn có utils/config.js thì thay API_BASE bằng import từ đó
-// import { API_BASE } from "../../utils/config";
+import { API_BASE } from "../../utils/config"; // ✅ dùng chung như Login
 
 export default function ForgotPasswordPage() {
-  // ===== CONFIG =====
-  const API_BASE = import.meta.env.VITE_API_BASE;
-  const FORGOT_ENDPOINT = `${API_BASE}/api/v1/password/forgot`;
-  const RESET_ENDPOINT = `${API_BASE}/api/v1/password/reset`;
+  // ===== ENDPOINTS (giống cách Login ghép /v1/...) =====
+  const FORGOT_ENDPOINT = `${API_BASE}/v1/password/forgot`;
+  const RESET_ENDPOINT = `${API_BASE}/v1/password/reset`;
 
   // ===== AUTH + ROUTER =====
   const { token } = useAuth?.() || {};
@@ -20,7 +17,6 @@ export default function ForgotPasswordPage() {
   const location = useLocation();
   const backTo = location.state?.from?.pathname || "/";
 
-  // ✅ Nếu đã đăng nhập thì đá khỏi trang quên mật khẩu
   useEffect(() => {
     if (token) navigate(backTo, { replace: true });
   }, [token, backTo, navigate]);
@@ -57,6 +53,17 @@ export default function ForgotPasswordPage() {
     return () => clearInterval(id);
   }, [cooldown]);
 
+  // --- nhỏ gọn giống Login: parse JSON an toàn, fallback HTML/redirect ---
+  async function safeJson(res) {
+    let raw = "";
+    try {
+      raw = await res.text();
+      return { data: raw ? JSON.parse(raw) : null, raw };
+    } catch {
+      return { data: null, raw };
+    }
+  }
+
   // ===== ACTIONS =====
   const handleRequest = async (e) => {
     e.preventDefault();
@@ -77,41 +84,42 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: emailTrim }),
       });
 
-      let data = null;
-      try {
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("application/json")) data = await res.json();
-      } catch {
-        data = null;
-      }
+      const { data, raw } = await safeJson(res);
 
-      const msg = data && (data.message || data.detail || data.error);
-      const msgStr = Array.isArray(msg) ? msg.join(" ") : String(msg || "");
-      const looksSuccess =
-        res.ok &&
-        ((data &&
-          (data.success === true || data.status === 200 || data.code === 0)) ||
-          /đã gửi otp|gửi otp thành công|otp đã được gửi/i.test(msgStr));
-
-      const looksEmailNotFound =
-        /không tồn tại|not exist|no such|không tìm thấy|does not exist/i.test(
-          msgStr
-        );
-
-      if (!looksSuccess || looksEmailNotFound) {
-        setRequestErr(
-          looksEmailNotFound
-            ? "Email không tồn tại. Vui lòng kiểm tra và nhập lại."
-            : msgStr || `Gửi yêu cầu thất bại (HTTP ${res.status})`
-        );
+      if (!res.ok) {
+        const msg =
+          (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
+          data?.error ||
+          (raw && raw.includes("<html")
+            ? "Máy chủ trả HTML/redirect. Hãy trả JSON 4xx/5xx thay vì 302."
+            : "") ||
+          `Gửi yêu cầu thất bại (HTTP ${res.status}).`;
+        setRequestErr(msg);
         return;
       }
 
+      // chấp nhận nhiều kiểu message khác nhau từ BE
+      const msg =
+        (Array.isArray(data?.message)
+          ? data.message.join(" ")
+          : data?.message) ||
+        data?.detail ||
+        "Đã gửi OTP tới email của bạn. Vui lòng kiểm tra hộp thư (kể cả Spam/Quảng cáo).";
+
+      // một số BE trả success flags/code
+      const looksSuccess =
+        data?.success === true ||
+        data?.status === 200 ||
+        data?.code === 0 ||
+        /đã gửi otp|gửi otp thành công|otp đã được gửi/i.test(String(msg));
+
+      if (!looksSuccess) {
+        setRequestErr(msg || "Không xác định được trạng thái gửi OTP.");
+        return;
+      }
+
+      setOkMsg(msg);
       setStep("VERIFY");
-      setOkMsg(
-        msgStr ||
-          "Đã gửi OTP tới email của bạn. Vui lòng kiểm tra hộp thư (kể cả Spam/Quảng cáo)."
-      );
       setCooldown(60);
     } catch {
       setRequestErr("Không thể kết nối server. Kiểm tra API & CORS.");
@@ -131,27 +139,24 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
+      const { data, raw } = await safeJson(res);
 
       if (!res.ok) {
         const msg =
-          (data && (data.message || data.error || data.detail)) ||
-          `Gửi lại OTP thất bại (HTTP ${res.status})`;
-        setRequestErr(Array.isArray(msg) ? msg.join(", ") : String(msg));
+          (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
+          data?.error ||
+          (raw && raw.includes("<html")
+            ? "Máy chủ trả HTML/redirect. Hãy trả JSON 4xx/5xx thay vì 302."
+            : "") ||
+          `Gửi lại OTP thất bại (HTTP ${res.status}).`;
+        setRequestErr(msg);
         return;
       }
-      setOkMsg(
-        (data &&
-          (Array.isArray(data.message)
-            ? data.message.join(" ")
-            : data.message)) ||
-          "Đã gửi lại OTP."
-      );
+      const msg =
+        (Array.isArray(data?.message)
+          ? data.message.join(" ")
+          : data?.message) || "Đã gửi lại OTP.";
+      setOkMsg(msg);
       setCooldown(60);
     } catch {
       setRequestErr("Không thể kết nối server. Kiểm tra API & CORS.");
@@ -195,30 +200,26 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify(payload),
       });
 
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
+      const { data, raw } = await safeJson(res);
 
       if (!res.ok) {
         const msg =
-          (data && (data.message || data.error || data.detail)) ||
-          `Đặt lại mật khẩu thất bại (HTTP ${res.status})`;
-        setVerifyErr(Array.isArray(msg) ? msg.join(" ") : String(msg));
+          (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
+          data?.error ||
+          (raw && raw.includes("<html")
+            ? "Máy chủ trả HTML/redirect. Hãy trả JSON 4xx/5xx thay vì 302."
+            : "") ||
+          `Đặt lại mật khẩu thất bại (HTTP ${res.status}).`;
+        setVerifyErr(msg);
         return;
       }
 
-      setOkMsg(
-        (data &&
-          (Array.isArray(data.message)
-            ? data.message.join(" ")
-            : data.message)) ||
-          "Đặt lại mật khẩu thành công!"
-      );
+      const msg =
+        (Array.isArray(data?.message)
+          ? data.message.join(" ")
+          : data?.message) || "Đặt lại mật khẩu thành công!";
+      setOkMsg(msg);
 
-      // ✅ Điều hướng về trang đăng nhập cho mượt (thay vì window.location.href)
       setTimeout(() => {
         navigate("/login", { replace: true });
       }, 1200);
@@ -260,6 +261,8 @@ export default function ForgotPasswordPage() {
             <span>Lượt xem quảng cáo đang chạy</span>
           </div>
         </div>
+
+        {/* SVG wave giữ nguyên */}
         <svg
           className="hero-wave transition duration-300 ease-in-out delay-150"
           width="100%"
@@ -371,7 +374,7 @@ export default function ForgotPasswordPage() {
             <button
               className="primary-btn"
               type="submit"
-              disabled={requestLoading}
+              disabled={requestLoading || !isEmailValid}
             >
               {requestLoading ? "Đang gửi..." : "Gửi OTP"}
             </button>

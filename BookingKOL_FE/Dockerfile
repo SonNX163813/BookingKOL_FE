@@ -12,7 +12,8 @@ RUN npm ci
 COPY . .
 
 
-
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE=${VITE_API_BASE_URL}
 # Phòng ngừa quyền thực thi cho các bin script (bao gồm vite)
 RUN chmod +x node_modules/.bin/* || true
 

@@ -6,7 +6,7 @@ import logo from "../../assets/logocty.png";
 import googleLogo from "../../assets/google_logo.svg.png";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-// import { API_BASE } from "../../utils/config";
+import { API_BASE } from "../../utils/config"; // ✅ dùng chung như Login
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -33,6 +33,9 @@ export default function RegisterPage() {
     }
   }, [token, backTo, navigate]);
 
+  // Helpers
+  const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
+
   const validate = () => {
     const next = {};
 
@@ -41,8 +44,6 @@ export default function RegisterPage() {
     if (!email.trim()) next.email = "Vui lòng nhập email";
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = "Email không hợp lệ";
 
-    // Mật khẩu mạnh: >=8 ký tự, có hoa, thường, số, ký tự đặc biệt
-    const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
     if (!strong.test(password)) {
       next.password =
         "Mật khẩu ≥ 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt";
@@ -55,6 +56,17 @@ export default function RegisterPage() {
     return Object.keys(next).length === 0;
   };
 
+  // Giống Login: parse JSON an toàn, fallback HTML/redirect
+  async function safeJson(res) {
+    let raw = "";
+    try {
+      raw = await res.text();
+      return { data: raw ? JSON.parse(raw) : null, raw };
+    } catch {
+      return { data: null, raw };
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerErr("");
@@ -62,10 +74,8 @@ export default function RegisterPage() {
 
     setSubmitting(true);
 
-    // Nếu dùng utils/config: const url = `${API_BASE}/api/v1/register/brand`;
-    const API_BASE = import.meta.env.VITE_API_BASE;
-    const url = `${API_BASE}/api/v1/register/brand`;
-
+    // ✅ Chuẩn hoá endpoint như Login: ${API_BASE}/v1/...
+    const url = `${API_BASE}/v1/register/brand`;
     const payload = { email, password, fullName };
 
     try {
@@ -76,45 +86,46 @@ export default function RegisterPage() {
         body: JSON.stringify(payload),
       });
 
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
+      const { data, raw } = await safeJson(res);
 
       if (!res.ok) {
         const msgRaw =
-          (data && (data.message || data.error || data.detail)) ||
-          `Đăng ký thất bại (HTTP ${res.status})`;
-        const msg = Array.isArray(msgRaw) ? msgRaw.join(", ") : String(msgRaw);
+          (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
+          data?.error ||
+          data?.detail ||
+          (raw && raw.includes("<html")
+            ? "Máy chủ trả HTML/redirect. Hãy trả JSON 4xx với message cụ thể."
+            : "") ||
+          `Đăng ký thất bại (HTTP ${res.status}).`;
 
-        const finalMsg = msg.includes("Full authentication is required")
-          ? "Endpoint /api/v1/register/brand cần permitAll() trong Spring Security, hoặc kiểm tra cấu hình auth/token."
-          : msg;
+        const finalMsg = String(msgRaw || "").includes(
+          "Full authentication is required"
+        )
+          ? "Endpoint /v1/register/brand cần permitAll() trong Spring Security, hoặc kiểm tra cấu hình auth/token."
+          : msgRaw;
 
-        setServerErr(finalMsg);
+        setServerErr(String(finalMsg || "Đăng ký thất bại."));
 
+        // Field-level errors
         const fieldErr =
-          (data &&
-            (data.errors || data.fieldErrors || data.validationErrors)) ||
-          null;
+          data?.errors || data?.fieldErrors || data?.validationErrors || null;
         if (fieldErr && typeof fieldErr === "object") {
           setErrors((prev) => ({ ...prev, ...fieldErr }));
         }
+
         setSubmitting(false);
         return;
       }
 
-      // 🎯 Thành công: đưa user sang trang xác minh email
+      // 🎯 Thành công: chuyển qua trang thông báo xác minh email
       const search = new URLSearchParams({ email });
       navigate(`/verify-email?${search.toString()}`, { replace: true });
 
-      // Nếu sau này BE trả token và bạn muốn auto-login luôn:
-      // const token = data?.data?.accessToken || data?.accessToken;
-      // if (token) {
+      // Nếu sau này BE trả token và muốn auto-login:
+      // const accessToken = data?.data?.accessToken || data?.accessToken || data?.token;
+      // if (accessToken) {
       //   const user = { id: data?.data?.id ?? null, email, roles: data?.data?.roles ?? [] };
-      //   dispatch({ type: "LOGIN_SUCCESS", payload: { user, token, roles: user.roles, remember: true } });
+      //   dispatch({ type: "LOGIN_SUCCESS", payload: { user, token: accessToken, roles: user.roles, remember: true } });
       //   navigate(backTo, { replace: true });
       // }
     } catch (err) {
@@ -159,6 +170,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
+        {/* SVG wave giữ nguyên của bạn */}
         <svg
           className="hero-wave transition duration-300 ease-in-out delay-150"
           width="100%"
