@@ -10,8 +10,23 @@ export const postCallSendAI = async ({ question }) => {
   });
 };
 
-export const getLogChatAI = async () => {
+export const getLogChatAI = async (
+  page,
+  size,
+  search,
+  startDate,
+  endDate,
+  sort
+) => {
   return await get({
     url: API_PATHS.AI.getLogChat,
+    params: {
+      page,
+      size,
+      search: search ?? null,
+      startDate: startDate ?? null,
+      endDate: endDate ?? null,
+      sort: sort ?? null,
+    },
   });
 };

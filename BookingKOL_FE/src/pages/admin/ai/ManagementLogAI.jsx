@@ -1,23 +1,78 @@
-import { Calendar, Eye, ListChecks, MessageSquare, Reply } from "lucide-react";
-import { Card, Modal, Table } from "antd";
+import {
+  Calendar,
+  Eye,
+  ListChecks,
+  MessageSquare,
+  Reply,
+  Search,
+  Trash2,
+} from "lucide-react";
+import {
+  Button,
+  Card,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Pagination,
+  Table,
+} from "antd";
 import { useGetLogChatAI } from "../../../hook/ai/useGetLogChatAI";
 import { useState } from "react";
-
+import dayjs from "dayjs";
 const ManagementLogAI = () => {
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(20);
   const [openViewDetailLog, setOpenViewDetailLog] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
+  const [form] = Form.useForm();
+  const [searchName, setSearchName] = useState(undefined);
+  const [searchStartDate, setSearchStartDate] = useState(undefined);
+  const [searchEndDate, setSearchEndDate] = useState(undefined);
 
-  const { isLoadingGetLogChatAI, ResponseGetLogChatAI } = useGetLogChatAI();
+  const { isLoadingGetLogChatAI, ResponseGetLogChatAI } = useGetLogChatAI(
+    page,
+    size,
+    searchName,
+    searchStartDate,
+    searchEndDate
+  );
+  const dataResponse = ResponseGetLogChatAI?.data?.content;
 
   const handleViewDetailLog = (record) => {
     setSelectedLog(record);
     setOpenViewDetailLog(true);
   };
+
+  const handleSearch = (value) => {
+    setSearchName(value.search);
+    const startTime = value.startDate
+      ? dayjs(value.startDate).format("YYYY-MM-DD")
+      : undefined;
+    const endTime = value.endDate
+      ? dayjs(value.endDate).format("YYYY-MM-DD")
+      : undefined;
+    setSearchStartDate(startTime);
+    setSearchEndDate(endTime);
+    setPage(0);
+  };
+
+  console.log(searchName, searchEndDate, searchStartDate);
+
+  const resetForm = () => {
+    form.resetFields();
+    setSearchName(undefined);
+    setSearchStartDate(undefined);
+    setSearchEndDate(undefined);
+  };
+
   const columns = [
     {
       title: "STT",
       key: "stt",
-      render: (_, __, index) => <div className="font-bold">#{index + 1}</div>,
+      render: (_, __, index) => (
+        <div className="font-bold">#{page * size + index + 1}</div>
+      ),
       width: "4%",
     },
     {
@@ -45,18 +100,18 @@ const ManagementLogAI = () => {
     {
       title: "Thao tác",
       key: "action",
-      render: (record) => {
-        return (
-          <div
-            className="cursor-pointer bg-blue-700 px-[14px] rounded-[5px] hover:bg-blue-300 transition-all
-                    flex items-center justify-center text-white h-10 w-15"
+      align: "center",
+      render: (record) => (
+        <div className="w-full flex justify-center">
+          <Button
             onClick={() => handleViewDetailLog(record)}
+            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
           >
-            <Eye size={18} className="!font-bold" />
-          </div>
-        );
-      },
-      width: "10%",
+            <Eye size={18} className="font-semibold" />
+          </Button>
+        </div>
+      ),
+      width: "12%",
     },
   ];
 
@@ -72,14 +127,63 @@ const ManagementLogAI = () => {
         </section>
       </div>
 
-      <div className="py-5">
+      <div className="flex gap-3 py-3">
+        <Form form={form} className="flex gap-3" onFinish={handleSearch}>
+          <Form.Item name="search">
+            <Input className="h-12!" placeholder="Tìm câu hỏi" />
+          </Form.Item>
+          <Form.Item name="startDate">
+            <DatePicker
+              className="h-12!"
+              placeholder="Tìm kiếm theo ngày bắt đầu"
+            />
+          </Form.Item>
+          <Form.Item name="endDate">
+            <DatePicker
+              className="h-12!"
+              placeholder="Tìm kiếm theo ngày kết thúc"
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              htmlType="submit"
+              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+            >
+              <Search size={16} /> Tìm kiếm
+            </Button>
+          </Form.Item>
+          <Form.Item>
+            <Button
+              onClick={resetForm}
+              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+            >
+              <Trash2 size={16} /> Xóa tìm kiếm
+            </Button>
+          </Form.Item>
+        </Form>
+      </div>
+
+      <div className="">
         <Table
           columns={columns}
-          dataSource={ResponseGetLogChatAI?.data?.content}
+          dataSource={dataResponse}
           loading={isLoadingGetLogChatAI}
           pagination={false}
           rowKey="id"
-          // scroll={{ y: 'calc(100vh - 300px)' }}
+        />
+      </div>
+
+      <div className="!my-4 py-5">
+        <Pagination
+          align="center"
+          current={page + 1}
+          pageSize={size}
+          pageSizeOptions={["5", "10", "20", "50", "100"]}
+          onChange={(pageNumber, sizeNumber) => {
+            setPage(pageNumber - 1), setSize(sizeNumber);
+          }}
+          total={ResponseGetLogChatAI?.data?.totalElements}
+          showSizeChanger
         />
       </div>
 

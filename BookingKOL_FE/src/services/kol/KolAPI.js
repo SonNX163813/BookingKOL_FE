@@ -1,54 +1,62 @@
-import { BASE_URL } from "../../utils/config";
+import { get } from "../../config/axios-config";
+import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
-const KOL_PROFILES_BASE = `${BASE_URL}/kol-profiles`;
-const KOL_PROFILES_ENDPOINT = `${KOL_PROFILES_BASE}/all-available`;
+const KOL_LIST_ALLOWED_PARAMS = new Set([
+  "minRating",
+  "categoryId",
+  "minPrice",
+  "page",
+  "size",
+]);
 
-const parseJsonSafely = async (response) => {
-  const rawText = await response.text();
-
-  if (!rawText) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawText);
-  } catch (error) {
-    console.error("Failed to parse KOL API response", error);
-    throw new Error("Failed to parse server response");
-  }
+const KOL_LIST_DEFAULT_PARAMS = {
+  page: 0,
+  size: 10,
 };
 
-const ensureSuccess = async (response) => {
-  if (response.ok) {
-    return response;
-  }
+const buildKolListParams = (params = {}) => {
+  const mergedParams = {
+    ...KOL_LIST_DEFAULT_PARAMS,
+    ...(params ?? {}),
+  };
 
-  let message = `Request failed with status ${response.status}`;
+  return Object.entries(mergedParams).reduce(
+    (accumulator, [key, value]) => {
+      if (!KOL_LIST_ALLOWED_PARAMS.has(key)) {
+        return accumulator;
+      }
 
-  try {
-    const payload = await parseJsonSafely(response);
-    const payloadMessage = Array.isArray(payload?.message)
-      ? payload.message.join(" ")
-      : payload?.message;
+      const shouldSkip =
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && value.trim() === "");
 
-    if (payloadMessage) {
-      message = payloadMessage;
-    }
-  } catch (error) {
-    console.error("Failed to read error payload", error);
-  }
+      if (shouldSkip) {
+        return accumulator;
+      }
 
-  throw new Error(message);
+      accumulator[key] = value;
+      return accumulator;
+    },
+    {}
+  );
 };
 
-export const getKolProfiles = async ({ signal } = {}) => {
-  const response = await fetch(KOL_PROFILES_ENDPOINT, { signal });
-  await ensureSuccess(response);
+export const getKolProfiles = async ({ signal, params } = {}) => {
+  const config = signal ? { signal } : undefined;
+  const payload = await get({
+    url: CLIENT_API_PATHS.KOL.getAllAvailable,
+    params: buildKolListParams(params),
+    config,
+  });
 
-  const payload = await parseJsonSafely(response);
-  const { data } = payload ?? {};
+  const data = payload?.data;
+  if (!data) {
+    return { content: [] };
+  }
 
-  return Array.isArray(data) ? data : [];
+  const content = Array.isArray(data.content) ? data.content : [];
+  return { ...data, content };
 };
 
 export const getKolProfileById = async (kolId, { signal } = {}) => {
@@ -56,11 +64,11 @@ export const getKolProfileById = async (kolId, { signal } = {}) => {
     throw new Error("kolId is required");
   }
 
-  const response = await fetch(`${KOL_PROFILES_BASE}/kol-id/${kolId}`, {
-    signal,
+  const config = signal ? { signal } : undefined;
+  const payload = await get({
+    url: `${CLIENT_API_PATHS.KOL.getDetailByKolId}/${kolId}`,
+    config,
   });
-  await ensureSuccess(response);
 
-  const payload = await parseJsonSafely(response);
   return payload?.data ?? null;
 };
