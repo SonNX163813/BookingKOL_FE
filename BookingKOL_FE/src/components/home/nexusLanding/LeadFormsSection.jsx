@@ -140,6 +140,7 @@ const labelSx = { sx: { color: "rgba(15, 23, 42, 0.62)" } };
 
 const inputFieldSx = {
   "& .MuiOutlinedInput-root": {
+    borderRadius: "12px",
     color: "#0f172a",
     backgroundColor: "rgba(255, 255, 255, 0.85)",
     "& fieldset": { borderColor: "rgba(74, 116, 218, 0.28)" },

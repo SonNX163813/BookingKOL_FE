@@ -75,7 +75,7 @@ const ManagementLogAI = () => {
       <div className="py-5">
         <Table
           columns={columns}
-          dataSource={ResponseGetLogChatAI}
+          dataSource={ResponseGetLogChatAI?.data?.content}
           loading={isLoadingGetLogChatAI}
           pagination={false}
           rowKey="id"
