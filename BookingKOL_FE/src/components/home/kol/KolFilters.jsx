@@ -101,7 +101,7 @@ const KolFilters = ({
             }}
           />
 
-          <FormControl
+          {/* <FormControl
             fullWidth
             size="medium"
             sx={{
@@ -133,11 +133,7 @@ const KolFilters = ({
                 <em>Tất cả lĩnh vực</em>
               </MenuItem>
               {loadingCategories && (
-                <MenuItem
-                  key="kol-filter-category-loading"
-                  value=""
-                  disabled
-                >
+                <MenuItem key="kol-filter-category-loading" value="" disabled>
                   <Stack
                     direction="row"
                     spacing={1}
@@ -155,7 +151,7 @@ const KolFilters = ({
                 </MenuItem>
               ))}
             </Select>
-          </FormControl>
+          </FormControl> */}
         </Stack>
 
         <Stack
