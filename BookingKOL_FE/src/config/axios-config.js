@@ -1,10 +1,10 @@
 import axios from "axios";
 import { toast } from "react-toastify";
 
-export const baseURL = "/api/";
+import { BASE_URL } from "../utils/config";
 
 export const api = axios.create({
-  baseURL,
+  baseURL: BASE_URL,
 });
 
 // Response interceptor
@@ -50,3 +50,6 @@ export const update = ({ url, data, config }) => api.put(url, data, config);
 
 // DELETE
 export const remove = ({ url }) => api.delete(url);
+
+// PUT/UPDATE
+export const patch = ({ url, data, config }) => api.patch(url, data, config);

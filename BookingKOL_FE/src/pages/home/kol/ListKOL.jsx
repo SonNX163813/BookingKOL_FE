@@ -15,7 +15,9 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useNavigate } from "react-router-dom";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import KOLCard from "../../../components/home/kol/KOLCard";
+import KolFilters from "../../../components/home/kol/KolFilters";
 import { getKolProfiles } from "../../../services/kol/KolAPI";
+import { getAllCategory } from "../../../services/CategoryServices";
 import { slugify } from "../../../utils/slugify";
 import hotkolimg from "../../../assets/hotkol.png";
 
@@ -24,6 +26,72 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
   maximumFractionDigits: 0,
 });
+
+const BASE_QUERY_PARAMS = {
+  page: 0,
+  size: 10,
+};
+
+const DEFAULT_FILTER_VALUES = Object.freeze({
+  minPrice: "",
+  minRating: "",
+  categoryId: "",
+});
+
+const FILTER_FIELDS = ["minPrice", "minRating", "categoryId"];
+
+const createDefaultFilters = () => ({
+  ...DEFAULT_FILTER_VALUES,
+});
+
+const parseNumericInput = (value) => {
+  const trimmed = value !== undefined ? String(value).trim() : "";
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const numeric = Number(trimmed);
+  return Number.isFinite(numeric) ? numeric : undefined;
+};
+
+const sanitizeFilters = (rawFilters) => {
+  const filters = rawFilters ?? DEFAULT_FILTER_VALUES;
+  const params = { ...BASE_QUERY_PARAMS };
+
+  const minPrice = parseNumericInput(filters.minPrice);
+  if (minPrice !== undefined && minPrice >= 0) {
+    params.minPrice = minPrice;
+  }
+
+  const minRating = parseNumericInput(filters.minRating);
+  if (minRating !== undefined && minRating >= 0) {
+    params.minRating = Math.min(Math.max(minRating, 0), 5);
+  }
+
+  const categoryId =
+    typeof filters.categoryId === "string" ? filters.categoryId.trim() : "";
+  if (categoryId) {
+    params.categoryId = categoryId;
+  }
+
+  return params;
+};
+
+const extractCategories = (payload) => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+  if (Array.isArray(payload?.content)) {
+    return payload.content;
+  }
+  if (Array.isArray(payload?.data?.content)) {
+    return payload.data.content;
+  }
+  return [];
+};
 
 const formatCurrency = (value) => {
   const numberValue = Number(value);
@@ -346,28 +414,127 @@ const ListKOL = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+  const [filters, setFilters] = useState(createDefaultFilters);
+  const [formFilters, setFormFilters] = useState(createDefaultFilters);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
-  const loadKolProfiles = useCallback(async (signal) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = signal
-        ? await getKolProfiles({ signal })
-        : await getKolProfiles();
-      setKolProfiles(Array.isArray(response) ? response : []);
-    } catch (err) {
-      if (signal?.aborted) {
-        return;
-      }
-      const message = err?.message ?? "Không thể tải danh sách KOL";
-      setError(message);
-      setShowErrorSnackbar(true);
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
-    }
+  const hasFilterChanges = useMemo(
+    () => FILTER_FIELDS.some((key) => formFilters[key] !== filters[key]),
+    [formFilters, filters]
+  );
+
+  const hasActiveFilters = useMemo(() => {
+    const params = sanitizeFilters(filters);
+    return ["minPrice", "minRating", "categoryId"].some(
+      (key) => params[key] !== undefined
+    );
+  }, [filters]);
+
+  const queryParams = useMemo(() => sanitizeFilters(filters), [filters]);
+
+  const categoryOptions = useMemo(
+    () =>
+      categories
+        .map((category) => ({
+          id: category?.id ?? category?.categoryId ?? category?.key,
+          name: category?.name ?? category?.categoryName ?? category?.label,
+        }))
+        .filter((item) => item.id && item.name),
+    [categories]
+  );
+
+  const handleFilterFieldChange = useCallback((field, value) => {
+    setFormFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   }, []);
+
+  const handleFilterInputChange = useCallback(
+    (field) => (event) => {
+      const { value } = event.target;
+      handleFilterFieldChange(field, value);
+    },
+    [handleFilterFieldChange]
+  );
+
+  const handleMinRatingChange = useCallback(
+    (_event, value) => {
+      handleFilterFieldChange("minRating", value ?? "");
+    },
+    [handleFilterFieldChange]
+  );
+
+  const handleApplyFilters = useCallback(() => {
+    setFilters(() => ({ ...formFilters }));
+  }, [formFilters]);
+
+  const handleResetFilters = useCallback(() => {
+    const defaults = createDefaultFilters();
+    setFilters(defaults);
+    setFormFilters(defaults);
+  }, []);
+
+  // useEffect(() => {
+  //   let isActive = true;
+  //   const fetchCategories = async () => {
+  //     try {
+  //       setLoadingCategories(true);
+  //       const response = await getAllCategory();
+  //       if (!isActive) {
+  //         return;
+  //       }
+  //       setCategories(extractCategories(response));
+  //     } catch (_error) {
+  //       if (!isActive) {
+  //         return;
+  //       }
+  //       setCategories([]);
+  //     } finally {
+  //       if (isActive) {
+  //         setLoadingCategories(false);
+  //       }
+  //     }
+  //   };
+
+  //   fetchCategories();
+  //   return () => {
+  //     isActive = false;
+  //   };
+  // }, []);
+
+  const loadKolProfiles = useCallback(
+    async (signal) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const requestConfig = { params: queryParams };
+        if (signal) {
+          requestConfig.signal = signal;
+        }
+        const response = await getKolProfiles(requestConfig);
+        const content = Array.isArray(response?.content)
+          ? response.content
+          : Array.isArray(response)
+          ? response
+          : [];
+        setKolProfiles(content);
+      } catch (err) {
+        if (signal?.aborted) {
+          return;
+        }
+        const message = err?.message ?? "Không thể tải danh sách KOL";
+        setError(message);
+        setShowErrorSnackbar(true);
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [queryParams]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -433,6 +600,19 @@ const ListKOL = () => {
             hasKols={decoratedKols.length > 0}
             loading={loading}
             onManualRefresh={handleRetry}
+          />
+
+          <KolFilters
+            filters={formFilters}
+            onFilterInputChange={handleFilterInputChange}
+            onMinRatingChange={handleMinRatingChange}
+            onApply={handleApplyFilters}
+            onReset={handleResetFilters}
+            loading={loading}
+            hasActiveFilters={hasActiveFilters}
+            hasFilterChanges={hasFilterChanges}
+            categoryOptions={categoryOptions}
+            loadingCategories={loadingCategories}
           />
 
           {loading ? (

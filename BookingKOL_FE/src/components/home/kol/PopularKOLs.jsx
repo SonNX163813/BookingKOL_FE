@@ -147,7 +147,12 @@ const PopularKOLs = () => {
       try {
         const data = await getKolProfiles({ signal: controller.signal });
         if (isActive) {
-          setKolProfiles(Array.isArray(data) ? data : []);
+          const content = Array.isArray(data?.content)
+            ? data.content
+            : Array.isArray(data)
+            ? data
+            : [];
+          setKolProfiles(content);
         }
       } catch (err) {
         if (err?.name === "AbortError") return;

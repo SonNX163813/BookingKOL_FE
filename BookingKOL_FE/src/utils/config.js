@@ -3,7 +3,7 @@
 
 // export const API_BASE = BASE;
 // // Nếu BASE đã là '/api' -> '/api/v1', còn nếu lỡ đặt '/api/v1' -> giữ nguyên
-// export const BASE_URL = BASE.endsWith("/api") ? ${BASE}/v1 : ${BASE};
+// export const BASE_URL = BASE.endsWith("/api") ? `${BASE}/v1` : `${BASE}`;
 
 // src/utils/config.js
 export const BASE_URL = "http://54.179.248.120/api";
