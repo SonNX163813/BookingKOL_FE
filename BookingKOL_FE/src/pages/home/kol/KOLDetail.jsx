@@ -23,6 +23,7 @@ import { useParams } from "react-router-dom";
 import ProfileHeader from "../../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../../components/home/kol-detail/Introduction";
 import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
+import BookingFlow from "../../../components/home/book-kol/BookingFlow";
 import { getKolProfileById } from "../../../services/kol/KolAPI";
 import hotkolimg from "../../../assets/hotkol.png";
 
@@ -198,6 +199,7 @@ const KOLDetail = () => {
   const [error, setError] = useState(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
   const [showNotFoundSnackbar, setShowNotFoundSnackbar] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
 
   const handleCloseErrorSnackbar = () => {
     setShowErrorSnackbar(false);
@@ -205,6 +207,14 @@ const KOLDetail = () => {
 
   const handleCloseNotFoundSnackbar = () => {
     setShowNotFoundSnackbar(false);
+  };
+
+  const handleOpenBooking = () => {
+    setIsBookingOpen(true);
+  };
+
+  const handleCloseBooking = () => {
+    setIsBookingOpen(false);
   };
 
   const handleRetry = () => {
@@ -262,6 +272,45 @@ const KOLDetail = () => {
     [kolData]
   );
   const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const bookingPackages = useMemo(() => {
+    if (!kolData) {
+      return [];
+    }
+    if (Array.isArray(kolData.packages)) {
+      return kolData.packages;
+    }
+    if (Array.isArray(kolData.packageDtos)) {
+      return kolData.packageDtos;
+    }
+    if (Array.isArray(kolData.rateCards)) {
+      return kolData.rateCards;
+    }
+    return [];
+  }, [kolData]);
+  const bookingSlots = useMemo(() => {
+    if (!kolData) {
+      return {};
+    }
+    return (
+      kolData.availableSlots ??
+      kolData.slotCalendar ??
+      kolData.schedule ??
+      kolData.calendar ??
+      {}
+    );
+  }, [kolData]);
+  const bookingProfile = useMemo(() => {
+    if (!kolData) {
+      return null;
+    }
+    return (
+      kolData.currentUserProfile ??
+      kolData.customerProfile ??
+      kolData.viewerProfile ??
+      kolData.clientProfile ??
+      null
+    );
+  }, [kolData]);
   const shouldShowContent = !isLoading && !error && headerData;
   const bgcolor = `
     radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.45) 0%, rgba(147, 206, 246, 0.1) 60%, rgba(147, 206, 246, 0) 80%),
@@ -332,6 +381,7 @@ const KOLDetail = () => {
               kol={headerData}
               pricing={pricingData}
               platforms={platformChips}
+              onBook={handleOpenBooking}
             />
             <Introduction profile={introductionData} />
             <ReviewsSection
@@ -456,6 +506,16 @@ const KOLDetail = () => {
           autoHideDuration={4000}
           severity="info"
           message="Không tìm thấy thông tin KOL."
+        />
+        <BookingFlow
+          open={isBookingOpen}
+          onClose={handleCloseBooking}
+          kolId={headerData?.id ?? kolId}
+          kolName={headerData?.name ?? kolData?.displayName ?? ""}
+          packages={bookingPackages}
+          availableSlots={bookingSlots}
+          userProfile={bookingProfile}
+          onViewSchedule={handleCloseBooking}
         />
       </Container>
     </Box>

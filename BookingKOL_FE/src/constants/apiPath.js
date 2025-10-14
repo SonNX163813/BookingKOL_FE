@@ -19,5 +19,6 @@ export const API_PATHS = {
     getCategoryById: "/v1/categories",
     createCategory: "/v1/categories",
     deleteCategory: "/v1/categories",
+    patchCategory: "/v1/categories",
   },
 };

@@ -1,19 +1,43 @@
-import { Eye, Folder, Loader2, Lock, Plus, Unlock } from "lucide-react";
-import { Button, Card, Modal, Spin, Table, Tag } from "antd";
+import {
+  Edit,
+  Eye,
+  Folder,
+  Loader2,
+  Lock,
+  Plus,
+  SquarePen,
+  Unlock,
+  X,
+} from "lucide-react";
+import { Button, Card, Form, Input, Modal, Spin, Table, Tag } from "antd";
 import { useState } from "react";
 import { useGetAllCategory } from "../../../hook/admin/category/useGetAllCategory";
 import { CategoryOutlined } from "@mui/icons-material";
 import { useRemoveCategory } from "../../../hook/admin/category/useRemoveCategory";
+import { useCreateCategory } from "../../../hook/admin/category/useCreateCategory";
+import { usePatchCategory } from "../../../hook/admin/category/usePatchCategory";
 
 const ManagementCategory = () => {
   const [openViewDetail, setOpenViewDetail] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isEditting, setIsEditting] = useState(null);
+  const [openShowModalCreate, setOpenShowModalCreate] = useState(false);
+  const [openShowModalUpdate, setOpenShowModalUpdate] = useState(false);
+  const [form] = Form.useForm();
 
   const {
     isLoadingGetAllCategory,
     ResponseGetAllCategory,
     refetchGetAllCategory,
   } = useGetAllCategory();
+
+  const { isLoadingCreateCategory, handleCreateCategory } = useCreateCategory(
+    refetchGetAllCategory
+  );
+
+  const { isLoadingPatchCategory, handlePatchCategory } = usePatchCategory(
+    refetchGetAllCategory
+  );
 
   const { isLoadingRemoveCategory, handleUpdateStatus, idCategoryRemove } =
     useRemoveCategory(refetchGetAllCategory);
@@ -23,6 +47,41 @@ const ManagementCategory = () => {
   const handleViewDetail = (record) => {
     setSelectedCategory(record);
     setOpenViewDetail(true);
+  };
+
+  const handleUpdate = (record) => {
+    setIsEditting(record.id);
+    setOpenShowModalUpdate(true);
+    form.setFieldsValue({
+      name: record.name,
+      key: record.key,
+    });
+  };
+
+  const handleCreate = () => {
+    setIsEditting(null);
+    form.resetFields();
+    setOpenShowModalCreate(true);
+  };
+
+  const onCancel = () => {
+    setIsEditting(null);
+    form.resetFields();
+    setOpenShowModalCreate(false);
+    setOpenShowModalUpdate(false);
+  };
+
+  const onSubmit = (value) => {
+    const data = {
+      name: value.name,
+      key: value.key,
+    };
+    if (isEditting) {
+      handlePatchCategory({ ...data, id: isEditting });
+    } else {
+      handleCreateCategory(data);
+    }
+    onCancel();
   };
 
   const columns = [
@@ -98,6 +157,13 @@ const ManagementCategory = () => {
               )}
             </Button>
           )}
+
+          <Button
+            onClick={() => handleUpdate(record)}
+            className="!h-10 !bg-green-600 !text-white !border-none hover:!bg-green-700 transition-all"
+          >
+            <Edit size={18} className="font-semibold" />
+          </Button>
         </div>
       ),
       width: "20%",
@@ -119,7 +185,7 @@ const ManagementCategory = () => {
       <div className="flex gap-5 justify-end">
         <Button
           className="mt-5! p-5! bg-[#fa7833]! text-[white]! h-12! font-bold!"
-          // onClick={() => setIsOpenModalCreateCategory(true)}
+          onClick={handleCreate}
         >
           <Plus size={16} />
           Tạo Loại Sản phẩm
@@ -187,6 +253,69 @@ const ManagementCategory = () => {
             </Card>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        footer={null}
+        title={
+          <div>
+            {isEditting ? (
+              <p className="flex gap-2">
+                <Folder /> CHỈNH SỬA CHUYÊN MỤC
+              </p>
+            ) : (
+              <p className="flex gap-2">
+                <Folder /> THÊM CHUYÊN MỤC MỚI
+              </p>
+            )}
+          </div>
+        }
+        open={isEditting ? openShowModalUpdate : openShowModalCreate}
+        onCancel={onCancel}
+      >
+        <Form form={form} layout="vertical" onFinish={onSubmit}>
+          <Form.Item
+            label="Tên chuyên mục"
+            name="name"
+            rules={[
+              { required: true, message: "Vui lòng nhập tên chuyên mục!" },
+            ]}
+          >
+            <Input className="h-12!" placeholder="Nhập tên chuyên mục" />
+          </Form.Item>
+          <Form.Item
+            label="Key"
+            name="key"
+            rules={[{ required: true, message: "Vui lòng nhập key!" }]}
+          >
+            <Input className="h-12!" placeholder="Nhập key" />
+          </Form.Item>
+          <div className="flex justify-end gap-2">
+            <Button className="h-12!" onClick={onCancel}>
+              <X size={16} /> Hủy
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="h-12!"
+              loading={
+                isEditting ? isLoadingPatchCategory : isLoadingCreateCategory
+              }
+            >
+              {isEditting ? (
+                <p className="flex! gap-2 items-center!">
+                  <SquarePen size={16} />
+                  Chỉnh sửa
+                </p>
+              ) : (
+                <p className="flex! gap-2 items-center!">
+                  <Plus size={16} />
+                  Thêm mới
+                </p>
+              )}
+            </Button>
+          </div>
+        </Form>
       </Modal>
     </div>
   );

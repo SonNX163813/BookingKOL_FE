@@ -48,7 +48,7 @@ const fadeUpProps = (delay = 0) => ({
   transition: { duration: 0.45, ease: "easeOut", delay },
 });
 
-const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
+const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
   const isMale = kol.gender?.toLowerCase() === "male";
   const genderLabel = kol.gender ? (isMale ? "Nam" : "Nữ") : null;
   const GenderIcon = isMale ? MaleRoundedIcon : FemaleRoundedIcon;
@@ -629,6 +629,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms }) => {
                       outlineOffset: 3,
                     },
                   }}
+                  onClick={onBook}
                   aria-label="Thuê KOL này"
                 >
                   <PlayArrowRoundedIcon sx={{ fontSize: 24 }} />
