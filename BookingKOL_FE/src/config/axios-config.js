@@ -51,5 +51,8 @@ export const update = ({ url, data, config }) => api.put(url, data, config);
 // DELETE
 export const remove = ({ url }) => api.delete(url);
 
+export const remove2 = ({ url, data, config }) =>
+  api.request({ url, method: "delete", data, ...(config || {}) });
+
 // PUT/UPDATE
 export const patch = ({ url, data, config }) => api.patch(url, data, config);
