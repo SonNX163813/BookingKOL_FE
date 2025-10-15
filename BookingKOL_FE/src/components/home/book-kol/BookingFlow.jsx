@@ -273,6 +273,7 @@ const BookingFlow = ({
   };
 
   const handlePayment = async () => {
+    if (submitting) return;
     // 🔹 Nếu chưa đồng ý điều khoản thì báo lỗi và dừng
     if (!agreeTerms) {
       toast.error("Vui lòng đồng ý với điều khoản trước khi thanh toán!");
@@ -281,12 +282,30 @@ const BookingFlow = ({
 
     if (!validateStep(1, true)) return;
 
+    const startIso = startDateTime?.toISOString?.();
+    const endIso = endDateTime?.toISOString?.();
+
+    if (!startIso || !endIso) {
+      toast.error("Kh?ng th? x?c d?nh khung gi?. Vui l?ng th? l?i.");
+      return;
+    }
+
+    const contactName = contact.fullName?.trim();
+    const contactEmail = contact.email?.trim();
+    const contactPhone = contact.phone?.trim();
+    const note = contact.note?.trim();
+
     try {
       const req = {
         kolId,
         description: buildDescription(),
-        startAt: startDateTime.format(),
-        endAt: endDateTime.format(),
+        startAt: startIso,
+        endAt: endIso,
+        paymentMethod,
+        contactName: contactName || undefined,
+        contactEmail: contactEmail || undefined,
+        contactPhone: contactPhone || undefined,
+        note: note || undefined,
         isConfirmWithTerms: agreeTerms ? "true" : "false",
       };
 
@@ -349,7 +368,9 @@ const BookingFlow = ({
   /* ---------------------- RENDER ---------------------- */
   const isLastStep = activeStep === TEXT.steps.length - 1;
   const primaryAction = isLastStep ? handlePayment : handleContinue;
-  const primaryLabel = isLastStep ? TEXT.actions.pay : TEXT.actions.continue;
+  const primaryLabel = isLastStep
+    ? (submitting ? "Dang xu ly..." : TEXT.actions.pay)
+    : TEXT.actions.continue;
   const primaryDisabled = useMemo(() => {
     if (isLastStep) {
       return !agreeTerms || submitting;
@@ -452,7 +473,7 @@ const BookingFlow = ({
           <Button
             variant="contained"
             onClick={primaryAction}
-            // disabled={primaryDisabled}
+            disabled={primaryDisabled}
             sx={{
               textTransform: "none",
               borderRadius: "16px",

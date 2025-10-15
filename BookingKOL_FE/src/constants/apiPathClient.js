@@ -4,7 +4,7 @@ export const CLIENT_API_PATHS = {
     getDetailByKolId: "/v1/kol-profiles/kol-id",
   },
   BOOKING: {
-    createSingle: "/v1/bookings/single",
+    createSingle: "/v1/user/booking/request/single",
     holdSlot: "/v1/user/booking/hold-slot",
   },
   COURSE: {

@@ -45,11 +45,6 @@ export const createSingleBooking = async ({
   return post({
     url: CLIENT_API_PATHS.BOOKING.createSingle,
     data: formData,
-    config: {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    },
   });
 };
 
