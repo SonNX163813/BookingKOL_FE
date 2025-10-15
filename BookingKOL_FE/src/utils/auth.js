@@ -31,13 +31,3 @@ export function clearAuth() {
   sessionStorage.removeItem("auth_token");
   sessionStorage.removeItem("auth_user");
 }
-
-export function isTokenExpired(jwt) {
-  try {
-    const [, payload] = jwt.split(".");
-    const { exp } = JSON.parse(atob(payload));
-    return exp ? Date.now() / 1000 >= exp : false;
-  } catch {
-    return false;
-  }
-}

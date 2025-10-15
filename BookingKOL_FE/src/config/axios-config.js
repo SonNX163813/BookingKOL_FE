@@ -25,11 +25,13 @@ api.interceptors.response.use(
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("auth_token");
+    const token =
+      localStorage.getItem("auth_token") ??
+      sessionStorage.getItem("auth_token");
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -50,6 +52,9 @@ export const update = ({ url, data, config }) => api.put(url, data, config);
 
 // DELETE
 export const remove = ({ url }) => api.delete(url);
+
+export const remove2 = ({ url, data, config }) =>
+  api.request({ url, method: "delete", data, ...(config || {}) });
 
 // PUT/UPDATE
 export const patch = ({ url, data, config }) => api.patch(url, data, config);
