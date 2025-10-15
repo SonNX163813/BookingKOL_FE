@@ -49,21 +49,24 @@ const { Title, Text } = Typography;
 const toPickerValue = (v) => (v ? dayjs(v) : null);
 const toDobIso = (p) => (p ? p.startOf("day").toISOString() : undefined);
 
-const inRole = (s) => {
-  if (!s) return undefined;
-  const u = String(s).toUpperCase();
-  if (
-    u.includes("CO_HOST") ||
-    u.includes("CO-HOST") ||
-    u.includes("ASSIS") ||
-    u.includes("TRO")
-  )
-    return "CO_HOST";
-  if (u.includes("HOST")) return "HOST";
+/* ================== ROLE MAPPING (UI <-> BE) ==================
+   - UI chỉ có 2 lựa chọn:
+       + HOST     (Host chính)
+       + CO_HOST  (Trợ live)
+   - BE chỉ nhận enum trong Roles: [KOL, SUPER_ADMIN, LIVE, ADMIN, USER]
+     => Khi gửi lên BE: HOST/CO_HOST => LIVE
+     => Khi nhận từ BE: LIVE => HOST (để hiển thị mặc định)
+*/
+const mapUiRoleToBackend = (ui) => {
+  if (ui === "HOST" || ui === "CO_HOST") return "LIVE";
   return undefined;
 };
-const roleLabel = (s) =>
-  s === "HOST" ? "Host chính" : s === "CO_HOST" ? "Trợ live" : "—";
+const mapBackendToUi = (be) => {
+  if (be === "LIVE") return "HOST";
+  return undefined;
+};
+const roleLabel = (ui) =>
+  ui === "HOST" ? "Host chính" : ui === "CO_HOST" ? "Trợ live" : "—";
 
 export default function KolProfile() {
   const navigate = useNavigate();
@@ -106,7 +109,7 @@ export default function KolProfile() {
         form.setFieldsValue({
           displayName: res.displayName || res.fullName || "",
           dateOfBirth: toPickerValue(res.dob),
-          role: inRole(res.role),
+          role: mapBackendToUi(res.role), // LIVE => HOST (UI)
           experience: res.experience || "",
           city: res.city || "",
           country: res.country || "",
@@ -207,7 +210,7 @@ export default function KolProfile() {
     form.setFieldsValue({
       displayName: kol.displayName || kol.fullName || "",
       dateOfBirth: toPickerValue(kol.dob),
-      role: inRole(kol.role),
+      role: mapBackendToUi(kol.role), // LIVE => HOST (UI)
       experience: kol.experience || "",
       city: kol.city || "",
       country: kol.country || "",
@@ -224,13 +227,17 @@ export default function KolProfile() {
       const payload = {
         displayName: values.displayName?.trim() || undefined,
         dob: toDobIso(values.dateOfBirth),
-        role: values.role || undefined, // HOST | CO_HOST
         experience: values.experience?.trim() || undefined,
         city: values.city?.trim() || undefined,
         country: values.country?.trim() || undefined,
         bio: values.bio?.trim() || undefined,
       };
 
+      // Map UI role => BE role
+      const beRole = mapUiRoleToBackend(values.role); // HOST/CO_HOST => LIVE
+      if (beRole) payload.role = beRole;
+
+      // categories diff
       const initialIds = Array.isArray(kol?.categories)
         ? kol.categories.map((c) => c.id)
         : [];
@@ -238,6 +245,7 @@ export default function KolProfile() {
       const toAdd = newIds.filter((id) => !initialIds.includes(id));
       const toRemove = initialIds.filter((id) => !newIds.includes(id));
 
+      // cover changed?
       const coverChanged =
         pendingCoverFileId && pendingCoverFileId !== currentCoverFileId;
 
@@ -477,7 +485,7 @@ export default function KolProfile() {
                 ID: {kol?.id || "—"}
               </Text>
               <Text type="secondary" className="block">
-                Vị trí: {roleLabel(inRole(kol?.role))}
+                Vị trí: {roleLabel(mapBackendToUi(kol?.role))}
               </Text>
               <Text type="secondary" className="block">
                 Danh mục:{" "}
