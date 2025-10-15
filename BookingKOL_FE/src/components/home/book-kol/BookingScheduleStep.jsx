@@ -16,53 +16,26 @@ const toDayjs = (value) => {
   return parsed.isValid() ? parsed : null;
 };
 
-const mergeDateAndTime = (date, time) => {
-  const dateMoment = toDayjs(date)?.startOf("day");
-  const timeMoment = toDayjs(time);
-  if (!dateMoment || !timeMoment) return null;
-  return dateMoment
-    .hour(timeMoment.hour())
-    .minute(timeMoment.minute())
-    .second(0)
-    .millisecond(0);
-};
-
-const formatIso = (value) =>
-  value ? value.format("YYYY-MM-DDTHH:mm:ssZ") : null;
-
 const BookingScheduleStep = ({
-  selectedDate,
-  selectedTime,
-  onSelectDate,
-  onSelectTime,
+  startDateTime,
+  endDateTime,
+  onStartDateTimeChange,
+  onEndDateTimeChange,
   STYLE,
   TEXT,
 }) => {
+  const startMoment = useMemo(() => toDayjs(startDateTime), [startDateTime]);
+  const endMoment = useMemo(() => toDayjs(endDateTime), [endDateTime]);
+
   const normalizedDate = useMemo(
-    () => toDayjs(selectedDate)?.startOf("day") ?? null,
-    [selectedDate]
+    () => startMoment?.startOf("day") ?? null,
+    [startMoment]
   );
-
-  const startMoment = useMemo(() => {
-    if (!selectedTime) return null;
-    if (dayjs.isDayjs(selectedTime.start)) return selectedTime.start;
-    if (selectedTime.startAt) return toDayjs(selectedTime.startAt);
-    if (dayjs.isDayjs(selectedTime))
-      return mergeDateAndTime(normalizedDate, selectedTime);
-    return null;
-  }, [selectedTime, normalizedDate]);
-
-  const endMoment = useMemo(() => {
-    if (!selectedTime) return null;
-    if (dayjs.isDayjs(selectedTime.end)) return selectedTime.end;
-    if (selectedTime.endAt) return toDayjs(selectedTime.endAt);
-    return null;
-  }, [selectedTime]);
 
   // Giờ tối thiểu cho cùng ngày hôm nay
   const minSelectableTime = useMemo(() => {
-    if (!normalizedDate) return null;
     const now = dayjs().second(0).millisecond(0);
+    if (!normalizedDate) return null;
     return normalizedDate.isSame(now, "day") ? now : null;
   }, [normalizedDate]);
 
@@ -83,110 +56,80 @@ const BookingScheduleStep = ({
 
   // 🟦 Chọn ngày bắt đầu
   const handleStartDateChange = (value) => {
-    if (!value) {
-      onSelectDate?.(null);
-      onSelectTime?.(null);
-      return;
-    }
+    if (!value || !onStartDateTimeChange) return;
 
     const newDate = value.startOf("day");
-    onSelectDate?.(newDate);
+    const currentTime = startMoment || dayjs();
+    const newDateTime = newDate
+      .hour(currentTime.hour())
+      .minute(currentTime.minute())
+      .second(0)
+      .millisecond(0);
 
-    if (!onSelectTime) return;
-
-    const nextStart = mergeDateAndTime(newDate, startMoment || dayjs());
-    let nextEnd = endMoment ? mergeDateAndTime(newDate, endMoment) : null;
-
-    if (nextEnd && !nextEnd.isAfter(nextStart)) nextEnd = null;
-
-    onSelectTime({
-      start: nextStart,
-      end: nextEnd,
-      startAt: formatIso(nextStart),
-      endAt: formatIso(nextEnd),
-    });
+    onStartDateTimeChange(newDateTime);
   };
 
   // 🟩 Chọn ngày kết thúc
   const handleEndDateChange = (value) => {
-    if (!onSelectTime || !value) return;
+    if (!value || !onEndDateTimeChange) return;
+
     const newDate = value.startOf("day");
+    const currentTime = endMoment || startMoment || dayjs();
+    let newDateTime = newDate
+      .hour(currentTime.hour())
+      .minute(currentTime.minute())
+      .second(0)
+      .millisecond(0);
 
-    let newEndMoment = endMoment
-      ? newDate.hour(endMoment.hour()).minute(endMoment.minute())
-      : newDate
-          .hour(startMoment?.hour() ?? 0)
-          .minute(startMoment?.minute() ?? 0);
-
-    // Nếu ngày kết thúc < ngày bắt đầu → đẩy lên cùng hoặc sau
-    if (startMoment && newDate.isBefore(startMoment, "day")) {
-      newEndMoment = startMoment
-        .add(1, "day")
-        .hour(startMoment.hour())
-        .minute(startMoment.minute());
+    // Đảm bảo end sau start
+    if (startMoment && newDateTime.isBefore(startMoment)) {
+      newDateTime = startMoment.add(1, "hour");
     }
 
-    onSelectTime({
-      start: startMoment,
-      end: newEndMoment,
-      startAt: formatIso(startMoment),
-      endAt: formatIso(newEndMoment),
-    });
+    onEndDateTimeChange(newDateTime);
   };
 
   // 🟨 Chọn giờ bắt đầu
   const handleStartTimeChange = (value) => {
-    if (!onSelectTime || !normalizedDate) return;
-    if (!value) {
-      onSelectTime(
-        selectedTime?.end ? { start: null, end: selectedTime.end } : null
-      );
-      return;
-    }
+    if (!value || !onStartDateTimeChange) return;
 
     const sanitized = toDayjs(value)?.second(0).millisecond(0);
     if (!sanitized) return;
-    const nextStart = mergeDateAndTime(normalizedDate, sanitized);
 
-    if (minSelectableTime && nextStart.isBefore(minSelectableTime)) return;
+    const newDateTime = (startMoment || dayjs())
+      .hour(sanitized.hour())
+      .minute(sanitized.minute())
+      .second(0)
+      .millisecond(0);
 
-    let nextEnd = endMoment;
-    if (
-      nextEnd &&
-      nextEnd.isSame(nextStart, "day") &&
-      !nextEnd.isAfter(nextStart)
-    )
-      nextEnd = null;
+    // Kiểm tra với minSelectableTime
+    if (minSelectableTime && newDateTime.isBefore(minSelectableTime)) {
+      return;
+    }
 
-    onSelectTime({
-      start: nextStart,
-      end: nextEnd,
-      startAt: formatIso(nextStart),
-      endAt: formatIso(nextEnd),
-    });
+    onStartDateTimeChange(newDateTime);
   };
 
   // 🟥 Chọn giờ kết thúc
   const handleEndTimeChange = (value) => {
-    if (!onSelectTime || !startMoment || !normalizedDate) return;
-    if (!value) {
-      onSelectTime({ start: startMoment, end: null });
-      return;
-    }
+    if (!value || !onEndDateTimeChange || !startMoment) return;
 
     const sanitized = toDayjs(value)?.second(0).millisecond(0);
     if (!sanitized) return;
-    const nextEnd = mergeDateAndTime(endMoment ?? normalizedDate, sanitized);
 
-    const sameDay = nextEnd.isSame(startMoment, "day");
-    if (sameDay && !nextEnd.isAfter(startMoment)) return; // cùng ngày phải sau start
+    const newDateTime = (endMoment || startMoment.add(1, "hour"))
+      .hour(sanitized.hour())
+      .minute(sanitized.minute())
+      .second(0)
+      .millisecond(0);
 
-    onSelectTime({
-      start: startMoment,
-      end: nextEnd,
-      startAt: formatIso(startMoment),
-      endAt: formatIso(nextEnd),
-    });
+    // Đảm bảo end sau start nếu cùng ngày
+    const sameDay = newDateTime.isSame(startMoment, "day");
+    if (sameDay && !newDateTime.isAfter(startMoment)) {
+      return;
+    }
+
+    onEndDateTimeChange(newDateTime);
   };
 
   const hasStart = Boolean(startMoment);
@@ -298,7 +241,7 @@ const BookingScheduleStep = ({
             </Stack>
 
             {/* Summary */}
-            <Alert
+            {/* <Alert
               severity={
                 hasStart && hasEnd && isEndTimeValid
                   ? "success"
@@ -326,7 +269,7 @@ const BookingScheduleStep = ({
               }}
             >
               {summaryMessage}
-            </Alert>
+            </Alert> */}
           </Stack>
         </Box>
       </Stack>

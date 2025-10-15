@@ -71,7 +71,7 @@ const BookingContactStep = ({
     <Stack spacing={3}>
       {/* Thông tin liên hệ */}
       <Stack spacing={2}>
-        <TextField
+        {/* <TextField
           label={TEXT.form.name}
           value={contact.fullName}
           onChange={(event) => onContactChange("fullName", event.target.value)}
@@ -83,8 +83,8 @@ const BookingContactStep = ({
               backgroundColor: STYLE.subtleSurface,
             },
           }}
-        />
-        <TextField
+        /> */}
+        {/* <TextField
           label={TEXT.form.email}
           value={contact.email}
           onChange={(event) => onContactChange("email", event.target.value)}
@@ -96,8 +96,8 @@ const BookingContactStep = ({
               backgroundColor: STYLE.subtleSurface,
             },
           }}
-        />
-        <TextField
+        /> */}
+        {/* <TextField
           label={TEXT.form.phone}
           value={contact.phone}
           onChange={(event) => onContactChange("phone", event.target.value)}
@@ -110,13 +110,15 @@ const BookingContactStep = ({
               backgroundColor: STYLE.subtleSurface,
             },
           }}
-        />
+        /> */}
         <TextField
           label={TEXT.form.note}
           value={contact.note}
           onChange={(event) => onContactChange("note", event.target.value)}
           multiline
           minRows={3}
+          // error={!contact.note}
+          // helperText={!contact.note ? "Vui lòng nhập ghi chú!" : ""}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -232,9 +234,9 @@ const BookingContactStep = ({
               <Typography sx={{ color: STYLE.textSecondary }}>
                 <strong>{TEXT.summary.kol}:</strong> {summary.kol}
               </Typography>
-              <Typography sx={{ color: STYLE.textSecondary }}>
+              {/* <Typography sx={{ color: STYLE.textSecondary }}>
                 <strong>{TEXT.summary.package}:</strong> {summary.package}
-              </Typography>
+              </Typography> */}
               <Typography sx={{ color: STYLE.textSecondary }}>
                 <strong>{TEXT.summary.duration}:</strong> {summary.duration}
               </Typography>

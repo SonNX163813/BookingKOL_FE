@@ -21,4 +21,8 @@ export const API_PATHS = {
     deleteCategory: "/v1/categories",
     patchCategory: "/v1/categories",
   },
+  BOOKINGPACKAGE: {
+    createBookingPackage: "/v1/bookings/packages",
+    getHistoryBookingPackage: "/v1/user/bookings",
+  },
 };

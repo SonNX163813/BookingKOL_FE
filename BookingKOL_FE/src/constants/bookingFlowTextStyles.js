@@ -14,6 +14,7 @@ export const BOOKING_FLOW_TEXT = {
   steps: ["Chọn lịch & giờ", "Thông tin liên hệ"],
   actions: {
     continue: "Tiếp tục",
+    hold: "Giữ chỗ",
     back: "Quay lại",
     close: "Đóng",
     pay: "Thanh toán",

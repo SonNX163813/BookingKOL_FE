@@ -26,6 +26,9 @@ import GuestOnly, { RequireAuth } from "./RouterGuards";
 import NotFound from "../pages/NotFound.jsx";
 import ListKOL from "../pages/home/kol/ListKOL.jsx";
 
+import ServicePackagePage from "../pages/booking_package/ServicePackagePage.jsx";
+import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPackagePage.jsx";
+
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
   {
@@ -55,6 +58,8 @@ export const routerCustomer = [
       { path: "/danh-sach-kol/:kolId/:kolName", element: <KOLDetail /> },
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
+      { path: "/chat-AI", element: <ChatAIPage /> },
+      { path: "/goi-dich-vu", element: <ServicePackagePage /> },
       ...courseRoutes,
     ],
   },
@@ -65,7 +70,10 @@ export const routerCustomer = [
     children: [
       {
         element: <MainLayout />,
-        children: [{ path: "/userprofile", element: <UserProfile /> }],
+        children: [
+          { path: "/userprofile", element: <UserProfile /> },
+          { path: "/don-mua", element: <HistoryBookingPackagePage /> },
+        ],
       },
     ],
   },

@@ -53,3 +53,21 @@ export const createSingleBooking = async ({
   });
 };
 
+export const holdBookingSlot = async ({
+  kolId,
+  startTimeIso,
+  endTimeIso,
+} = {}) => {
+  if (!kolId || !startTimeIso || !endTimeIso) {
+    throw new Error("kolId, startTimeIso and endTimeIso are required");
+  }
+
+  return post({
+    url: CLIENT_API_PATHS.BOOKING.holdSlot,
+    data: {
+      kolId,
+      startTimeIso,
+      endTimeIso,
+    },
+  });
+};
