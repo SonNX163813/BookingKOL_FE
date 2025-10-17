@@ -252,14 +252,14 @@ const CourseLivesteam = () => {
         }}
       >
         <Stack spacing={6}>
-          <CourseHeroSection
+          {/* <CourseHeroSection
             onExploreTopCourse={() =>
               handleNavigateDetail(topCourse?.id, topCourse?.slug)
             }
             hasCourses={decoratedCourses.length > 0}
             loading={loading}
             onManualRefresh={handleRetry}
-          />
+          /> */}
 
           <CourseFilters
             filters={formFilters}

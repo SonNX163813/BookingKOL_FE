@@ -37,10 +37,11 @@ export const createSingleBooking = async ({
   extractFileList(attachedFiles).forEach((file) => {
     formData.append("attachedFiles", file);
   });
-  formData.append(
-    "bookingSingleReqDTO",
-    JSON.stringify(bookingSingleReqDTO ?? {})
-  );
+  const bookingJson = JSON.stringify(bookingSingleReqDTO ?? {});
+  const bookingBlob = new Blob([bookingJson], {
+    type: "application/json",
+  });
+  formData.append("bookingSingleReqDTO", bookingBlob);
 
   return post({
     url: CLIENT_API_PATHS.BOOKING.createSingle,

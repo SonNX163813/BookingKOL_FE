@@ -28,6 +28,7 @@ import ListKOL from "../pages/home/kol/ListKOL.jsx";
 
 import ServicePackagePage from "../pages/booking_package/ServicePackagePage.jsx";
 import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPackagePage.jsx";
+import BookingSinglePayment from "../pages/booking_single/BookingSinglePayment.jsx";
 
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
@@ -55,11 +56,11 @@ export const routerCustomer = [
     children: [
       { path: "/", element: <HomePage /> },
       { path: "/danh-sach-kol", element: <ListKOL /> },
-      { path: "/danh-sach-kol/:kolId/:kolName", element: <KOLDetail /> },
+      { path: "/danh-sach-kol/:kolId?/:kolName?", element: <KOLDetail /> },
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
-      { path: "/chat-AI", element: <ChatAIPage /> },
-      { path: "/goi-dich-vu", element: <ServicePackagePage /> },
+      { path: "/goi-chien-dich", element: <ServicePackagePage /> },
+      { path: "/thanh-toan-kol-le", element: <BookingSinglePayment /> },
       ...courseRoutes,
     ],
   },

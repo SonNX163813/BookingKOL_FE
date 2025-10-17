@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 // import {
 //   Box,
 //   Container,
@@ -15,11 +15,13 @@ import {
   Typography,
   CircularProgress,
   Stack,
+  Button,
 } from "@mui/material";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import IconButton from "@mui/material/IconButton";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CloseIcon from "@mui/icons-material/Close";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "../../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../../components/home/kol-detail/Introduction";
 import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
@@ -45,12 +47,12 @@ const buildHeaderData = (kol) => {
   // if (kol?.rateCardNote) {
   //   achievements.push(`Lưu ý: ${kol.rateCardNote}`);
   // }
+  const primaryAvatarUrl =
+    typeof kol?.avatarUrl === "string" && kol.avatarUrl.trim().length > 0
+      ? kol.avatarUrl
+      : null;
   const fallbackAvatar =
-    kol?.avatarUrl ||
-    kol?.profileImage ||
-    kol?.imageUrl ||
-    kol?.thumbnailUrl ||
-    null;
+    kol?.profileImage || kol?.imageUrl || kol?.thumbnailUrl || null;
 
   const mediaItems = Array.isArray(kol?.fileUsageDtos)
     ? kol.fileUsageDtos
@@ -78,24 +80,48 @@ const buildHeaderData = (kol) => {
   const videoItems = mediaItems.filter((item) => item.type === "VIDEO");
 
   const avatar =
+    primaryAvatarUrl ||
     imageItems.find((item) => item.isCover)?.url ||
     imageItems[0]?.url ||
     fallbackAvatar ||
     hotkolimg;
 
-  const thumbnails =
-    mediaItems.length > 0
-      ? [...imageItems, ...videoItems]
-      : [
-          {
-            id: "default-avatar",
-            type: "IMAGE",
-            url: avatar,
-            name: "Avatar",
-            previewUrl: null,
-            isCover: true,
-          },
-        ];
+  let thumbnails = [...imageItems, ...videoItems];
+
+  if (primaryAvatarUrl) {
+    const existingIndex = thumbnails.findIndex(
+      (item) => item.url === primaryAvatarUrl
+    );
+    if (existingIndex >= 0) {
+      const [existingAvatar] = thumbnails.splice(existingIndex, 1);
+      thumbnails = [{ ...existingAvatar, isCover: true }, ...thumbnails];
+    } else {
+      thumbnails = [
+        {
+          id: `avatar-${kol.id ?? primaryAvatarUrl}`,
+          type: "IMAGE",
+          url: primaryAvatarUrl,
+          name: "Avatar",
+          previewUrl: null,
+          isCover: true,
+        },
+        ...thumbnails,
+      ];
+    }
+  }
+
+  if (thumbnails.length === 0) {
+    thumbnails = [
+      {
+        id: "default-avatar",
+        type: "IMAGE",
+        url: avatar,
+        name: "Avatar",
+        previewUrl: null,
+        isCover: true,
+      },
+    ];
+  }
   return {
     id: kol.id,
     name: kol.displayName ?? "Đang cập nhật",
@@ -200,6 +226,7 @@ const KOLDetail = () => {
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
   const [showNotFoundSnackbar, setShowNotFoundSnackbar] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleCloseErrorSnackbar = () => {
     setShowErrorSnackbar(false);
@@ -208,6 +235,10 @@ const KOLDetail = () => {
   const handleCloseNotFoundSnackbar = () => {
     setShowNotFoundSnackbar(false);
   };
+
+  const handleBack = useCallback(() => {
+    navigate("/danh-sach-kol");
+  }, [navigate]);
 
   const handleOpenBooking = () => {
     setIsBookingOpen(true);
@@ -377,6 +408,27 @@ const KOLDetail = () => {
               gap: { xs: 4, md: 5 },
             }}
           >
+            <Button
+              onClick={handleBack}
+              startIcon={<ArrowBackRoundedIcon />}
+              sx={{
+                alignSelf: "flex-start",
+                textTransform: "none",
+                fontWeight: 600,
+                color: "#4a74da",
+                borderRadius: 2,
+                border: "1px solid rgba(74, 116, 218, 0.24)",
+                px: 2.5,
+                py: 1,
+                bgcolor: "rgba(74, 116, 218, 0.08)",
+                "&:hover": {
+                  bgcolor: "rgba(74, 116, 218, 0.16)",
+                  borderColor: "rgba(74, 116, 218, 0.32)",
+                },
+              }}
+            >
+              Trở về danh sách KOL
+            </Button>
             <ProfileHeader
               kol={headerData}
               pricing={pricingData}

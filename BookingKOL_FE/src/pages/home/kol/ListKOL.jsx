@@ -593,14 +593,14 @@ const ListKOL = () => {
         }}
       >
         <Stack spacing={6}>
-          <KOLListHeroSection
+          {/* <KOLListHeroSection
             onExploreTopKol={() =>
               handleNavigateDetail(topKol?.id, topKol?.slug)
             }
             hasKols={decoratedKols.length > 0}
             loading={loading}
             onManualRefresh={handleRetry}
-          />
+          /> */}
 
           <KolFilters
             filters={formFilters}
