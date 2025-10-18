@@ -17,7 +17,7 @@ export const routerKOL = [
       { path: "orders", element: <KolOrders /> },
       { path: "portfolio/:kolId?/:kolName?", element: <KolPortfolio /> },
       { path: "profile/:kolId?/:kolName?", element: <KolProfile /> },
-      { path: "schedule", element: <KolSchedule /> },
+      { path: "schedule/:kolId?/:kolName?", element: <KolSchedule /> },
       { path: "settings", element: <KolSettings /> },
     ],
   },

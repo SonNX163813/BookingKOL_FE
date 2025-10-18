@@ -21,4 +21,8 @@ export const CLIENT_API_PATHS = {
     getAll: "/v1/courses/all",
     getDetail: "/v1/courses",
   },
+
+  SCHEDULER: {
+    kolTimeline: (kolId) => `/v1/kol/availabilities/time-line/kol/${kolId}`,
+  },
 };

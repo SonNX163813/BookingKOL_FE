@@ -174,3 +174,24 @@ export const deactivateKolMedias = async (fileUsageIds, { signal } = {}) => {
     config: signal ? { signal } : undefined,
   });
 };
+export const getKolTimeline = async ({
+  kolId,
+  startDate,
+  endDate,
+  page = 0,
+  size = 500,
+  signal,
+} = {}) => {
+  if (!kolId) throw new Error("kolId is required");
+  const url = `/v1/kol/availabilities/time-line/kol/${encodeURIComponent(
+    kolId
+  )}`;
+  const payload = await get({
+    url,
+    params: { startDate, endDate, page, size },
+    config: signal ? { signal } : undefined,
+  });
+  // interceptor của bạn thường trả {status, message, data}
+  // ở đây mình trả về payload.data (danh sách timeline)
+  return payload?.data ?? [];
+};
