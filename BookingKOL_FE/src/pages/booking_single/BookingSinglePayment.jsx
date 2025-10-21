@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   Alert,
@@ -12,123 +12,209 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { get } from "../../config/axios-config";
 import { BOOKING_SINGLE_PAYMENT_STORAGE_KEY } from "../../constants/storageKeys";
+import { BASE_URL } from "../../utils/config";
 
-const DEFAULT_COUNTDOWN_MS = 15 * 60 * 1000;
+const THOI_GIAN_DEM_NGUOC = 15 * 60 * 1000; // 15 phút = 900.000 ms
 
-const formatCurrency = (value) =>
+const dinhDangTien = (value) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
 
-const formatCountdown = (remainingMs) => {
-  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-    2,
-    "0"
-  )}`;
+const dinhDangThoiGianDemNguoc = (remainingMs) => {
+  const tongGiay = Math.max(0, Math.ceil(remainingMs / 1000));
+  const phut = Math.floor(tongGiay / 60);
+  const giay = tongGiay % 60;
+  return `${String(phut).padStart(2, "0")}:${String(giay).padStart(2, "0")}`;
+};
+
+const boSungHanDemNguoc = (payment) => {
+  if (!payment) return null;
+
+  const { localCountdownDeadline } = payment;
+  if (localCountdownDeadline && dayjs(localCountdownDeadline).isValid()) {
+    return payment;
+  }
+
+  const countdownDeadline = dayjs().add(15, "minute").toISOString();
+  return {
+    ...payment,
+    localCountdownDeadline: countdownDeadline,
+  };
 };
 
 const BookingSinglePayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [paymentInfo, setPaymentInfo] = useState(null);
-  const [remainingMs, setRemainingMs] = useState(DEFAULT_COUNTDOWN_MS);
+  const [thongTinThanhToan, setThongTinThanhToan] = useState(null);
+  const [thoiGianConLai, setThoiGianConLai] = useState(THOI_GIAN_DEM_NGUOC);
 
+  // Lấy dữ liệu thanh toán từ location hoặc sessionStorage
   useEffect(() => {
     const statePayment = location.state?.payment;
 
     if (statePayment) {
-      setPaymentInfo(statePayment);
+      setThongTinThanhToan(statePayment);
       try {
         sessionStorage.setItem(
           BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
           JSON.stringify({ payment: statePayment })
         );
-      } catch (storageError) {
-        console.error("Cannot persist booking payment data", storageError);
+      } catch (err) {
+        console.error("Không thể lưu dữ liệu thanh toán", err);
       }
       return;
     }
 
-    const storedPayload = sessionStorage.getItem(
+    const duLieuLuu = sessionStorage.getItem(
       BOOKING_SINGLE_PAYMENT_STORAGE_KEY
     );
-    if (storedPayload) {
+    if (duLieuLuu) {
       try {
-        const parsed = JSON.parse(storedPayload);
+        const parsed = JSON.parse(duLieuLuu);
         if (parsed?.payment) {
-          setPaymentInfo(parsed.payment);
+          setThongTinThanhToan(parsed.payment);
           return;
         }
-      } catch (error) {
-        console.error("Cannot parse booking payment data", error);
+      } catch (err) {
+        console.error("Không thể đọc dữ liệu thanh toán", err);
       }
     }
 
     navigate("/", { replace: true });
   }, [location.state, navigate]);
 
+  // Đếm ngược thời gian còn lại
   useEffect(() => {
-    if (!paymentInfo) {
-      return;
-    }
+    if (!thongTinThanhToan) return;
 
-    const expiryMoment = paymentInfo.expiresAt
-      ? dayjs(paymentInfo.expiresAt)
+    const thoiDiemHetHan = thongTinThanhToan.expiresAt
+      ? dayjs(thongTinThanhToan.expiresAt)
       : dayjs().add(15, "minute");
 
-    const updateCountdown = () => {
-      const diff = expiryMoment.diff(dayjs());
-      setRemainingMs(diff > 0 ? diff : 0);
+    const capNhatThoiGian = () => {
+      const diff = thoiDiemHetHan.diff(dayjs());
+      setThoiGianConLai(diff > 0 ? diff : 0);
     };
 
-    updateCountdown();
-    const intervalId = setInterval(updateCountdown, 1000);
-
+    capNhatThoiGian();
+    const intervalId = setInterval(capNhatThoiGian, 1000);
     return () => clearInterval(intervalId);
-  }, [paymentInfo]);
+  }, [thongTinThanhToan]);
 
-  const formattedExpiresAt = useMemo(() => {
-    const target = paymentInfo?.expiresAt
-      ? dayjs(paymentInfo.expiresAt)
+  useEffect(() => {
+    const contractId = thongTinThanhToan?.contractId;
+    if (!contractId) return;
+
+    let isActive = true;
+    let intervalId;
+
+    const kiemTraTrangThaiThanhToan = async () => {
+      try {
+        const response = await fetch(
+          `${BASE_URL}/v1/payment/check/${contractId}`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            "Không thể gọi API kiểm tra trạng thái thanh toán:",
+            response.status
+          );
+          return;
+        }
+
+        const ketQua = await response.json();
+
+        if (!isActive) return;
+
+        const daThanhToan =
+          typeof ketQua === "boolean"
+            ? ketQua
+            : typeof ketQua?.data === "boolean"
+            ? ketQua.data
+            : typeof ketQua?.isPaid === "boolean"
+            ? ketQua.isPaid
+            : typeof ketQua?.paid === "boolean"
+            ? ketQua.paid
+            : typeof ketQua?.status === "string"
+            ? ketQua.status.toLowerCase() === "paid"
+            : false;
+
+        if (daThanhToan) {
+          isActive = false;
+          if (intervalId) clearInterval(intervalId);
+
+          sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
+          toast.success("Thanh toán thành công! 🎉");
+          navigate("/", { replace: true });
+        }
+      } catch (error) {
+        console.error("Lỗi kiểm tra trạng thái thanh toán:", error);
+      }
+    };
+
+    kiemTraTrangThaiThanhToan();
+    intervalId = setInterval(kiemTraTrangThaiThanhToan, 30000);
+
+    return () => {
+      isActive = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [navigate, thongTinThanhToan?.contractId]);
+
+  const thoiGianHetHanHienThi = useMemo(() => {
+    const target = thongTinThanhToan?.expiresAt
+      ? dayjs(thongTinThanhToan.expiresAt)
       : dayjs().add(15, "minute");
     return target.isValid() ? target.format("DD/MM/YYYY HH:mm:ss") : "--";
-  }, [paymentInfo]);
+  }, [thongTinThanhToan]);
 
-  const countdownLabel = useMemo(
-    () => formatCountdown(remainingMs),
-    [remainingMs]
+  const demNguocLabel = useMemo(
+    () => dinhDangThoiGianDemNguoc(thoiGianConLai),
+    [thoiGianConLai]
   );
 
-  if (!paymentInfo) {
-    return null;
-    // Optional: show a loading state here if needed.
-  }
+  if (!thongTinThanhToan) return null;
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 4, md: 6 } }}>
       <Stack spacing={4}>
-        <Button
-          variant="text"
-          startIcon={<ArrowBackRoundedIcon />}
-          onClick={() => navigate(-1)}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          Quay lai
-        </Button>
-
-        <Stack spacing={1}>
+        <Stack spacing={1} alignItems="center">
           <Typography variant="h4" fontWeight={700}>
-            Thanh toan booking KOL le
+            Thanh toán booking KOL lẻ
           </Typography>
+
+          {/* Thời gian đếm ngược hiển thị lớn */}
+          <Typography
+            variant="h3"
+            sx={{
+              fontWeight: 800,
+              color: "primary.main",
+              letterSpacing: 1,
+              mt: 1,
+              textShadow: "0 2px 8px rgba(74,116,218,0.3)",
+              animation: "pulse 1.5s infinite",
+              "@keyframes pulse": {
+                "0%": { transform: "scale(1)" },
+                "50%": { transform: "scale(1.05)" },
+                "100%": { transform: "scale(1)" },
+              },
+            }}
+          >
+            {demNguocLabel}
+          </Typography>
+
           <Typography variant="body1" color="text.secondary">
-            Vui long hoan tat thanh toan trong {countdownLabel}. Ma QR het han
-            vao {formattedExpiresAt}.
+            Mã QR sẽ hết hạn vào {thoiGianHetHanHienThi}.
           </Typography>
         </Stack>
 
@@ -148,43 +234,53 @@ const BookingSinglePayment = () => {
               direction={{ xs: "column", md: "row" }}
               spacing={{ xs: 3, md: 4 }}
             >
+              {/* --- Thông tin thanh toán --- */}
               <Stack spacing={2} flex={1}>
                 <Typography variant="overline" color="primary" fontWeight={600}>
-                  Thong tin thanh toan
+                  Thông tin thanh toán
                 </Typography>
 
                 <Stack spacing={1.5}>
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography color="text.secondary">So tien</Typography>
+                    <Typography color="text.secondary">Số tiền</Typography>
                     <Typography fontWeight={700} color="primary">
-                      {formatCurrency(paymentInfo.amount)}
+                      {dinhDangTien(thongTinThanhToan.amount)}
                     </Typography>
                   </Stack>
+
                   <Stack direction="row" justifyContent="space-between">
                     <Typography color="text.secondary">
-                      Noi dung chuyen khoan
+                      Nội dung chuyển khoản
                     </Typography>
                     <Typography fontWeight={600}>
-                      {paymentInfo.transferContent}
+                      {thongTinThanhToan.transferContent}
                     </Typography>
                   </Stack>
+
                   <Divider />
+
                   <Stack spacing={1}>
                     <Typography color="text.secondary">
-                      Chu tai khoan
-                    </Typography>
-                    <Typography fontWeight={600}>{paymentInfo.name}</Typography>
-                  </Stack>
-                  <Stack spacing={1}>
-                    <Typography color="text.secondary">Ngan hang</Typography>
-                    <Typography fontWeight={600}>{paymentInfo.bank}</Typography>
-                  </Stack>
-                  <Stack spacing={1}>
-                    <Typography color="text.secondary">
-                      So tai khoan nhan
+                      Chủ tài khoản
                     </Typography>
                     <Typography fontWeight={600}>
-                      {paymentInfo.accountNumber}
+                      {thongTinThanhToan.name}
+                    </Typography>
+                  </Stack>
+
+                  <Stack spacing={1}>
+                    <Typography color="text.secondary">Ngân hàng</Typography>
+                    <Typography fontWeight={600}>
+                      {thongTinThanhToan.bank}
+                    </Typography>
+                  </Stack>
+
+                  <Stack spacing={1}>
+                    <Typography color="text.secondary">
+                      Số tài khoản nhận
+                    </Typography>
+                    <Typography fontWeight={600}>
+                      {thongTinThanhToan.accountNumber}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -196,6 +292,7 @@ const BookingSinglePayment = () => {
                 sx={{ display: { xs: "none", md: "block" } }}
               />
 
+              {/* --- QR Thanh toán --- */}
               <Stack
                 spacing={2}
                 alignItems="center"
@@ -203,7 +300,7 @@ const BookingSinglePayment = () => {
                 flex={1}
               >
                 <Typography color="text.secondary">
-                  Quet ma QR de thanh toan
+                  Quét mã QR để thanh toán
                 </Typography>
                 <Box
                   sx={{
@@ -221,8 +318,8 @@ const BookingSinglePayment = () => {
                 >
                   <Box
                     component="img"
-                    src={paymentInfo.qrUrl}
-                    alt="QR thanh toan"
+                    src={thongTinThanhToan.qrUrl}
+                    alt="QR thanh toán"
                     sx={{
                       width: "100%",
                       height: "100%",
@@ -231,26 +328,26 @@ const BookingSinglePayment = () => {
                   />
                 </Box>
                 <Typography variant="body2" color="text.secondary">
-                  Ma se het han sau {countdownLabel}
+                  Mã sẽ hết hạn sau {demNguocLabel}
                 </Typography>
               </Stack>
             </Stack>
 
+            {/* --- Cảnh báo --- */}
             <Alert severity="warning" sx={{ borderRadius: 3 }}>
               <Stack spacing={1}>
-                <Typography fontWeight={600}>Luu y khi thanh toan</Typography>
+                <Typography fontWeight={600}>Lưu ý khi thanh toán</Typography>
                 <Typography variant="body2">
-                  - Nhap dung SO TIEN va NOI DUNG chuyen tien de he thong tu
-                  dong kiem tra sau tu 1 - 5 phut.
+                  - Nhập đúng <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển tiền để
+                  hệ thống tự động kiểm tra trong vòng 1 - 5 phút.
                 </Typography>
                 <Typography variant="body2">
-                  - Thong tin nap tien o tren chi dung duoc 1 lan. Neu ban su
-                  dung lai thong tin nay o giao dich khac thi he thong se khong
-                  xu ly.
+                  - Thông tin ở trên chỉ sử dụng <b>một lần duy nhất</b>. Nếu
+                  dùng lại, hệ thống sẽ không xử lý.
                 </Typography>
                 <Typography variant="body2">
-                  - Trang web khong ho tro hoan tien neu nhap sai thong tin, vui
-                  long kiem tra ky truoc khi chuyen tien.
+                  - Trang web <b>không hỗ trợ hoàn tiền</b> nếu nhập sai thông
+                  tin. Vui lòng kiểm tra kỹ trước khi chuyển.
                 </Typography>
               </Stack>
             </Alert>

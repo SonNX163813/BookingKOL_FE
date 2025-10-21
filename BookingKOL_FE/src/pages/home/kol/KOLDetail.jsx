@@ -24,7 +24,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "../../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../../components/home/kol-detail/Introduction";
-import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
 import BookingFlow from "../../../components/home/book-kol/BookingFlow";
 import { getKolProfileById } from "../../../services/kol/KolAPI";
 import hotkolimg from "../../../assets/hotkol.png";
@@ -162,6 +161,42 @@ const buildPlatformChips = (kol) => {
       verified: true,
     }))
     .filter((item) => Boolean(item.name));
+};
+
+const buildLivestreamVideos = (kol) => {
+  if (!Array.isArray(kol?.fileUsageDtos)) {
+    return [];
+  }
+
+  return kol.fileUsageDtos
+    .map((usage) => {
+      const file = usage?.file ?? {};
+      const rawType = (file?.fileType || usage?.fileType || "")
+        .toString()
+        .toUpperCase();
+      if (rawType !== "VIDEO") {
+        return null;
+      }
+
+      const url = file?.fileUrl ?? usage?.fileUrl ?? "";
+      if (!url) {
+        return null;
+      }
+
+      return {
+        id: usage?.id ?? file?.id ?? url,
+        url,
+        title: file?.fileName ?? usage?.title ?? "Video livestream",
+        thumbnail: file?.thumbnailUrl ?? file?.previewUrl ?? null,
+        description: usage?.description ?? file?.description ?? "",
+        externalUrl:
+          usage?.metadata?.externalUrl ??
+          usage?.externalUrl ??
+          file?.externalUrl ??
+          null,
+      };
+    })
+    .filter(Boolean);
 };
 
 const buildIntroductionData = (kol) => {
@@ -303,6 +338,10 @@ const KOLDetail = () => {
     [kolData]
   );
   const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const livestreamVideos = useMemo(
+    () => buildLivestreamVideos(kolData),
+    [kolData]
+  );
   const bookingPackages = useMemo(() => {
     if (!kolData) {
       return [];
@@ -435,11 +474,10 @@ const KOLDetail = () => {
               platforms={platformChips}
               onBook={handleOpenBooking}
             />
-            <Introduction profile={introductionData} />
-            <ReviewsSection
-              reviews={reviewsData.reviews}
-              overallRating={reviewsData.overallRating}
-              ratingDistribution={reviewsData.ratingDistribution}
+            <Introduction
+              profile={introductionData}
+              livestreamVideos={livestreamVideos}
+              feedback={reviewsData}
             />
           </Box>
         )}
@@ -498,7 +536,7 @@ const KOLDetail = () => {
           </Alert>
         </Snackbar> */}
 
-        <AppSnackbar
+        {/* <AppSnackbar
           open={showErrorSnackbar}
           onClose={handleCloseErrorSnackbar}
           autoHideDuration={6000}
@@ -519,7 +557,7 @@ const KOLDetail = () => {
               </IconButton>
             </>
           }
-        />
+        /> */}
 
         {/* Thông báo không tìm thấy */}
         {/* <Snackbar
@@ -552,13 +590,13 @@ const KOLDetail = () => {
           </Alert>
         </Snackbar> */}
 
-        <AppSnackbar
+        {/* <AppSnackbar
           open={showNotFoundSnackbar}
           onClose={handleCloseNotFoundSnackbar}
           autoHideDuration={4000}
           severity="info"
           message="Không tìm thấy thông tin KOL."
-        />
+        /> */}
         <BookingFlow
           open={isBookingOpen}
           onClose={handleCloseBooking}
@@ -567,6 +605,7 @@ const KOLDetail = () => {
           packages={bookingPackages}
           availableSlots={bookingSlots}
           userProfile={bookingProfile}
+          kolMinPrice={pricingData?.hourlyRate}
           onViewSchedule={handleCloseBooking}
         />
       </Container>

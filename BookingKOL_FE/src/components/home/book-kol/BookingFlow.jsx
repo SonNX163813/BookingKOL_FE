@@ -64,6 +64,7 @@ const BookingFlow = ({
   userProfile,
   onSubmit,
   onViewSchedule,
+  kolMinPrice = 0,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -132,10 +133,7 @@ const BookingFlow = ({
       if (contact.fullName && !contact.fullName.trim()) {
         newErrors.fullName = "Ten khong hop le";
       }
-      if (
-        contact.email &&
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)
-      ) {
+      if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
         newErrors.email = "Email chua hop le";
       }
       if (contact.phone && !/^\d{9,15}$/.test(contact.phone)) {
@@ -148,7 +146,7 @@ const BookingFlow = ({
     return Object.keys(newErrors).length === 0;
   };
 
-/* ---------------------- STEP HANDLERS ---------------------- */
+  /* ---------------------- STEP HANDLERS ---------------------- */
   const handleBack = () => {
     if (activeStep === 0) onClose?.();
     else setActiveStep((prev) => Math.max(prev - 1, 0));
@@ -160,7 +158,8 @@ const BookingFlow = ({
   };
 
   const handleHoldSlotClick = async () => {
-    if (!validateStep(0, true)) return;
+    if (!validateStep(activeStep, true)) return;
+    setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
 
     const startIso = startDateTime?.toISOString?.();
     const endIso = endDateTime?.toISOString?.();
@@ -333,9 +332,10 @@ const BookingFlow = ({
     const start = startDateTime ? dayjs(startDateTime) : null;
     const end = endDateTime ? dayjs(endDateTime) : null;
     let duration = "";
+    let totalMinutes = 0;
 
     if (start && end && end.isAfter(start)) {
-      const totalMinutes = end.diff(start, "minute");
+      totalMinutes = end.diff(start, "minute");
       const hours = Math.floor(totalMinutes / 60);
       const minutes = totalMinutes % 60;
 
@@ -347,20 +347,43 @@ const BookingFlow = ({
       }
     }
 
+    const normalizedRate = (() => {
+      if (typeof kolMinPrice === "number" && Number.isFinite(kolMinPrice)) {
+        return kolMinPrice;
+      }
+      if (typeof kolMinPrice === "string") {
+        const sanitized = kolMinPrice.replace(/[^\d.-]/g, "");
+        const parsed = Number(sanitized);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      return 0;
+    })();
+
+    const billableHours = totalMinutes > 0 ? totalMinutes / 60 : 0;
+    const subtotal =
+      normalizedRate > 0 && billableHours > 0
+        ? normalizedRate * billableHours
+        : 0;
+    const extra = 0;
+    const discount = 0;
+    const total = Math.max(subtotal + extra - discount, 0);
+
     return {
       kol: kolName || "KOL",
       duration: duration || "N/A",
       schedule: getScheduleLabel(startDateTime, endDateTime),
-      subtotal: 0,
-      extra: 0,
-      discount: 0,
-      total: 0,
+      subtotal,
+      extra,
+      discount,
+      total,
+      hourlyRate: normalizedRate,
+      billableHours,
     };
-  }, [kolName, startDateTime, endDateTime]);
+  }, [kolName, startDateTime, endDateTime, kolMinPrice]);
 
   /* ---------------------- RENDER ---------------------- */
   const isLastStep = activeStep === TEXT.steps.length - 1;
-  const primaryAction = isLastStep ? handleSubmit : handleContinue;
+  const primaryAction = isLastStep ? handleSubmit : handleHoldSlotClick;
   const primaryLabel = isLastStep
     ? submitting
       ? "Dang xu ly..."
@@ -373,13 +396,21 @@ const BookingFlow = ({
   const renderStepContent = () => {
     if (activeStep === 0) {
       return (
+        // <BookingScheduleStep
+        //   startDateTime={startDateTime}
+        //   endDateTime={endDateTime}
+        //   onStartDateTimeChange={setStartDateTime}
+        //   onEndDateTimeChange={setEndDateTime}
+        //   STYLE={STYLE}
+        //   TEXT={TEXT}
+        // />
         <BookingScheduleStep
-          startDateTime={startDateTime}
-          endDateTime={endDateTime}
-          onStartDateTimeChange={setStartDateTime}
-          onEndDateTimeChange={setEndDateTime}
           STYLE={STYLE}
           TEXT={TEXT}
+          onSelectSchedule={(start, end) => {
+            setStartDateTime(start);
+            setEndDateTime(end);
+          }}
         />
       );
     }
@@ -425,7 +456,7 @@ const BookingFlow = ({
         <Stack direction="row" spacing={2}>
           {activeStep === 0 && (
             <>
-              <Button
+              {/* <Button
                 variant="outlined"
                 onClick={handleHoldSlotClick}
                 disabled={!validateStep(0) || holdingSlot}
@@ -444,10 +475,10 @@ const BookingFlow = ({
                 }}
               >
                 {holdingSlot ? "Đang giữ..." : TEXT.actions.hold}
-              </Button>
+              </Button> */}
               <Button
                 variant="contained"
-                onClick={handleContinue}
+                onClick={handleHoldSlotClick}
                 disabled={!validateStep(activeStep)}
                 sx={{
                   textTransform: "none",
@@ -621,4 +652,3 @@ const BookingFlow = ({
 };
 
 export default BookingFlow;
-
