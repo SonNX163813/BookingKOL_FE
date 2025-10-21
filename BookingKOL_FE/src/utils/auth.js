@@ -31,3 +31,13 @@ export function clearAuth() {
   sessionStorage.removeItem("auth_token");
   sessionStorage.removeItem("auth_user");
 }
+
+export function eraseAllCookies() {
+  if (typeof document === "undefined") return;
+  document.cookie.split(";").forEach((c) => {
+    const eq = c.indexOf("=");
+    const name = (eq > -1 ? c.slice(0, eq) : c).trim();
+    if (!name) return;
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+  });
+}

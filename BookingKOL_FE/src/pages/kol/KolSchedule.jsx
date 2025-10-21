@@ -1,268 +1,353 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { DatePicker, Empty, Spin } from "antd";
+import isoWeek from "dayjs/plugin/isoWeek";
+import "dayjs/locale/vi";
+import { DatePicker, Empty, message } from "antd";
 import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
-import { useParams } from "react-router-dom";
 
 import SchedulerGrid from "../../components/kol/kol-schedule/SchedulerGrid";
-import { getKolTimeline } from "../../services/kol/KolAPI"; // bạn đã thêm hàm này trong KolAPI
-// Nếu bạn đã tách normalize ra file riêng, hãy dùng:
-// import { normalizeKolTimeline } from "./normalizeKolTimeline";
+import {
+  getKolProfileByUserId,
+  getKolTimeline,
+} from "../../services/kol/KolAPI";
+import { useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
-/** ====== Helper: build mảng ngày trong khoảng [fromDate, toDate] (YYYY-MM-DD) ====== */
-const eachDateStrings = (fromIso, toIso) => {
-  const out = [];
-  let cur = dayjs(fromIso);
-  const end = dayjs(toIso);
-  while (cur.isSame(end) || cur.isBefore(end)) {
-    out.push(cur.format("YYYY-MM-DD"));
-    cur = cur.add(1, "day");
-  }
-  return out;
-};
+dayjs.extend(isoWeek);
+dayjs.locale("vi");
 
-/** ====== Helper: chuẩn hóa data API về Goals cho SchedulerGrid ======
- * API mẫu bạn cung cấp:
- * {
- *   id, startAt, endAt, status, note, timeLine, kolId, fullName, email, phone, avatarUrl
- * }
- * Ta sẽ map thành:
- * goals = {
- *   goalsTitle: [{ title: 'Lịch làm', colorCode: '#3b82f6' }],
- *   goalList: [
- *     { day: '18', task: [ { time:'06', description:[{...event}]} ] }
- *   ]
- * }
- */
-const normalizeKolTimeline = (records = [], fromDate, toDate) => {
-  // gom event theo ngày "YYYY-MM-DD"
-  const byDate = {};
-  for (const r of records) {
-    const start = dayjs(r.startAt);
-    const end = dayjs(r.endAt);
-    if (!start.isValid() || !end.isValid()) continue;
+/* ================= MOCK CONFIG ================= */
+const ENABLE_MOCK_FALLBACK = true;
+const DEFAULT_COLOR_AVAILABLE = "#3b82f6";
+const DEFAULT_COLOR_UNAVAILABLE = "#ef4444";
 
-    const dateKey = start.format("YYYY-MM-DD");
-    if (!byDate[dateKey]) byDate[dateKey] = [];
-    byDate[dateKey].push({
-      id: r.id,
-      description: r.note || "Lịch làm",
-      status: r.status || "",
-      colorCode: "#3b82f6", // có thể đổi theo status nếu muốn
-      goalsTitle: "Lịch làm",
-      startTime: start.format("HH:mm:ss"),
-      endTime: end.format("HH:mm:ss"),
-      goalId: r.kolId || "kol", // field bắt buộc cho TaskPopup hiện tại
-      // các field còn lại cho đồng bộ type cũ:
-      time: start.format("HH:mm:ss"),
-      title: r.note || "Lịch làm",
-      category: "",
-      isDone: false,
-    });
-  }
-
-  // đảm bảo có đủ ngày trong khoảng, kể cả ngày không có event
-  const allDates = eachDateStrings(fromDate, toDate);
-  const goalList = allDates.map((d) => {
-    const day = d.slice(8, 10); // 'DD'
-    const events = (byDate[d] || []).sort((a, b) =>
-      a.startTime.localeCompare(b.startTime)
+/** mock items theo khoảng from..to */
+function makeMockItems(from, to) {
+  const items = [];
+  for (
+    let d = dayjs(from).startOf("day");
+    d.isBefore(to);
+    d = d.add(1, "day")
+  ) {
+    const s1 = d.hour(9).minute(0).second(0);
+    const e1 = d.hour(11).minute(0).second(0);
+    const s2 = d.hour(14).minute(0).second(0);
+    const e2 = d.hour(16).minute(0).second(0);
+    items.push(
+      {
+        id: `mk-${d.format("YYYYMMDD")}-1`,
+        startAt: s1.toISOString(),
+        endAt: e1.toISOString(),
+        status: "AVAILABLE",
+        note: "Available block",
+        color: DEFAULT_COLOR_AVAILABLE,
+      },
+      {
+        id: `mk-${d.format("YYYYMMDD")}-2`,
+        startAt: s2.toISOString(),
+        endAt: e2.toISOString(),
+        status: "UNAVAILABLE",
+        note: "Busy block",
+        color: DEFAULT_COLOR_UNAVAILABLE,
+      }
     );
+  }
+  return items;
+}
 
-    // group theo giờ (HH)
-    const byHour = {};
-    events.forEach((ev) => {
-      const hourKey = ev.startTime.slice(0, 2); // 'HH'
-      if (!byHour[hourKey]) byHour[hourKey] = [];
-      byHour[hourKey].push(ev);
-    });
+/* helpers parse/map */
+const fmtDay = (d) => dayjs(d).format("DD");
+const fmtHour = (d) => dayjs(d).format("HH");
+const parseStart = (item) => {
+  const raw =
+    item?.startTime ||
+    item?.startDate ||
+    item?.startAt ||
+    item?.startDateTime ||
+    item?.start;
+  return dayjs(raw);
+};
+const parseEnd = (item, fallback) => {
+  const raw =
+    item?.endTime ||
+    item?.endDate ||
+    item?.endAt ||
+    item?.endDateTime ||
+    item?.end;
+  const d = dayjs(raw);
+  return d.isValid() ? d : dayjs(fallback).add(1, "hour");
+};
+const getColor = (item) => {
+  if (item?.color) return item.color;
+  const available =
+    item?.available ??
+    item?.isAvailable ??
+    (typeof item?.status === "string"
+      ? item.status.toLowerCase().includes("available")
+      : undefined);
+  if (available === false) return DEFAULT_COLOR_UNAVAILABLE;
+  return DEFAULT_COLOR_AVAILABLE;
+};
+const getTitle = (item) =>
+  item?.title || item?.note || item?.description || "Available";
 
-    const task = Object.keys(byHour)
-      .sort((a, b) => a.localeCompare(b))
-      .map((hh) => ({
-        time: hh,
-        description: byHour[hh], // list GoalDetailsByTime
-      }));
+/** shape về {goalsTitle, goalList} */
+const toGoalsShape = (items, rangeFrom, rangeTo) => {
+  const buckets = {};
+  items.forEach((raw, idx) => {
+    const s = parseStart(raw);
+    if (!s.isValid()) return;
+    if (dayjs(s).isBefore(dayjs(rangeFrom), "day")) return;
+    if (dayjs(s).isAfter(dayjs(rangeTo), "day")) return;
 
-    return { day, task };
+    const e = parseEnd(raw, s);
+    const dayKey = fmtDay(s);
+    const hourKey = fmtHour(s);
+
+    const rec = {
+      id: raw.id || `${s.toISOString()}_${idx}`,
+      time: s.format("HH:mm:ss"),
+      title: getTitle(raw),
+      description: getTitle(raw),
+      category: raw.category || "",
+      status: raw.status || "",
+      colorCode: getColor(raw),
+      goalsTitle: raw.goalTitle || "",
+      isDone: !!raw.isDone,
+      startTime: s.format("HH:mm:ss"),
+      endTime: e.format("HH:mm:ss"),
+      goalId: raw.goalId || "",
+    };
+
+    if (!buckets[dayKey]) buckets[dayKey] = {};
+    if (!buckets[dayKey][hourKey]) buckets[dayKey][hourKey] = [];
+    if (!buckets[dayKey][hourKey].some((x) => x.id === rec.id)) {
+      buckets[dayKey][hourKey].push(rec);
+    }
   });
 
-  return {
-    goalsTitle: [{ title: "Lịch làm", colorCode: "#3b82f6" }],
-    goalList,
-  };
-};
+  const goalList = Object.keys(buckets)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((dayKey) => {
+      const hours = Object.keys(buckets[dayKey]).sort(
+        (a, b) => Number(a) - Number(b)
+      );
+      const task = hours.map((hh) => ({
+        time: hh,
+        description: buckets[dayKey][hh].sort((a, b) =>
+          a.startTime.localeCompare(b.startTime)
+        ),
+      }));
+      return { day: dayKey, task };
+    });
 
-/** ====== Helper: tính from/to theo range ====== */
-const computeRange = (anchorIso, range) => {
-  const d = dayjs(anchorIso);
-  if (range === "day") {
-    const from = d.startOf("day").format("YYYY-MM-DD");
-    const to = d.endOf("day").format("YYYY-MM-DD");
-    return { from, to, label: d.format("ddd, DD/MM/YYYY") };
-  }
-  if (range === "week") {
-    // dayjs tuần mặc định bắt đầu chủ nhật
-    const from = d.startOf("week").format("YYYY-MM-DD");
-    const to = d.endOf("week").format("YYYY-MM-DD");
-    return {
-      from,
-      to,
-      label: `${dayjs(from).format("DD/MM/YYYY")} - ${dayjs(to).format(
-        "DD/MM/YYYY"
-      )}`,
-    };
-  }
-  // month
-  const from = d.startOf("month").format("YYYY-MM-DD");
-  const to = d.endOf("month").format("YYYY-MM-DD");
-  return { from, to, label: d.format("MMMM, YYYY") };
+  return { goalsTitle: [], goalList };
 };
 
 export default function KolSchedule() {
-  const { kolId: routeKolId } = useParams();
-  // bạn có thể truyền ?kolName nhưng không bắt buộc
-  const [kolId, setKolId] = useState(routeKolId || "");
-  const [range, setRange] = useState("week"); // 'day' | 'week' | 'month'
-  const [anchorDate, setAnchorDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const { kolId: kolIdParam } = useParams();
+  const auth = useAuth?.() || {};
+  const userId = auth?.user?.id;
 
-  const { from, to, label } = useMemo(
-    () => computeRange(anchorDate, range),
-    [anchorDate, range]
-  );
-
+  const [range, setRange] = useState("week");
+  const [anchorDate, setAnchorDate] = useState(dayjs());
+  const [kolId, setKolId] = useState(kolIdParam || null);
   const [loading, setLoading] = useState(false);
-  const [goalsByDay, setGoalsByDay] = useState(null);
-  const [error, setError] = useState("");
+  const [goalsByDay, setGoalsByDay] = useState({
+    goalsTitle: [],
+    goalList: [],
+  });
 
-  const fetchData = useCallback(async () => {
-    if (!kolId) return;
+  // from/to + header
+  const { fromDate, toDate, headerLabel } = useMemo(() => {
+    if (range === "day") {
+      const from = anchorDate.startOf("day");
+      const to = anchorDate.endOf("day");
+      return {
+        fromDate: from,
+        toDate: to,
+        headerLabel: `${anchorDate.format("dddd")}, ${anchorDate.format(
+          "DD/MM/YYYY"
+        )}`,
+      };
+    }
+    if (range === "week") {
+      const from = anchorDate.startOf("isoWeek");
+      const to = anchorDate.endOf("isoWeek");
+      return {
+        fromDate: from,
+        toDate: to,
+        headerLabel: `${from.format("DD/MM/YYYY")} - ${to.format(
+          "DD/MM/YYYY"
+        )}`,
+      };
+    }
+    const from = anchorDate.startOf("month").startOf("week");
+    const to = anchorDate.endOf("month").endOf("week");
+    return {
+      fromDate: from,
+      toDate: to,
+      headerLabel: anchorDate.format("MMMM, YYYY"),
+    };
+  }, [range, anchorDate]);
+
+  // resolve kolId nếu thiếu
+  useEffect(() => {
+    let mounted = true;
+    const resolveKolId = async () => {
+      if (kolIdParam) {
+        setKolId(kolIdParam);
+        return;
+      }
+      if (!userId) return;
+      try {
+        const me = await getKolProfileByUserId(userId);
+        if (mounted) setKolId(me?.id || null);
+      } catch {
+        if (ENABLE_MOCK_FALLBACK) {
+          console.warn("[Schedule] Không lấy được KOL ID, dùng mock.");
+          setKolId(null);
+        } else {
+          message.error("Không lấy được thông tin KOL.");
+        }
+      }
+    };
+    resolveKolId();
+    return () => {
+      mounted = false;
+    };
+  }, [kolIdParam, userId]);
+
+  const fetchTimeline = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
-      const res = await getKolTimeline({
-        kolId,
-        startDate: from,
-        endDate: to,
-        page: 0,
-        size: 500,
-      });
-      const records = Array.isArray(res?.data?.data)
-        ? res.data.data
-        : Array.isArray(res)
-        ? res
-        : [];
-      const normalized = normalizeKolTimeline(records, from, to);
-      setGoalsByDay(normalized);
+      let list = [];
+      if (kolId) {
+        const payload = await getKolTimeline({
+          kolId,
+          startDate: fromDate.toISOString(),
+          endDate: toDate.toISOString(),
+          page: 0,
+          size: 500,
+        });
+        list = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+          ? payload
+          : [];
+      }
+      if ((!kolId || !list.length) && ENABLE_MOCK_FALLBACK) {
+        console.warn("[Schedule] Dùng mock fallback");
+        list = makeMockItems(fromDate, toDate);
+      }
+      setGoalsByDay(toGoalsShape(list, fromDate, toDate));
     } catch (e) {
       console.error(e);
-      setError("Không thể tải lịch làm.");
-      setGoalsByDay(null);
+      if (ENABLE_MOCK_FALLBACK) {
+        console.warn("[Schedule] API lỗi, dùng mock fallback");
+        setGoalsByDay(
+          toGoalsShape(makeMockItems(fromDate, toDate), fromDate, toDate)
+        );
+      } else {
+        message.error("Không tải được lịch làm việc.");
+        setGoalsByDay({ goalsTitle: [], goalList: [] });
+      }
     } finally {
       setLoading(false);
     }
-  }, [kolId, from, to]);
+  }, [kolId, fromDate, toDate]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchTimeline();
+  }, [fetchTimeline]);
 
-  const onPrev = () => {
-    const d = dayjs(anchorDate);
-    const nextAnchor =
-      range === "day"
-        ? d.subtract(1, "day")
-        : range === "week"
-        ? d.subtract(1, "week")
-        : d.subtract(1, "month");
-    setAnchorDate(nextAnchor.format("YYYY-MM-DD"));
+  // prev/next
+  const handlePrev = () => {
+    if (range === "day") setAnchorDate((d) => d.subtract(1, "day"));
+    else if (range === "week") setAnchorDate((d) => d.subtract(1, "week"));
+    else setAnchorDate((d) => d.subtract(1, "month"));
   };
+  const handleNext = () => {
+    if (range === "day") setAnchorDate((d) => d.add(1, "day"));
+    else if (range === "week") setAnchorDate((d) => d.add(1, "week"));
+    else setAnchorDate((d) => d.add(1, "month"));
+  };
+  const handleRangeChange = (val) => setRange(val);
+  const handleDateChange = (d) => d && setAnchorDate(d);
 
-  const onNext = () => {
-    const d = dayjs(anchorDate);
-    const nextAnchor =
-      range === "day"
-        ? d.add(1, "day")
-        : range === "week"
-        ? d.add(1, "week")
-        : d.add(1, "month");
-    setAnchorDate(nextAnchor.format("YYYY-MM-DD"));
-  };
-
-  const onPickDay = (d) => {
-    if (!d) return;
-    setAnchorDate(d.format("YYYY-MM-DD"));
-  };
+  const showEmpty = !loading && goalsByDay?.goalList?.length === 0;
 
   return (
-    <div className="w-full px-4 py-4">
-      {/* Header controls */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
+    <div className="w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-4 mt-2">
+        <div className="flex items-center gap-3">
           <button
-            onClick={onPrev}
-            className="p-1.5 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100"
+            onClick={handlePrev}
+            className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
           >
-            <IoIosArrowBack className="text-[#7bb4fb] md:text-[22px]" />
+            <IoIosArrowBack className="text-[#7bb4fb] md:!text-[22px]" />
           </button>
           <button
-            onClick={onNext}
-            className="p-1.5 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100"
+            onClick={handleNext}
+            className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
           >
-            <IoIosArrowForward className="text-[#7bb4fb] md:text-[22px]" />
+            <IoIosArrowForward className="text-[#7bb4fb] md:!text-[22px]" />
           </button>
 
-          <div className="ml-3">
-            <DatePicker
-              value={dayjs(anchorDate)}
-              format="DD/MM/YYYY"
-              allowClear={false}
-              onChange={onPickDay}
-              bordered
-              size="middle"
-            />
-          </div>
+          <DatePicker
+            value={anchorDate}
+            onChange={handleDateChange}
+            format="DD/MM/YYYY"
+            allowClear={false}
+          />
         </div>
 
-        {/* Range switch */}
-        <div className="inline-flex rounded-full bg-gray-100 p-1">
-          {["day", "week", "month"].map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium ${
-                range === r ? "bg-white shadow border" : "text-gray-600"
-              }`}
-            >
-              {r === "day" ? "Ngày" : r === "week" ? "Tuần" : "Tháng"}
-            </button>
-          ))}
+        <p className="text-[#0050ab] text-xl md:text-2xl lg:text-3xl font-bold capitalize">
+          {headerLabel}
+        </p>
+
+        <div className="rounded-full border flex overflow-hidden">
+          <button
+            className={`px-4 py-1 ${
+              range === "day" ? "bg-[#0050ab] text-white" : ""
+            }`}
+            onClick={() => handleRangeChange("day")}
+          >
+            Ngày
+          </button>
+          <button
+            className={`px-4 py-1 ${
+              range === "week" ? "bg-[#0050ab] text-white" : ""
+            }`}
+            onClick={() => handleRangeChange("week")}
+          >
+            Tuần
+          </button>
+          <button
+            className={`px-4 py-1 ${
+              range === "month" ? "bg-[#0050ab] text-white" : ""
+            }`}
+            onClick={() => handleRangeChange("month")}
+          >
+            Tháng
+          </button>
         </div>
       </div>
 
-      {/* Label */}
-      <div className="text-[#0050ab] text-xl md:text-2xl font-bold mb-3">
-        {label}
-      </div>
-
-      {/* Body */}
-      <div className="w-full">
-        {loading ? (
-          <div className="w-full flex items-center justify-center py-16">
-            <Spin />
-          </div>
-        ) : error ? (
-          <div className="w-full flex items-center justify-center py-16">
-            <Empty description={error} />
-          </div>
-        ) : !goalsByDay ? (
-          <div className="w-full flex items-center justify-center py-16">
-            <Empty description="Không có dữ liệu" />
-          </div>
-        ) : (
-          <SchedulerGrid range={range} goalsByDay={goalsByDay} />
-        )}
-      </div>
+      {/* Grid */}
+      {showEmpty ? (
+        <div className="w-full h-[480px] flex items-center justify-center">
+          <Empty description="Không có dữ liệu" />
+        </div>
+      ) : (
+        <SchedulerGrid
+          range={range}
+          dayDuties={goalsByDay}
+          fromDate={fromDate.format("YYYY-MM-DD")}
+          toDate={toDate.format("YYYY-MM-DD")}
+        />
+      )}
     </div>
   );
 }

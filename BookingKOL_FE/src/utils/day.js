@@ -40,8 +40,9 @@ export const getCalendarGridDays = (
   const startOfMonth = d.startOf("month");
   const endOfMonth = d.endOf("month");
 
-  const startGrid = startOfMonth.startOf("week");
-  const endGrid = endOfMonth.endOf("week");
+  // ✅ Monday-first
+  const startGrid = startOfMonth.startOf("isoWeek");
+  const endGrid = endOfMonth.endOf("isoWeek");
 
   const days = [];
   let cur = startGrid.clone();

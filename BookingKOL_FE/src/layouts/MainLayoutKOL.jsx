@@ -11,7 +11,8 @@ import {
   PaidOutlined,
   SettingsOutlined,
   PersonOutline,
-  CollectionsOutlined, // 👈 icon cho Portfolio
+  CollectionsOutlined,
+  EditCalendarOutlined, // 👈 icon cho "Đăng ký lịch làm"
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import AdminHeader from "../components/admin/layout/AdminHeader";
@@ -19,20 +20,30 @@ import AdminHeader from "../components/admin/layout/AdminHeader";
 export default function MainLayoutKOL() {
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [pathname]);
 
+  // Map dùng để biết item nào đang active và group nào cần mở
   const routeKeyMap = useMemo(
     () => [
       { key: "kol", path: "/kol" },
 
+      // Lịch làm việc
       {
         key: "kol-schedule",
         path: "/kol/schedule",
         parentKey: "group-schedule",
       },
+      // 👉 thêm route cho trang Đăng ký lịch làm
+      {
+        key: "kol-schedule-register",
+        path: "/kol/schedule/register",
+        parentKey: "group-schedule",
+      },
 
+      // Đơn
       { key: "kol-orders", path: "/kol/orders", parentKey: "group-orders" },
       {
         key: "kol-order-detail",
@@ -40,18 +51,21 @@ export default function MainLayoutKOL() {
         parentKey: "group-orders",
       },
 
+      // Tin nhắn (nếu dùng)
       {
         key: "kol-messages",
         path: "/kol/messages",
         parentKey: "group-messages",
       },
 
+      // Portfolio
       {
         key: "kol-portfolio",
         path: "/kol/portfolio",
         parentKey: "group-portfolio",
-      }, // 👈
+      },
 
+      // Hồ sơ
       { key: "kol-profile", path: "/kol/profile", parentKey: "group-profile" },
       {
         key: "kol-settings",
@@ -59,6 +73,7 @@ export default function MainLayoutKOL() {
         parentKey: "group-profile",
       },
 
+      // Doanh thu
       {
         key: "kol-earnings",
         path: "/kol/earnings",
@@ -68,6 +83,7 @@ export default function MainLayoutKOL() {
     []
   );
 
+  // Xác định item đang active theo URL hiện tại
   const active = [...routeKeyMap]
     .sort((a, b) => b.path.length - a.path.length)
     .find((it) => matchPath({ path: it.path, end: false }, pathname)) || {
@@ -77,12 +93,14 @@ export default function MainLayoutKOL() {
   const selectedKeys = [active.key];
   const defaultOpenKeys = active.parentKey ? [active.parentKey] : [];
 
+  // Cấu hình menu bên trái
   const menuItems = [
     {
       key: "kol",
       icon: <StackedBarChartOutlined />,
       label: <Link to="/kol">Tổng quan</Link>,
     },
+
     {
       key: "group-schedule",
       icon: <EventOutlined />,
@@ -93,8 +111,14 @@ export default function MainLayoutKOL() {
           icon: <EventOutlined />,
           label: <Link to="schedule">Lịch của tôi</Link>,
         },
+        {
+          key: "kol-schedule-register",
+          icon: <EditCalendarOutlined />,
+          label: <Link to="schedule/register">Đăng ký lịch làm</Link>,
+        },
       ],
     },
+
     {
       key: "group-orders",
       icon: <ShoppingBagOutlined />,
@@ -120,6 +144,7 @@ export default function MainLayoutKOL() {
         },
       ],
     },
+
     {
       key: "group-profile",
       icon: <PersonOutline />,
@@ -137,6 +162,7 @@ export default function MainLayoutKOL() {
         },
       ],
     },
+
     {
       key: "group-earnings",
       icon: <PaidOutlined />,
@@ -155,6 +181,7 @@ export default function MainLayoutKOL() {
     <>
       <AdminHeader />
       <div className="flex h-[calc(100vh-80px)]">
+        {/* Sidebar */}
         <aside
           className={`bg-white transition-all duration-300 ${
             collapsed ? "w-[80px]" : "w-[300px]"
@@ -169,6 +196,7 @@ export default function MainLayoutKOL() {
                 {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               </button>
             </div>
+
             <Menu
               mode="inline"
               items={menuItems}
@@ -181,6 +209,7 @@ export default function MainLayoutKOL() {
           </div>
         </aside>
 
+        {/* Content */}
         <main className="flex-1 p-2 md:p-5 overflow-y-auto min-h-[400px]">
           <div className="bg-white h-full rounded-[8px] w-full">
             <Outlet />

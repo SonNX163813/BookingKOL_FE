@@ -6,7 +6,7 @@ import {
   useReducer,
   useMemo,
 } from "react";
-import { loadAuth } from "../utils/auth";
+import { loadAuth, clearAuth } from "../utils/auth";
 
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -110,9 +110,19 @@ export function AuthProvider({ children }) {
     () => ({
       ...state,
       dispatch,
-      logout: () => {
-        clearStorage();
-        dispatch({ type: "LOGOUT" });
+      logout: async (api) => {
+        try {
+          // Nếu BE có /v1/auth/logout thì có thể gọi, không bắt buộc
+          await api
+            ?.post?.("/v1/auth/logout", null, { withCredentials: true })
+            .catch(() => {});
+        } finally {
+          clearAuth(); // xoá local + session
+          dispatch({ type: "LOGOUT" }); // reset context
+          if (api?.defaults?.headers?.common?.Authorization) {
+            delete api.defaults.headers.common.Authorization; // bỏ header mặc định nếu có
+          }
+        }
       },
       setRemember: (remember) =>
         dispatch({

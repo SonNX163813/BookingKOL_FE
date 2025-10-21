@@ -1,4 +1,3 @@
-// src/components/scheduler/TaskPopup.jsx
 import React from "react";
 import { Modal } from "antd";
 import { IoCloseOutline } from "react-icons/io5";
@@ -67,13 +66,12 @@ export default function TaskPopup({
           <div
             className="w-4 h-4 rounded-full"
             style={{ backgroundColor: goalDetails.colorCode }}
-          ></div>
+          />
         </div>
 
         {readOnly && (
           <div className="text-xs text-gray-500 mt-2 italic">
-            *Đang ở chế độ xem. Khi BE có API tạo/sửa/xoá, sẽ bật nút thao tác
-            tại đây.
+            *Chế độ xem (read-only).
           </div>
         )}
       </div>

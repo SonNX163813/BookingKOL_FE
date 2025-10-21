@@ -1,4 +1,3 @@
-// src/components/scheduler/DayTasksPopup.jsx
 import React, { useState } from "react";
 import { IoClose } from "react-icons/io5";
 import TaskPopup from "./TaskPopup";
@@ -6,15 +5,15 @@ import TaskPopup from "./TaskPopup";
 export default function DayTasksPopup({ details, onClose }) {
   const [selectedTask, setSelectedTask] = useState(null);
   if (!details) return null;
-  const { tasks, weekDate } = details;
 
+  const { tasks, weekDate } = details;
   const sorted = [...tasks].sort((a, b) =>
     a.startTime.localeCompare(b.startTime)
   );
 
   return (
     <div>
-      {/* Popup task chi tiết */}
+      {/* Popup task chi tiết (nổi trên) */}
       <div className="fixed z-[9999] flex justify-center items-center right-[40%] top-[40%]">
         {selectedTask && (
           <TaskPopup

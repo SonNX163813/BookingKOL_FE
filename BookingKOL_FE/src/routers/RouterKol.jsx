@@ -7,6 +7,7 @@ import KolPortfolio from "../pages/kol/KolPortfolio";
 import KolProfile from "../pages/kol/KolProfile";
 import KolSchedule from "../pages/kol/KolSchedule";
 import KolSettings from "../pages/kol/KolSettings";
+import KolWorkRegistration from "../pages/kol/KolWorkRegistration";
 
 export const routerKOL = [
   {
@@ -18,6 +19,10 @@ export const routerKOL = [
       { path: "portfolio/:kolId?/:kolName?", element: <KolPortfolio /> },
       { path: "profile/:kolId?/:kolName?", element: <KolProfile /> },
       { path: "schedule/:kolId?/:kolName?", element: <KolSchedule /> },
+      {
+        path: "schedule/register/:kolId?/:kolName?",
+        element: <KolWorkRegistration />,
+      },
       { path: "settings", element: <KolSettings /> },
     ],
   },
