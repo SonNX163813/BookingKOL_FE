@@ -3,24 +3,24 @@ import { LogoutOutlined, VerifiedUserOutlined } from "@mui/icons-material";
 import { Menu, MenuItem, IconButton, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useAuth } from "../../../context/AuthContext";
 
 const AdminHeader = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const navigate = useNavigate();
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
+  const { logout, user } = useAuth(); // lấy từ AuthContext
 
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+  const handleClick = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleClose();
-    localStorage.clear();
-    navigate("/login");
+    await logout(); // ⬅️ không truyền tham số
     toast.success("Đăng xuất thành công.");
+    navigate("/login", { replace: true }); // chặn Back quay lại trang cũ
+    // Nếu vẫn còn cache từ Redux/React Query thì thêm:
+    // window.location.reload();
   };
 
   return (
@@ -42,20 +42,16 @@ const AdminHeader = () => {
           className="!text-white flex items-center space-x-2"
         >
           <VerifiedUserOutlined className="w-6 h-6" />
-          <Typography className="font-medium">Admin Name</Typography>
+          <Typography className="font-medium">
+            {user?.fullName || user?.username || "Tài khoản"}
+          </Typography>
         </IconButton>
         <Menu
           anchorEl={anchorEl}
           open={open}
           onClose={handleClose}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <MenuItem onClick={handleLogout}>
             <LogoutOutlined className="mr-2" /> Logout
@@ -65,19 +61,9 @@ const AdminHeader = () => {
 
       <style>
         {`
-                    .animate-marquee {
-                        display: inline-block;
-                        animation: marquee 10s linear infinite;
-                    }
-                    @keyframes marquee {
-                        0% {
-                            transform: translateX(0%);
-                        }
-                        100% {
-                            transform: translateX(-100%);
-                        }
-                    }
-                `}
+          .animate-marquee { display: inline-block; animation: marquee 10s linear infinite; }
+          @keyframes marquee { 0% { transform: translateX(0%);} 100% { transform: translateX(-100%);} }
+        `}
       </style>
     </header>
   );

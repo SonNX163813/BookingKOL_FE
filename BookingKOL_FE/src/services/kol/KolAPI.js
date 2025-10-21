@@ -1,5 +1,6 @@
 import { get, post, remove, remove2, update } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
+import dayjs from "dayjs";
 
 // ================== GIỮ NGUYÊN CŨ ==================
 const KOL_LIST_ALLOWED_PARAMS = new Set([
@@ -173,4 +174,72 @@ export const deactivateKolMedias = async (fileUsageIds, { signal } = {}) => {
     data: { fileUsageIds: ids },
     config: signal ? { signal } : undefined,
   });
+};
+export const getKolTimeline = async ({
+  kolId,
+  startDate,
+  endDate,
+  page = 0,
+  size = 500,
+  signal,
+} = {}) => {
+  if (!kolId) throw new Error("kolId is required");
+  const url = `/v1/kol/availabilities/time-line/kol/${encodeURIComponent(
+    kolId
+  )}`;
+  const payload = await get({
+    url,
+    params: { startDate, endDate, page, size },
+    config: signal ? { signal } : undefined,
+  });
+  // interceptor của bạn thường trả {status, message, data}
+  // ở đây mình trả về payload.data (danh sách timeline)
+  return payload?.data ?? [];
+};
+const toISO = (dateObj, timeObj) =>
+  dateObj
+    .hour(timeObj.hour())
+    .minute(timeObj.minute())
+    .second(0)
+    .millisecond(0)
+    .toISOString();
+
+/**
+ * Đăng ký các ca làm việc cho 1 ngày.
+ * @param {Object} params
+ * @param {string} params.id                 ID hồ sơ KOL (BE lấy theo "id", KHÔNG phải kolId)
+ * @param {import('dayjs').Dayjs} params.date  dayjs của ngày đăng ký
+ * @param {{start: import('dayjs').Dayjs, end: import('dayjs').Dayjs}[]} params.shifts
+ * @param {AbortSignal} [params.signal]
+ * @returns {Promise<any[]>}
+ */
+export const registerKolAvailabilities = async ({
+  id,
+  date,
+  shifts,
+  signal,
+}) => {
+  if (!id) throw new Error("Missing KOL id");
+  if (!dayjs.isDayjs(date)) throw new Error("`date` must be a dayjs object");
+  if (!Array.isArray(shifts) || shifts.length === 0)
+    throw new Error("`shifts` must be a non-empty array");
+
+  const url = CLIENT_API_PATHS.SCHEDULER.kolSchedule(id); // /v1/kol/availabilities/schedule/{id}
+
+  // Gửi tuần tự để dễ debug (có thể chuyển sang Promise.all nếu muốn)
+  const results = [];
+  for (const s of shifts) {
+    const body = {
+      id, // BE không dùng ở body cũng không sao, giữ cho nhất quán
+      startAt: toISO(date, s.start),
+      endAt: toISO(date, s.end),
+    };
+    const res = await post({
+      url,
+      data: body,
+      config: signal ? { signal } : undefined,
+    });
+    results.push(res?.data ?? res);
+  }
+  return results;
 };

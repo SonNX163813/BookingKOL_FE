@@ -1,4 +1,3 @@
-// src/components/kol/SideNavKol.jsx
 import { useState, Fragment } from "react";
 import {
   Drawer,
@@ -54,7 +53,7 @@ export default function SideNavKol({ mobileOpen, onToggle }) {
         <IconButton sx={{ display: { md: "none" } }} onClick={onToggle}>
           <MenuRounded />
         </IconButton>
-        <Typography sx={{ fontWeight: 700, letterSpacing: 0.4 }}>
+        <Typography sx={{ fontWeight: 700, letterSpacing: 0.4, fontSize: 15 }}>
           KOL Management
         </Typography>
       </Box>
@@ -86,11 +85,16 @@ export default function SideNavKol({ mobileOpen, onToggle }) {
                 })}
               >
                 <ListItemIcon sx={{ minWidth: 36 }}>
-                  <Icon sx={{ fontSize: 20, color: "text.secondary" }} />
+                  {/* tăng icon 1 chút */}
+                  <Icon sx={{ fontSize: 21, color: "text.secondary" }} />
                 </ListItemIcon>
                 <ListItemText
+                  disableTypography
                   primary={it.label}
-                  primaryTypographyProps={{ fontSize: 14.5, fontWeight: 600 }}
+                  primaryTypographyProps={{
+                    fontSize: 15.5, // ⬆️ trước là 14.5
+                    fontWeight: 600,
+                  }}
                 />
                 {hasChild ? (
                   openMap[it.label] ? (
@@ -114,8 +118,11 @@ export default function SideNavKol({ mobileOpen, onToggle }) {
                           sx={{ borderRadius: 1.5, mb: 0.25 }}
                         >
                           <ListItemText
+                            disableTypography
                             primary={c.label}
-                            primaryTypographyProps={{ fontSize: 13.5 }}
+                            primaryTypographyProps={{
+                              fontSize: 14.5, // ⬆️ trước là 13.5
+                            }}
                           />
                         </ListItemButton>
                       );

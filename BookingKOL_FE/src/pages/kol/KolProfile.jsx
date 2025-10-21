@@ -68,6 +68,26 @@ const mapBackendToUi = (be) => {
 const roleLabel = (ui) =>
   ui === "HOST" ? "Host chính" : ui === "CO_HOST" ? "Trợ live" : "—";
 
+// ===== Helpers cho validate DOB (>= 18 tuổi) =====
+const disabledDOB = (current) =>
+  current && current.isAfter(dayjs().subtract(18, "year").endOf("day"));
+
+const validateAdult = (_, value) => {
+  if (!value) return Promise.resolve();
+  const age = dayjs().diff(value, "year");
+  return age >= 18
+    ? Promise.resolve()
+    : Promise.reject(new Error("Bạn phải từ 18 tuổi trở lên."));
+};
+
+// Rule helper tránh toàn khoảng trắng
+const notOnlySpacesRule = (msg) => ({
+  validator: (_, v) =>
+    typeof v === "string" && v.trim().length === 0
+      ? Promise.reject(new Error(msg))
+      : Promise.resolve(),
+});
+
 export default function KolProfile() {
   const navigate = useNavigate();
   const { kolId } = useParams();
@@ -118,7 +138,6 @@ export default function KolProfile() {
             ? res.categories.map((c) => c.id)
             : [],
         });
-        // reset cover tạm khi load mới
         setPendingCoverFileId(null);
       }
     } catch (e) {
@@ -144,7 +163,6 @@ export default function KolProfile() {
       setAllCategories(list.filter(Boolean));
     } catch (e) {
       console.error(e);
-      // interceptor sẽ lo 401
     }
   };
 
@@ -201,16 +219,14 @@ export default function KolProfile() {
   // cover hiển thị: ưu tiên cover tạm
   const effectiveCoverFileId = pendingCoverFileId ?? currentCoverFileId;
 
-  const startEdit = () => setEditing(true);
-
   const cancelEdit = () => {
     setEditing(false);
-    setPendingCoverFileId(null); // hủy cover tạm
+    setPendingCoverFileId(null);
     if (!kol) return;
     form.setFieldsValue({
       displayName: kol.displayName || kol.fullName || "",
       dateOfBirth: toPickerValue(kol.dob),
-      role: mapBackendToUi(kol.role), // LIVE => HOST (UI)
+      role: mapBackendToUi(kol.role),
       experience: kol.experience || "",
       city: kol.city || "",
       country: kol.country || "",
@@ -233,11 +249,9 @@ export default function KolProfile() {
         bio: values.bio?.trim() || undefined,
       };
 
-      // Map UI role => BE role
-      const beRole = mapUiRoleToBackend(values.role); // HOST/CO_HOST => LIVE
+      const beRole = mapUiRoleToBackend(values.role);
       if (beRole) payload.role = beRole;
 
-      // categories diff
       const initialIds = Array.isArray(kol?.categories)
         ? kol.categories.map((c) => c.id)
         : [];
@@ -245,7 +259,6 @@ export default function KolProfile() {
       const toAdd = newIds.filter((id) => !initialIds.includes(id));
       const toRemove = initialIds.filter((id) => !newIds.includes(id));
 
-      // cover changed?
       const coverChanged =
         pendingCoverFileId && pendingCoverFileId !== currentCoverFileId;
 
@@ -281,8 +294,7 @@ export default function KolProfile() {
   const onDeactivateMedia = async (usageId, fileId) => {
     setDeleting((p) => ({ ...p, [usageId]: true }));
     try {
-      await deactivateKolMedias(usageId); // service của bạn cho phép truyền 1 id hoặc mảng
-      // nếu đang chọn cover tạm mà trùng ảnh vừa xóa -> bỏ chọn
+      await deactivateKolMedias(usageId);
       setPendingCoverFileId((prev) => (prev === fileId ? null : prev));
       toast.success("Đã xoá media.");
       await fetchKol();
@@ -293,10 +305,6 @@ export default function KolProfile() {
       setDeleting((p) => ({ ...p, [usageId]: false }));
     }
   };
-
-  // Upload ảnh/video
-  const onAddImage = () => imgInputRef.current?.click();
-  const onAddVideo = () => vidInputRef.current?.click();
 
   const onPickImage = async (e) => {
     const file = e.target.files?.[0];
@@ -383,13 +391,7 @@ export default function KolProfile() {
                     </Button>
                   </Space>
                 )}
-                <Button
-                  onClick={() => navigate(-1)}
-                  className="rounded-xl !h-10 !flex !items-center"
-                  type="default"
-                >
-                  <ArrowRight size={18} /> Quay lại
-                </Button>
+                {/* ĐÃ BỎ nút Quay lại ở header */}
               </div>
             </div>
           </Title>
@@ -405,6 +407,8 @@ export default function KolProfile() {
                 name="displayName"
                 rules={[
                   { required: true, message: "Vui lòng nhập tên hiển thị" },
+                  { min: 2, max: 60, message: "Độ dài 2–60 ký tự" },
+                  notOnlySpacesRule("Tên không được chỉ gồm khoảng trắng"),
                 ]}
               >
                 <Input className="!h-12" placeholder="Tên hiển thị" />
@@ -412,16 +416,36 @@ export default function KolProfile() {
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item label="Ngày sinh" name="dateOfBirth">
+                  <Form.Item
+                    label="Ngày sinh"
+                    name="dateOfBirth"
+                    rules={[
+                      { required: true, message: "Vui lòng chọn ngày sinh" },
+                      { validator: validateAdult },
+                    ]}
+                  >
                     <DatePicker
                       className="!h-12 w-full"
                       format="DD/MM/YYYY"
-                      placeholder="Chọn ngày sinh"
+                      placeholder="Chọn ngày sinh (>= 18 tuổi)"
+                      disabledDate={disabledDOB}
                     />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
-                  <Form.Item label="Vị trí" name="role">
+                  <Form.Item
+                    label="Vị trí"
+                    name="role"
+                    rules={[
+                      { required: true, message: "Vui lòng chọn vị trí" },
+                      {
+                        validator: (_, v) =>
+                          v === "HOST" || v === "CO_HOST"
+                            ? Promise.resolve()
+                            : Promise.reject(new Error("Vị trí không hợp lệ.")),
+                      },
+                    ]}
+                  >
                     <Select
                       className="!h-12"
                       options={[
@@ -437,7 +461,16 @@ export default function KolProfile() {
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item label="Kinh nghiệm" name="experience">
+                  <Form.Item
+                    label="Kinh nghiệm"
+                    name="experience"
+                    rules={[
+                      { max: 100, message: "Tối đa 100 ký tự" },
+                      notOnlySpacesRule(
+                        "Kinh nghiệm không được rỗng toàn khoảng trắng"
+                      ),
+                    ]}
+                  >
                     <Input
                       className="!h-12"
                       placeholder="VD: 3 năm livestream..."
@@ -445,7 +478,14 @@ export default function KolProfile() {
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
-                  <Form.Item label="Thành phố" name="city">
+                  <Form.Item
+                    label="Thành phố"
+                    name="city"
+                    rules={[
+                      { max: 50, message: "Tối đa 50 ký tự" },
+                      notOnlySpacesRule("Thành phố không hợp lệ"),
+                    ]}
+                  >
                     <Input className="!h-12" placeholder="VD: Đà Nẵng" />
                   </Form.Item>
                 </Col>
@@ -453,12 +493,32 @@ export default function KolProfile() {
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item label="Quốc gia" name="country">
+                  <Form.Item
+                    label="Quốc gia"
+                    name="country"
+                    rules={[
+                      { max: 50, message: "Tối đa 50 ký tự" },
+                      notOnlySpacesRule("Quốc gia không hợp lệ"),
+                    ]}
+                  >
                     <Input className="!h-12" placeholder="VD: Việt Nam" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
-                  <Form.Item label="Chuyên mục" name="categories">
+                  <Form.Item
+                    label="Chuyên mục"
+                    name="categories"
+                    rules={[
+                      {
+                        validator: (_, v) =>
+                          Array.isArray(v) && v.length > 0
+                            ? Promise.resolve()
+                            : Promise.reject(
+                                new Error("Chọn ít nhất 1 chuyên mục")
+                              ),
+                      },
+                    ]}
+                  >
                     <Select
                       mode="multiple"
                       className="!min-h-12"
@@ -466,6 +526,7 @@ export default function KolProfile() {
                       options={categoryOptions}
                       showSearch
                       optionFilterProp="label"
+                      maxTagCount="responsive"
                     />
                   </Form.Item>
                 </Col>
@@ -510,7 +571,11 @@ export default function KolProfile() {
         style={{ marginTop: 12 }}
       >
         <Form form={form} layout="vertical" disabled={!editing}>
-          <Form.Item label="Nội dung" name="bio">
+          <Form.Item
+            label="Nội dung"
+            name="bio"
+            rules={[{ max: 1000, message: "Tối đa 1000 ký tự" }]}
+          >
             <TextArea
               autoSize={{ minRows: 8 }}
               style={{
@@ -518,6 +583,8 @@ export default function KolProfile() {
                 fontSize: 15,
               }}
               placeholder="Mô tả bản thân, thế mạnh…"
+              maxLength={1000}
+              showCount
             />
           </Form.Item>
         </Form>
@@ -708,10 +775,18 @@ export default function KolProfile() {
         </div>
       </Card>
 
+      {/* ==== Footer actions: THÊM nút Lưu thay đổi ở dưới cùng, bỏ nút Quay lại ==== */}
       <Divider style={{ margin: "12px 0 0" }} />
       <div className="flex items-center justify-end">
-        <Button onClick={() => navigate(-1)} icon={<ArrowRight size={16} />}>
-          Quay lại
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          loading={saving}
+          onClick={onSave}
+          disabled={!editing}
+          className="rounded-xl !h-10"
+        >
+          Lưu thay đổi
         </Button>
       </div>
     </div>
