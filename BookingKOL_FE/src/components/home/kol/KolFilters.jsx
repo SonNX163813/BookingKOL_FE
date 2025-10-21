@@ -37,13 +37,14 @@ const KolFilters = ({
   <Box
     sx={{
       position: "relative",
-      overflow: "hidden",
       borderRadius: { xs: 4, md: 6 },
       border: "1px solid rgba(74, 116, 218, 0.18)",
       boxShadow: "0 20px 50px rgba(74, 116, 218, 0.18)",
       backdropFilter: "blur(6px)",
       background: "#ffffff",
       p: { xs: 3, md: 5 },
+      width: "100%",
+      mx: "auto",
     }}
   >
     <Box
@@ -158,6 +159,10 @@ const KolFilters = ({
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
           alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{
+            flexWrap: { xs: "wrap", sm: "wrap" },
+            rowGap: { xs: 2, sm: 1.5 },
+          }}
         >
           <Typography
             variant="body2"
@@ -177,7 +182,11 @@ const KolFilters = ({
             onChange={onMinRatingChange}
             sx={{
               width: { xs: "100%", sm: "auto" },
-              gap: { xs: 2, sm: 1 },
+              gap: { xs: 1.5, sm: 1 },
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: { xs: "flex-start", sm: "flex-start" },
+              flexGrow: 1,
               "& .MuiToggleButton-root": {
                 borderRadius: 3,
                 textTransform: "none",
@@ -189,6 +198,10 @@ const KolFilters = ({
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
+                boxSizing: "border-box",
+                flex: { xs: "1 1 calc(50% - 12px)", sm: "0 0 auto" },
+                maxWidth: { xs: "calc(50% - 12px)", sm: "none" },
+                minWidth: { xs: "calc(50% - 12px)", sm: "auto" },
                 "&:hover": {
                   backgroundColor: "rgba(74, 116, 218, 0.08)",
                 },
@@ -219,6 +232,7 @@ const KolFilters = ({
         spacing={1.5}
         direction={{ xs: "column", sm: "row" }}
         justifyContent="flex-end"
+        alignItems={{ xs: "stretch", sm: "center" }}
       >
         <Button
           variant="outlined"
@@ -231,6 +245,7 @@ const KolFilters = ({
             textTransform: "none",
             borderRadius: 3,
             px: 3,
+            width: { xs: "100%", sm: "auto" },
           }}
         >
           Làm mới bộ lọc
@@ -246,6 +261,7 @@ const KolFilters = ({
             textTransform: "none",
             borderRadius: 3,
             px: 3,
+            width: { xs: "100%", sm: "auto" },
             "&:hover": {
               backgroundColor: "#3b5ec8",
             },

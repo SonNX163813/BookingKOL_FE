@@ -379,8 +379,8 @@ const KOLGrid = ({ kols, onSelectKol }) => (
   <Grid
     container
     spacing={{ xs: 2, md: 3 }}
-    columns={{ xs: 12, sm: 12, md: 15, lg: 20, xl: 20 }}
-    justifyContent="center"
+    justifyContent="flex-start"
+    alignItems="stretch"
   >
     {kols.map((kol) => {
       const { slug, ...cardProps } = kol;
@@ -389,9 +389,9 @@ const KOLGrid = ({ kols, onSelectKol }) => (
           item
           xs={12}
           sm={6}
-          md={5}
-          lg={4}
-          xl={4}
+          md={3}
+          lg={3}
+          xl={3}
           key={kol.id}
           sx={{ display: "flex" }}
         >
@@ -593,39 +593,63 @@ const ListKOL = () => {
         }}
       >
         <Stack spacing={6}>
-          <KOLListHeroSection
+          {/* <KOLListHeroSection
             onExploreTopKol={() =>
               handleNavigateDetail(topKol?.id, topKol?.slug)
             }
             hasKols={decoratedKols.length > 0}
             loading={loading}
             onManualRefresh={handleRetry}
-          />
+          /> */}
 
-          <KolFilters
-            filters={formFilters}
-            onFilterInputChange={handleFilterInputChange}
-            onMinRatingChange={handleMinRatingChange}
-            onApply={handleApplyFilters}
-            onReset={handleResetFilters}
-            loading={loading}
-            hasActiveFilters={hasActiveFilters}
-            hasFilterChanges={hasFilterChanges}
-            categoryOptions={categoryOptions}
-            loadingCategories={loadingCategories}
-          />
+          <Box
+            sx={{
+              display: "flex",
+              gap: { xs: 4, md: 6 },
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { xs: "stretch", md: "flex-start" },
+            }}
+          >
+            <Box
+              sx={{
+                flexShrink: 0,
+                width: { xs: "100%", md: 320, lg: 360 },
+                maxWidth: { xs: "100%", md: 360 },
+                alignSelf: { xs: "stretch", md: "flex-start" },
+                mx: { xs: "auto", md: 0 },
+              }}
+            >
+              <KolFilters
+                filters={formFilters}
+                onFilterInputChange={handleFilterInputChange}
+                onMinRatingChange={handleMinRatingChange}
+                onApply={handleApplyFilters}
+                onReset={handleResetFilters}
+                loading={loading}
+                hasActiveFilters={hasActiveFilters}
+                hasFilterChanges={hasFilterChanges}
+                categoryOptions={categoryOptions}
+                loadingCategories={loadingCategories}
+              />
+            </Box>
 
-          {loading ? (
-            <KOLLoadingState />
-          ) : decoratedKols.length === 0 ? (
-            <KOLEmptyState onRetry={handleRetry} />
-          ) : (
-            <KOLGrid kols={decoratedKols} onSelectKol={handleNavigateDetail} />
-          )}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              {loading ? (
+                <KOLLoadingState />
+              ) : decoratedKols.length === 0 ? (
+                <KOLEmptyState onRetry={handleRetry} />
+              ) : (
+                <KOLGrid
+                  kols={decoratedKols}
+                  onSelectKol={handleNavigateDetail}
+                />
+              )}
+            </Box>
+          </Box>
         </Stack>
       </Container>
 
-      <AppSnackbar
+      {/* <AppSnackbar
         open={showErrorSnackbar}
         onClose={() => setShowErrorSnackbar(false)}
         severity="error"
@@ -646,7 +670,7 @@ const ListKOL = () => {
             </Typography>
           </IconButton>
         }
-      />
+      /> */}
     </Box>
   );
 };

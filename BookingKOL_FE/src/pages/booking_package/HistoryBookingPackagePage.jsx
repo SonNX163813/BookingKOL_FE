@@ -73,7 +73,7 @@ const HistoryBookingPackagePage = () => {
       key: "startDate",
       render: (_, record) => (
         <span>
-          {record.startDate} - {record.endDate}
+          {record.startDate} → {record.endDate}
         </span>
       ),
     },

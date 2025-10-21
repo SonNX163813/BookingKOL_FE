@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Box,
@@ -19,9 +19,28 @@ const overlayGradient =
 const cardGradient =
   "linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(147, 206, 246, 0.25) 55%, rgba(255, 161, 218, 0.22) 100%)";
 
-const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
+const ReviewsSection = ({
+  reviews,
+  overallRating,
+  ratingDistribution,
+  reviewCount,
+  variant = "standalone",
+}) => {
+  const safeReviews = useMemo(
+    () => (Array.isArray(reviews) ? reviews : []),
+    [reviews]
+  );
+  const safeDistribution = useMemo(
+    () => (Array.isArray(ratingDistribution) ? ratingDistribution : []),
+    [ratingDistribution]
+  );
+  const totalReviews = Number.isFinite(reviewCount)
+    ? reviewCount
+    : safeReviews.length;
+
   const renderStars = (rating) => {
-    const fullStars = Math.round(Math.max(0, Math.min(5, rating)));
+    const normalized = Number.isFinite(rating) ? rating : 0;
+    const fullStars = Math.round(Math.max(0, Math.min(5, normalized)));
 
     return Array.from({ length: 5 }, (_, index) => (
       <StarRoundedIcon
@@ -34,37 +53,50 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
     ));
   };
 
+  const isEmbedded = variant === "embedded";
+
+  const containerSx = {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: isEmbedded ? "20px" : "24px",
+    backgroundColor: isEmbedded ? "transparent" : "#ffffff",
+    border: isEmbedded ? "none" : "1px solid rgba(74, 116, 218, 0.18)",
+    boxShadow: isEmbedded
+      ? "none"
+      : "0 6px 12px rgba(141, 226, 237, 0.36), \
+ 0 12px 24px rgba(147, 206, 246, 0.32), \
+ 0 18px 32px rgba(74, 116, 218, 0.38), \
+ 0 2px 6px rgba(255, 255, 255, 0.18)",
+    p: isEmbedded ? { xs: 0, md: 0 } : { xs: 3, md: 4 },
+  };
+
+  const motionSettings = isEmbedded
+    ? {
+        initial: { opacity: 0, y: 16 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.45, ease: "easeOut", delay: 0.1 },
+      }
+    : {
+        initial: { opacity: 0, y: 24 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.5, ease: "easeOut", delay: 0.25 },
+      };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut", delay: 0.25 }}
-    >
-      <Box
-        sx={{
-          position: "relative",
-          overflow: "hidden",
-          borderRadius: "24px",
-          backgroundColor: "#ffffff",
-          border: "1px solid rgba(74, 116, 218, 0.18)",
-          boxShadow:
-            "0 6px 12px rgba(141, 226, 237, 0.36), \
-     0 12px 24px rgba(147, 206, 246, 0.32), \
-     0 18px 32px rgba(74, 116, 218, 0.38), \
-     0 2px 6px rgba(255, 255, 255, 0.18)",
-          p: { xs: 3, md: 4 },
-        }}
-      >
-        <Box
-          aria-hidden
-          sx={{
-            position: "absolute",
-            inset: 0,
-            background: overlayGradient,
-            opacity: 0.9,
-            pointerEvents: "none",
-          }}
-        />
+    <motion.div {...motionSettings}>
+      <Box sx={containerSx}>
+        {!isEmbedded && (
+          <Box
+            aria-hidden
+            sx={{
+              position: "absolute",
+              inset: 0,
+              background: overlayGradient,
+              opacity: 0.9,
+              pointerEvents: "none",
+            }}
+          />
+        )}
 
         <Box sx={{ position: "relative", zIndex: 1 }}>
           <Typography
@@ -89,78 +121,110 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
           >
             <Box sx={{ flex: { xs: "1 1 100%", md: "1 1 66.67%" } }}>
               <Stack spacing={2.5}>
-                {reviews.map((review) => (
+                {safeReviews.length > 0 ? (
+                  safeReviews.map((review) => (
+                    <Box
+                      key={review.id ?? review.name}
+                      sx={{
+                        borderRadius: "18px",
+                        background: cardGradient,
+                        border: "1px solid rgba(74, 116, 218, 0.16)",
+                        px: { xs: 2, sm: 2.5 },
+                        py: { xs: 2, sm: 2.25 },
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1.5}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                      >
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              background:
+                                "linear-gradient(135deg, rgba(141, 226, 237, 0.45), rgba(88, 43, 175, 0.3))",
+                              color: textPrimary,
+                              fontWeight: 700,
+                            }}
+                            alt={`Ảnh đại diện của ${review.name ?? "khách hàng"}`}
+                          >
+                            {review.name?.charAt(0)}
+                          </Avatar>
+                          <Box>
+                            <Typography
+                              sx={{ color: textPrimary, fontWeight: 600 }}
+                            >
+                              {review.name ?? "Khách hàng"}
+                            </Typography>
+                            <Stack direction="row" spacing={0.5}>
+                              {renderStars(review.rating ?? review.score ?? 0)}
+                            </Stack>
+                          </Box>
+                        </Stack>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: textSecondary, minWidth: 120 }}
+                        >
+                          {review.date ?? ""}
+                        </Typography>
+                      </Stack>
+
+                      <Typography
+                        sx={{
+                          color: textSecondary,
+                          mt: 1.75,
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        {review.comment ?? review.content ?? ""}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
                   <Box
-                    key={review.id}
                     sx={{
                       borderRadius: "18px",
-                      background: cardGradient,
-                      border: "1px solid rgba(74, 116, 218, 0.16)",
-                      px: { xs: 2, sm: 2.5 },
-                      py: { xs: 2, sm: 2.25 },
+                      border: "1px dashed rgba(74, 116, 218, 0.35)",
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      px: { xs: 2.5, sm: 3 },
+                      py: { xs: 3, sm: 3.5 },
                     }}
                   >
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={1.5}
-                      justifyContent="space-between"
-                      alignItems={{ xs: "flex-start", sm: "center" }}
-                    >
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            background:
-                              "linear-gradient(135deg, rgba(141, 226, 237, 0.45), rgba(88, 43, 175, 0.3))",
-                            color: textPrimary,
-                            fontWeight: 700,
-                          }}
-                          alt={`Ảnh đại diện của ${review.name}`}
-                        >
-                          {review.name?.charAt(0)}
-                        </Avatar>
-                        <Box>
-                          <Typography
-                            sx={{ color: textPrimary, fontWeight: 600 }}
-                          >
-                            {review.name}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: textSecondary }}
-                          >
-                            {review.time}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      <Stack direction="row" spacing={0.5}>
-                        {renderStars(review.rating)}
-                      </Stack>
-                    </Stack>
                     <Typography
-                      variant="body2"
-                      sx={{ color: textSecondary, mt: 1.75, lineHeight: 1.7 }}
+                      variant="subtitle1"
+                      sx={{ color: textPrimary, fontWeight: 600, mb: 1 }}
                     >
-                      {review.content}
+                      Chưa có đánh giá
+                    </Typography>
+                    <Typography sx={{ color: textSecondary, lineHeight: 1.6 }}>
+                      Hiện tại chưa ghi nhận phản hồi nào cho KOL này. Hãy là
+                      người đầu tiên chia sẻ trải nghiệm của bạn.
                     </Typography>
                   </Box>
-                ))}
+                )}
 
-                <Button
-                  endIcon={<ChevronRightRoundedIcon />}
-                  sx={{
-                    alignSelf: "flex-start",
-                    color: "#4a74da",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    px: 0,
-                    "&:hover": { color: "#582baf", background: "transparent" },
-                  }}
-                  aria-label="Xem thêm đánh giá"
-                >
-                  Xem thêm đánh giá
-                </Button>
+                {safeReviews.length > 0 && (
+                  <Button
+                    endIcon={<ChevronRightRoundedIcon />}
+                    sx={{
+                      alignSelf: "flex-start",
+                      color: "#4a74da",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      px: 0,
+                      "&:hover": {
+                        color: "#582baf",
+                        background: "transparent",
+                      },
+                    }}
+                    aria-label="Xem thêm đánh giá"
+                  >
+                    Xem thêm đánh giá
+                  </Button>
+                )}
               </Stack>
             </Box>
 
@@ -184,18 +248,18 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
                     variant="h2"
                     sx={{ color: textPrimary, fontWeight: 700 }}
                   >
-                    {overallRating}
+                    {Number(overallRating ?? 0).toFixed(1)}
                   </Typography>
                   <Stack direction="row" spacing={0.5}>
                     {renderStars(overallRating)}
                   </Stack>
                   <Typography variant="body2" sx={{ color: textSecondary }}>
-                    Dựa trên {reviews.length} đánh giá
+                    Dựa trên {totalReviews} đánh giá
                   </Typography>
                 </Stack>
 
                 <Stack spacing={1.2}>
-                  {ratingDistribution.map((item) => (
+                  {safeDistribution.map((item) => (
                     <Stack
                       key={item.stars}
                       direction="row"
@@ -211,7 +275,7 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
                       </Typography>
                       <LinearProgress
                         variant="determinate"
-                        value={item.percentage}
+                        value={Number(item.percentage) || 0}
                         sx={{
                           flex: 1,
                           height: 8,
@@ -232,7 +296,7 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
                           textAlign: "right",
                         }}
                       >
-                        {item.count}
+                        {item.count ?? 0}
                       </Typography>
                     </Stack>
                   ))}

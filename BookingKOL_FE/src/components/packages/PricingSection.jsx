@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Steps,
   Form,
@@ -14,8 +14,16 @@ import dayjs from "dayjs";
 import { Crown, Megaphone, CheckCircle } from "lucide-react";
 import { useCreateBooking } from "../../hook/booking_package/useCreateBooking";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getKolProfiles } from "../../services/kol/KolAPI";
 
 const { Step } = Steps;
+
+const ASSISTANT_OPTIONS = [
+  { value: "Ngoc Anh", label: "Ngọc Anh" },
+  { value: "Bao Tram", label: "Bảo Trâm" },
+  { value: "Quang Minh", label: "Quang Minh" },
+];
 
 const PricingCard = ({
   title,
@@ -103,8 +111,72 @@ const PricingSection = () => {
   const [vipExtraData, setVipExtraData] = useState({});
   const navigate = useNavigate();
 
+  const {
+    data: kolResponse,
+    isFetching: isFetchingKols,
+    isError: isKolFetchError,
+    error: kolFetchError,
+  } = useQuery({
+    queryKey: ["kol-available"],
+    queryFn: ({ signal }) => getKolProfiles({ signal, params: { size: 50 } }),
+    enabled: selectedPackage === "vip",
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const kolOptions = useMemo(() => {
+    const list = Array.isArray(kolResponse?.content) ? kolResponse.content : [];
+    return list
+      .filter((kol) => kol?.id)
+      .map((kol) => ({
+        value: kol.id,
+        label:
+          kol.displayName ||
+          kol.name ||
+          kol.fullName ||
+          `KOL ${String(kol.id).slice(0, 6)}`,
+      }));
+  }, [kolResponse]);
+
+  useEffect(() => {
+    if (!isKolFetchError) return;
+    const fallbackMessage =
+      "Khong the tai danh sach KOL. Vui long thu lai sau.";
+    message.error(kolFetchError?.message || fallbackMessage);
+  }, [isKolFetchError, kolFetchError]);
+
+  useEffect(() => {
+    if (selectedPackage !== "vip") return;
+    if (!kolOptions.length) return;
+    const currentKol = vipForm.getFieldValue("kol");
+    if (!currentKol) {
+      vipForm.setFieldsValue({ kol: kolOptions[0].value });
+    }
+  }, [selectedPackage, kolOptions, vipForm]);
+
+  useEffect(() => {
+    if (selectedPackage !== "vip") return;
+    if (!vipExtraData.kol && !vipExtraData.assistant) return;
+    if (
+      vipExtraData.kol &&
+      !kolOptions.some((option) => option.value === vipExtraData.kol)
+    )
+      return;
+    vipForm.setFieldsValue({
+      kol: vipExtraData.kol ?? vipForm.getFieldValue("kol"),
+      assistant:
+        vipExtraData.assistant ??
+        vipForm.getFieldValue("assistant") ??
+        "Ngoc Anh",
+    });
+  }, [selectedPackage, vipExtraData, kolOptions, vipForm]);
+
   const handleSelectPackage = (pkg) => {
     setSelectedPackage(pkg);
+    if (pkg !== "vip") {
+      vipForm.resetFields();
+      setVipExtraData({});
+    }
     setCurrent(1);
   };
 
@@ -124,7 +196,17 @@ const PricingSection = () => {
   };
 
   const handleVipFormFinish = (values) => {
-    setVipExtraData(values);
+    const selectedKol = kolOptions.find(
+      (option) => option.value === values.kol
+    );
+    const assistantOption = ASSISTANT_OPTIONS.find(
+      (option) => option.value === values.assistant
+    );
+    setVipExtraData({
+      ...values,
+      kolName: selectedKol?.label || "",
+      assistantName: assistantOption?.label || "",
+    });
     setCurrent(3);
   };
 
@@ -149,8 +231,9 @@ const PricingSection = () => {
       startDate: campaignData.startDate,
       endDate: campaignData.endDate,
       recurrencePattern: campaignData.recurrencePattern,
-      liveIds: vipExtraData?.assistant ?? null,
-      kolIds: vipExtraData?.kol ?? null,
+      // liveIds:
+      //   selectedPackage === "vip" ? vipExtraData?.assistant ?? null : null,
+      kolIds: selectedPackage === "vip" ? vipExtraData?.kol ?? null : null,
     };
 
     handleCreateBooking(data);
@@ -321,7 +404,7 @@ const PricingSection = () => {
                 form={vipForm}
                 layout="vertical"
                 onFinish={handleVipFormFinish}
-                initialValues={{ kol: "Mai Chi", assistant: "Ngọc Anh" }}
+                initialValues={{ assistant: "Ngoc Anh" }}
                 className="p-4"
               >
                 <Form.Item
@@ -333,12 +416,16 @@ const PricingSection = () => {
                 >
                   <Select
                     className="!h-12"
-                    options={[
-                      { value: "Mai Chi", label: "KOL Mai Chi" },
-                      { value: "Thảo Vy", label: "KOL Thảo Vy" },
-                      { value: "Minh Anh", label: "KOL Minh Anh" },
-                    ]}
+                    loading={isFetchingKols}
+                    options={kolOptions}
                     placeholder="Chọn KOL phù hợp"
+                    optionFilterProp="label"
+                    showSearch
+                    notFoundContent={
+                      isFetchingKols
+                        ? "Đang tải danh sách KOL..."
+                        : "Không có KOL khả dụng"
+                    }
                   />
                 </Form.Item>
                 <Form.Item
@@ -350,11 +437,7 @@ const PricingSection = () => {
                 >
                   <Select
                     className="!h-12"
-                    options={[
-                      { value: "Ngọc Anh", label: "Ngọc Anh" },
-                      { value: "Bảo Trâm", label: "Bảo Trâm" },
-                      { value: "Quang Minh", label: "Quang Minh" },
-                    ]}
+                    options={ASSISTANT_OPTIONS}
                     placeholder="Chọn trợ lý livestream"
                   />
                 </Form.Item>
@@ -362,7 +445,12 @@ const PricingSection = () => {
                   <Button className="!h-12" onClick={() => setCurrent(1)}>
                     Quay lại
                   </Button>
-                  <Button className="!h-12" type="primary" htmlType="submit">
+                  <Button
+                    className="!h-12"
+                    type="primary"
+                    htmlType="submit"
+                    disabled={!kolOptions.length}
+                  >
                     Tiếp tục
                   </Button>
                 </div>
@@ -419,10 +507,10 @@ const PricingSection = () => {
             labelStyle={{ fontWeight: "bold" }}
           >
             <Descriptions.Item label="KOL">
-              {vipExtraData.kol}
+              {vipExtraData.kolName || vipExtraData.kol}
             </Descriptions.Item>
             <Descriptions.Item label="Trợ lý Livestream">
-              {vipExtraData.assistant}
+              {vipExtraData.assistantName || vipExtraData.assistant}
             </Descriptions.Item>
           </Descriptions>
         )}

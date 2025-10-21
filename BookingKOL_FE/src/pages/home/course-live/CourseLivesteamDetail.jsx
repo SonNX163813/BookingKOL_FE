@@ -218,7 +218,7 @@ const CourseLivesteamDetail = () => {
         </Stack>
       </Container>
 
-      <AppSnackbar
+      {/* <AppSnackbar
         open={showErrorSnackbar}
         onClose={() => setShowErrorSnackbar(false)}
         severity="error"
@@ -239,7 +239,7 @@ const CourseLivesteamDetail = () => {
             </Typography>
           </IconButton>
         }
-      />
+      /> */}
     </Box>
   );
 };

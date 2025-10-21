@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -21,7 +22,6 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
 import BookingScheduleStep from "./BookingScheduleStep";
 import BookingContactStep from "./BookingContactStep";
-import BookingReceipt from "./BookingReceipt";
 
 import {
   BOOKING_FLOW_STYLE as STYLE,
@@ -29,20 +29,13 @@ import {
 } from "../../../constants/bookingFlowTextStyles";
 import { useCreateBooking as useCreateSingleBooking } from "../../../hook/booking_single/useCreateBooking";
 import { useHoldBookingSlot } from "../../../hook/booking_single/useHoldBookingSlot";
+import { BOOKING_SINGLE_PAYMENT_STORAGE_KEY } from "../../../constants/storageKeys";
 
 /* ------------------------- CONSTANTS & HELPERS ------------------------- */
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_SIZE_MB = 10;
 const MAX_ATTACHMENT_SIZE_BYTES = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
-
-const PAYMENT_OPTIONS = [
-  { value: "momo", label: "MoMo" },
-  { value: "zalopay", label: "ZaloPay" },
-  { value: "vnpay", label: "VNPay" },
-  { value: "stripe", label: "Thẻ/Stripe (test)" },
-  { value: "bank", label: "Chuyển khoản" },
-];
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
@@ -71,9 +64,11 @@ const BookingFlow = ({
   userProfile,
   onSubmit,
   onViewSchedule,
+  kolMinPrice = 0,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const navigate = useNavigate();
 
   /* ---------------------- STATE ---------------------- */
   const [activeStep, setActiveStep] = useState(0);
@@ -84,13 +79,12 @@ const BookingFlow = ({
     email: "",
     phone: "",
     note: "",
+    location: "",
   });
   const [attachments, setAttachments] = useState([]);
   const [errors, setErrors] = useState({});
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_OPTIONS[0].value);
-  const [paymentResult, setPaymentResult] = useState(null);
   const [heldSlot, setHeldSlot] = useState(null);
 
   const { isLoadingCreateBooking: submitting, handleCreateBooking } =
@@ -116,35 +110,36 @@ const BookingFlow = ({
       email: userProfile?.email ?? userProfile?.contactEmail ?? "",
       phone: userProfile?.phone ?? userProfile?.phoneNumber ?? "",
       note: "",
+      location: "",
     });
     setAttachments([]);
     setErrors({});
     setAgreeTerms(false);
     setTermsOpen(false);
-    setPaymentMethod(PAYMENT_OPTIONS[0].value);
-    setPaymentResult(null);
     setHeldSlot(null);
   }, [open, userProfile]);
 
   /* ---------------------- VALIDATION ---------------------- */
   const validateStep = (stepIndex = activeStep, touchErrors = false) => {
-    if (paymentResult) return true;
     const newErrors = {};
 
     if (stepIndex === 0) {
       if (!startDateTime || !endDateTime) {
-        newErrors.schedule = "Vui lòng chọn ngày giờ hợp lệ";
+        newErrors.schedule = "Vui long chon ngay gio hop le";
       } else if (!endDateTime.isAfter(startDateTime)) {
-        newErrors.schedule = "Thời gian kết thúc phải sau thời gian bắt đầu";
+        newErrors.schedule = "Thoi gian ket thuc phai sau thoi gian bat dau";
       }
     } else if (stepIndex === 1) {
-      if (!contact.fullName.trim())
-        newErrors.fullName = "Tên không được để trống";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email))
-        newErrors.email = "Email chưa hợp lệ";
-      if (!/^\d{10,11}$/.test(contact.phone))
-        newErrors.phone = "Số điện thoại gồm 10–11 số";
-      if (!agreeTerms) newErrors.terms = "Vui lòng đồng ý điều khoản";
+      if (contact.fullName && !contact.fullName.trim()) {
+        newErrors.fullName = "Ten khong hop le";
+      }
+      if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+        newErrors.email = "Email chua hop le";
+      }
+      if (contact.phone && !/^\d{9,15}$/.test(contact.phone)) {
+        newErrors.phone = "So dien thoai chua hop le";
+      }
+      if (!agreeTerms) newErrors.terms = "Vui long dong y dieu khoan";
     }
 
     if (touchErrors) setErrors(newErrors);
@@ -163,7 +158,8 @@ const BookingFlow = ({
   };
 
   const handleHoldSlotClick = async () => {
-    if (!validateStep(0, true)) return;
+    if (!validateStep(activeStep, true)) return;
+    setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
 
     const startIso = startDateTime?.toISOString?.();
     const endIso = endDateTime?.toISOString?.();
@@ -256,27 +252,11 @@ const BookingFlow = ({
     setAttachments((prev) => prev.filter((x) => x.id !== id));
   };
 
-  /* ---------------------- PAYMENT ---------------------- */
-  const buildDescription = () => {
-    const info = [
-      `Tên: ${contact.fullName}`,
-      `Email: ${contact.email}`,
-      `Điện thoại: ${contact.phone}`,
-      `Lịch: ${getScheduleLabel(startDateTime, endDateTime)}`,
-      `Thanh toán: ${
-        PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.label ??
-        paymentMethod
-      }`,
-    ];
-    if (contact.note?.trim()) info.unshift(contact.note.trim(), "");
-    return info.join("\n");
-  };
-
-  const handlePayment = async () => {
+  /* ---------------------- SUBMIT ---------------------- */
+  const handleSubmit = async () => {
     if (submitting) return;
-    // 🔹 Nếu chưa đồng ý điều khoản thì báo lỗi và dừng
     if (!agreeTerms) {
-      toast.error("Vui lòng đồng ý với điều khoản trước khi thanh toán!");
+      toast.error("Vui long dong y voi dieu khoan truoc khi gui!");
       return;
     }
 
@@ -286,123 +266,151 @@ const BookingFlow = ({
     const endIso = endDateTime?.toISOString?.();
 
     if (!startIso || !endIso) {
-      toast.error("Kh?ng th? x?c d?nh khung gi?. Vui l?ng th? l?i.");
+      toast.error("Khong the xac dinh khung gio. Vui long thu lai.");
       return;
     }
 
-    const contactName = contact.fullName?.trim();
-    const contactEmail = contact.email?.trim();
-    const contactPhone = contact.phone?.trim();
     const note = contact.note?.trim();
+    const location = contact.location?.trim();
 
     try {
-      const req = {
+      const bookingSingleReqDTO = {
         kolId,
-        description: buildDescription(),
         startAt: startIso,
         endAt: endIso,
-        paymentMethod,
-        contactName: contactName || undefined,
-        contactEmail: contactEmail || undefined,
-        contactPhone: contactPhone || undefined,
-        note: note || undefined,
-        isConfirmWithTerms: agreeTerms ? "true" : "false",
+        description: note || "",
+        location: location || "",
+        isConfirmWithTerms: !!agreeTerms,
       };
 
-      const res = await handleCreateBooking({
-        bookingSingleReqDTO: req,
+      const payload = {
+        bookingSingleReqDTO,
         attachedFiles: attachments.map((a) => a.file),
+      };
+
+      const response = await handleCreateBooking(payload);
+      const paymentData = response?.data ?? null;
+
+      if (!paymentData) {
+        toast.error("Khong tim thay thong tin thanh toan.");
+        return;
+      }
+
+      if (paymentData) {
+        try {
+          sessionStorage.setItem(
+            BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
+            JSON.stringify({ payment: paymentData })
+          );
+        } catch (storageError) {
+          console.error("Cannot persist booking payment data", storageError);
+        }
+      }
+
+      onSubmit?.({
+        response,
+        bookingSingleReqDTO,
+        attachments,
       });
 
-      const data = res?.data ?? res;
-      const payment = data?.data ?? data;
-      if (!payment) throw new Error("Thiếu dữ liệu thanh toán");
-
-      const normalizedPayment = {
-        contractId: payment.contractId ?? "",
-        amount: payment.amount ?? 0,
-        qrUrl: payment.qrUrl ?? "",
-        transferContent: payment.transferContent ?? "",
-        expiresAt: payment.expiresAt ?? null,
-        accountName: payment.name ?? "",
-        bank: payment.bank ?? "",
-        accountNumber: payment.accountNumber ?? "",
-      };
-
-      const bookingSummary = {
-        kolName: kolName || "KOL",
-        schedule: getScheduleLabel(startDateTime, endDateTime),
-        startAt: startDateTime.format(),
-        endAt: endDateTime.format(),
-        total: payment.amount ?? 0,
-        paymentMethod:
-          PAYMENT_OPTIONS.find((x) => x.value === paymentMethod)?.label ??
-          paymentMethod,
-      };
-
-      setPaymentResult({ booking: bookingSummary, payment: normalizedPayment });
-      onSubmit?.({
-        booking: bookingSummary,
-        payment: normalizedPayment,
-        req,
-        attachments,
+      onClose?.();
+      navigate("/thanh-toan-kol-le", {
+        state: {
+          payment: paymentData,
+          bookingSingleReqDTO,
+        },
       });
     } catch (e) {
       toast.error(
-        e?.response?.data?.message ?? "Không thể tạo booking. Vui lòng thử lại."
+        e?.response?.data?.message ?? "Khong the gui booking. Vui long thu lai."
       );
     }
   };
 
   /* ---------------------- COMPUTED VALUES ---------------------- */
   const summary = useMemo(() => {
+    const start = startDateTime ? dayjs(startDateTime) : null;
+    const end = endDateTime ? dayjs(endDateTime) : null;
+    let duration = "";
+    let totalMinutes = 0;
+
+    if (start && end && end.isAfter(start)) {
+      totalMinutes = end.diff(start, "minute");
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      if (hours > 0) {
+        duration = `${hours}h`;
+        if (minutes > 0) duration = `${duration} ${minutes}m`;
+      } else if (minutes > 0) {
+        duration = `${minutes}m`;
+      }
+    }
+
+    const normalizedRate = (() => {
+      if (typeof kolMinPrice === "number" && Number.isFinite(kolMinPrice)) {
+        return kolMinPrice;
+      }
+      if (typeof kolMinPrice === "string") {
+        const sanitized = kolMinPrice.replace(/[^\d.-]/g, "");
+        const parsed = Number(sanitized);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      return 0;
+    })();
+
+    const billableHours = totalMinutes > 0 ? totalMinutes / 60 : 0;
+    const subtotal =
+      normalizedRate > 0 && billableHours > 0
+        ? normalizedRate * billableHours
+        : 0;
+    const extra = 0;
+    const discount = 0;
+    const total = Math.max(subtotal + extra - discount, 0);
+
     return {
+      kol: kolName || "KOL",
+      duration: duration || "N/A",
       schedule: getScheduleLabel(startDateTime, endDateTime),
-      subtotal: 0,
-      extra: 0,
-      discount: 0,
-      total: 0,
+      subtotal,
+      extra,
+      discount,
+      total,
+      hourlyRate: normalizedRate,
+      billableHours,
     };
-  }, [startDateTime, endDateTime]);
+  }, [kolName, startDateTime, endDateTime, kolMinPrice]);
 
   /* ---------------------- RENDER ---------------------- */
   const isLastStep = activeStep === TEXT.steps.length - 1;
-  const primaryAction = isLastStep ? handlePayment : handleContinue;
+  const primaryAction = isLastStep ? handleSubmit : handleHoldSlotClick;
   const primaryLabel = isLastStep
-    ? (submitting ? "Dang xu ly..." : TEXT.actions.pay)
+    ? submitting
+      ? "Dang xu ly..."
+      : TEXT.actions.apply
     : TEXT.actions.continue;
-  const primaryDisabled = useMemo(() => {
-    if (isLastStep) {
-      return !agreeTerms || submitting;
-    }
-    return !validateStep(activeStep);
-  });
+  const primaryDisabled = isLastStep
+    ? !agreeTerms || submitting
+    : !validateStep(activeStep);
 
   const renderStepContent = () => {
-    if (paymentResult) {
-      return (
-        <BookingReceipt
-          result={paymentResult}
-          onClose={onClose}
-          onViewSchedule={
-            onViewSchedule ? () => onViewSchedule(paymentResult) : undefined
-          }
-          STYLE={STYLE}
-          TEXT={TEXT}
-          formatCurrency={formatCurrency}
-        />
-      );
-    }
-
     if (activeStep === 0) {
       return (
+        // <BookingScheduleStep
+        //   startDateTime={startDateTime}
+        //   endDateTime={endDateTime}
+        //   onStartDateTimeChange={setStartDateTime}
+        //   onEndDateTimeChange={setEndDateTime}
+        //   STYLE={STYLE}
+        //   TEXT={TEXT}
+        // />
         <BookingScheduleStep
-          startDateTime={startDateTime}
-          endDateTime={endDateTime}
-          onStartDateTimeChange={setStartDateTime}
-          onEndDateTimeChange={setEndDateTime}
           STYLE={STYLE}
           TEXT={TEXT}
+          onSelectSchedule={(start, end) => {
+            setStartDateTime(start);
+            setEndDateTime(end);
+          }}
         />
       );
     }
@@ -429,8 +437,6 @@ const BookingFlow = ({
   };
 
   const renderFooter = () => {
-    if (paymentResult) return null;
-
     return (
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
         <Button
@@ -449,47 +455,73 @@ const BookingFlow = ({
         </Button>
         <Stack direction="row" spacing={2}>
           {activeStep === 0 && (
-            <Button
-              variant="outlined"
-              onClick={handleHoldSlotClick}
-              disabled={!validateStep(0) || holdingSlot}
-              sx={{
-                textTransform: "none",
-                borderRadius: "16px",
-                px: 3,
-                py: 1.2,
-                fontWeight: 600,
-                borderColor: STYLE.accent,
-                color: STYLE.accent,
-                "&:hover": {
+            <>
+              {/* <Button
+                variant="outlined"
+                onClick={handleHoldSlotClick}
+                disabled={!validateStep(0) || holdingSlot}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "16px",
+                  px: 3,
+                  py: 1.2,
+                  fontWeight: 600,
                   borderColor: STYLE.accent,
-                  backgroundColor: STYLE.accentSoft,
-                },
-              }}
-            >
-              {holdingSlot ? "Đang giữ..." : TEXT.actions.hold}
-            </Button>
+                  color: STYLE.accent,
+                  "&:hover": {
+                    borderColor: STYLE.accent,
+                    backgroundColor: STYLE.accentSoft,
+                  },
+                }}
+              >
+                {holdingSlot ? "Đang giữ..." : TEXT.actions.hold}
+              </Button> */}
+              <Button
+                variant="contained"
+                onClick={handleHoldSlotClick}
+                disabled={!validateStep(activeStep)}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "16px",
+                  px: 4,
+                  py: 1.2,
+                  fontWeight: 600,
+                  background:
+                    "linear-gradient(145deg, rgba(74,116,218,1) 0%, rgba(147,206,246,1) 100%)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(145deg, rgba(62,100,196,1) 0%, rgba(132,190,230,1) 100%)",
+                  },
+                }}
+              >
+                {activeStep ? "Đang tiếp tục..." : TEXT.actions.continue}
+              </Button>
+            </>
           )}
-          <Button
-            variant="contained"
-            onClick={primaryAction}
-            disabled={primaryDisabled}
-            sx={{
-              textTransform: "none",
-              borderRadius: "16px",
-              px: 4,
-              py: 1.2,
-              fontWeight: 600,
-              background:
-                "linear-gradient(145deg, rgba(74,116,218,1) 0%, rgba(147,206,246,1) 100%)",
-              "&:hover": {
-                background:
-                  "linear-gradient(145deg, rgba(62,100,196,1) 0%, rgba(132,190,230,1) 100%)",
-              },
-            }}
-          >
-            {primaryLabel}
-          </Button>
+          {activeStep === 1 && (
+            <>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={!agreeTerms || submitting}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "16px",
+                  px: 4,
+                  py: 1.2,
+                  fontWeight: 600,
+                  background:
+                    "linear-gradient(145deg, rgba(74,116,218,1) 0%, rgba(147,206,246,1) 100%)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(145deg, rgba(62,100,196,1) 0%, rgba(132,190,230,1) 100%)",
+                  },
+                }}
+              >
+                {submitting ? "Đang chuyển trang..." : TEXT.actions.pay}
+              </Button>
+            </>
+          )}
         </Stack>
       </Stack>
     );
@@ -508,7 +540,7 @@ const BookingFlow = ({
           <CloseRoundedIcon />
         </IconButton>
       </Stack>
-      {!paymentResult && !isMobile && (
+      {!isMobile && (
         <Stepper activeStep={activeStep} alternativeLabel sx={{ mt: 1 }}>
           {TEXT.steps.map((label) => (
             <Step key={label}>

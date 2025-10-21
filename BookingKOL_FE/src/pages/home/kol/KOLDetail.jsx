@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 // import {
 //   Box,
 //   Container,
@@ -15,14 +15,15 @@ import {
   Typography,
   CircularProgress,
   Stack,
+  Button,
 } from "@mui/material";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import IconButton from "@mui/material/IconButton";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CloseIcon from "@mui/icons-material/Close";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "../../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../../components/home/kol-detail/Introduction";
-import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
 import BookingFlow from "../../../components/home/book-kol/BookingFlow";
 import { getKolProfileById } from "../../../services/kol/KolAPI";
 import hotkolimg from "../../../assets/hotkol.png";
@@ -45,12 +46,12 @@ const buildHeaderData = (kol) => {
   // if (kol?.rateCardNote) {
   //   achievements.push(`Lưu ý: ${kol.rateCardNote}`);
   // }
+  const primaryAvatarUrl =
+    typeof kol?.avatarUrl === "string" && kol.avatarUrl.trim().length > 0
+      ? kol.avatarUrl
+      : null;
   const fallbackAvatar =
-    kol?.avatarUrl ||
-    kol?.profileImage ||
-    kol?.imageUrl ||
-    kol?.thumbnailUrl ||
-    null;
+    kol?.profileImage || kol?.imageUrl || kol?.thumbnailUrl || null;
 
   const mediaItems = Array.isArray(kol?.fileUsageDtos)
     ? kol.fileUsageDtos
@@ -78,24 +79,48 @@ const buildHeaderData = (kol) => {
   const videoItems = mediaItems.filter((item) => item.type === "VIDEO");
 
   const avatar =
+    primaryAvatarUrl ||
     imageItems.find((item) => item.isCover)?.url ||
     imageItems[0]?.url ||
     fallbackAvatar ||
     hotkolimg;
 
-  const thumbnails =
-    mediaItems.length > 0
-      ? [...imageItems, ...videoItems]
-      : [
-          {
-            id: "default-avatar",
-            type: "IMAGE",
-            url: avatar,
-            name: "Avatar",
-            previewUrl: null,
-            isCover: true,
-          },
-        ];
+  let thumbnails = [...imageItems, ...videoItems];
+
+  if (primaryAvatarUrl) {
+    const existingIndex = thumbnails.findIndex(
+      (item) => item.url === primaryAvatarUrl
+    );
+    if (existingIndex >= 0) {
+      const [existingAvatar] = thumbnails.splice(existingIndex, 1);
+      thumbnails = [{ ...existingAvatar, isCover: true }, ...thumbnails];
+    } else {
+      thumbnails = [
+        {
+          id: `avatar-${kol.id ?? primaryAvatarUrl}`,
+          type: "IMAGE",
+          url: primaryAvatarUrl,
+          name: "Avatar",
+          previewUrl: null,
+          isCover: true,
+        },
+        ...thumbnails,
+      ];
+    }
+  }
+
+  if (thumbnails.length === 0) {
+    thumbnails = [
+      {
+        id: "default-avatar",
+        type: "IMAGE",
+        url: avatar,
+        name: "Avatar",
+        previewUrl: null,
+        isCover: true,
+      },
+    ];
+  }
   return {
     id: kol.id,
     name: kol.displayName ?? "Đang cập nhật",
@@ -136,6 +161,42 @@ const buildPlatformChips = (kol) => {
       verified: true,
     }))
     .filter((item) => Boolean(item.name));
+};
+
+const buildLivestreamVideos = (kol) => {
+  if (!Array.isArray(kol?.fileUsageDtos)) {
+    return [];
+  }
+
+  return kol.fileUsageDtos
+    .map((usage) => {
+      const file = usage?.file ?? {};
+      const rawType = (file?.fileType || usage?.fileType || "")
+        .toString()
+        .toUpperCase();
+      if (rawType !== "VIDEO") {
+        return null;
+      }
+
+      const url = file?.fileUrl ?? usage?.fileUrl ?? "";
+      if (!url) {
+        return null;
+      }
+
+      return {
+        id: usage?.id ?? file?.id ?? url,
+        url,
+        title: file?.fileName ?? usage?.title ?? "Video livestream",
+        thumbnail: file?.thumbnailUrl ?? file?.previewUrl ?? null,
+        description: usage?.description ?? file?.description ?? "",
+        externalUrl:
+          usage?.metadata?.externalUrl ??
+          usage?.externalUrl ??
+          file?.externalUrl ??
+          null,
+      };
+    })
+    .filter(Boolean);
 };
 
 const buildIntroductionData = (kol) => {
@@ -200,6 +261,7 @@ const KOLDetail = () => {
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
   const [showNotFoundSnackbar, setShowNotFoundSnackbar] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleCloseErrorSnackbar = () => {
     setShowErrorSnackbar(false);
@@ -208,6 +270,10 @@ const KOLDetail = () => {
   const handleCloseNotFoundSnackbar = () => {
     setShowNotFoundSnackbar(false);
   };
+
+  const handleBack = useCallback(() => {
+    navigate("/danh-sach-kol");
+  }, [navigate]);
 
   const handleOpenBooking = () => {
     setIsBookingOpen(true);
@@ -272,6 +338,10 @@ const KOLDetail = () => {
     [kolData]
   );
   const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const livestreamVideos = useMemo(
+    () => buildLivestreamVideos(kolData),
+    [kolData]
+  );
   const bookingPackages = useMemo(() => {
     if (!kolData) {
       return [];
@@ -377,17 +447,37 @@ const KOLDetail = () => {
               gap: { xs: 4, md: 5 },
             }}
           >
+            <Button
+              onClick={handleBack}
+              startIcon={<ArrowBackRoundedIcon />}
+              sx={{
+                alignSelf: "flex-start",
+                textTransform: "none",
+                fontWeight: 600,
+                color: "#4a74da",
+                borderRadius: 2,
+                border: "1px solid rgba(74, 116, 218, 0.24)",
+                px: 2.5,
+                py: 1,
+                bgcolor: "rgba(74, 116, 218, 0.08)",
+                "&:hover": {
+                  bgcolor: "rgba(74, 116, 218, 0.16)",
+                  borderColor: "rgba(74, 116, 218, 0.32)",
+                },
+              }}
+            >
+              Trở về danh sách KOL
+            </Button>
             <ProfileHeader
               kol={headerData}
               pricing={pricingData}
               platforms={platformChips}
               onBook={handleOpenBooking}
             />
-            <Introduction profile={introductionData} />
-            <ReviewsSection
-              reviews={reviewsData.reviews}
-              overallRating={reviewsData.overallRating}
-              ratingDistribution={reviewsData.ratingDistribution}
+            <Introduction
+              profile={introductionData}
+              livestreamVideos={livestreamVideos}
+              feedback={reviewsData}
             />
           </Box>
         )}
@@ -446,7 +536,7 @@ const KOLDetail = () => {
           </Alert>
         </Snackbar> */}
 
-        <AppSnackbar
+        {/* <AppSnackbar
           open={showErrorSnackbar}
           onClose={handleCloseErrorSnackbar}
           autoHideDuration={6000}
@@ -467,7 +557,7 @@ const KOLDetail = () => {
               </IconButton>
             </>
           }
-        />
+        /> */}
 
         {/* Thông báo không tìm thấy */}
         {/* <Snackbar
@@ -500,13 +590,13 @@ const KOLDetail = () => {
           </Alert>
         </Snackbar> */}
 
-        <AppSnackbar
+        {/* <AppSnackbar
           open={showNotFoundSnackbar}
           onClose={handleCloseNotFoundSnackbar}
           autoHideDuration={4000}
           severity="info"
           message="Không tìm thấy thông tin KOL."
-        />
+        /> */}
         <BookingFlow
           open={isBookingOpen}
           onClose={handleCloseBooking}
@@ -515,6 +605,7 @@ const KOLDetail = () => {
           packages={bookingPackages}
           availableSlots={bookingSlots}
           userProfile={bookingProfile}
+          kolMinPrice={pricingData?.hourlyRate}
           onViewSchedule={handleCloseBooking}
         />
       </Container>

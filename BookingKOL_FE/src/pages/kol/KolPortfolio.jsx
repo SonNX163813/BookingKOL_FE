@@ -14,7 +14,6 @@ import AppSnackbar from "../../components/UI/AppSnackbar";
 // Reuse UI components từ KOL Detail
 import ProfileHeader from "../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../components/home/kol-detail/Introduction";
-import ReviewsSection from "../../components/home/kol-detail/ReviewsSection";
 
 import {
   getKolProfileById,
@@ -126,19 +125,53 @@ const buildPricingData = (kol) => ({
 });
 
 const buildPlatformChips = (kol) => {
-  if (!Array.isArray(kol?.categories)) return [];
+  if (!Array.isArray(kol?.categories)) {
+    return [];
+  }
   return kol.categories
-    .map((c) => ({
-      name: c?.name ?? "Danh mục",
+    .map((category) => ({
+      name: category?.name ?? "Danh mục",
       icon: "tiktok",
       verified: true,
     }))
-    .filter((x) => Boolean(x.name));
+    .filter((item) => Boolean(item.name));
 };
 
+const buildLivestreamVideos = (kol) => {
+  if (!Array.isArray(kol?.fileUsageDtos)) {
+    return [];
+  }
+  return kol.fileUsageDtos
+    .map((usage) => {
+      const file = usage?.file ?? {};
+      const rawType = (file?.fileType || usage?.fileType || "")
+        .toString()
+        .toUpperCase();
+      if (rawType !== "VIDEO") {
+        return null;
+      }
+      const url = file?.fileUrl ?? usage?.fileUrl ?? "";
+      if (!url) {
+        return null;
+      }
+      return {
+        id: usage?.id ?? file?.id ?? url,
+        url,
+        title: file?.fileName ?? usage?.title ?? "Video livestream",
+        thumbnail: file?.thumbnailUrl ?? file?.previewUrl ?? null,
+        description: usage?.description ?? file?.description ?? "",
+        externalUrl:
+          usage?.metadata?.externalUrl ??
+          usage?.externalUrl ??
+          file?.externalUrl ??
+          null,
+      };
+    })
+    .filter(Boolean);
+};
 const buildIntroductionData = (kol) => {
   const categoryNames = Array.isArray(kol?.categories)
-    ? kol.categories.map((c) => c?.name).filter(Boolean)
+    ? kol.categories.map((category) => category?.name).filter(Boolean)
     : [];
   const location = [kol?.city, kol?.country].filter(Boolean).join(", ");
 
@@ -270,6 +303,10 @@ export default function KolPortfolio() {
     [kolData]
   );
   const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const livestreamVideos = useMemo(
+    () => buildLivestreamVideos(kolData),
+    [kolData]
+  );
 
   const shouldShowContent = !isLoading && !error && headerData;
 
@@ -339,29 +376,28 @@ export default function KolPortfolio() {
               showActions={false}
               pricingLocked
             />
-            <Introduction profile={introductionData} />
-            <ReviewsSection
-              reviews={reviewsData.reviews}
-              overallRating={reviewsData.overallRating}
-              ratingDistribution={reviewsData.ratingDistribution}
+            <Introduction
+              profile={introductionData}
+              livestreamVideos={livestreamVideos}
+              feedback={reviewsData}
             />
           </Box>
         )}
 
-        <AppSnackbar
+        {/* <AppSnackbar
           open={showErrorSnackbar}
           onClose={() => setShowErrorSnackbar(false)}
           autoHideDuration={6000}
           severity="error"
           message={error}
-        />
-        <AppSnackbar
+        /> */}
+        {/* <AppSnackbar
           open={showNotFoundSnackbar}
           onClose={() => setShowNotFoundSnackbar(false)}
           autoHideDuration={4000}
           severity="info"
           message="Không tìm thấy thông tin KOL."
-        />
+        /> */}
       </Container>
     </Box>
   );
