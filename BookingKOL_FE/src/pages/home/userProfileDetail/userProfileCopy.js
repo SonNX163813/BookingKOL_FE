@@ -10,9 +10,9 @@ import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 
 export const USER_PROFILE_GENDER_OPTIONS = [
   { value: "", label: "Chọn" },
-  { value: "male", label: "Nam" },
-  { value: "female", label: "Nữ" },
-  { value: "other", label: "Khác" },
+  { value: "Male", label: "Nam" },
+  { value: "Female", label: "Nữ" },
+  { value: "Other", label: "Khác" },
 ];
 
 export const USER_PROFILE_SECTIONS = [
@@ -20,7 +20,7 @@ export const USER_PROFILE_SECTIONS = [
     key: "contact",
     title: "Thông tin liên hệ",
     description:
-      "Thông tin này giúp BookingKOL và đối tác có thể liên hệ với bạn nhanh hơn.",
+      "Thông tin này giúp NexusSocial và KOL có thể liên hệ với bạn nhanh hơn.",
     fields: [
       {
         name: "fullName",

@@ -50,7 +50,7 @@ const sectionCardStyles = {
 
 const normalizeGender = (value) => {
   if (value === undefined || value === null) return "";
-  const normalized = String(value).trim().toLowerCase();
+  const normalized = String(value).trim();
   if (["Male", "Nam", "M"].includes(normalized)) return "Male";
   if (["Female", "Nữ", "F"].includes(normalized)) return "Female";
   if (["Other", "Khác", "O"].includes(normalized)) return "Other";
@@ -686,9 +686,9 @@ export default function UserProfile() {
                     </Typography>
                   </Stack>
                   <Grid container spacing={2.5} alignItems="stretch">
+                    {renderField(contactEmailField)}
                     {renderField(contactFullNameField)}
                     {renderField(contactBrandNameField)}
-                    {renderField(contactEmailField)}
                     {renderField(contactPhoneField)}
                     {renderField(contactAddressField, {
                       sx: {

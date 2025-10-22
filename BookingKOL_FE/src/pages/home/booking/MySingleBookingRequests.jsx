@@ -13,7 +13,13 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { CalendarRange, Eye, RefreshCcw, RotateCcw, Search } from "lucide-react";
+import {
+  CalendarRange,
+  Eye,
+  RefreshCcw,
+  RotateCcw,
+  Search,
+} from "lucide-react";
 import { useGetMySingleBookingRequests } from "../../../hook/user/booking/useGetMySingleBookingRequests";
 
 const { Text } = Typography;
@@ -265,14 +271,15 @@ const MySingleBookingRequests = () => {
         title: "Thao tác",
         key: "actions",
         fixed: "right",
-        width: 140,
+        width: 100,
         render: (_, record) => (
           <Button
             type="link"
-            icon={<Eye size={16} />}
+            // icon={<Eye size={16} />}
             onClick={() => handleViewDetail(record)}
+            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
           >
-            Chi tiết
+            <Eye size={18} className="font-semibold" />
           </Button>
         ),
       },
@@ -282,7 +289,7 @@ const MySingleBookingRequests = () => {
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 px-4 py-8">
-      <div className="w-full max-w-[1500px] flex flex-col items-center text-center">
+      <div className="w-full max-w-[1560px] flex flex-col items-center text-center">
         <div className="inline-flex items-center gap-2 border-2 border-gray-300 p-2 rounded-md mb-2">
           <CalendarRange className="text-gray-500" size={18} />
           <Text strong className="uppercase text-[15px]">
@@ -352,7 +359,7 @@ const MySingleBookingRequests = () => {
           loading={isLoadingMyBookingRequests}
           pagination={false}
           rowKey={deriveRowKey}
-          scroll={{ x: 1200 }}
+          scroll={{ x: "auto" }}
           locale={{ emptyText: "Không có dữ liệu" }}
         />
 

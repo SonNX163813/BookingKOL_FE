@@ -420,17 +420,18 @@ const ManagementBookingRequests = () => {
         },
       },
       {
-        title: "Actions",
+        title: "Thao tác",
         key: "actions",
         fixed: "right",
-        width: 140,
+        width: 100,
         render: (_, record) => (
           <Button
             type="link"
-            icon={<Eye size={16} />}
+            // icon={<Eye size={16} />}
             onClick={() => handleViewDetail(record)}
+            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
           >
-            Xem chi tiet
+            <Eye size={18} className="font-semibold" />
           </Button>
         ),
       },
@@ -517,7 +518,7 @@ const ManagementBookingRequests = () => {
           loading={isLoadingBookingRequests}
           pagination={false}
           rowKey={composeRowKey}
-          scroll={{ x: 960 }}
+          scroll={{ x: "auto" }}
         />
 
         <div className="mt-4 flex justify-end">
