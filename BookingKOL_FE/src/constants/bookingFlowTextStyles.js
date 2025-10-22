@@ -29,6 +29,7 @@ export const BOOKING_FLOW_TEXT = {
     email: "Email",
     phone: "Số điện thoại",
     note: "Ghi chú cho KOL",
+    location: "Địa điểm/ Nền tảng tổ chức",
     attachments: "Tệp đính kèm (không bắt buộc)",
     scheduleTitle: "Chọn khung giờ khả dụng",
     summaryTitle: "Tổng quan đặt lịch",

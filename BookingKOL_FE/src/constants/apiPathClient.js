@@ -25,6 +25,7 @@ export const CLIENT_API_PATHS = {
     createSingle: "/v1/user/booking/request/single",
     holdSlot: "/v1/user/booking/hold-slot",
     getMySingleRequests: "/v1/user/booking/single-requests/all",
+    getMySingleRequestDetail: "/v1/user/booking/single-requests/detail",
   },
   COURSE: {
     getAll: "/v1/courses/all",

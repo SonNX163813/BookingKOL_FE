@@ -31,6 +31,7 @@ import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPa
 import BookingSinglePayment from "../pages/booking_single/BookingSinglePayment.jsx";
 import BookingSinglePaymentSuccess from "../pages/booking_single/BookingSinglePaymentSuccess.jsx";
 import MySingleBookingRequests from "../pages/home/booking/MySingleBookingRequests.jsx";
+import MySingleBookingRequestDetail from "../pages/home/booking/MySingleBookingRequestDetail.jsx";
 
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
@@ -81,6 +82,10 @@ export const routerCustomer = [
           { path: "/userprofile", element: <UserProfile /> },
           { path: "/don-mua", element: <HistoryBookingPackagePage /> },
           { path: "/don-booking-kol", element: <MySingleBookingRequests /> },
+          {
+            path: "/don-booking-kol/:requestId",
+            element: <MySingleBookingRequestDetail />,
+          },
         ],
       },
     ],

@@ -71,7 +71,7 @@ const BookingContactStep = ({
     <Stack spacing={3}>
       {/* Thông tin liên hệ */}
       <Stack spacing={2}>
-        {/* <TextField
+        <TextField
           label={TEXT.form.name}
           value={contact.fullName}
           onChange={(event) => onContactChange("fullName", event.target.value)}
@@ -83,8 +83,8 @@ const BookingContactStep = ({
               backgroundColor: STYLE.subtleSurface,
             },
           }}
-        /> */}
-        {/* <TextField
+        />
+        <TextField
           label={TEXT.form.email}
           value={contact.email}
           onChange={(event) => onContactChange("email", event.target.value)}
@@ -96,8 +96,8 @@ const BookingContactStep = ({
               backgroundColor: STYLE.subtleSurface,
             },
           }}
-        /> */}
-        {/* <TextField
+        />
+        <TextField
           label={TEXT.form.phone}
           value={contact.phone}
           onChange={(event) => onContactChange("phone", event.target.value)}
@@ -110,7 +110,23 @@ const BookingContactStep = ({
               backgroundColor: STYLE.subtleSurface,
             },
           }}
-        /> */}
+        />
+        <TextField
+          label={TEXT.form.location}
+          value={contact.location}
+          onChange={(event) => onContactChange("location", event.target.value)}
+          // error={Boolean(errors.location)}
+          // helperText={errors.location}
+          multiline
+          minRows={3}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: "16px",
+              backgroundColor: STYLE.subtleSurface,
+            },
+          }}
+        />
+
         <TextField
           label={TEXT.form.note}
           value={contact.note}

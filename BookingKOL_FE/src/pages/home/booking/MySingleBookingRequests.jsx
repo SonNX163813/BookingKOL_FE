@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 import {
   Button,
   Card,
@@ -10,30 +11,36 @@ import {
   Space,
   Table,
   Tag,
+  Typography,
 } from "antd";
-import { CalendarRange, RefreshCcw, RotateCcw, Search } from "lucide-react";
+import { CalendarRange, Eye, RefreshCcw, RotateCcw, Search } from "lucide-react";
 import { useGetMySingleBookingRequests } from "../../../hook/user/booking/useGetMySingleBookingRequests";
 
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
+/* ------------------- CONSTANTS ------------------- */
+
 const BOOKING_STATUS_OPTIONS = [
-  { label: "Cho xu ly", value: "PENDING" },
-  { label: "Dang dam phan", value: "NEGOTIATING" },
-  { label: "Da chap nhan", value: "ACCEPTED" },
-  { label: "Da xac nhan", value: "CONFIRMED" },
-  { label: "Dang thuc hien", value: "IN_PROGRESS" },
-  { label: "Da giao", value: "DELIVERED" },
-  { label: "Hoan thanh", value: "COMPLETED" },
-  { label: "Dang tranh chap", value: "DISPUTED" },
-  { label: "Da tu choi", value: "REJECTED" },
-  { label: "Da huy", value: "CANCELLED" },
-  { label: "Da ky hop dong", value: "CONTRACT_SIGNED" },
-  { label: "Ban nhap", value: "DRAFT" },
-  { label: "Dang yeu cau", value: "REQUESTED" },
-  { label: "Het han", value: "EXPIRED" },
+  { label: "Bản nháp", value: "DRAFT" },
+  { label: "Đang yêu cầu", value: "REQUESTED" },
+  { label: "Chờ xử lý", value: "PENDING" },
+  { label: "Đang đàm phán", value: "NEGOTIATING" },
+  { label: "Đã chấp nhận", value: "ACCEPTED" },
+  { label: "Đã xác nhận", value: "CONFIRMED" },
+  { label: "Đang thực hiện", value: "IN_PROGRESS" },
+  { label: "Đã giao", value: "DELIVERED" },
+  { label: "Hoàn thành", value: "COMPLETED" },
+  { label: "Đang tranh chấp", value: "DISPUTED" },
+  { label: "Đã từ chối", value: "REJECTED" },
+  { label: "Đã hủy", value: "CANCELLED" },
+  { label: "Đã ký hợp đồng", value: "CONTRACT_SIGNED" },
+  { label: "Hết hạn", value: "EXPIRED" },
 ];
 
 const STATUS_TAG_COLOR = {
+  DRAFT: "default",
+  REQUESTED: "processing",
   PENDING: "processing",
   NEGOTIATING: "cyan",
   ACCEPTED: "success",
@@ -45,20 +52,18 @@ const STATUS_TAG_COLOR = {
   REJECTED: "error",
   CANCELLED: "warning",
   CONTRACT_SIGNED: "purple",
-  DRAFT: "default",
-  REQUESTED: "processing",
   EXPIRED: "volcano",
 };
 
 const PAYMENT_STATUS_OPTIONS = [
-  { label: "Da thanh toan", value: "PAID" },
-  { label: "Cho thanh toan", value: "PENDING" },
-  { label: "Dang xu ly", value: "PROCESSING" },
-  { label: "Hoan tat", value: "COMPLETED" },
-  { label: "That bai", value: "FAILED" },
-  { label: "Het han", value: "EXPIRED" },
-  { label: "Da huy", value: "CANCELLED" },
-  { label: "Da hoan tien", value: "REFUNDED" },
+  { label: "Đã thanh toán", value: "PAID" },
+  { label: "Chờ thanh toán", value: "PENDING" },
+  { label: "Đang xử lý", value: "PROCESSING" },
+  { label: "Hoàn tất", value: "COMPLETED" },
+  { label: "Thất bại", value: "FAILED" },
+  { label: "Hết hạn", value: "EXPIRED" },
+  { label: "Đã hủy", value: "CANCELLED" },
+  { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 
 const PAYMENT_STATUS_COLOR = {
@@ -72,121 +77,55 @@ const PAYMENT_STATUS_COLOR = {
   REFUNDED: "purple",
 };
 
-const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
-  if (!value) {
-    return "--";
-  }
+/* ------------------- HELPERS ------------------- */
 
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format(pattern) : "--";
-};
+const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
+  value ? (dayjs(value).isValid() ? dayjs(value).format(pattern) : "--") : "--";
 
 const composeExecutionTime = (record) => {
-  const start = record?.startAt ?? record?.startTime ?? null;
-  const end = record?.endAt ?? record?.endTime ?? null;
+  const start = record?.startAt ?? record?.startTime;
+  const end = record?.endAt ?? record?.endTime;
+  if (!start && !end) return "--";
 
-  if (!start && !end) {
-    return "--";
-  }
+  const startLabel = formatDateTime(start);
+  const endLabel = formatDateTime(end);
+  const sameDay =
+    dayjs(start).isValid() &&
+    dayjs(end).isValid() &&
+    dayjs(start).isSame(end, "day");
 
-  const startLabel = start ? formatDateTime(start) : null;
-  const endLabel = end ? formatDateTime(end) : null;
-
-  if (startLabel && endLabel) {
-    const sameDay =
-      dayjs(start).isValid() &&
-      dayjs(end).isValid() &&
-      dayjs(start).isSame(dayjs(end), "day");
-
-    if (sameDay) {
-      return `${dayjs(start).format("DD/MM/YYYY HH:mm")} -> ${dayjs(end).format(
+  return sameDay
+    ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} → ${dayjs(end).format(
         "HH:mm"
-      )}`;
-    }
-
-    return `${startLabel} -> ${endLabel}`;
-  }
-
-  return startLabel ?? endLabel ?? "--";
+      )}`
+    : `${startLabel} → ${endLabel}`;
 };
 
-const getPrimaryContract = (record) => {
-  if (!record?.contracts || !Array.isArray(record.contracts)) {
-    return null;
-  }
+const formatCurrency = (value) =>
+  value
+    ? new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+        maximumFractionDigits: 0,
+      }).format(value)
+    : "--";
 
-  return record.contracts.find(Boolean) ?? null;
-};
+const deriveRowKey = (record) =>
+  record?.id ??
+  record?.code ??
+  `booking-${Math.random().toString(36).slice(2, 10)}`;
 
-const getPrimaryPayment = (record) => {
-  const contract = getPrimaryContract(record);
-  return contract?.paymentDTO ?? null;
-};
+const getPrimaryContract = (r) => r?.contracts?.find(Boolean) ?? null;
+const getPrimaryPayment = (r) => getPrimaryContract(r)?.paymentDTO ?? null;
 
-const formatCurrency = (value, currency = "VND") => {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-
-  const numeric =
-    typeof value === "number" ? value : Number.parseFloat(String(value));
-
-  if (Number.isNaN(numeric)) {
-    return "--";
-  }
-
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(numeric);
-};
-
-const deriveRowKey = (record) => {
-  if (!record || typeof record !== "object") {
-    return `booking-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
-  const candidates = [
-    record.id,
-    record.bookingRequestId,
-    record.requestId,
-    record.code,
-  ]
-    .map((value) =>
-      value === undefined || value === null ? undefined : String(value)
-    )
-    .filter(Boolean);
-
-  if (candidates.length > 0) {
-    return candidates[0];
-  }
-
-  const fallback = [
-    record.userId,
-    record.kolId,
-    record.createdAt,
-    record.startAt,
-    record.endAt,
-  ]
-    .filter((value) => value !== undefined && value !== null)
-    .map((value) => String(value))
-    .join("-");
-
-  return fallback || `booking-${Math.random().toString(36).slice(2, 10)}`;
-};
+/* ------------------- COMPONENT ------------------- */
 
 const MySingleBookingRequests = () => {
   const [form] = Form.useForm();
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
-  const [filters, setFilters] = useState({
-    status: undefined,
-    startAt: undefined,
-    endAt: undefined,
-    createdAtFrom: undefined,
-    createdAtTo: undefined,
-  });
+  const [filters, setFilters] = useState({});
+  const navigate = useNavigate();
 
   const {
     isLoadingMyBookingRequests,
@@ -203,269 +142,231 @@ const MySingleBookingRequests = () => {
   const dataSource = Array.isArray(rawData)
     ? rawData
     : rawData?.content ?? rawData?.items ?? [];
-
-  const explicitTotal =
-    typeof rawData?.totalElements === "number"
-      ? rawData.totalElements
-      : typeof rawData?.total === "number"
-      ? rawData.total
-      : undefined;
-
-  const inferredTotal =
-    page * size +
-    dataSource.length +
-    (explicitTotal === undefined && dataSource.length === size ? 1 : 0);
-
   const totalElements =
-    explicitTotal ??
-    Math.max(
-      Array.isArray(rawData) ? rawData.length : dataSource.length,
-      inferredTotal
-    );
-
-  useEffect(() => {
-    if (page > 0 && dataSource.length === 0) {
-      setPage((prev) => Math.max(0, prev - 1));
-    }
-  }, [dataSource.length, page]);
+    rawData?.totalElements ?? rawData?.total ?? dataSource?.length ?? 0;
 
   const handleFilter = (values) => {
     const { status, executionRange, createdRange } = values ?? {};
-
-    const [executionStart, executionEnd] = Array.isArray(executionRange)
-      ? executionRange
-      : [];
-    const [createdStart, createdEnd] = Array.isArray(createdRange)
-      ? createdRange
-      : [];
-
     setFilters({
-      status: status ?? undefined,
-      startAt: executionStart ? executionStart.toISOString() : undefined,
-      endAt: executionEnd ? executionEnd.toISOString() : undefined,
-      createdAtFrom: createdStart
-        ? createdStart.startOf("day").format("YYYY-MM-DD")
-        : undefined,
-      createdAtTo: createdEnd
-        ? createdEnd.endOf("day").format("YYYY-MM-DD")
-        : undefined,
+      status,
+      startAt: executionRange?.[0]?.toISOString(),
+      endAt: executionRange?.[1]?.toISOString(),
+      createdAtFrom: createdRange?.[0]?.startOf("day").format("YYYY-MM-DD"),
+      createdAtTo: createdRange?.[1]?.endOf("day").format("YYYY-MM-DD"),
     });
     setPage(0);
   };
 
   const handleReset = () => {
     form.resetFields();
-    setFilters({
-      status: undefined,
-      startAt: undefined,
-      endAt: undefined,
-      createdAtFrom: undefined,
-      createdAtTo: undefined,
-    });
+    setFilters({});
     setPage(0);
   };
+
+  const handleViewDetail = useCallback(
+    (record) => {
+      const requestId = record?.id;
+      if (!requestId) {
+        return;
+      }
+
+      navigate(`/don-booking-kol/${requestId}`);
+    },
+    [navigate]
+  );
 
   const columns = useMemo(
     () => [
       {
-        title: "Ma don",
-        dataIndex: "id",
-        key: "id",
-        width: 230,
-        ellipsis: true,
-        render: (value) => value ?? "--",
+        title: "Mã đơn",
+        key: "contractId",
+        width: 260,
+        render: (_, record) => {
+          const contractId = record?.contracts?.[0]?.id;
+          return contractId ?? "--";
+        },
       },
       {
-        title: "Trang thai",
+        title: "Trạng thái",
         dataIndex: "status",
         key: "status",
-        width: 160,
-        render: (status) => {
-          const normalized = status?.toUpperCase();
-          const displayLabel =
-            BOOKING_STATUS_OPTIONS.find((item) => item.value === normalized)
-              ?.label ?? normalized ?? "--";
+        width: 150,
+        render: (v) => {
+          const normalized = v?.toUpperCase();
+          const label =
+            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
+            normalized;
           return (
-            <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>
-              {displayLabel}
-            </Tag>
+            <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>{label}</Tag>
           );
         },
       },
       {
-        title: "Loai booking",
-        dataIndex: "bookingType",
-        key: "bookingType",
-        width: 140,
-        render: (type) => type ?? "--",
-      },
-      {
-        title: "Thoi gian thuc hien",
+        title: "Thời gian thực hiện",
         key: "executionTime",
-        width: 260,
-        render: (_, record) => composeExecutionTime(record),
+        width: 250,
+        render: (_, r) => composeExecutionTime(r),
       },
       {
-        title: "Dia diem",
+        title: "Địa điểm",
         dataIndex: "location",
         key: "location",
         width: 200,
-        ellipsis: true,
-        render: (value) => value || "--",
+        render: (v) => v || "--",
       },
       {
-        title: "Trang thai thanh toan",
+        title: "Thanh toán",
         key: "paymentStatus",
-        width: 190,
-        render: (_, record) => {
-          const payment = getPrimaryPayment(record);
-          const normalized = payment?.status
-            ? String(payment.status).toUpperCase()
-            : null;
-
-          if (!normalized) {
-            return "--";
-          }
-
-          const displayLabel =
-            PAYMENT_STATUS_OPTIONS.find((item) => item.value === normalized)
-              ?.label ?? normalized;
-
+        width: 160,
+        render: (_, r) => {
+          const payment = getPrimaryPayment(r);
+          const normalized = payment?.status?.toUpperCase();
+          const label =
+            PAYMENT_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
+            normalized ??
+            "--";
           return (
             <Tag color={PAYMENT_STATUS_COLOR[normalized] ?? "default"}>
-              {displayLabel}
+              {label}
             </Tag>
           );
         },
       },
       {
-        title: "Tong tien",
+        title: "Tổng tiền",
         key: "totalAmount",
-        width: 160,
-        render: (_, record) => {
-          const payment = getPrimaryPayment(record);
+        width: 150,
+        render: (_, r) => {
+          const payment = getPrimaryPayment(r);
           const amount =
             payment?.totalAmount ??
             payment?.paidAmount ??
-            record?.totalAmount ??
-            record?.budget ??
+            r?.totalAmount ??
+            r?.budget ??
             null;
-
           return formatCurrency(amount);
         },
       },
       {
-        title: "Ngay tao",
+        title: "Ngày tạo",
         dataIndex: "createdAt",
         key: "createdAt",
-        width: 200,
-        render: (createdAt) => formatDateTime(createdAt),
+        width: 180,
+        render: (v) => formatDateTime(v),
       },
       {
-        title: "Ghi chu",
+        title: "Ghi chú",
         dataIndex: "description",
         key: "description",
         ellipsis: true,
-        render: (value) => (value && value.trim()) || "--",
+        render: (v) => v?.trim() || "--",
+      },
+      {
+        title: "Thao tác",
+        key: "actions",
+        fixed: "right",
+        width: 140,
+        render: (_, record) => (
+          <Button
+            type="link"
+            icon={<Eye size={16} />}
+            onClick={() => handleViewDetail(record)}
+          >
+            Chi tiết
+          </Button>
+        ),
       },
     ],
-    []
+    [handleViewDetail]
   );
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="border-2 border-gray-300 p-2 rounded-md w-fit">
-          <CalendarRange className="text-gray-500" size={20} />
+    <div className="flex flex-col items-center justify-center gap-6 px-4 py-8">
+      <div className="w-full max-w-[1500px] flex flex-col items-center text-center">
+        <div className="inline-flex items-center gap-2 border-2 border-gray-300 p-2 rounded-md mb-2">
+          <CalendarRange className="text-gray-500" size={18} />
+          <Text strong className="uppercase text-[15px]">
+            Đơn booking của tôi
+          </Text>
         </div>
-        <div>
-          <h1 className="text-[18px] font-bold uppercase">
-            Don booking cua toi
-          </h1>
-          <p className="text-[14px] text-gray-600">
-            Theo doi tat ca don booking KOL ma ban da tao va trang thai xu ly.
-          </p>
-        </div>
+        <p className="text-gray-600 text-sm">
+          Theo dõi toàn bộ đơn booking KOL bạn đã tạo và trạng thái xử lý.
+        </p>
       </div>
 
-      <Card bordered={false} className="shadow-sm">
+      <Card bordered={false} className="w-full max-w-[1500px] shadow-sm">
         <Form
           form={form}
           layout="vertical"
           onFinish={handleFilter}
-          className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+          className="grid md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
-          <Form.Item label="Trang thai booking" name="status">
+          <Form.Item label="Trạng thái booking" name="status">
             <Select
+              placeholder="Chọn trạng thái"
               allowClear
-              placeholder="Chon trang thai"
               options={BOOKING_STATUS_OPTIONS}
             />
           </Form.Item>
-          <Form.Item label="Thoi gian thuc hien" name="executionRange">
+          <Form.Item label="Thời gian thực hiện" name="executionRange">
             <RangePicker
-              className="w-full"
               showTime
-              allowEmpty={[true, true]}
-              placeholder={["Bat dau", "Ket thuc"]}
+              className="w-full"
+              placeholder={["Bắt đầu", "Kết thúc"]}
             />
           </Form.Item>
-          <Form.Item label="Thoi gian tao" name="createdRange">
+          <Form.Item label="Ngày tạo" name="createdRange">
             <RangePicker
               className="w-full"
-              format="YYYY-MM-DD"
-              allowEmpty={[true, true]}
-              placeholder={["Tu ngay", "Den ngay"]}
+              placeholder={["Từ ngày", "Đến ngày"]}
             />
           </Form.Item>
-          <div className="flex flex-col justify-end gap-2 sm:flex-row sm:items-end sm:justify-end">
-            <Space size="middle" wrap>
+          <div className="flex justify-center ">
+            <Space>
               <Button
                 type="primary"
                 htmlType="submit"
                 icon={<Search size={16} />}
               >
-                Tim kiem
+                Tìm kiếm
               </Button>
               <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
-                Dat lai
+                Đặt lại
               </Button>
               <Button
                 icon={<RefreshCcw size={16} />}
                 onClick={() => refetchMyBookingRequests()}
                 loading={isFetchingMyBookingRequests}
               >
-                Lam moi
+                Làm mới
               </Button>
             </Space>
           </div>
         </Form>
       </Card>
 
-      <Card bordered={false} className="flex-1 shadow-sm">
+      <Card bordered={false} className="w-full max-w-[1500px] shadow-sm">
         <Table
           columns={columns}
           dataSource={dataSource}
           loading={isLoadingMyBookingRequests}
           pagination={false}
           rowKey={deriveRowKey}
-          scroll={{ x: 1080 }}
-          locale={{
-            emptyText: "Khong co du lieu",
-          }}
+          scroll={{ x: 1200 }}
+          locale={{ emptyText: "Không có dữ liệu" }}
         />
 
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-center mt-5">
           <Pagination
             current={page + 1}
             pageSize={size}
             total={totalElements}
-            pageSizeOptions={["10", "20", "50"]}
             showSizeChanger
-            onChange={(nextPage, nextSize) => {
-              const isSizeChanged = nextSize !== size;
-              setSize(nextSize);
-              setPage(isSizeChanged ? 0 : nextPage - 1);
+            pageSizeOptions={["10", "20", "50"]}
+            onChange={(p, s) => {
+              const sizeChanged = s !== size;
+              setSize(s);
+              setPage(sizeChanged ? 0 : p - 1);
             }}
           />
         </div>

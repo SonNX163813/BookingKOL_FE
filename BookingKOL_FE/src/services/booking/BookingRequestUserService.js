@@ -36,3 +36,15 @@ export const getMySingleBookingRequests = async ({
     },
   });
 };
+
+export const getMySingleBookingRequestDetail = async (requestId) => {
+  if (!requestId) {
+    throw new Error(
+      "requestId is required to fetch single booking request detail"
+    );
+  }
+
+  return await get({
+    url: `${CLIENT_API_PATHS.BOOKING.getMySingleRequestDetail}/${requestId}`,
+  });
+};
