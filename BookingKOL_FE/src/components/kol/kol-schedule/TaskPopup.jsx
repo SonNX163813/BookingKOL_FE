@@ -1,3 +1,4 @@
+// src/components/kol/kol-schedule/TaskPopup.jsx
 import React from "react";
 import { Modal } from "antd";
 import { IoCloseOutline } from "react-icons/io5";
@@ -9,71 +10,97 @@ export default function TaskPopup({
   goalDetails,
   dayInfo,
   onClose,
-  range,
-  isLastCol,
-  readOnly = true,
 }) {
   if (!isDisplay) return null;
+
+  const hhmm = (t) => (t ? t.slice(0, 5) : "");
+  const isBooking =
+    goalDetails?.isBooking ||
+    String(goalDetails?.status || "")
+      .toLowerCase()
+      .includes("book");
+
+  const titleText = isBooking
+    ? goalDetails?.description || "Booking"
+    : "Lịch rảnh";
 
   return (
     <Modal
       open={isDisplay}
       onCancel={onClose}
-      closable={false}
-      footer={null}
+      title={null} // tự render header để canh lề đẹp
+      closable={false} // dùng nút X tự làm
+      maskClosable
+      keyboard
+      destroyOnClose
       centered
-      width={360}
-      classNames={{ content: "!p-0" }}
+      width={"min(92vw, 500px)"} // hẹp ngang, cao vừa nội dung
+      styles={{
+        content: {
+          background: "#ffffff",
+          borderRadius: 24,
+          border: "1px solid #e5e7eb", // xám nhạt, nhẹ mắt
+          overflow: "hidden",
+        },
+        body: { padding: 0 },
+      }}
+      zIndex={2000}
+      footer={null}
     >
-      <div className="px-4 py-3 rounded-2xl w-full bg-white flex flex-col gap-3">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="font-semibold truncate">
-            {goalDetails.description}
-          </div>
-          <IoCloseOutline
-            className="text-2xl text-gray-500 cursor-pointer"
-            onClick={onClose}
-          />
-        </div>
+      {/* Header */}
+      <div className="px-5 pt-3 pb-2 border-b border-gray-200 flex items-start justify-between">
+        <h3 className="font-semibold text-[18px] leading-none mt-1">
+          {titleText}
+        </h3>
+        <button
+          aria-label="Đóng"
+          onClick={onClose}
+          className="p-1 -mt-1 rounded hover:bg-gray-100 transition"
+        >
+          <IoCloseOutline className="text-2xl text-gray-600" />
+        </button>
+      </div>
 
-        {/* Time */}
-        <div className="flex justify-between mt-2 text-[14px] gap-6 text-gray-700">
+      {/* Body */}
+      <div className="px-5 pt-4 pb-5 text-gray-700">
+        {/* Thời gian */}
+        <div className="flex items-start justify-between gap-3 text-[15px] flex-wrap">
           <div className="flex items-center gap-2">
-            <CiClock2 className="text-lg" />
-            <span>
-              {dayInfo.weekday}, {dayInfo.day}/{dayInfo.month}/{dayInfo.year}
+            <CiClock2 className="text-xl text-gray-600" />
+            <span className="font-medium">
+              {dayInfo?.weekday}, {dayInfo?.day}/{dayInfo?.month}/
+              {dayInfo?.year}
             </span>
           </div>
-          <div>
-            {goalDetails.startTime?.slice(0, 5)} -{" "}
-            {goalDetails.endTime?.slice(0, 5)}
+          <div className="font-semibold">
+            {isBooking
+              ? `${hhmm(goalDetails?.startTime)} - ${hhmm(
+                  goalDetails?.endTime
+                )}`
+              : `Rảnh từ ${hhmm(goalDetails?.startTime)} đến ${hhmm(
+                  goalDetails?.endTime
+                )}`}
           </div>
         </div>
 
-        {/* Goal */}
-        <div className="flex items-center gap-2 text-gray-700 text-sm mt-2">
-          <GoGoal className="text-lg" />
-          <span>Mục tiêu:</span>
+        {/* Mục tiêu */}
+        <div className="mt-4 flex items-center gap-2 text-[15px]">
+          <GoGoal className="text-xl text-gray-600" />
+          <span className="font-medium">Mục tiêu:</span>
           <span className="font-semibold">
-            {goalDetails.goalsTitle || "Lịch làm"}
+            {goalDetails?.goalsTitle || (isBooking ? "Booking" : "Lịch rảnh")}
           </span>
         </div>
 
-        {/* Color */}
-        <div className="mt-2 flex items-center gap-2">
-          <span className="text-sm text-gray-600">Màu:</span>
-          <div
-            className="w-4 h-4 rounded-full"
-            style={{ backgroundColor: goalDetails.colorCode }}
-          />
+        {/* Footer */}
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition text-[14px]"
+          >
+            Đóng
+          </button>
         </div>
-
-        {readOnly && (
-          <div className="text-xs text-gray-500 mt-2 italic">
-            *Chế độ xem (read-only).
-          </div>
-        )}
       </div>
     </Modal>
   );

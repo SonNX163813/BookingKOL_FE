@@ -1,3 +1,4 @@
+// src/pages/kol/KolSchedule.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -16,12 +17,12 @@ import { useAuth } from "../../context/AuthContext";
 dayjs.extend(isoWeek);
 dayjs.locale("vi");
 
-/* ================= MOCK CONFIG ================= */
+/* ================= CONFIG ================= */
 const ENABLE_MOCK_FALLBACK = true;
-const DEFAULT_COLOR_AVAILABLE = "#3b82f6";
-const DEFAULT_COLOR_UNAVAILABLE = "#ef4444";
+const DEFAULT_COLOR_AVAILABLE = "#3b82f6"; // Xanh dương: lịch rảnh
+const DEFAULT_COLOR_UNAVAILABLE = "#ef4444"; // Đỏ: booking
 
-/** mock items theo khoảng from..to */
+/** Tạo mock items trong khoảng from..to */
 function makeMockItems(from, to) {
   const items = [];
   for (
@@ -34,20 +35,22 @@ function makeMockItems(from, to) {
     const s2 = d.hour(14).minute(0).second(0);
     const e2 = d.hour(16).minute(0).second(0);
     items.push(
+      // Lịch rảnh (AVAILABLE) — xanh
       {
         id: `mk-${d.format("YYYYMMDD")}-1`,
         startAt: s1.toISOString(),
         endAt: e1.toISOString(),
         status: "AVAILABLE",
-        note: "Available block",
+        note: "Lịch rảnh",
         color: DEFAULT_COLOR_AVAILABLE,
       },
+      // Booking — đỏ (thêm bookingTitle để nhận diện)
       {
         id: `mk-${d.format("YYYYMMDD")}-2`,
         startAt: s2.toISOString(),
         endAt: e2.toISOString(),
-        status: "UNAVAILABLE",
-        note: "Busy block",
+        status: "BOOKING",
+        bookingTitle: "Booking demo",
         color: DEFAULT_COLOR_UNAVAILABLE,
       }
     );
@@ -55,9 +58,10 @@ function makeMockItems(from, to) {
   return items;
 }
 
-/* helpers parse/map */
+/* ================= Helpers parse/map ================= */
 const fmtDay = (d) => dayjs(d).format("DD");
 const fmtHour = (d) => dayjs(d).format("HH");
+
 const parseStart = (item) => {
   const raw =
     item?.startTime ||
@@ -67,6 +71,7 @@ const parseStart = (item) => {
     item?.start;
   return dayjs(raw);
 };
+
 const parseEnd = (item, fallback) => {
   const raw =
     item?.endTime ||
@@ -77,21 +82,34 @@ const parseEnd = (item, fallback) => {
   const d = dayjs(raw);
   return d.isValid() ? d : dayjs(fallback).add(1, "hour");
 };
-const getColor = (item) => {
-  if (item?.color) return item.color;
-  const available =
-    item?.available ??
-    item?.isAvailable ??
-    (typeof item?.status === "string"
-      ? item.status.toLowerCase().includes("available")
-      : undefined);
-  if (available === false) return DEFAULT_COLOR_UNAVAILABLE;
-  return DEFAULT_COLOR_AVAILABLE;
-};
-const getTitle = (item) =>
-  item?.title || item?.note || item?.description || "Available";
 
-/** shape về {goalsTitle, goalList} */
+// Nhận diện booking vs availability
+const isBookingLike = (item) => {
+  const s = String(item?.status || "").toLowerCase();
+  return (
+    s.includes("book") ||
+    !!item?.bookingTitle ||
+    !!item?.bookingId ||
+    !!item?.orderId ||
+    !!item?.campaignTitle
+  );
+};
+
+const getColor = (item) =>
+  isBookingLike(item) ? DEFAULT_COLOR_UNAVAILABLE : DEFAULT_COLOR_AVAILABLE;
+
+// Title dùng cho thẻ hiển thị
+const getTitle = (item) =>
+  isBookingLike(item)
+    ? item?.bookingTitle || item?.title || item?.note || "Booking"
+    : "Lịch rảnh"; // đổi Available -> Lịch rảnh
+
+/**
+ * Chuẩn hóa dữ liệu về dạng:
+ * { goalsTitle: [], goalList: [{ day: "DD", task: [{ time: "HH", description: Task[] }] }] }
+ * Trong đó mỗi Task có:
+ *   { id, description, colorCode, startTime, endTime, status, isBooking, ... }
+ */
 const toGoalsShape = (items, rangeFrom, rangeTo) => {
   const buckets = {};
   items.forEach((raw, idx) => {
@@ -106,16 +124,17 @@ const toGoalsShape = (items, rangeFrom, rangeTo) => {
 
     const rec = {
       id: raw.id || `${s.toISOString()}_${idx}`,
-      time: s.format("HH:mm:ss"),
-      title: getTitle(raw),
-      description: getTitle(raw),
-      category: raw.category || "",
-      status: raw.status || "",
-      colorCode: getColor(raw),
+      description: getTitle(raw), // "Lịch rảnh" hoặc bookingTitle
+      colorCode: getColor(raw), // xanh cho rảnh, đỏ cho booking
       goalsTitle: raw.goalTitle || "",
-      isDone: !!raw.isDone,
+      status: raw.status || (isBookingLike(raw) ? "BOOKING" : "AVAILABLE"),
       startTime: s.format("HH:mm:ss"),
       endTime: e.format("HH:mm:ss"),
+      isBooking: isBookingLike(raw),
+
+      // giữ thêm nếu cần
+      category: raw.category || "",
+      isDone: !!raw.isDone,
       goalId: raw.goalId || "",
     };
 
@@ -149,7 +168,7 @@ export default function KolSchedule() {
   const auth = useAuth?.() || {};
   const userId = auth?.user?.id;
 
-  const [range, setRange] = useState("week");
+  const [range, setRange] = useState("week"); // "day" | "week" | "month"
   const [anchorDate, setAnchorDate] = useState(dayjs());
   const [kolId, setKolId] = useState(kolIdParam || null);
   const [loading, setLoading] = useState(false);
@@ -158,7 +177,7 @@ export default function KolSchedule() {
     goalList: [],
   });
 
-  // from/to + header
+  // Tính from/to + nhãn header theo range
   const { fromDate, toDate, headerLabel } = useMemo(() => {
     if (range === "day") {
       const from = anchorDate.startOf("day");
@@ -172,7 +191,7 @@ export default function KolSchedule() {
       };
     }
     if (range === "week") {
-      const from = anchorDate.startOf("isoWeek");
+      const from = anchorDate.startOf("isoWeek"); // Monday
       const to = anchorDate.endOf("isoWeek");
       return {
         fromDate: from,
@@ -182,8 +201,9 @@ export default function KolSchedule() {
         )}`,
       };
     }
-    const from = anchorDate.startOf("month").startOf("week");
-    const to = anchorDate.endOf("month").endOf("week");
+    // month
+    const from = anchorDate.startOf("month").startOf("isoWeek");
+    const to = anchorDate.endOf("month").endOf("isoWeek");
     return {
       fromDate: from,
       toDate: to,
@@ -191,7 +211,7 @@ export default function KolSchedule() {
     };
   }, [range, anchorDate]);
 
-  // resolve kolId nếu thiếu
+  // Resolve kolId nếu thiếu: lấy theo userId
   useEffect(() => {
     let mounted = true;
     const resolveKolId = async () => {
@@ -218,6 +238,7 @@ export default function KolSchedule() {
     };
   }, [kolIdParam, userId]);
 
+  // Gọi API timeline
   const fetchTimeline = useCallback(async () => {
     setLoading(true);
     try {
@@ -236,10 +257,12 @@ export default function KolSchedule() {
           ? payload
           : [];
       }
+
       if ((!kolId || !list.length) && ENABLE_MOCK_FALLBACK) {
         console.warn("[Schedule] Dùng mock fallback");
         list = makeMockItems(fromDate, toDate);
       }
+
       setGoalsByDay(toGoalsShape(list, fromDate, toDate));
     } catch (e) {
       console.error(e);
@@ -261,7 +284,7 @@ export default function KolSchedule() {
     fetchTimeline();
   }, [fetchTimeline]);
 
-  // prev/next
+  // Điều hướng prev/next
   const handlePrev = () => {
     if (range === "day") setAnchorDate((d) => d.subtract(1, "day"));
     else if (range === "week") setAnchorDate((d) => d.subtract(1, "week"));

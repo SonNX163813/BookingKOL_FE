@@ -145,31 +145,46 @@ export default function MonthGrid({ dayDuties, range, fromDate }) {
                       </div>
 
                       <div className="flex flex-col gap-0.5 mt-1 flex-1 min-h-0">
-                        {visible.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => setPopupIndex(item.id)}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            <span
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: item.colorCode }}
-                            />
-                            <Tooltip title={item.description}>
-                              <p className="truncate text-[11px] md:text-[12px] font-medium text-[#1f335c]">
-                                {item.description}
-                              </p>
-                            </Tooltip>
-                          </div>
-                        ))}
+                        {visible.map((item) => {
+                          const isBooking =
+                            item?.isBooking ||
+                            String(item?.status || "")
+                              .toLowerCase()
+                              .includes("book");
+                          const hhmm = (t) => (t ? t.slice(0, 5) : "");
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-gray-50 cursor-pointer"
+                              onClick={() => setPopupIndex(item.id)}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: item.colorCode }}
+                              />
+                              <Tooltip title={item.description}>
+                                <p className="truncate text-[11px] md:text-[12px] font-medium text-[#1f335c]">
+                                  {isBooking
+                                    ? `${hhmm(item.startTime)}–${hhmm(
+                                        item.endTime
+                                      )} ${item.description}`
+                                    : `Rảnh từ ${hhmm(
+                                        item.startTime
+                                      )} đến ${hhmm(item.endTime)}`}
+                                </p>
+                              </Tooltip>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {hiddenCount > 0 && (
                         <div className="mt-2 pl-[12px]">
                           <p
-                            className="text-[11px] md:text-[12px] leading-5 text-[#0b60d0] cursor-pointer font-semibold"
+                            className="text-[11px] md:text-[12px] leading-1 text-[#0b60d0] cursor-pointer font-semibold"
                             onClick={() =>
                               setViewedDay({ tasks: allDescriptions, weekDate })
                             }
