@@ -29,6 +29,8 @@ import ListKOL from "../pages/home/kol/ListKOL.jsx";
 import ServicePackagePage from "../pages/booking_package/ServicePackagePage.jsx";
 import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPackagePage.jsx";
 import BookingSinglePayment from "../pages/booking_single/BookingSinglePayment.jsx";
+import BookingSinglePaymentSuccess from "../pages/booking_single/BookingSinglePaymentSuccess.jsx";
+import MySingleBookingRequests from "../pages/home/booking/MySingleBookingRequests.jsx";
 
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
@@ -61,6 +63,10 @@ export const routerCustomer = [
       { path: "/chat-AI", element: <ChatAIPage /> },
       { path: "/goi-chien-dich", element: <ServicePackagePage /> },
       { path: "/thanh-toan-kol-le", element: <BookingSinglePayment /> },
+      {
+        path: "/thanh-toan-kol-le/thanh-cong",
+        element: <BookingSinglePaymentSuccess />,
+      },
       ...courseRoutes,
     ],
   },
@@ -74,6 +80,7 @@ export const routerCustomer = [
         children: [
           { path: "/userprofile", element: <UserProfile /> },
           { path: "/don-mua", element: <HistoryBookingPackagePage /> },
+          { path: "/don-booking-kol", element: <MySingleBookingRequests /> },
         ],
       },
     ],

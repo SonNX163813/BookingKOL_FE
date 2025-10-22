@@ -21,7 +21,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 
-import hotkolimg from "../../../assets/hotkol.png";
+import defaultImg from "../../../assets/default.png";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import {
   getMyUserProfile,
@@ -51,9 +51,9 @@ const sectionCardStyles = {
 const normalizeGender = (value) => {
   if (value === undefined || value === null) return "";
   const normalized = String(value).trim().toLowerCase();
-  if (["male", "nam", "m"].includes(normalized)) return "Male";
-  if (["female", "nu", "f"].includes(normalized)) return "Female";
-  if (["other", "khac", "o"].includes(normalized)) return "Other";
+  if (["Male", "Nam", "M"].includes(normalized)) return "Male";
+  if (["Female", "Nữ", "F"].includes(normalized)) return "Female";
+  if (["Other", "Khác", "O"].includes(normalized)) return "Other";
   return normalized;
 };
 
@@ -343,7 +343,7 @@ export default function UserProfile() {
     normalizedProfile.avatar ??
     normalizedProfile.profileImage ??
     normalizedProfile.imageUrl ??
-    hotkolimg;
+    defaultImg;
 
   const [contactSection = {}, personalSection = {}, bioSection = {}] =
     USER_PROFILE_SECTIONS;
@@ -441,10 +441,10 @@ export default function UserProfile() {
                 : "rgba(255, 255, 255, 0.96)",
               transition: "all 0.2s ease",
               height: fieldConfig.multiline ? "auto" : "60px",
-              minHeight: fieldConfig.multiline ? "120px" : "60px",
+              minHeight: fieldConfig.multiline ? "100px" : "60px",
               alignItems: fieldConfig.multiline ? "flex-start" : "center",
               "& textarea": {
-                minHeight: fieldConfig.multiline ? "80px" : "auto",
+                minHeight: fieldConfig.multiline ? "70px" : "auto",
               },
               "& fieldset": {
                 borderColor: "rgba(74, 116, 218, 0.28)",
@@ -461,6 +461,7 @@ export default function UserProfile() {
             "& .MuiInputBase-input": {
               py: fieldConfig.multiline ? 1.5 : 1.2,
             },
+            ...(gridProps?.sx || {}), // nhận style bổ sung từ renderField
           }}
         >
           {fieldConfig.select &&
@@ -485,7 +486,13 @@ export default function UserProfile() {
         py: { xs: 5, md: 9 },
       }}
     >
-      <Container maxWidth="md">
+      <Container
+        maxWidth={false}
+        sx={{
+          maxWidth: "1500px",
+          mx: "auto",
+        }}
+      >
         <MotionBox
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -644,8 +651,26 @@ export default function UserProfile() {
               onSubmit={handleSubmit}
               sx={{ position: "relative" }}
             >
-              <Stack spacing={3.25}>
-                <Stack spacing={2.25} sx={sectionCardStyles}>
+              {/* --- Bố cục 2 cột cân đối --- */}
+              <Stack
+                direction={{ xs: "column", lg: "row" }}
+                spacing={3.25}
+                alignItems="stretch"
+                sx={{
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                }}
+              >
+                {/* Cột 1: Thông tin liên hệ */}
+                <Stack
+                  spacing={2.25}
+                  sx={{
+                    ...sectionCardStyles,
+                    flex: 1,
+                    minWidth: { xs: "100%", md: 420 },
+                    height: "100%",
+                  }}
+                >
                   <Stack spacing={0.75}>
                     <Typography
                       variant="h6"
@@ -665,11 +690,27 @@ export default function UserProfile() {
                     {renderField(contactBrandNameField)}
                     {renderField(contactEmailField)}
                     {renderField(contactPhoneField)}
-                    {renderField(contactAddressField)}
+                    {renderField(contactAddressField, {
+                      sx: {
+                        "& .MuiOutlinedInput-root textarea": {
+                          maxHeight: 80,
+                          overflowY: "auto",
+                        },
+                      },
+                    })}
                   </Grid>
                 </Stack>
 
-                <Stack spacing={2.25} sx={sectionCardStyles}>
+                {/* Cột 2: Thông tin cá nhân */}
+                <Stack
+                  spacing={2.25}
+                  sx={{
+                    ...sectionCardStyles,
+                    flex: 1,
+                    minWidth: { xs: "100%", md: 420 },
+                    height: "100%",
+                  }}
+                >
                   <Stack spacing={0.75}>
                     <Typography
                       variant="h6"
@@ -688,10 +729,19 @@ export default function UserProfile() {
                     {renderField(personalGenderField)}
                     {renderField(personalDateOfBirthField)}
                     {renderField(personalCountryField)}
+                    {renderField(bioIntroductionField, {
+                      sx: {
+                        "& .MuiOutlinedInput-root textarea": {
+                          maxHeight: 80,
+                          overflowY: "auto",
+                        },
+                      },
+                    })}
                   </Grid>
                 </Stack>
+              </Stack>
 
-                <Stack spacing={2.25} sx={sectionCardStyles}>
+              {/* <Stack spacing={2.25} sx={sectionCardStyles}>
                   <Stack spacing={0.75}>
                     <Typography
                       variant="h6"
@@ -709,8 +759,7 @@ export default function UserProfile() {
                   <Grid container spacing={2.5} alignItems="stretch">
                     {renderField(bioIntroductionField)}
                   </Grid>
-                </Stack>
-              </Stack>
+                </Stack> */}
 
               {editing && (
                 <Stack

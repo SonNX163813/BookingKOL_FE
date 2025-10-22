@@ -25,4 +25,8 @@ export const API_PATHS = {
     createBookingPackage: "/v1/bookings/packages",
     getHistoryBookingPackage: "/v1/user/bookings",
   },
+  BOOKING_REQUEST: {
+    getAll: "/v1/admin/booking/single-requests/all",
+    getDetail: "/v1/admin/booking/single-requests/detail",
+  },
 };

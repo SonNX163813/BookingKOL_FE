@@ -36,9 +36,10 @@ const DEFAULT_FILTER_VALUES = Object.freeze({
   minPrice: "",
   minRating: "",
   categoryId: "",
+  role: "",
 });
 
-const FILTER_FIELDS = ["minPrice", "minRating", "categoryId"];
+const FILTER_FIELDS = ["minPrice", "minRating", "categoryId", "role"];
 
 const createDefaultFilters = () => ({
   ...DEFAULT_FILTER_VALUES,
@@ -66,6 +67,12 @@ const sanitizeFilters = (rawFilters) => {
   const minRating = parseNumericInput(filters.minRating);
   if (minRating !== undefined && minRating >= 0) {
     params.minRating = Math.min(Math.max(minRating, 0), 5);
+  }
+
+  const role =
+    typeof filters.role === "string" ? filters.role.trim().toUpperCase() : "";
+  if (role) {
+    params.role = role;
   }
 
   const categoryId =
@@ -378,8 +385,8 @@ const KOLEmptyState = ({ onRetry }) => (
 const KOLGrid = ({ kols, onSelectKol }) => (
   <Grid
     container
-    spacing={{ xs: 2, md: 3 }}
-    justifyContent="flex-start"
+    spacing={{ xs: 2, sm: 2.5, md: 3 }}
+    justifyContent={{ xs: "center", sm: "center" }}
     alignItems="stretch"
   >
     {kols.map((kol) => {
@@ -389,7 +396,7 @@ const KOLGrid = ({ kols, onSelectKol }) => (
           item
           xs={12}
           sm={6}
-          md={3}
+          md={4}
           lg={3}
           xl={3}
           key={kol.id}
@@ -426,7 +433,7 @@ const ListKOL = () => {
 
   const hasActiveFilters = useMemo(() => {
     const params = sanitizeFilters(filters);
-    return ["minPrice", "minRating", "categoryId"].some(
+    return ["minPrice", "minRating", "categoryId", "role"].some(
       (key) => params[key] !== undefined
     );
   }, [filters]);
@@ -469,6 +476,14 @@ const ListKOL = () => {
   const handleApplyFilters = useCallback(() => {
     setFilters(() => ({ ...formFilters }));
   }, [formFilters]);
+
+  const handleRoleChange = useCallback(
+    (_event, value) => {
+      const normalized = value === "LIVE" ? "LIVE" : "";
+      handleFilterFieldChange("role", normalized);
+    },
+    [handleFilterFieldChange]
+  );
 
   const handleResetFilters = useCallback(() => {
     const defaults = createDefaultFilters();
@@ -572,7 +587,7 @@ const ListKOL = () => {
         position: "relative",
         bgcolor: "#ffffff",
         overflow: "hidden",
-        py: { xs: 8, md: 12 },
+        py: { xs: 6, md: 6 },
       }}
     >
       <Box
@@ -585,8 +600,9 @@ const ListKOL = () => {
         }}
       />
       <Container
-        maxWidth="xl"
+        maxWidth={false}
         sx={{
+          maxWidth: "1600px",
           position: "relative",
           zIndex: 1,
           color: "#0f172a",
@@ -604,17 +620,20 @@ const ListKOL = () => {
 
           <Box
             sx={{
-              display: "flex",
-              gap: { xs: 4, md: 6 },
-              flexDirection: { xs: "column", md: "row" },
-              alignItems: { xs: "stretch", md: "flex-start" },
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "minmax(260px, 320px) minmax(0, 1fr)",
+                lg: "minmax(280px, 340px) minmax(0, 1fr)",
+              },
+              gap: { xs: 4, sm: 4.5, md: 6 },
+              alignItems: "start",
             }}
           >
             <Box
               sx={{
-                flexShrink: 0,
-                width: { xs: "100%", md: 320, lg: 360 },
-                maxWidth: { xs: "100%", md: 360 },
+                width: "100%",
+                maxWidth: { xs: "100%", md: 320, lg: 340 },
                 alignSelf: { xs: "stretch", md: "flex-start" },
                 mx: { xs: "auto", md: 0 },
               }}
@@ -623,6 +642,7 @@ const ListKOL = () => {
                 filters={formFilters}
                 onFilterInputChange={handleFilterInputChange}
                 onMinRatingChange={handleMinRatingChange}
+                onRoleChange={handleRoleChange}
                 onApply={handleApplyFilters}
                 onReset={handleResetFilters}
                 loading={loading}
@@ -633,7 +653,12 @@ const ListKOL = () => {
               />
             </Box>
 
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: "100%",
+                minWidth: 0,
+              }}
+            >
               {loading ? (
                 <KOLLoadingState />
               ) : decoratedKols.length === 0 ? (

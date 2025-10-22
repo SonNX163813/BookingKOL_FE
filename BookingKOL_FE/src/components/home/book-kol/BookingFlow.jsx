@@ -159,7 +159,6 @@ const BookingFlow = ({
 
   const handleHoldSlotClick = async () => {
     if (!validateStep(activeStep, true)) return;
-    setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
 
     const startIso = startDateTime?.toISOString?.();
     const endIso = endDateTime?.toISOString?.();
@@ -185,10 +184,19 @@ const BookingFlow = ({
 
       setHeldSlot(nextSlot);
       toast.success("Đã giữ chỗ thành công!");
+      // ✅ Chỉ chuyển step khi giữ chỗ thành công
+      setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
     } catch (err) {
       const errorMsg =
-        err?.response?.data?.message ?? "Không thể giữ chỗ. Vui lòng thử lại.";
+        err?.response?.message ?? "Không thể giữ chỗ. Vui lòng thử lại.";
+
+      // const rawMessage = err?.response?.data?.message;
+      // const errorMsg = Array.isArray(rawMessage)
+      //   ? rawMessage.join("\n") // ghép nhiều dòng nếu có
+      //   : rawMessage || "Không thể giữ chỗ. Vui lòng thử lại.";
+
       toast.error(errorMsg);
+      // ❌ Không chuyển step nếu lỗi
     }
   };
 

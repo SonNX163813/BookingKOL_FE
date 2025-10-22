@@ -11,6 +11,10 @@ import {
 } from "@mui/material";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
+import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
+import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
+import NotesRoundedIcon from "@mui/icons-material/NotesRounded";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
@@ -41,21 +45,62 @@ const Introduction = ({ profile, livestreamVideos, feedback }) => {
     videos.length > 0 ? "videos" : "videos"
   );
 
-  const infoItems = useMemo(
-    () => [
+  const infoItems = useMemo(() => {
+    const fallback = "Đang cập nhật";
+    const items = [
       {
         label: "Ngày sinh",
-        value: normalizedProfile.dateOfBirth ?? "Đang cập nhật",
+        value: normalizedProfile.dateOfBirth ?? fallback,
         icon: EventRoundedIcon,
       },
-      {
-        label: "Kinh nghiệm",
-        value: normalizedProfile.experience ?? "Đang cập nhật",
-        icon: WorkspacePremiumRoundedIcon,
-      },
-    ],
-    [normalizedProfile.dateOfBirth, normalizedProfile.experience]
-  );
+    ];
+
+    if (normalizedProfile.roleLabel) {
+      items.push({
+        label: "Vai trò",
+        value: normalizedProfile.roleLabel,
+        icon: BadgeRoundedIcon,
+      });
+    }
+
+    if (normalizedProfile.location) {
+      items.push({
+        label: "Khu vực",
+        value: normalizedProfile.location,
+        icon: PublicRoundedIcon,
+      });
+    }
+
+    if (normalizedProfile.languages) {
+      items.push({
+        label: "Ngôn ngữ",
+        value: normalizedProfile.languages,
+        icon: TranslateRoundedIcon,
+      });
+    }
+
+    items.push({
+      label: "Kinh nghiệm",
+      value: normalizedProfile.experience ?? fallback,
+      icon: WorkspacePremiumRoundedIcon,
+    });
+
+    // if (normalizedProfile.rateCardNote) {
+    //   items.push({
+    //     label: "Ghi chú báo giá",
+    //     value: normalizedProfile.rateCardNote,
+    //     icon: NotesRoundedIcon,
+    //   });
+    // }
+
+    return items;
+  }, [
+    normalizedProfile.dateOfBirth,
+    normalizedProfile.roleLabel,
+    normalizedProfile.experience,
+    normalizedProfile.location,
+    normalizedProfile.languages,
+  ]);
 
   const strengths = Array.isArray(normalizedProfile.strengths)
     ? normalizedProfile.strengths
@@ -315,15 +360,15 @@ const Introduction = ({ profile, livestreamVideos, feedback }) => {
     </Stack>
   );
 
-  const renderFeedbackPanel = () => (
-    <ReviewsSection
-      reviews={reviews}
-      overallRating={overallRating}
-      ratingDistribution={ratingDistribution}
-      reviewCount={reviewCount}
-      variant="embedded"
-    />
-  );
+  // const renderFeedbackPanel = () => (
+  //   <ReviewsSection
+  //     reviews={reviews}
+  //     overallRating={overallRating}
+  //     ratingDistribution={ratingDistribution}
+  //     reviewCount={reviewCount}
+  //     variant="embedded"
+  //   />
+  // );
 
   return (
     <motion.div
@@ -414,7 +459,7 @@ const Introduction = ({ profile, livestreamVideos, feedback }) => {
                 },
               }}
             />
-            <Tab
+            {/* <Tab
               value="feedback"
               label="Feedback"
               disableRipple
@@ -430,12 +475,12 @@ const Introduction = ({ profile, livestreamVideos, feedback }) => {
                   color: textPrimary,
                 },
               }}
-            />
+            /> */}
           </Tabs>
 
           {activeTab === "videos" && renderVideoPanel()}
           {activeTab === "introduction" && renderIntroductionPanel()}
-          {activeTab === "feedback" && renderFeedbackPanel()}
+          {/* {activeTab === "feedback" && renderFeedbackPanel()} */}
         </Stack>
       </Box>
     </motion.div>

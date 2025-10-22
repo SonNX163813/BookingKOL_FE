@@ -17,9 +17,9 @@ import StarRoundedIcon from "@mui/icons-material/StarRounded";
 
 const ratingOptions = [
   { value: "5", label: "5.0★" },
-  { value: "4.5", label: "4.5★ +" },
-  { value: "4", label: "4.0★ +" },
-  { value: "3", label: "3.0★ +" },
+  { value: "4.5", label: "4.5★" },
+  { value: "4", label: "4.0★" },
+  { value: "3", label: "3.0★" },
 ];
 
 const KolFilters = ({

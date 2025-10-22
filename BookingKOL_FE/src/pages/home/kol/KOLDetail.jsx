@@ -27,6 +27,88 @@ import Introduction from "../../../components/home/kol-detail/Introduction";
 import BookingFlow from "../../../components/home/book-kol/BookingFlow";
 import { getKolProfileById } from "../../../services/kol/KolAPI";
 import hotkolimg from "../../../assets/hotkol.png";
+import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
+
+const ROLE_LABELS = {
+  LIVE: "Trợ live",
+  KOL: "KOL",
+};
+
+const buildRoleInfo = (role) => {
+  if (role == null || role === "") {
+    return { roleKey: "KOL", roleLabel: ROLE_LABELS.KOL };
+  }
+  const roleString = role.toString().trim();
+  if (!roleString) {
+    return { roleKey: "KOL", roleLabel: ROLE_LABELS.KOL };
+  }
+  const normalized = roleString.toUpperCase();
+  if (ROLE_LABELS[normalized]) {
+    return { roleKey: normalized, roleLabel: ROLE_LABELS[normalized] };
+  }
+  return { roleKey: normalized, roleLabel: roleString };
+};
+
+const formatDateOfBirth = (dob) => {
+  if (!dob) {
+    return null;
+  }
+  const date = new Date(dob);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  try {
+    return new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return null;
+  }
+};
+
+const LANGUAGE_LABELS = {
+  vi: "Tiếng Việt",
+  en: "Tiếng Anh",
+  ko: "Tiếng Hàn",
+  ja: "Tiếng Nhật",
+  zh: "Tiếng Trung",
+  fr: "Tiếng Pháp",
+  de: "Tiếng Đức",
+  th: "Tiếng Thái",
+  id: "Tiếng Indonesia",
+  es: "Tiếng Tây Ban Nha",
+};
+
+const formatLanguages = (languages) => {
+  if (!languages) {
+    return null;
+  }
+  const items = Array.isArray(languages)
+    ? languages
+    : languages.toString().split(/[,;\n]/);
+
+  const formatted = items
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const lower = item.toLowerCase();
+      const base = lower.split(/[-_]/)[0];
+      if (LANGUAGE_LABELS[lower]) {
+        return LANGUAGE_LABELS[lower];
+      }
+      if (LANGUAGE_LABELS[base]) {
+        return LANGUAGE_LABELS[base];
+      }
+      return item;
+    });
+
+  if (formatted.length === 0) {
+    return null;
+  }
+  return formatted.join(", ");
+};
 
 const buildHeaderData = (kol) => {
   if (!kol) {
@@ -77,6 +159,7 @@ const buildHeaderData = (kol) => {
 
   const imageItems = mediaItems.filter((item) => item.type === "IMAGE");
   const videoItems = mediaItems.filter((item) => item.type === "VIDEO");
+  const { roleKey, roleLabel } = buildRoleInfo(kol?.role);
 
   const avatar =
     primaryAvatarUrl ||
@@ -128,6 +211,8 @@ const buildHeaderData = (kol) => {
     avatar,
     thumbnails: thumbnails,
     isOnline: Boolean(kol.isAvailable),
+    roleKey,
+    roleLabel,
     stats: {
       followers: kol.followersCount ?? "--",
       fans: kol.followersCount ? `${kol.followersCount}` : "--",
@@ -222,14 +307,29 @@ const buildIntroductionData = (kol) => {
     platform: name,
     level: "Chuyên gia",
   }));
+  const formattedDob = formatDateOfBirth(kol?.dob ?? kol?.dateOfBirth);
+  const experienceText =
+    typeof kol?.experience === "string"
+      ? kol.experience.trim() || null
+      : kol?.experience ?? null;
+  const languages = formatLanguages(kol?.languages);
+  const { roleLabel } = buildRoleInfo(kol?.role);
+  const rateCardNote =
+    typeof kol?.rateCardNote === "string"
+      ? kol.rateCardNote.trim() || null
+      : kol?.rateCardNote ?? null;
   return {
-    dateOfBirth: kol?.dateOfBirth ?? "Đang cập nhật",
-    experience: kol?.experience ?? "Đang cập nhật",
+    dateOfBirth: formattedDob,
+    experience: experienceText,
     strengths: strengths.length > 0 ? strengths : ["Đang cập nhật"],
     platformProficiency:
       platformProficiency.length > 0
         ? platformProficiency
         : [{ platform: "Danh mục", level: "Đang cập nhật" }],
+    location: location || null,
+    languages,
+    roleLabel,
+    rateCardNote,
   };
 };
 
@@ -477,7 +577,12 @@ const KOLDetail = () => {
             <Introduction
               profile={introductionData}
               livestreamVideos={livestreamVideos}
-              feedback={reviewsData}
+              // feedback={reviewsData}
+            />
+            <ReviewsSection
+              reviews={reviewsData.reviews}
+              overallRating={reviewsData.overallRating}
+              ratingDistribution={reviewsData.ratingDistribution}
             />
           </Box>
         )}

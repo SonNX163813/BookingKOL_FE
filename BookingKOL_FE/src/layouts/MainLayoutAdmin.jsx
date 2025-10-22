@@ -15,6 +15,8 @@ import {
   AccountCircleOutlined,
   SchoolOutlined,
   PlayCircleOutline,
+  CalendarMonthOutlined,
+  EventNoteOutlined,
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 
@@ -33,15 +35,37 @@ const MainLayoutAdmin = () => {
   const pathKeyMap = [
     { pattern: /^\/admin(\/)?$/, key: "admin" },
     {
-      pattern: /^\/management-log-chat-ai(\/)?$/,
+      pattern: /^\/admin\/management-log-chat-ai(\/)?$/,
       key: "management-log-chat-ai",
     },
-    { pattern: /^\/management\/users(\/)?$/, key: "management-users" },
-    { pattern: /^\/management\/orders(\/)?$/, key: "management-orders" },
-    { pattern: /^\/management-kol(\/)?$/, key: "management-kol" },
-    { pattern: /^\/management-customer(\/)?$/, key: "management-customer" },
-    { pattern: /^\/management-category(\/)?$/, key: "management-category" },
-    { pattern: /^\/management-course(\/)?$/, key: "management-course" },
+    {
+      pattern: /^\/admin\/management-kol(\/)?$/,
+      key: "management-kol",
+    },
+    {
+      pattern: /^\/admin\/management-customer(\/|$)/,
+      key: "management-customer",
+    },
+    {
+      pattern: /^\/admin\/management-category(\/)?$/,
+      key: "management-category",
+    },
+    {
+      pattern: /^\/admin\/management-course(\/)?$/,
+      key: "management-course",
+    },
+    {
+      pattern: /^\/admin\/create-course(\/)?$/,
+      key: "management-course",
+    },
+    {
+      pattern: /^\/admin\/view-detail-course(\/)?$/,
+      key: "management-course",
+    },
+    {
+      pattern: /^\/admin\/management-booking-requests(\/)?$/,
+      key: "management-booking-requests",
+    },
   ];
 
   const getSelectedKey = (pathname) => {
@@ -106,6 +130,22 @@ const MainLayoutAdmin = () => {
           key: "management-course",
           icon: <PlayCircleOutline />,
           label: <Link to="management-course">Khóa học</Link>,
+        },
+      ],
+    },
+    {
+      key: "management-booking",
+      icon: <EventNoteOutlined />,
+      label: "Quản lý booking",
+      children: [
+        {
+          key: "management-booking-requests",
+          icon: <CalendarMonthOutlined />,
+          label: (
+            <Link to="management-booking-requests">
+              Quản lý booking lẻ
+            </Link>
+          ),
         },
       ],
     },

@@ -20,6 +20,7 @@ import ShoppingBagRoundedIcon from "@mui/icons-material/ShoppingBagRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -52,6 +53,8 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
   const isMale = kol.gender?.toLowerCase() === "male";
   const genderLabel = kol.gender ? (isMale ? "Nam" : "Nữ") : null;
   const GenderIcon = isMale ? MaleRoundedIcon : FemaleRoundedIcon;
+  const roleLabel = kol.roleLabel || null;
+  const isLiveRole = kol.roleKey === "LIVE";
 
   const shortBio =
     kol.shortDescription ||
@@ -437,6 +440,22 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                             size="small"
                             sx={{
                               background: "rgba(147, 206, 246, 0.18)",
+                              color: textPrimary,
+                              borderRadius: "999px",
+                              fontWeight: 600,
+                              border: "1px solid rgba(74, 116, 218, 0.24)",
+                            }}
+                          />
+                        )}
+                        {roleLabel && (
+                          <Chip
+                            icon={<BadgeRoundedIcon sx={{ fontSize: 18 }} />}
+                            label={roleLabel}
+                            size="small"
+                            sx={{
+                              background: isLiveRole
+                                ? "rgba(255, 161, 218, 0.25)"
+                                : "rgba(147, 206, 246, 0.18)",
                               color: textPrimary,
                               borderRadius: "999px",
                               fontWeight: 600,

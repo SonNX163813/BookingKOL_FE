@@ -10,6 +10,8 @@ import ManagementCourse from "../pages/admin/course/ManagementCourse";
 import ViewDetailCourse from "../pages/admin/course/ViewDetailCourse";
 import ManagementCategory from "../pages/admin/category/ManagementCategory";
 import CreateCoursePage from "../pages/admin/course/CreateCoursePage";
+import ManagementBookingRequests from "../pages/admin/booking/ManagementBookingRequests";
+import BookingRequestDetail from "../pages/admin/booking/BookingRequestDetail";
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
 
@@ -22,6 +24,14 @@ export const routerAdmin = [
       { path: "management-customer", element: <ManagementCustomer /> },
       { path: "management-customer/:id", element: <UserDetailPage /> },
       { path: "management-kol", element: <ManagementKOL /> },
+      {
+        path: "management-booking-requests",
+        element: <ManagementBookingRequests />,
+      },
+      {
+        path: "management-booking-requests/:requestId",
+        element: <BookingRequestDetail />,
+      },
       { path: "management-course", element: <ManagementCourse /> },
       { path: "view-detail-course/:id", element: <ViewDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },

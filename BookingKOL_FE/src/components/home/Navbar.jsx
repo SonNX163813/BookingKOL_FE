@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -522,11 +522,19 @@ const Navbar = () => {
         </MenuItem>
         <MenuItem
           component={Link}
+          to="/don-booking-kol"
+          onClick={closeAccount}
+          sx={{ fontWeight: 700, py: 1.25 }}
+        >
+          Đơn đặt KOL
+        </MenuItem>
+        <MenuItem
+          component={Link}
           to="/don-mua"
           onClick={closeAccount}
           sx={{ fontWeight: 700, py: 1.25 }}
         >
-          Đơn đặt lịch
+          Đơn đặt chiến dịch
         </MenuItem>
         <Divider sx={{ my: 0.5 }} />
         <MenuItem

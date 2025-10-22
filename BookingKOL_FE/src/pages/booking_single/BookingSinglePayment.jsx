@@ -154,8 +154,11 @@ const BookingSinglePayment = () => {
           if (intervalId) clearInterval(intervalId);
 
           sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
-          toast.success("Thanh toán thành công! 🎉");
-          navigate("/", { replace: true });
+          // toast.success("Thanh toán thành công! 🎉");
+          navigate("/thanh-toan-kol-le/thanh-cong", {
+            replace: true,
+            state: { payment: thongTinThanhToan },
+          });
         }
       } catch (error) {
         console.error("Lỗi kiểm tra trạng thái thanh toán:", error);
@@ -163,7 +166,7 @@ const BookingSinglePayment = () => {
     };
 
     kiemTraTrangThaiThanhToan();
-    intervalId = setInterval(kiemTraTrangThaiThanhToan, 30000);
+    intervalId = setInterval(kiemTraTrangThaiThanhToan, 5000);
 
     return () => {
       isActive = false;
@@ -190,7 +193,7 @@ const BookingSinglePayment = () => {
       <Stack spacing={4}>
         <Stack spacing={1} alignItems="center">
           <Typography variant="h4" fontWeight={700}>
-            Thanh toán booking KOL lẻ
+            Thanh toán booking KOL
           </Typography>
 
           {/* Thời gian đếm ngược hiển thị lớn */}

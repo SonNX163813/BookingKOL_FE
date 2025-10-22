@@ -121,7 +121,7 @@ const HistoryBookingPackagePage = () => {
               letterSpacing: 1,
             }}
           >
-            Lịch sử đơn Booking
+            Lịch sử đơn đặt theo chiến dịch
           </span>
         }
       >

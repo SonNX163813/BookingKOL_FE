@@ -139,7 +139,7 @@ const KOLCard = ({
             {
               position: "relative",
               width: "100%",
-              aspectRatio: { xs: "1 / 1", sm: "2 / 3", md: "2 / 3" },
+              // aspectRatio: { xs: "1 / 1", sm: "2 / 3", md: "2 / 3" },
               minHeight: { xs: 230, sm: 270, md: 290, lg: 310 },
               overflow: "hidden",
               flexShrink: 0,
