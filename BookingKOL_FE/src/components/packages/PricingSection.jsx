@@ -196,16 +196,17 @@ const PricingSection = () => {
   };
 
   const handleVipFormFinish = (values) => {
-    const selectedKol = kolOptions.find(
-      (option) => option.value === values.kol
+    const selectedKols = kolOptions.filter((option) =>
+      values.kol.includes(option.value)
     );
-    const assistantOption = ASSISTANT_OPTIONS.find(
-      (option) => option.value === values.assistant
+    const selectedAssistants = ASSISTANT_OPTIONS.filter((option) =>
+      values.assistant.includes(option.value)
     );
+
     setVipExtraData({
       ...values,
-      kolName: selectedKol?.label || "",
-      assistantName: assistantOption?.label || "",
+      kolNames: selectedKols.map((k) => k.label).join(", "),
+      assistantNames: selectedAssistants.map((a) => a.label).join(", "),
     });
     setCurrent(3);
   };
@@ -232,8 +233,8 @@ const PricingSection = () => {
       endDate: campaignData.endDate,
       recurrencePattern: campaignData.recurrencePattern,
       // liveIds:
-      //   selectedPackage === "vip" ? vipExtraData?.assistant ?? null : null,
-      kolIds: selectedPackage === "vip" ? vipExtraData?.kol ?? null : null,
+      //   selectedPackage === "vip" ? vipExtraData.assistant ?? [] : [],
+      kolIds: selectedPackage === "vip" ? vipExtraData.kol ?? [] : [],
     };
 
     handleCreateBooking(data);
@@ -411,10 +412,14 @@ const PricingSection = () => {
                   label="Chọn KOL"
                   name="kol"
                   rules={[
-                    { required: true, message: "Vui lòng chọn một KOL!" },
+                    {
+                      required: true,
+                      message: "Vui lòng chọn ít nhất một KOL!",
+                    },
                   ]}
                 >
                   <Select
+                    mode="multiple"
                     className="!h-12"
                     loading={isFetchingKols}
                     options={kolOptions}
@@ -428,19 +433,25 @@ const PricingSection = () => {
                     }
                   />
                 </Form.Item>
+
                 <Form.Item
                   label="Chọn trợ lý livestream"
                   name="assistant"
                   rules={[
-                    { required: true, message: "Vui lòng chọn một trợ lý!" },
+                    {
+                      required: true,
+                      message: "Vui lòng chọn ít nhất một trợ lý!",
+                    },
                   ]}
                 >
                   <Select
+                    mode="multiple"
                     className="!h-12"
                     options={ASSISTANT_OPTIONS}
                     placeholder="Chọn trợ lý livestream"
                   />
                 </Form.Item>
+
                 <div className="flex justify-end gap-4 pt-4">
                   <Button className="!h-12" onClick={() => setCurrent(1)}>
                     Quay lại
@@ -507,10 +518,11 @@ const PricingSection = () => {
             labelStyle={{ fontWeight: "bold" }}
           >
             <Descriptions.Item label="KOL">
-              {vipExtraData.kolName || vipExtraData.kol}
+              {vipExtraData.kolNames || vipExtraData.kol?.join(", ")}
             </Descriptions.Item>
             <Descriptions.Item label="Trợ lý Livestream">
-              {vipExtraData.assistantName || vipExtraData.assistant}
+              {vipExtraData.assistantNames ||
+                vipExtraData.assistant?.join(", ")}
             </Descriptions.Item>
           </Descriptions>
         )}
