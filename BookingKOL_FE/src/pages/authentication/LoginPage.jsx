@@ -35,6 +35,43 @@ export default function LoginPage() {
     if (ctxError) setErrorMsg(ctxError);
   }, [ctxError]);
 
+  // Spinner SVG nhỏ (không cần thêm CSS)
+  const Spinner16 = () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      role="img"
+      aria-label="loading"
+      style={{ marginRight: 8, verticalAlign: "middle" }}
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.25"
+        strokeWidth="4"
+      />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4"
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 12 12"
+          to="360 12 12"
+          dur="0.9s"
+          repeatCount="indefinite"
+        />
+      </path>
+    </svg>
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
@@ -65,16 +102,36 @@ export default function LoginPage() {
         data = null;
       }
 
+      // ====== Xử lý lỗi: gom sai tài khoản/mật khẩu về 1 thông điệp ======
       if (!res.ok) {
-        const msg =
+        const serverMsg =
           (Array.isArray(data?.message) ? data.message[0] : data?.message) ||
           data?.error ||
-          (raw && raw.includes("<html")
-            ? "Máy chủ trả HTML/redirect. Hãy trả JSON 401/403 thay vì 302."
-            : "") ||
-          `Đăng nhập thất bại (HTTP ${res.status}).`;
-        throw new Error(msg);
+          "";
+        const lower = String(serverMsg).toLowerCase();
+
+        if (
+          res.status === 401 ||
+          res.status === 403 ||
+          lower.includes("bad credentials") ||
+          lower.includes("unauthorized") ||
+          lower.includes("invalid") ||
+          lower.includes("password")
+        ) {
+          throw new Error("Tài khoản hoặc mật khẩu không đúng.");
+        }
+
+        if (raw && raw.includes("<html")) {
+          throw new Error(
+            "Máy chủ trả HTML/redirect. Hãy trả JSON 401/403 thay vì 302."
+          );
+        }
+
+        throw new Error(
+          serverMsg || `Đăng nhập thất bại (HTTP ${res.status}).`
+        );
       }
+      // ===================================================================
 
       const accessToken =
         data?.accessToken ||
@@ -96,6 +153,7 @@ export default function LoginPage() {
         payload: { user, token: accessToken, roles: user.roles, remember },
       });
 
+      // Giữ nguyên navigate; nút đã bị disable + có spinner nên không gây cảm giác "reload"
       navigate(backTo, { replace: true });
     } catch (err) {
       const msg = err?.message || "Có lỗi xảy ra khi đăng nhập.";
@@ -272,8 +330,30 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <button className="primary-btn" type="submit" disabled={loading}>
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          <button
+            className="primary-btn"
+            type="submit"
+            disabled={loading}
+            aria-busy={loading}
+            aria-live="polite"
+            style={
+              loading
+                ? {
+                    opacity: 0.8,
+                    filter: "grayscale(40%)",
+                    cursor: "not-allowed",
+                  }
+                : undefined
+            }
+          >
+            {loading ? (
+              <span style={{ display: "inline-flex", alignItems: "center" }}>
+                <Spinner16 />
+                Đang đăng nhập...
+              </span>
+            ) : (
+              "Đăng nhập"
+            )}
           </button>
 
           <div className="divider">

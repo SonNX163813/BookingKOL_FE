@@ -55,24 +55,45 @@ export default function DayTasksPopup({ details, onClose }) {
           </div>
 
           <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-            {sorted.map((task) => (
-              <div
-                key={task.id}
-                className="flex items-start gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100"
-                onClick={() => setSelectedTask(task)}
-              >
+            {sorted.map((task) => {
+              const isBooking =
+                task?.isBooking ||
+                String(task?.status || "")
+                  .toLowerCase()
+                  .includes("book");
+              const hhmm = (t) => (t ? t.slice(0, 5) : "");
+
+              return (
                 <div
-                  className="w-3 h-3 rounded-full mt-1.5"
-                  style={{ backgroundColor: task.colorCode }}
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-semibold mr-2">
-                    {task.startTime.slice(0, 5)}
-                  </span>
-                  <span>{task.description}</span>
+                  key={task.id}
+                  className="flex items-start gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100"
+                  onClick={() => setSelectedTask(task)}
+                >
+                  <div
+                    className="w-3 h-3 rounded-full mt-1.5"
+                    style={{ backgroundColor: task.colorCode }}
+                  />
+                  <div className="flex-1">
+                    {isBooking ? (
+                      <span className="text-sm">
+                        <span className="font-semibold mr-2">
+                          {hhmm(task.startTime)}–{hhmm(task.endTime)}
+                        </span>
+                        {task.description}
+                      </span>
+                    ) : (
+                      <span className="text-sm">
+                        Rảnh từ{" "}
+                        <span className="font-semibold">
+                          {hhmm(task.startTime)} đến {hhmm(task.endTime)}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+
             {!sorted.length && (
               <div className="text-center text-gray-500">
                 Không có lịch trong ngày

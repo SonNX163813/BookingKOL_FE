@@ -1,10 +1,8 @@
-import { Search, Trash2, Eye } from "lucide-react";
+import { Search, Trash2, Eye, Pencil } from "lucide-react";
 import {
   Button,
-  Card,
   Form,
   Input,
-  Modal,
   Pagination,
   Table,
   Tag,
@@ -14,14 +12,16 @@ import {
   Select,
 } from "antd";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useGetAllKol } from "../../../../hook/admin/management-user/useGetAllKol";
 import imgdef from "../../../../assets/default.png";
 import { VerifiedUserOutlined } from "@mui/icons-material";
+
 const ManagementKOL = () => {
+  const navigate = useNavigate();
+
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
-  const [openViewDetail, setOpenViewDetail] = useState(false);
-  const [selectedKOL, setSelectedKOL] = useState(null);
   const [form] = Form.useForm();
   const [searchValue, setSearchValue] = useState(undefined);
   const [searchMinBookingPrice, setSearchMinBookingPrice] = useState(undefined);
@@ -31,19 +31,23 @@ const ManagementKOL = () => {
     page,
     size,
     searchMinBookingPrice,
-    minRating
+    minRating,
+    searchValue
   );
 
   const dataResponse = ResponseGetAllKol?.data?.content;
 
-  const handleViewDetail = (record) => {
-    setSelectedKOL(record);
-    setOpenViewDetail(true);
+  const handleEdit = (record) => {
+    navigate(`/admin/kols/${record.id}/edit`, { state: { kol: record } });
   };
 
-  const handleSearch = (value) => {
-    setSearchValue(value.search);
-    setSearchMinBookingPrice(value.minBookingPrice);
+  const handleViewDetail = (record) => {
+    navigate(`/admin/kols/${record.id}/portfolio`);
+  };
+
+  const handleSearch = (values) => {
+    setSearchValue(values.search);
+    setSearchMinBookingPrice(values.minBookingPrice);
     setPage(0);
   };
 
@@ -51,13 +55,15 @@ const ManagementKOL = () => {
     form.resetFields();
     setSearchValue(undefined);
     setSearchMinBookingPrice(undefined);
-    setMinRating(undefined);
+    setMinRating(null);
+    setPage(0);
   };
 
   const columns = [
     {
       title: "STT",
       key: "stt",
+      width: 80,
       render: (_, __, index) => (
         <div className="font-bold">#{page * size + index + 1}</div>
       ),
@@ -66,6 +72,7 @@ const ManagementKOL = () => {
       title: "Ảnh",
       key: "fileUrl",
       dataIndex: "fileUsageDtos",
+      width: 100,
       render: (fileUsageDtos) => {
         const imgUrl = fileUsageDtos?.[0]?.file?.fileUrl;
         return imgUrl ? (
@@ -80,13 +87,11 @@ const ManagementKOL = () => {
             />
           </Tooltip>
         ) : (
-          <div>
-            <img
-              src={imgdef}
-              alt="Ảnh mặc định"
-              className="w-[70px] h-[70px] rounded-xl"
-            />
-          </div>
+          <img
+            src={imgdef}
+            alt="Ảnh mặc định"
+            className="w-[70px] h-[70px] rounded-xl object-cover"
+          />
         );
       },
     },
@@ -104,7 +109,7 @@ const ManagementKOL = () => {
       title: "Chuyên mục",
       key: "categories",
       dataIndex: "categories",
-      render: (categories) => (
+      render: (categories = []) => (
         <>
           {categories.map((cat) => (
             <Tag color="blue" key={cat.id}>
@@ -119,7 +124,9 @@ const ManagementKOL = () => {
       key: "minBookingPrice",
       dataIndex: "minBookingPrice",
       render: (price) =>
-        price ? price.toLocaleString("vi-VN") + " VNĐ" : "N/A",
+        typeof price === "number"
+          ? price.toLocaleString("vi-VN") + " VNĐ"
+          : "N/A",
     },
     {
       title: "Đánh giá",
@@ -127,7 +134,8 @@ const ManagementKOL = () => {
       dataIndex: "overallRating",
       render: (rating, record) => (
         <span>
-          <Rate disabled value={rating} /> ({record.feedbackCount})
+          <Rate disabled value={Number(rating) || 0} /> (
+          {record?.feedbackCount ?? 0})
         </span>
       ),
     },
@@ -135,13 +143,20 @@ const ManagementKOL = () => {
       title: "Thao tác",
       key: "action",
       align: "center",
+      width: 160,
       render: (record) => (
-        <div className="w-full flex justify-center">
+        <div className="w-full flex justify-center gap-2">
           <Button
             onClick={() => handleViewDetail(record)}
             className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
           >
             <Eye size={18} className="font-semibold" />
+          </Button>
+          <Button
+            onClick={() => handleEdit(record)}
+            className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
+          >
+            <Pencil size={18} className="font-semibold" />
           </Button>
         </div>
       ),
@@ -169,8 +184,10 @@ const ManagementKOL = () => {
             <Input
               className="h-12!"
               placeholder="Tìm với giá Booking nhỏ nhất"
+              inputMode="numeric"
             />
           </Form.Item>
+
           <Select
             placeholder="Đánh giá tối thiểu"
             value={minRating}
@@ -186,6 +203,7 @@ const ManagementKOL = () => {
               { label: "5 sao", value: 5 },
             ]}
           />
+
           <Form.Item>
             <Button
               htmlType="submit"
@@ -205,15 +223,13 @@ const ManagementKOL = () => {
         </Form>
       </div>
 
-      <div>
-        <Table
-          columns={columns}
-          dataSource={dataResponse}
-          loading={isLoadingGetALlKol}
-          pagination={false}
-          rowKey="id"
-        />
-      </div>
+      <Table
+        columns={columns}
+        dataSource={dataResponse}
+        loading={isLoadingGetALlKol}
+        pagination={false}
+        rowKey="id"
+      />
 
       <div className="!my-4 py-5">
         <Pagination
@@ -225,84 +241,9 @@ const ManagementKOL = () => {
             setPage(pageNumber - 1);
             setSize(sizeNumber);
           }}
-          // total={filteredData.length}
           showSizeChanger
         />
       </div>
-
-      <Modal
-        open={openViewDetail}
-        onCancel={() => setOpenViewDetail(false)}
-        footer={null}
-        width={700}
-        closable={false}
-      >
-        {selectedKOL && (
-          <Card className="shadow-lg rounded-2xl border border-gray-200 p-6 space-y-6">
-            <div className="flex gap-6 items-center pb-4">
-              {selectedKOL.fileUsageDtos?.[0]?.file?.fileUrl && (
-                <img
-                  src={selectedKOL.fileUsageDtos[0].file.fileUrl}
-                  alt={selectedKOL.displayName}
-                  style={{
-                    width: 120,
-                    height: 120,
-                    objectFit: "cover",
-                    borderRadius: 12,
-                  }}
-                />
-              )}
-              <div>
-                <p className="text-gray-600 font-medium">Tên KOL:</p>
-                <p className="text-gray-900 font-semibold">
-                  {selectedKOL.displayName}
-                </p>
-                <p className="text-gray-600 font-medium">
-                  Quốc gia:{" "}
-                  <span className="text-gray-900">{selectedKOL.country}</span>
-                </p>
-                <p className="text-gray-600 font-medium">
-                  Ngôn ngữ:{" "}
-                  <span className="text-gray-900">{selectedKOL.languages}</span>
-                </p>
-                <p className="text-gray-600 font-medium">Chuyên mục:</p>
-                <div>
-                  {selectedKOL.categories.map((cat) => (
-                    <Tag color="blue" key={cat.id}>
-                      {cat.name}
-                    </Tag>
-                  ))}
-                </div>
-                {/* <p className="text-gray-600 font-medium">Giá booking tối thiểu: <span className="text-gray-900">{selectedKOL.minBookingPrice.toLocaleString("vi-VN")} đ</span></p> */}
-                <p className="text-gray-600 font-medium">
-                  Đánh giá: <Rate disabled value={selectedKOL.overallRating} />{" "}
-                  ({selectedKOL.feedbackCount})
-                </p>
-                <p className="text-gray-600 font-medium">
-                  Trạng thái:{" "}
-                  <span className="text-gray-900">
-                    {selectedKOL.isAvailable ? "Sẵn sàng" : "Không hoạt động"}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <div>
-              <p className="text-gray-600 font-medium">Kinh nghiệm:</p>
-              <p className="text-gray-900 whitespace-pre-line">
-                {selectedKOL.experience}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-600 font-medium">Ghi chú rate card:</p>
-              <p className="text-gray-900">{selectedKOL.rateCardNote}</p>
-            </div>
-            <div>
-              <p className="text-gray-600 font-medium">ID:</p>
-              <p className="text-gray-900">{selectedKOL.id}</p>
-            </div>
-          </Card>
-        )}
-      </Modal>
     </div>
   );
 };

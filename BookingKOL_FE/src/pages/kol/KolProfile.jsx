@@ -13,7 +13,6 @@ import {
   Space,
   Button,
   Divider,
-  DatePicker,
   Popconfirm,
 } from "antd";
 import {
@@ -24,10 +23,10 @@ import {
   SaveOutlined,
   CloseOutlined,
   StarOutlined,
+  CheckOutlined,
 } from "@ant-design/icons";
-import { ArrowRight } from "lucide-react";
 import dayjs from "dayjs";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import {
@@ -37,8 +36,8 @@ import {
   uploadKolMedias,
   addKolCategories,
   removeKolCategories,
-  setCoverImage, // gọi ở onSave nếu có pending cover
-  deactivateKolMedias, // API xóa (deactivate)
+  setCoverImage,
+  deleteKolMedia, // xoá media theo fileId
 } from "../../services/kol/KolAPI";
 import { getAllCategory } from "../../services/CategoryServices";
 import { useAuth } from "../../context/AuthContext";
@@ -46,17 +45,7 @@ import { useAuth } from "../../context/AuthContext";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
-const toPickerValue = (v) => (v ? dayjs(v) : null);
-const toDobIso = (p) => (p ? p.startOf("day").toISOString() : undefined);
-
-/* ================== ROLE MAPPING (UI <-> BE) ==================
-   - UI chỉ có 2 lựa chọn:
-       + HOST     (Host chính)
-       + CO_HOST  (Trợ live)
-   - BE chỉ nhận enum trong Roles: [KOL, SUPER_ADMIN, LIVE, ADMIN, USER]
-     => Khi gửi lên BE: HOST/CO_HOST => LIVE
-     => Khi nhận từ BE: LIVE => HOST (để hiển thị mặc định)
-*/
+/* ================== ROLE MAPPING (UI <-> BE) ================== */
 const mapUiRoleToBackend = (ui) => {
   if (ui === "HOST" || ui === "CO_HOST") return "LIVE";
   return undefined;
@@ -68,19 +57,7 @@ const mapBackendToUi = (be) => {
 const roleLabel = (ui) =>
   ui === "HOST" ? "Host chính" : ui === "CO_HOST" ? "Trợ live" : "—";
 
-// ===== Helpers cho validate DOB (>= 18 tuổi) =====
-const disabledDOB = (current) =>
-  current && current.isAfter(dayjs().subtract(18, "year").endOf("day"));
-
-const validateAdult = (_, value) => {
-  if (!value) return Promise.resolve();
-  const age = dayjs().diff(value, "year");
-  return age >= 18
-    ? Promise.resolve()
-    : Promise.reject(new Error("Bạn phải từ 18 tuổi trở lên."));
-};
-
-// Rule helper tránh toàn khoảng trắng
+/* ================== Helpers ================== */
 const notOnlySpacesRule = (msg) => ({
   validator: (_, v) =>
     typeof v === "string" && v.trim().length === 0
@@ -88,31 +65,81 @@ const notOnlySpacesRule = (msg) => ({
       : Promise.resolve(),
 });
 
+const now = dayjs();
+const MIN_YEAR = now.year() - 60;
+const MAX_YEAR = now.year() - 18;
+const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+  value: i + 1,
+  label: `Tháng ${i + 1}`,
+}));
+const padded = (n) => String(n).padStart(2, "0");
+
 export default function KolProfile() {
-  const navigate = useNavigate();
   const { kolId } = useParams();
   const auth = useAuth?.() || {};
   const userId = auth?.user?.id;
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(false); // chỉnh sửa thông tin cá nhân
+  const [mediaEditing, setMediaEditing] = useState(false); // chỉnh sửa media độc lập
 
   const [kol, setKol] = useState(null);
   const [allCategories, setAllCategories] = useState([]);
 
   const [uploadingImg, setUploadingImg] = useState(false);
   const [uploadingVid, setUploadingVid] = useState(false);
+  const [settingCoverId, setSettingCoverId] = useState(null);
 
-  // chọn ảnh bìa tạm trong phiên edit
-  const [pendingCoverFileId, setPendingCoverFileId] = useState(null);
-
-  // loading xóa theo từng usageId
   const [deleting, setDeleting] = useState({}); // { [usageId]: boolean }
 
   const [form] = Form.useForm();
   const imgInputRef = useRef(null);
   const vidInputRef = useRef(null);
+
+  // === watch DOB sub-fields to render correct day options ===
+  const dobMonth = Form.useWatch("dobMonth", form);
+  const dobYear = Form.useWatch("dobYear", form);
+  const dobDay = Form.useWatch("dobDay", form);
+
+  const dayCount = useMemo(() => {
+    if (!dobMonth || !dobYear) return 31;
+    const first = dayjs(
+      `${dobYear}-${padded(dobMonth)}-01`,
+      "YYYY-MM-DD",
+      true
+    );
+    return first.isValid() ? first.daysInMonth() : 31;
+  }, [dobMonth, dobYear]);
+
+  const yearOptions = useMemo(() => {
+    const arr = [];
+    for (let y = MAX_YEAR; y >= MIN_YEAR; y--)
+      arr.push({ value: y, label: `${y}` });
+    return arr;
+  }, []);
+
+  const dayOptions = useMemo(
+    () =>
+      Array.from({ length: dayCount }, (_, i) => ({
+        value: i + 1,
+        label: `${i + 1}`,
+      })),
+    [dayCount]
+  );
+
+  const dobDisplay = useMemo(() => {
+    if (dobDay && dobMonth && dobYear) {
+      const d = dayjs(
+        `${dobYear}-${padded(dobMonth)}-${padded(dobDay)}`,
+        "YYYY-MM-DD",
+        true
+      );
+      if (d.isValid()) return d.format("DD/MM/YYYY");
+    }
+    const dob = kol?.dob ? dayjs(kol.dob) : null;
+    return dob?.isValid() ? dob.format("DD/MM/YYYY") : "";
+  }, [dobDay, dobMonth, dobYear, kol?.dob]);
 
   const fetchKol = async () => {
     setLoading(true);
@@ -126,10 +153,13 @@ export default function KolProfile() {
         setKol(null);
       } else {
         setKol(res);
+        const dob = res.dob ? dayjs(res.dob) : null;
         form.setFieldsValue({
           displayName: res.displayName || res.fullName || "",
-          dateOfBirth: toPickerValue(res.dob),
-          role: mapBackendToUi(res.role), // LIVE => HOST (UI)
+          dobDay: dob?.date() ?? undefined,
+          dobMonth: dob ? dob.month() + 1 : undefined,
+          dobYear: dob?.year() ?? undefined,
+          role: mapBackendToUi(res.role),
           experience: res.experience || "",
           city: res.city || "",
           country: res.country || "",
@@ -138,7 +168,6 @@ export default function KolProfile() {
             ? res.categories.map((c) => c.id)
             : [],
         });
-        setPendingCoverFileId(null);
       }
     } catch (e) {
       console.error(e);
@@ -180,12 +209,18 @@ export default function KolProfile() {
     [allCategories]
   );
 
-  // Chuẩn hóa fileUsageDtos
+  // Lọc media hiển thị
   const images = useMemo(
     () =>
       Array.isArray(kol?.fileUsageDtos)
         ? kol.fileUsageDtos
-            .filter((u) => u?.file?.fileType?.toUpperCase() === "IMAGE")
+            .filter(
+              (u) =>
+                u?.isActive !== false &&
+                u?.file?.fileType?.toUpperCase() === "IMAGE" &&
+                u?.file?.status !== "DELETED" &&
+                !!u?.file?.fileUrl
+            )
             .map((u) => ({
               usageId: u.id,
               fileId: u?.file?.id || null,
@@ -200,7 +235,13 @@ export default function KolProfile() {
     () =>
       Array.isArray(kol?.fileUsageDtos)
         ? kol.fileUsageDtos
-            .filter((u) => u?.file?.fileType?.toUpperCase() === "VIDEO")
+            .filter(
+              (u) =>
+                u?.isActive !== false &&
+                u?.file?.fileType?.toUpperCase() === "VIDEO" &&
+                u?.file?.status !== "DELETED" &&
+                !!u?.file?.fileUrl
+            )
             .map((u) => ({
               usageId: u.id,
               fileId: u?.file?.id || null,
@@ -210,22 +251,20 @@ export default function KolProfile() {
     [kol]
   );
 
-  // id cover hiện tại từ server
   const currentCoverFileId = useMemo(() => {
     const u = (kol?.fileUsageDtos || []).find((x) => x?.isCover && x?.file?.id);
     return u?.file?.id || null;
   }, [kol]);
 
-  // cover hiển thị: ưu tiên cover tạm
-  const effectiveCoverFileId = pendingCoverFileId ?? currentCoverFileId;
-
   const cancelEdit = () => {
     setEditing(false);
-    setPendingCoverFileId(null);
     if (!kol) return;
+    const dob = kol.dob ? dayjs(kol.dob) : null;
     form.setFieldsValue({
       displayName: kol.displayName || kol.fullName || "",
-      dateOfBirth: toPickerValue(kol.dob),
+      dobDay: dob?.date() ?? undefined,
+      dobMonth: dob ? dob.month() + 1 : undefined,
+      dobYear: dob?.year() ?? undefined,
       role: mapBackendToUi(kol.role),
       experience: kol.experience || "",
       city: kol.city || "",
@@ -240,9 +279,30 @@ export default function KolProfile() {
   const onSave = async () => {
     try {
       const values = await form.validateFields();
+
+      // Ghép DOB (YYYY-MM-DD, tránh lệch TZ)
+      const { dobDay, dobMonth, dobYear } = values;
+      let composedDob = null;
+      if (dobDay && dobMonth && dobYear) {
+        const date = dayjs(
+          `${dobYear}-${padded(dobMonth)}-${padded(dobDay)}`,
+          "YYYY-MM-DD",
+          true
+        );
+        if (!date.isValid()) {
+          toast.error("Ngày sinh không hợp lệ.");
+          return;
+        }
+        if (dayjs().diff(date, "year") < 18) {
+          toast.error("Bạn phải từ 18 tuổi trở lên.");
+          return;
+        }
+        composedDob = date;
+      }
+
       const payload = {
         displayName: values.displayName?.trim() || undefined,
-        dob: toDobIso(values.dateOfBirth),
+        dob: composedDob ? composedDob.format("YYYY-MM-DD") : undefined,
         experience: values.experience?.trim() || undefined,
         city: values.city?.trim() || undefined,
         country: values.country?.trim() || undefined,
@@ -252,6 +312,7 @@ export default function KolProfile() {
       const beRole = mapUiRoleToBackend(values.role);
       if (beRole) payload.role = beRole;
 
+      // diff categories
       const initialIds = Array.isArray(kol?.categories)
         ? kol.categories.map((c) => c.id)
         : [];
@@ -259,21 +320,17 @@ export default function KolProfile() {
       const toAdd = newIds.filter((id) => !initialIds.includes(id));
       const toRemove = initialIds.filter((id) => !newIds.includes(id));
 
-      const coverChanged =
-        pendingCoverFileId && pendingCoverFileId !== currentCoverFileId;
-
       setSaving(true);
+
+      await updateMyKolProfile(payload);
       await Promise.all([
-        updateMyKolProfile(payload),
         toAdd.length ? addKolCategories(toAdd) : Promise.resolve(),
         toRemove.length ? removeKolCategories(toRemove) : Promise.resolve(),
-        coverChanged ? setCoverImage(pendingCoverFileId) : Promise.resolve(),
       ]);
 
       toast.success("Đã lưu thay đổi.");
       setEditing(false);
-      setPendingCoverFileId(null);
-      fetchKol();
+      await fetchKol();
     } catch (err) {
       if (!err?.errorFields) {
         console.error(err);
@@ -284,19 +341,22 @@ export default function KolProfile() {
     }
   };
 
-  // chọn cover tạm
-  const onChooseCover = (fileId) => {
-    setPendingCoverFileId(fileId);
-    toast.info("Đã chọn ảnh bìa (chưa lưu). Nhấn 'Lưu thay đổi' để áp dụng.");
-  };
-
-  // xóa media (deactivate)
-  const onDeactivateMedia = async (usageId, fileId) => {
+  // ===== Media actions (tự lưu ngay, không ảnh hưởng thông tin cá nhân) =====
+  const onDeleteMedia = async (usageId, fileId) => {
     setDeleting((p) => ({ ...p, [usageId]: true }));
     try {
-      await deactivateKolMedias(usageId);
-      setPendingCoverFileId((prev) => (prev === fileId ? null : prev));
-      toast.success("Đã xoá media.");
+      await deleteKolMedia(fileId);
+      // Optimistic remove
+      setKol((prev) =>
+        prev
+          ? {
+              ...prev,
+              fileUsageDtos: (prev.fileUsageDtos || []).filter(
+                (u) => u?.file?.id !== fileId
+              ),
+            }
+          : prev
+      );
       await fetchKol();
     } catch (e) {
       console.error(e);
@@ -318,8 +378,7 @@ export default function KolProfile() {
         fileType: "IMAGE",
         targetType: "PORTFOLIO",
       });
-      toast.success("Tải ảnh lên thành công.");
-      fetchKol();
+      await fetchKol();
     } catch (err) {
       console.error(err);
       toast.error(err?.response?.data?.message || "Tải ảnh lên thất bại.");
@@ -340,13 +399,26 @@ export default function KolProfile() {
         fileType: "VIDEO",
         targetType: "PORTFOLIO",
       });
-      toast.success("Tải video lên thành công.");
-      fetchKol();
+      await fetchKol();
     } catch (err) {
       console.error(err);
       toast.error(err?.response?.data?.message || "Tải video lên thất bại.");
     } finally {
       setUploadingVid(false);
+    }
+  };
+
+  const onChooseCover = async (fileId) => {
+    try {
+      setSettingCoverId(fileId);
+      await setCoverImage(fileId); // lưu ngay
+      await fetchKol();
+      toast.success("Đã đặt làm ảnh bìa.");
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.response?.data?.message || "Đặt ảnh bìa thất bại.");
+    } finally {
+      setSettingCoverId(null);
     }
   };
 
@@ -391,7 +463,6 @@ export default function KolProfile() {
                     </Button>
                   </Space>
                 )}
-                {/* ĐÃ BỎ nút Quay lại ở header */}
               </div>
             </div>
           </Title>
@@ -416,22 +487,86 @@ export default function KolProfile() {
 
               <Row gutter={16}>
                 <Col xs={24} md={12}>
-                  <Form.Item
-                    label="Ngày sinh"
-                    name="dateOfBirth"
-                    rules={[
-                      { required: true, message: "Vui lòng chọn ngày sinh" },
-                      { validator: validateAdult },
-                    ]}
-                  >
-                    <DatePicker
-                      className="!h-12 w-full"
-                      format="DD/MM/YYYY"
-                      placeholder="Chọn ngày sinh (>= 18 tuổi)"
-                      disabledDate={disabledDOB}
-                    />
-                  </Form.Item>
+                  {editing ? (
+                    <Row gutter={8}>
+                      <Col span={8}>
+                        <Form.Item
+                          label="Ngày"
+                          name="dobDay"
+                          rules={[{ required: true, message: "Chọn ngày" }]}
+                        >
+                          <Select
+                            size="large"
+                            className="!h-12"
+                            options={dayOptions}
+                            placeholder="Ngày"
+                            allowClear
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={8}>
+                        <Form.Item
+                          label="Tháng"
+                          name="dobMonth"
+                          rules={[{ required: true, message: "Chọn tháng" }]}
+                        >
+                          <Select
+                            size="large"
+                            className="!h-12"
+                            options={monthOptions}
+                            placeholder="Tháng"
+                            allowClear
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={8}>
+                        <Form.Item
+                          label="Năm"
+                          name="dobYear"
+                          rules={[
+                            { required: true, message: "Chọn năm" },
+                            {
+                              validator: () => {
+                                const d = form.getFieldValue("dobDay");
+                                const m = form.getFieldValue("dobMonth");
+                                const y = form.getFieldValue("dobYear");
+                                if (!d || !m || !y) return Promise.resolve();
+                                const date = dayjs(
+                                  `${y}-${padded(m)}-${padded(d)}`,
+                                  "YYYY-MM-DD",
+                                  true
+                                );
+                                if (!date.isValid())
+                                  return Promise.reject(
+                                    new Error("Ngày sinh không hợp lệ.")
+                                  );
+                                const age = dayjs().diff(date, "year");
+                                return age >= 18
+                                  ? Promise.resolve()
+                                  : Promise.reject(
+                                      new Error("Bạn phải từ 18 tuổi trở lên.")
+                                    );
+                              },
+                            },
+                          ]}
+                        >
+                          <Select
+                            size="large"
+                            className="!h-12"
+                            options={yearOptions}
+                            placeholder="Năm"
+                            allowClear
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  ) : (
+                    <Form.Item label="Ngày sinh">
+                      <Input className="!h-12" value={dobDisplay} disabled />
+                    </Form.Item>
+                  )}
                 </Col>
+
                 <Col xs={24} md={12}>
                   <Form.Item
                     label="Vị trí"
@@ -448,6 +583,7 @@ export default function KolProfile() {
                   >
                     <Select
                       className="!h-12"
+                      size="large"
                       options={[
                         { value: "HOST", label: "Host chính" },
                         { value: "CO_HOST", label: "Trợ live" },
@@ -522,6 +658,7 @@ export default function KolProfile() {
                     <Select
                       mode="multiple"
                       className="!min-h-12"
+                      size="large"
                       placeholder="Chọn chuyên mục"
                       options={categoryOptions}
                       showSearch
@@ -569,6 +706,7 @@ export default function KolProfile() {
         className="shadow-sm rounded-2xl"
         loading={loading}
         style={{ marginTop: 12 }}
+        bodyStyle={{ padding: 20 }} // padding thêm
       >
         <Form form={form} layout="vertical" disabled={!editing}>
           <Form.Item
@@ -597,42 +735,60 @@ export default function KolProfile() {
             <Title level={4} className="!mb-0">
               Media
             </Title>
-            {editing && (
-              <Space>
-                <input
-                  ref={imgInputRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={onPickImage}
-                />
-                <input
-                  ref={vidInputRef}
-                  type="file"
-                  accept="video/*"
-                  hidden
-                  onChange={onPickVideo}
-                />
+            <Space>
+              {!mediaEditing ? (
                 <Button
-                  icon={<PlusOutlined />}
-                  onClick={() => imgInputRef.current?.click()}
-                  loading={uploadingImg}
+                  icon={<EditOutlined />}
+                  onClick={() => setMediaEditing(true)}
                 >
-                  Thêm ảnh
+                  Chỉnh sửa media
                 </Button>
+              ) : (
                 <Button
-                  icon={<PlusOutlined />}
-                  onClick={() => vidInputRef.current?.click()}
-                  loading={uploadingVid}
+                  icon={<CheckOutlined />}
+                  onClick={() => setMediaEditing(false)}
                 >
-                  Thêm video
+                  Xong
                 </Button>
-              </Space>
-            )}
+              )}
+              {mediaEditing && (
+                <>
+                  <input
+                    ref={imgInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={onPickImage}
+                  />
+                  <input
+                    ref={vidInputRef}
+                    type="file"
+                    accept="video/*"
+                    hidden
+                    onChange={onPickVideo}
+                  />
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => imgInputRef.current?.click()}
+                    loading={uploadingImg}
+                  >
+                    Thêm ảnh
+                  </Button>
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => vidInputRef.current?.click()}
+                    loading={uploadingVid}
+                  >
+                    Thêm video
+                  </Button>
+                </>
+              )}
+            </Space>
           </div>
         }
         className="shadow-sm rounded-2xl"
         loading={loading}
+        bodyStyle={{ padding: 20 }} // padding thêm
       >
         {/* ẢNH */}
         <div className="mb-4">
@@ -645,7 +801,7 @@ export default function KolProfile() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {images.map((img) => {
-              const isEffectiveCover = img.fileId === effectiveCoverFileId;
+              const isCover = img.fileId === currentCoverFileId;
               return (
                 <div
                   key={img.usageId}
@@ -653,7 +809,9 @@ export default function KolProfile() {
                   style={{ height: 140 }}
                 >
                   <Image
-                    src={img.file.fileUrl}
+                    src={`${img.file.fileUrl}${
+                      img.file.fileUrl.includes("?") ? "&" : "?"
+                    }v=${kol?.updatedAt || Date.now()}`}
                     alt={img.file.fileName}
                     preview={false}
                     fallback={<FileImageOutlined />}
@@ -664,7 +822,7 @@ export default function KolProfile() {
                     }}
                   />
 
-                  {isEffectiveCover && (
+                  {isCover && (
                     <Tag
                       className="!absolute !top-1 !left-1 !rounded-full !px-2 !py-0"
                       color="blue"
@@ -673,15 +831,13 @@ export default function KolProfile() {
                     </Tag>
                   )}
 
-                  {editing && (
+                  {mediaEditing && (
                     <div className="!absolute !top-1 !right-1 z-20">
                       <Popconfirm
                         title="Xoá media này?"
                         okText="Xoá"
                         cancelText="Huỷ"
-                        onConfirm={() =>
-                          onDeactivateMedia(img.usageId, img.fileId)
-                        }
+                        onConfirm={() => onDeleteMedia(img.usageId, img.fileId)}
                       >
                         <Button
                           type="text"
@@ -696,12 +852,13 @@ export default function KolProfile() {
                     </div>
                   )}
 
-                  {editing && !isEffectiveCover && (
+                  {mediaEditing && !isCover && (
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 pointer-events-none">
                       <Button
                         type="primary"
                         disabled={!img.fileId}
                         icon={<StarOutlined />}
+                        loading={settingCoverId === img.fileId}
                         onClick={() => onChooseCover(img.fileId)}
                         className="pointer-events-auto"
                       >
@@ -744,13 +901,13 @@ export default function KolProfile() {
                   controls
                 />
 
-                {editing && (
+                {mediaEditing && (
                   <div className="!absolute !top-1 !right-1 z-20">
                     <Popconfirm
                       title="Xoá media này?"
                       okText="Xoá"
                       cancelText="Huỷ"
-                      onConfirm={() => onDeactivateMedia(v.usageId, v.fileId)}
+                      onConfirm={() => onDeleteMedia(v.usageId, v.fileId)}
                     >
                       <Button
                         type="text"
@@ -775,7 +932,7 @@ export default function KolProfile() {
         </div>
       </Card>
 
-      {/* ==== Footer actions: THÊM nút Lưu thay đổi ở dưới cùng, bỏ nút Quay lại ==== */}
+      {/* ==== Footer actions: chỉ lưu thông tin cá nhân ==== */}
       <Divider style={{ margin: "12px 0 0" }} />
       <div className="flex items-center justify-end">
         <Button

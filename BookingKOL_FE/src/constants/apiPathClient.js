@@ -15,6 +15,7 @@ export const CLIENT_API_PATHS = {
       changeCover: "/v1/kol/cover-image/change",
       avatarChangeExisting: "/v1/kol/avatar/change/existed-image",
       avatarChangeNew: "/v1/kol/avatar/change/new-image",
+      delete: (fileId) => `/v1/kol/medias/delete/${fileId}`,
     },
   },
   BOOKING: {

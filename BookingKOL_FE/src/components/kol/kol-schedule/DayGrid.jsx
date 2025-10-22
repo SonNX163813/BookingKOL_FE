@@ -1,3 +1,4 @@
+// src/components/kol/kol-schedule/DayGrid.jsx
 import React, { useMemo, useState } from "react";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -29,13 +30,15 @@ const timeToMinutes = (time) => {
 const minutesToPixels = (mins) => (mins / 60) * TOTAL_SLOT_HEIGHT;
 
 export default function DayGrid({ range, dayDuties, fromDate }) {
-  const [popupIndex, setPopupIndex] = useState("");
+  const [popupItem, setPopupItem] = useState(null);
+  const [popupDayInfo, setPopupDayInfo] = useState(null);
+
   const hours = Array.from(
     { length: 24 },
     (_, i) => `${String(i).padStart(2, "0")}:00`
   );
 
-  // ✅ phải là dayjs object, KHÔNG .toDate()
+  // phải là dayjs object
   const refDate = dayjs(fromDate);
 
   const weekDates = useMemo(() => {
@@ -47,7 +50,7 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
           day: d.format("DD"),
           month: d.format("MM"),
           year: d.format("YYYY"),
-          weekday: d.isoWeekday(), // 1..7 (Mon..Sun)
+          weekday: d.isoWeekday(), // 1..7
         };
       });
     }
@@ -90,7 +93,7 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
         })
         .sort((a, b) => a.startMinutes - b.startMinutes);
 
-      // overlap
+      // tính overlap
       for (let i = 0; i < events.length; i++) {
         for (let j = i + 1; j < events.length; j++) {
           const a = events[i],
@@ -102,7 +105,7 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
         }
       }
 
-      // column index
+      // gán columnIndex
       for (const e of events) {
         const occupied = e.collisions
           .map((c) => c.columnIndex)
@@ -148,7 +151,20 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
     return layouts;
   }, [dayDuties, weekDates, range]);
 
-  const handleClosePopup = () => setPopupIndex("");
+  const openPopup = (item, weekDate) => {
+    setPopupItem(item);
+    setPopupDayInfo({
+      weekday: WEEKDAY_LABEL[weekDate.weekday],
+      day: weekDate.day,
+      month: weekDate.month,
+      year: weekDate.year,
+    });
+  };
+
+  const handleClosePopup = () => {
+    setPopupItem(null);
+    setPopupDayInfo(null);
+  };
 
   // GMT (tuỳ chọn)
   const timeZoneOffset = new Date().getTimezoneOffset();
@@ -180,6 +196,7 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
               )}
               style={{ overflow: "visible" }}
             >
+              {/* Header thứ/ngày (tuần) */}
               {weekDates.length <= 1 ? null : (
                 <div className="flex flex-col justify-center items-center text-lg font-bold">
                   <p className="uppercase whitespace-nowrap">
@@ -189,9 +206,10 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                 </div>
               )}
 
+              {/* Grid nền theo giờ (không bắt click) */}
               <div
                 className={clsx(
-                  "absolute left-0 right-0",
+                  "absolute left-0 right-0 pointer-events-none",
                   range === "day" ? "top-[118px]" : "top-[63px]"
                 )}
                 style={{
@@ -203,12 +221,14 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                 }}
               />
 
+              {/* Cột giờ + tasks */}
               <div
                 className={clsx(
                   "relative w-full",
                   range === "day" ? "mt-[118px]" : "mt-[63px]"
                 )}
               >
+                {/* Cột giờ bên trái */}
                 <div className="flex flex-col w-full items-center">
                   {hours.map((hour) => (
                     <div
@@ -232,55 +252,65 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                   ))}
                 </div>
 
-                <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-10">
+                {/* Layer chứa tasks (được click) */}
+                <div className="absolute top-0 left-0 right-0 bottom-0 z-10">
                   <div
                     className={clsx(
                       "relative h-full",
                       range === "day" ? "ml-13 lg:ml-5" : ""
                     )}
                   >
-                    {laidOut.map((item) => (
-                      <div
-                        key={item.id}
-                        role="button"
-                        tabIndex={0}
-                        className="absolute pointer-events-auto cursor-pointer"
-                        style={{
-                          top: `${item.top}px`,
-                          height: `${item.height}px`,
-                          minHeight: "22.5px",
-                          left: item.left,
-                          width: item.width,
-                          zIndex: item.zIndex,
-                        }}
-                        onClick={() => setPopupIndex(item.id)}
-                      >
-                        <div
-                          className="h-full w-full rounded-xl p-2 text-white overflow-hidden border-2 border-white/60 shadow-sm"
-                          style={{ backgroundColor: item.colorCode }}
-                        >
-                          <p className="font-bold text-xs truncate text-white">
-                            {item.description}
-                          </p>
-                          <p className="text-xs text-white truncate mt-0.5">
-                            {item.startTime.slice(0, 5)} –{" "}
-                            {item.endTime.slice(0, 5)}
-                          </p>
-                        </div>
+                    {laidOut.map((item) => {
+                      const isBooking =
+                        item?.isBooking ||
+                        String(item?.status || "")
+                          .toLowerCase()
+                          .includes("book");
+                      const hhmm = (t) => (t ? t.slice(0, 5) : "");
 
-                        {popupIndex === item.id && (
-                          <TaskPopup
-                            isDisplay={true}
-                            onClose={handleClosePopup}
-                            goalDetails={item}
-                            dayInfo={weekDate}
-                            range={range}
-                            isLastCol={i >= 5}
-                            readOnly
-                          />
-                        )}
-                      </div>
-                    ))}
+                      return (
+                        <div
+                          key={item.id}
+                          role="button"
+                          tabIndex={0}
+                          className="absolute cursor-pointer"
+                          style={{
+                            top: `${item.top}px`,
+                            height: `${item.height}px`,
+                            minHeight: "22.5px",
+                            left: item.left,
+                            width: item.width,
+                            zIndex: item.zIndex,
+                          }}
+                          onClick={() => openPopup(item, weekDate)}
+                          onKeyDown={(e) =>
+                            (e.key === "Enter" || e.key === " ") &&
+                            openPopup(item, weekDate)
+                          }
+                        >
+                          <div
+                            className="h-full w-full rounded-xl p-2 text-white overflow-hidden border-2 border-white/60 shadow-sm"
+                            style={{ backgroundColor: item.colorCode }}
+                          >
+                            {/* Title */}
+                            <p className="font-bold text-xs truncate text-white">
+                              {isBooking ? item.description : "Lịch rảnh"}
+                            </p>
+                            {/* Time line */}
+                            {isBooking ? (
+                              <p className="text-xs text-white truncate mt-0.5">
+                                {hhmm(item.startTime)} – {hhmm(item.endTime)}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-white truncate mt-0.5">
+                                Rảnh từ {hhmm(item.startTime)} đến{" "}
+                                {hhmm(item.endTime)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -296,6 +326,17 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
           <div className="border-t border-gray-300 flex-1 -mt-12" />
         </div>
       </div>
+
+      {/* ======= POPUP TÁCH RIÊNG (portal qua antd) ======= */}
+      <TaskPopup
+        isDisplay={!!popupItem}
+        goalDetails={popupItem}
+        dayInfo={popupDayInfo}
+        onClose={handleClosePopup}
+        range={range}
+        isLastCol={false}
+        readOnly
+      />
     </div>
   );
 }

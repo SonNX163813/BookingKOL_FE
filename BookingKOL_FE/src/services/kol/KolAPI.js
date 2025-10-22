@@ -1,4 +1,11 @@
-import { get, post, remove, remove2, update } from "../../config/axios-config";
+import {
+  get,
+  patch,
+  post,
+  remove,
+  remove2,
+  update,
+} from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 import dayjs from "dayjs";
 
@@ -127,28 +134,53 @@ export const uploadKolMedias = async (files, opts = {}) => {
   });
 };
 
-export const addKolCategories = async (categoryIds, { signal } = {}) => {
+export const addKolCategories = async (categoryIds = [], { signal } = {}) => {
   const ids = (Array.isArray(categoryIds) ? categoryIds : [categoryIds]).filter(
     Boolean
   );
   if (!ids.length) return null;
-  return await post({
-    url: CLIENT_API_PATHS.KOL.categoryAdd,
-    data: { categoryIds: ids },
-    config: signal ? { signal } : undefined,
-  });
+
+  const results = [];
+  for (const id of ids) {
+    const res = await post({
+      url: CLIENT_API_PATHS.KOL.categoryAdd, // "/v1/kol/category/add"
+      data: null,
+      // post cho phép config.params => truyền query qua đây
+      config: { params: { categoryId: id }, ...(signal ? { signal } : {}) },
+    });
+    results.push(res ?? null);
+  }
+  return results;
 };
 
-export const removeKolCategories = async (categoryIds, { signal } = {}) => {
+// Remove nhiều categoryId (loop từng id) — DELETE /v1/kol/category/remove?categoryId=...
+export const removeKolCategories = async (
+  categoryIds = [],
+  { signal } = {}
+) => {
   const ids = (Array.isArray(categoryIds) ? categoryIds : [categoryIds]).filter(
     Boolean
   );
   if (!ids.length) return null;
-  return await remove2({
-    url: CLIENT_API_PATHS.KOL.categoryRemove,
-    data: { categoryIds: ids }, // gửi body
-    config: signal ? { signal } : undefined,
-  });
+
+  const results = [];
+  for (const id of ids) {
+    // Cách 1 (đơn giản): remove() chỉ nhận {url} => gắn query trực tiếp
+    const url = `${
+      CLIENT_API_PATHS.KOL.categoryRemove
+    }?categoryId=${encodeURIComponent(id)}`;
+    const res = await remove({ url });
+
+    // Nếu muốn truyền thêm signal/params qua config, dùng remove2 như dưới và bỏ 2 dòng trên:
+    // const res = await remove2({
+    //   url: CLIENT_API_PATHS.KOL.categoryRemove,
+    //   data: null,
+    //   config: { params: { categoryId: id }, ...(signal ? { signal } : {}) },
+    // });
+
+    results.push(res ?? null);
+  }
+  return results;
 };
 export const setCoverImage = async (fileId, { signal } = {}) => {
   if (!fileId) throw new Error("fileId is required");
@@ -242,4 +274,11 @@ export const registerKolAvailabilities = async ({
     results.push(res?.data ?? res);
   }
   return results;
+};
+export const deleteKolMedia = async (fileId, { signal } = {}) => {
+  if (!fileId) throw new Error("fileId is required");
+  // remove() chỉ nhận {url} → gắn id vào path
+  return await patch({
+    url: CLIENT_API_PATHS.KOL.medias.delete(encodeURIComponent(fileId)),
+  });
 };
