@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -21,6 +21,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { useGetMySingleBookingRequestDetail } from "../../../hook/user/booking/useGetMySingleBookingRequestDetail";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
 const { Text } = Typography;
 
@@ -80,54 +81,28 @@ const PAYMENT_STATUS_COLOR = {
   REFUNDED: "purple",
 };
 
-const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
-  if (!value) return "--";
+const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
+  value ? (dayjs(value).isValid() ? dayjs(value).format(pattern) : "--") : "--";
 
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format(pattern) : "--";
-};
-
-const formatCurrency = (value, currency = "VND") => {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-
-  const numeric =
-    typeof value === "number" ? value : Number.parseFloat(String(value));
-
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(numeric);
-};
+const formatCurrency = (value, currency = "VND") =>
+  value
+    ? new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 0,
+      }).format(value)
+    : "--";
 
 const composeExecutionTime = (record) => {
   const start = record?.startAt ?? record?.startTime;
   const end = record?.endAt ?? record?.endTime;
-
-  if (!start && !end) {
-    return "--";
-  }
-
+  if (!start && !end) return "--";
   const startLabel = formatDateTime(start);
   const endLabel = formatDateTime(end);
-
   const sameDay =
     dayjs(start).isValid() &&
     dayjs(end).isValid() &&
     dayjs(start).isSame(dayjs(end), "day");
-
-  if (!start) {
-    return endLabel;
-  }
-  if (!end) {
-    return startLabel;
-  }
 
   return sameDay
     ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} → ${dayjs(end).format(
@@ -136,16 +111,10 @@ const composeExecutionTime = (record) => {
     : `${startLabel} → ${endLabel}`;
 };
 
-const formatArray = (value) => {
-  if (!Array.isArray(value)) {
-    return value ?? "--";
-  }
+const formatArray = (v) => (Array.isArray(v) && v.length ? v.join(", ") : "--");
 
-  return value.length > 0 ? value.join(", ") : "--";
-};
-
-const normalizeStatus = (status) =>
-  status && typeof status === "string" ? status.toUpperCase() : status;
+const normalizeStatus = (s) =>
+  s && typeof s === "string" ? s.toUpperCase() : s;
 
 const MySingleBookingRequestDetail = () => {
   const navigate = useNavigate();
@@ -167,12 +136,11 @@ const MySingleBookingRequestDetail = () => {
     : [];
 
   const status = normalizeStatus(detail?.status);
-  const statusLabel = status
-    ? BOOKING_STATUS_LABEL[status] ?? status
-    : "--";
+  const statusLabel = status ? BOOKING_STATUS_LABEL[status] ?? status : "--";
 
-  const isLoading =
-    isLoadingMyBookingRequestDetail || isFetchingMyBookingRequestDetail;
+  const handleBack = useCallback(() => {
+    navigate("/don-booking-kol");
+  }, [navigate]);
 
   const attachedFileColumns = useMemo(
     () => [
@@ -180,34 +148,27 @@ const MySingleBookingRequestDetail = () => {
         title: "Tên tệp",
         dataIndex: ["file", "fileName"],
         key: "fileName",
-        render: (_, record) => record?.file?.fileName ?? "--",
+        render: (_, r) => r?.file?.fileName ?? "--",
       },
       {
         title: "Loại",
         dataIndex: ["file", "fileType"],
         key: "fileType",
-        render: (_, record) => record?.file?.fileType ?? "--",
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        render: (value) => value ?? "--",
+        render: (_, r) => r?.file?.fileType ?? "--",
       },
       {
         title: "Ngày tạo",
         dataIndex: "createdAt",
         key: "createdAt",
-        render: (value) => formatDateTime(value),
+        render: (v) => formatDateTime(v),
       },
       {
         title: "Liên kết",
         key: "link",
-        render: (_, record) => {
-          const url = record?.file?.fileUrl;
-          return url ? (
+        render: (_, r) =>
+          r?.file?.fileUrl ? (
             <Typography.Link
-              href={url}
+              href={r.file.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -215,36 +176,46 @@ const MySingleBookingRequestDetail = () => {
             </Typography.Link>
           ) : (
             "--"
-          );
-        },
+          ),
       },
     ],
     []
   );
 
-  return (
-    <div className="flex flex-col items-center gap-6 px-4 py-8">
-      <div className="w-full max-w-[1200px] flex flex-col gap-4">
-        <Button
-          type="link"
-          icon={<ArrowLeft size={16} />}
-          onClick={() => navigate(-1)}
-          className="self-start px-0"
-        >
-          Quay lại
-        </Button>
+  const isLoading =
+    isLoadingMyBookingRequestDetail || isFetchingMyBookingRequestDetail;
 
-        <div className="flex flex-col items-center text-center gap-2">
-          <div className="inline-flex items-center gap-2 border-2 border-gray-300 p-2 rounded-md">
-            <CalendarRange className="text-gray-500" size={18} />
-            <Text strong className="uppercase text-[15px]">
-              Chi tiết đơn booking KOL
-            </Text>
-          </div>
-          <Text type="secondary">
-            Xem đầy đủ thông tin của đơn booking KOL đã tạo.
-          </Text>
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-pink-50 py-12">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-indigo-300/30 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 rounded-full bg-purple-300/20 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 md:px-6 lg:px-8 flex flex-col gap-10">
+        {/* Header */}
+        <div>
+          <Button
+            icon={<ArrowLeft size={16} />}
+            onClick={handleBack}
+            className="!flex !items-center !gap-2 !h-11 !rounded-xl !border !border-slate-200 !bg-white !text-indigo-600 !font-semibold !shadow-sm hover:!border-indigo-500/60 hover:!text-indigo-700 hover:!bg-indigo-50 transition-all duration-300"
+          >
+            Trở về đơn đặt KOL
+          </Button>
         </div>
+        <section className="rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
+                <CalendarRange size={16} />
+                <span>Chi tiết booking KOL</span>
+              </div>
+              <p className="mt-4 text-sm text-slate-600">
+                Xem chi tiết thông tin đơn, hợp đồng và thanh toán.
+              </p>
+            </div>
+          </div>
+        </section>
 
         {myBookingRequestDetailError ? (
           <Alert
@@ -259,68 +230,55 @@ const MySingleBookingRequestDetail = () => {
 
         <Skeleton active loading={isLoading}>
           {detail ? (
-            <Space direction="vertical" size="large" className="w-full">
-              <Card
-                bordered={false}
-                className="shadow-sm"
-                title={
-                  <Space>
-                    <FileText size={18} />
-                    <span>Thông tin booking</span>
-                  </Space>
-                }
-              >
-                <Descriptions
-                  bordered
-                  size="middle"
-                  column={1}
-                  labelStyle={{ width: 180 }}
-                >
-                  <Descriptions.Item label="Mã đơn">
-                    {detail?.id ?? "--"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Trạng thái">
-                    {status ? (
-                      <Tag color={STATUS_TAG_COLOR[status] ?? "default"}>
-                        {statusLabel}
-                      </Tag>
-                    ) : (
-                      "--"
-                    )}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Thời gian thực hiện">
-                    {composeExecutionTime(detail)}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Địa điểm">
-                    {detail?.location?.trim?.() || "--"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Ngày tạo">
-                    {formatDateTime(detail?.createdAt)}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Ghi chú">
-                    <Text style={{ whiteSpace: "pre-wrap" }}>
-                      {detail?.description?.trim?.() || "--"}
-                    </Text>
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
+            <>
+              {/* Booking Info */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space direction="vertical" size="large" className="w-full">
+                  <Descriptions bordered size="middle" column={1}>
+                    <Descriptions.Item label="Mã đơn">
+                      {detail?.id ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Trạng thái">
+                      {status ? (
+                        <Tag color={STATUS_TAG_COLOR[status] ?? "default"}>
+                          {statusLabel}
+                        </Tag>
+                      ) : (
+                        "--"
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Thời gian thực hiện">
+                      {composeExecutionTime(detail)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Địa điểm">
+                      {detail?.location?.trim?.() || "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Ngày tạo">
+                      {formatDateTime(detail?.createdAt)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Ghi chú">
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {detail?.description?.trim?.() || "--"}
+                      </Text>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Space>
+              </section>
 
-              <Card
-                bordered={false}
-                className="shadow-sm"
-                title={
-                  <Space>
-                    <UserCircle2 size={18} />
-                    <span>Thông tin người đặt</span>
-                  </Space>
-                }
-              >
+              {/* User Info */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <UserCircle2 size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Thông tin người đặt
+                  </span>
+                </Space>
                 {detail?.user ? (
                   <Descriptions
                     bordered
                     size="middle"
                     column={1}
-                    labelStyle={{ width: 180 }}
+                    className="mt-4"
                   >
                     <Descriptions.Item label="Tên">
                       {detail.user.fullName ?? "--"}
@@ -338,118 +296,97 @@ const MySingleBookingRequestDetail = () => {
                 ) : (
                   <Empty description="Không có thông tin người đặt" />
                 )}
-              </Card>
+              </section>
 
-              <Card
-                bordered={false}
-                className="shadow-sm"
-                title={
-                  <Space>
-                    <UserCircle2 size={18} />
-                    <span>Thông tin KOL</span>
-                  </Space>
-                }
-              >
+              {/* KOL Info */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <UserCircle2 size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Thông tin KOL
+                  </span>
+                </Space>
                 {detail?.kol ? (
-                  <Space direction="vertical" size="large" className="w-full">
-                    <Descriptions
-                      bordered
-                      size="middle"
-                      column={1}
-                      labelStyle={{ width: 180 }}
-                    >
-                      <Descriptions.Item label="Tên KOL">
-                        {detail.kol.displayName ?? detail.kol.fullName ?? "--"}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Quốc gia">
-                        {detail.kol.country ?? "--"}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Thành phố">
-                        {detail.kol.city ?? "--"}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Danh mục">
-                        {formatArray(
-                          detail.kol.categories?.map((c) => c?.name).filter(Boolean)
-                        )}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Kinh nghiệm">
-                        {detail.kol.experience ?? "--"}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Mô tả">
-                        <Text style={{ whiteSpace: "pre-wrap" }}>
-                          {detail.kol.bio ?? "--"}
-                        </Text>
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </Space>
+                  <Descriptions
+                    bordered
+                    size="middle"
+                    column={1}
+                    className="mt-4"
+                  >
+                    <Descriptions.Item label="Tên KOL">
+                      {detail.kol.displayName ?? detail.kol.fullName ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Quốc gia">
+                      {detail.kol.country ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Thành phố">
+                      {detail.kol.city ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Danh mục">
+                      {formatArray(
+                        detail.kol.categories
+                          ?.map((c) => c?.name)
+                          .filter(Boolean)
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Kinh nghiệm">
+                      {detail.kol.experience ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Mô tả">
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {detail.kol.bio ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
+                  </Descriptions>
                 ) : (
                   <Empty description="Không có thông tin KOL" />
                 )}
-              </Card>
+              </section>
 
-              <Card
-                bordered={false}
-                className="shadow-sm"
-                title={
-                  <Space>
-                    <Layers size={18} />
-                    <span>Hợp đồng & thanh toán</span>
-                  </Space>
-                }
-              >
+              {/* Contract & Payment */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <Layers size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Hợp đồng & thanh toán
+                  </span>
+                </Space>
                 {contracts.length > 0 ? (
-                  <Space direction="vertical" size="large" className="w-full">
-                    {contracts.map((contract) => {
-                      const normalizedContractStatus = normalizeStatus(
-                        contract?.status
-                      );
+                  <Space
+                    direction="vertical"
+                    size="large"
+                    className="w-full mt-4"
+                  >
+                    {contracts.map((c) => {
                       const paymentStatus = normalizeStatus(
-                        contract?.paymentDTO?.status
+                        c?.paymentDTO?.status
                       );
-
                       return (
                         <Card
-                          key={contract?.id ?? Math.random()}
+                          key={c?.id}
                           type="inner"
-                          title={`Hợp đồng ${contract?.id ?? ""}`.trim()}
+                          title={`Hợp đồng ${c?.id ?? ""}`}
+                          className="shadow-sm"
                         >
-                          <Descriptions
-                            bordered
-                            size="middle"
-                            column={1}
-                            labelStyle={{ width: 180 }}
-                          >
+                          <Descriptions bordered size="middle" column={1}>
                             <Descriptions.Item label="Trạng thái hợp đồng">
-                              {normalizedContractStatus ? (
-                                <Tag
-                                  color={
-                                    STATUS_TAG_COLOR[normalizedContractStatus] ??
-                                    "default"
-                                  }
-                                >
-                                  {BOOKING_STATUS_LABEL[normalizedContractStatus] ??
-                                    normalizedContractStatus}
-                                </Tag>
-                              ) : (
-                                "--"
-                              )}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Ngày tạo">
-                              {formatDateTime(contract?.createdAt)}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Ngày cập nhật">
-                              {formatDateTime(contract?.updatedAt)}
+                              <Tag
+                                color={
+                                  STATUS_TAG_COLOR[c?.status?.toUpperCase()] ??
+                                  "default"
+                                }
+                              >
+                                {BOOKING_STATUS_LABEL[
+                                  c?.status?.toUpperCase()
+                                ] ?? c?.status}
+                              </Tag>
                             </Descriptions.Item>
                             <Descriptions.Item label="Thanh toán">
                               {paymentStatus ? (
                                 <Tag
-                                  color={
-                                    PAYMENT_STATUS_COLOR[paymentStatus] ??
-                                    "default"
-                                  }
+                                  color={PAYMENT_STATUS_COLOR[paymentStatus]}
                                 >
-                                  {PAYMENT_STATUS_LABEL[paymentStatus] ??
-                                    paymentStatus}
+                                  {PAYMENT_STATUS_LABEL[paymentStatus]}
                                 </Tag>
                               ) : (
                                 "--"
@@ -457,18 +394,18 @@ const MySingleBookingRequestDetail = () => {
                             </Descriptions.Item>
                             <Descriptions.Item label="Tổng tiền">
                               {formatCurrency(
-                                contract?.paymentDTO?.totalAmount,
-                                contract?.paymentDTO?.currency ?? "VND"
+                                c?.paymentDTO?.totalAmount,
+                                c?.paymentDTO?.currency ?? "VND"
                               )}
                             </Descriptions.Item>
                             <Descriptions.Item label="Đã thanh toán">
                               {formatCurrency(
-                                contract?.paymentDTO?.paidAmount,
-                                contract?.paymentDTO?.currency ?? "VND"
+                                c?.paymentDTO?.paidAmount,
+                                c?.paymentDTO?.currency ?? "VND"
                               )}
                             </Descriptions.Item>
                             <Descriptions.Item label="Hết hạn thanh toán">
-                              {formatDateTime(contract?.paymentDTO?.expiresAt)}
+                              {formatDateTime(c?.paymentDTO?.expiresAt)}
                             </Descriptions.Item>
                           </Descriptions>
                         </Card>
@@ -478,32 +415,30 @@ const MySingleBookingRequestDetail = () => {
                 ) : (
                   <Empty description="Không có thông tin hợp đồng" />
                 )}
-              </Card>
+              </section>
 
-              <Card
-                bordered={false}
-                className="shadow-sm"
-                title={
-                  <Space>
-                    <FileText size={18} />
-                    <span>Tệp đính kèm</span>
-                  </Space>
-                }
-              >
+              {/* Attached Files */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <FileText size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Tệp đính kèm
+                  </span>
+                </Space>
                 {attachedFiles.length > 0 ? (
                   <Table
                     columns={attachedFileColumns}
                     dataSource={attachedFiles}
-                    rowKey={(record) => record?.id ?? Math.random().toString(36)}
                     pagination={false}
-                    scroll={{ x: 720 }}
+                    rowKey={(r) => r?.id ?? Math.random()}
+                    className="mt-4"
                   />
                 ) : (
                   <Empty description="Không có tệp đính kèm" />
                 )}
-              </Card>
-            </Space>
-          ) : myBookingRequestDetailError ? null : (
+              </section>
+            </>
+          ) : (
             <Empty description="Không tìm thấy dữ liệu" />
           )}
         </Skeleton>

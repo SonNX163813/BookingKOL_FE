@@ -1,5 +1,6 @@
 import React from "react";
 import { Grid, Stack, Typography, Divider, Box } from "@mui/material";
+import { Image } from "antd";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -14,6 +15,27 @@ const cardStyles = {
 
 const textColor = "rgba(15, 23, 42, 0.75)";
 
+const isVideoMediaItem = (item) => {
+  if (!item) {
+    return false;
+  }
+  const rawType = (item.type || item.fileType || item.mediaType || "")
+    .toString()
+    .toUpperCase();
+  if (rawType.includes("VIDEO")) {
+    return true;
+  }
+  const contentType =
+    item.contentType || item.mimeType || item.mimetype || item.fileContentType;
+  if (
+    typeof contentType === "string" &&
+    contentType.toLowerCase().startsWith("video/")
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const CourseDetailOverview = ({
   descriptionBlocks,
   keyTakeaways,
@@ -21,7 +43,25 @@ const CourseDetailOverview = ({
   courseTitle,
   coverImage,
 }) => {
-  const galleryItems = Array.isArray(media?.gallery) ? media.gallery : [];
+  const galleryItems = React.useMemo(() => {
+    const items = Array.isArray(media?.gallery) ? media.gallery : [];
+    if (items.length <= 1) {
+      return items;
+    }
+
+    const images = [];
+    const videos = [];
+
+    items.forEach((item) => {
+      if (isVideoMediaItem(item)) {
+        videos.push(item);
+      } else {
+        images.push(item);
+      }
+    });
+
+    return [...images, ...videos];
+  }, [media?.gallery]);
 
   return (
     <Grid container spacing={4}>
@@ -94,37 +134,67 @@ const CourseDetailOverview = ({
             <Typography variant="h6" sx={{ fontWeight: 600, color: "#0f172a" }}>
               Thư viện ảnh khoá học
             </Typography>
-            <Stack direction="row" spacing={1.5} flexWrap="wrap">
-              {galleryItems.length === 0 ? (
-                <Box
-                  component="img"
-                  src={coverImage}
-                  alt={courseTitle}
-                  sx={{
-                    width: "100%",
-                    borderRadius: 3,
-                    border: "1px solid rgba(74, 116, 218, 0.16)",
-                    objectFit: "cover",
-                  }}
-                />
-              ) : (
-                galleryItems.map((item) => (
-                  <Box
-                    key={item.id}
-                    component="img"
-                    src={item.url}
-                    alt={item.name || courseTitle}
-                    sx={{
-                      width: "calc(50% - 12px)",
-                      minWidth: 140,
-                      borderRadius: 3,
-                      border: "1px solid rgba(74, 116, 218, 0.16)",
-                      objectFit: "cover",
-                    }}
-                  />
-                ))
-              )}
-            </Stack>
+            {galleryItems.length === 0 ? (
+              <Image
+                src={coverImage}
+                alt={courseTitle ?? "image-preview"}
+                style={{
+                  width: "100%",
+                  borderRadius: 12,
+                  border: "1px solid rgba(74, 116, 218, 0.16)",
+                  objectFit: "cover",
+                  aspectRatio: "4 / 3",
+                }}
+                preview={{ mask: "Xem ảnh" }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: { xs: 1.5, md: 2 },
+                  gridTemplateColumns: {
+                    xs: "repeat(1, minmax(0, 1fr))",
+                    sm: "repeat(3, minmax(0, 1fr))",
+                    lg: "repeat(2, minmax(0, 1fr))",
+                  },
+                }}
+              >
+                {galleryItems.map((item) => {
+                  const isVideo = isVideoMediaItem(item);
+                  return isVideo ? (
+                    <Box
+                      key={item.id}
+                      component="video"
+                      src={item.url}
+                      controls
+                      preload="metadata"
+                      poster={item.thumbnail ?? undefined}
+                      sx={{
+                        width: "100%",
+                        borderRadius: 3,
+                        border: "1px solid rgba(74, 116, 218, 0.16)",
+                        // objectFit: "cover",
+                        // aspectRatio: "4 / 3",
+                      }}
+                    ></Box>
+                  ) : (
+                    <Image
+                      key={item.id}
+                      src={item.url}
+                      alt={item.name || courseTitle}
+                      style={{
+                        width: "100%",
+                        borderRadius: 12,
+                        border: "1px solid rgba(74, 116, 218, 0.16)",
+                        objectFit: "cover",
+                        aspectRatio: "4 / 3",
+                      }}
+                      preview={{ mask: "Xem ảnh" }}
+                    />
+                  );
+                })}
+              </Box>
+            )}
           </Stack>
         </Stack>
       </Grid>

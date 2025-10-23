@@ -59,27 +59,76 @@ export const getCoursePackageById = async (courseId, { signal } = {}) => {
   return payload?.data ?? null;
 };
 
+const normalizeMediaType = (usage) => {
+  const file = usage?.file ?? {};
+  const rawType = (
+    file?.fileType ||
+    usage?.fileType ||
+    usage?.type ||
+    ""
+  )
+    .toString()
+    .toUpperCase();
+
+  if (rawType.includes("VIDEO")) {
+    return "VIDEO";
+  }
+
+  const contentType =
+    file?.contentType ||
+    file?.mimeType ||
+    file?.mimetype ||
+    file?.fileContentType ||
+    "";
+
+  if (
+    typeof contentType === "string" &&
+    contentType.toLowerCase().startsWith("video/")
+  ) {
+    return "VIDEO";
+  }
+
+  return "IMAGE";
+};
+
 export const adaptCourseMedia = (course) => {
   if (!Array.isArray(course?.fileUsageDtos)) {
     return { cover: null, gallery: [] };
   }
-  const gallery = course.fileUsageDtos
+
+  const normalizedItems = course.fileUsageDtos
+    .filter((usage) => usage?.isActive)
     .map((usage) => {
       const file = usage?.file ?? {};
       const url = file?.fileUrl;
       if (!url) {
         return null;
       }
+      const type = normalizeMediaType(usage);
       return {
         id: usage?.id ?? file?.id ?? url,
         url,
         isCover: Boolean(usage?.isCover),
         name: file?.fileName ?? "",
+        type,
+        thumbnail: file?.thumbnailUrl ?? file?.previewUrl ?? null,
+        contentType:
+          file?.contentType ?? file?.mimeType ?? file?.mimetype ?? null,
       };
     })
     .filter(Boolean);
-  const cover =
-    gallery.find((item) => item.isCover)?.url ?? gallery[0]?.url ?? null;
+
+  const imageItems = normalizedItems.filter((item) => item.type !== "VIDEO");
+  const videoItems = normalizedItems.filter((item) => item.type === "VIDEO");
+  const gallery = [...imageItems, ...videoItems];
+
+  const coverItem =
+    gallery.find((item) => item.isCover) ??
+    imageItems[0] ??
+    gallery[0] ??
+    null;
+  const cover = coverItem ? coverItem.url : null;
+
   return { cover, gallery };
 };
 export default {

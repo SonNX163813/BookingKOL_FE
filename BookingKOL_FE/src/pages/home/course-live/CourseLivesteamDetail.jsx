@@ -156,8 +156,9 @@ const CourseLivesteamDetail = () => {
         sx={{
           position: "absolute",
           inset: 0,
-          background:
-            "radial-gradient(90% 90% at 12% 20%, rgba(74, 116, 218, 0.2) 0%, rgba(147, 206, 246, 0.05) 55%, rgba(147, 206, 246, 0) 85%), radial-gradient(90% 90% at 88% 15%, rgba(255, 161, 218, 0.16) 0%, rgba(255, 161, 218, 0) 70%)",
+          bgcolor: "#ffffff",
+          // background:
+          //   "radial-gradient(90% 90% at 12% 20%, rgba(74, 116, 218, 0.2) 0%, rgba(147, 206, 246, 0.05) 55%, rgba(147, 206, 246, 0) 85%), radial-gradient(90% 90% at 88% 15%, rgba(255, 161, 218, 0.16) 0%, rgba(255, 161, 218, 0) 70%)",
           opacity: 0.8,
         }}
       />
