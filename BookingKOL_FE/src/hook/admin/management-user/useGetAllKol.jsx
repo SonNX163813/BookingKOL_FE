@@ -24,6 +24,8 @@ export const useGetAllKol = (
     queryFn: () =>
       getAllKol(page, size, minBookingPrice, minRating, isAvailable),
     retry: false,
+    enabled: false,
+    keepPreviousData: true,
     refetchOnMount: false,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,

@@ -1,4 +1,4 @@
-import { Search, Trash2, Eye, Pencil } from "lucide-react";
+import { Search, Trash2, Eye, Pencil, Plus } from "lucide-react";
 import {
   Button,
   Form,
@@ -11,7 +11,7 @@ import {
   Image,
   Select,
 } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetAllKol } from "../../../../hook/admin/management-user/useGetAllKol";
 import imgdef from "../../../../assets/default.png";
@@ -27,7 +27,7 @@ const ManagementKOL = () => {
   const [searchMinBookingPrice, setSearchMinBookingPrice] = useState(undefined);
   const [minRating, setMinRating] = useState(null);
 
-  const { isLoadingGetALlKol, ResponseGetAllKol } = useGetAllKol(
+  const { isLoadingGetALlKol, ResponseGetAllKol, refetchGetAllKol } = useGetAllKol(
     page,
     size,
     searchMinBookingPrice,
@@ -36,6 +36,17 @@ const ManagementKOL = () => {
   );
 
   const dataResponse = ResponseGetAllKol?.data?.content;
+  const totalElements = ResponseGetAllKol?.data?.totalElements ?? 0;
+  useEffect(() => {
+    refetchGetAllKol();
+  }, [
+    page,
+    size,
+    searchMinBookingPrice,
+    minRating,
+    searchValue,
+    refetchGetAllKol,
+  ]);
 
   const handleEdit = (record) => {
     navigate(`/admin/kols/${record.id}/edit`, { state: { kol: record } });
@@ -43,6 +54,10 @@ const ManagementKOL = () => {
 
   const handleViewDetail = (record) => {
     navigate(`/admin/kols/${record.id}/portfolio`);
+  };
+
+  const handleCreateKol = () => {
+    navigate("/admin/kols/create");
   };
 
   const handleSearch = (values) => {
@@ -57,6 +72,25 @@ const ManagementKOL = () => {
     setSearchMinBookingPrice(undefined);
     setMinRating(null);
     setPage(0);
+  };
+
+  const handlePaginationChange = (pageNumber, pageSizeNumber) => {
+    const nextPage = pageNumber - 1;
+    if (nextPage !== page) {
+      setPage(nextPage);
+    }
+    if (pageSizeNumber !== size) {
+      setSize(pageSizeNumber);
+    }
+  };
+
+  const handlePageSizeChange = (_currentPage, pageSizeNumber) => {
+    if (page !== 0) {
+      setPage(0);
+    }
+    if (pageSizeNumber !== size) {
+      setSize(pageSizeNumber);
+    }
   };
 
   const columns = [
@@ -165,14 +199,16 @@ const ManagementKOL = () => {
 
   return (
     <div className="relative h-full">
-      <div className="flex gap-2 items-center">
-        <div className="border-2 p-2 border-gray-300">
-          <VerifiedUserOutlined className="text-gray-400" />
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-2 items-center">
+          <div className="border-2 p-2 border-gray-300">
+            <VerifiedUserOutlined className="text-gray-400" />
+          </div>
+          <section>
+            <h1 className="text-[18px] font-bold">QUẢN LÝ KOL</h1>
+            <p className="text-[14px]">Danh sách KOL hệ thống</p>
+          </section>
         </div>
-        <section>
-          <h1 className="text-[18px] font-bold">QUẢN LÝ KOL</h1>
-          <p className="text-[14px]">Danh sách KOL hệ thống</p>
-        </section>
       </div>
 
       <div className="flex gap-3 py-3">
@@ -220,6 +256,15 @@ const ManagementKOL = () => {
               <Trash2 size={16} /> Xóa tìm kiếm
             </Button>
           </Form.Item>
+          <Form.Item>
+            <Button
+              onClick={handleCreateKol}
+              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+            >
+              <Plus size={18} />
+              Tạo KOL
+            </Button>
+          </Form.Item>
         </Form>
       </div>
 
@@ -235,12 +280,11 @@ const ManagementKOL = () => {
         <Pagination
           align="center"
           current={page + 1}
+          total={totalElements}
           pageSize={size}
           pageSizeOptions={["5", "10", "20", "50", "100"]}
-          onChange={(pageNumber, sizeNumber) => {
-            setPage(pageNumber - 1);
-            setSize(sizeNumber);
-          }}
+          onChange={handlePaginationChange}
+          onShowSizeChange={handlePageSizeChange}
           showSizeChanger
         />
       </div>

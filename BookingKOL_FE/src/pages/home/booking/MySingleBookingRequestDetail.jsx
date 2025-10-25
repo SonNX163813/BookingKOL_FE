@@ -1,27 +1,33 @@
-import { useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Alert,
   Button,
+  Checkbox,
   Card,
   Descriptions,
   Empty,
+  Form,
+  Input,
   Skeleton,
   Space,
   Table,
   Tag,
   Typography,
+  Upload,
 } from "antd";
 import {
   ArrowLeft,
   CalendarRange,
+  Edit3,
   FileText,
   Layers,
   UserCircle2,
 } from "lucide-react";
 import { useGetMySingleBookingRequestDetail } from "../../../hook/user/booking/useGetMySingleBookingRequestDetail";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import { UploadOutlined } from "@ant-design/icons";
+import { useUpdateMySingleBookingRequest } from "../../../hook/user/booking/useUpdateMySingleBookingRequest";
 
 const { Text } = Typography;
 
@@ -124,8 +130,16 @@ const MySingleBookingRequestDetail = () => {
     isLoadingMyBookingRequestDetail,
     isFetchingMyBookingRequestDetail,
     myBookingRequestDetailResponse,
+    refetchMyBookingRequestDetail,
     myBookingRequestDetailError,
   } = useGetMySingleBookingRequestDetail(requestId);
+  const {
+    isUpdatingMySingleBookingRequest,
+    handleUpdateMySingleBookingRequest,
+  } = useUpdateMySingleBookingRequest();
+  const [updateForm] = Form.useForm();
+  const [newAttachments, setNewAttachments] = useState([]);
+  const [fileIdsToDelete, setFileIdsToDelete] = useState([]);
 
   const detail = myBookingRequestDetailResponse?.data ?? null;
   const contracts = Array.isArray(detail?.contracts)
@@ -134,6 +148,40 @@ const MySingleBookingRequestDetail = () => {
   const attachedFiles = Array.isArray(detail?.attachedFiles)
     ? detail.attachedFiles.filter(Boolean)
     : [];
+  const formattedAttachments = useMemo(
+    () =>
+      attachedFiles
+        .map((item) => {
+          const rawId =
+            item?.id ??
+            item?.fileId ??
+            item?.file?.id ??
+            item?.file?.fileId ??
+            null;
+          return {
+            id: rawId ? String(rawId) : null,
+            name:
+              item?.file?.fileName ??
+              item?.fileName ??
+              (rawId ? `Tệp ${String(rawId).slice(-6)}` : "Tệp không tên"),
+            type: item?.file?.fileType ?? item?.fileType ?? "",
+          };
+        })
+        .filter(Boolean),
+    [attachedFiles]
+  );
+  const deletableAttachments = useMemo(
+    () => formattedAttachments.filter((item) => item.id),
+    [formattedAttachments]
+  );
+  const deletableAttachmentOptions = useMemo(
+    () =>
+      deletableAttachments.map((item) => ({
+        label: `${item.name}${item.type ? ` (${item.type})` : ""}`,
+        value: item.id,
+      })),
+    [deletableAttachments]
+  );
 
   const status = normalizeStatus(detail?.status);
   const statusLabel = status ? BOOKING_STATUS_LABEL[status] ?? status : "--";
@@ -141,6 +189,96 @@ const MySingleBookingRequestDetail = () => {
   const handleBack = useCallback(() => {
     navigate("/don-booking-kol");
   }, [navigate]);
+
+  const updateFormInitialValues = useMemo(
+    () => ({
+      fullName:
+        detail?.fullName ??
+        detail?.contact?.fullName ??
+        detail?.user?.fullName ??
+        "",
+      phone:
+        detail?.phone ?? detail?.contact?.phone ?? detail?.user?.phone ?? "",
+      email:
+        detail?.email ?? detail?.contact?.email ?? detail?.user?.email ?? "",
+      description: detail?.description ?? "",
+      location: detail?.location ?? "",
+    }),
+    [detail]
+  );
+
+  useEffect(() => {
+    if (!detail) return;
+    updateForm.setFieldsValue(updateFormInitialValues);
+  }, [detail, updateForm, updateFormInitialValues]);
+
+  useEffect(() => {
+    if (!detail) return;
+    setNewAttachments([]);
+    setFileIdsToDelete([]);
+  }, [detail]);
+
+  const handleUploadChange = useCallback(({ fileList }) => {
+    setNewAttachments(fileList);
+  }, []);
+
+  const handleSelectFilesToDelete = useCallback((values) => {
+    const sanitized = (values ?? [])
+      .map((value) => (value == null ? null : String(value)))
+      .filter((value) => typeof value === "string" && value.trim().length > 0);
+    setFileIdsToDelete(sanitized);
+  }, []);
+
+  const handleTriggerInlineUpdate = useCallback(() => {
+    updateForm.submit();
+  }, [updateForm]);
+
+  const handleSubmitUpdate = useCallback(
+    async (values) => {
+      const attachmentsPayload = newAttachments
+        .map((file) => file?.originFileObj)
+        .filter(Boolean);
+
+      const payloadDto = {};
+      ["fullName", "phone", "email", "description", "location"].forEach(
+        (key) => {
+          const raw = values?.[key];
+          if (raw === undefined || raw === null) return;
+          if (typeof raw === "string") {
+            payloadDto[key] = raw.trim();
+          } else {
+            payloadDto[key] = raw;
+          }
+        }
+      );
+
+      const sanitizedIds = fileIdsToDelete.filter(
+        (id) => typeof id === "string" && id.trim().length > 0
+      );
+
+      try {
+        await handleUpdateMySingleBookingRequest({
+          requestId,
+          updateBookingReqDTO:
+            Object.keys(payloadDto).length > 0 ? payloadDto : undefined,
+          attachedFiles: attachmentsPayload,
+          fileIdsToDelete: sanitizedIds,
+        });
+        await refetchMyBookingRequestDetail();
+        setNewAttachments([]);
+        setFileIdsToDelete([]);
+      } catch (error) {
+        // handled by interceptors
+      }
+    },
+    [
+      newAttachments,
+      fileIdsToDelete,
+      handleUpdateMySingleBookingRequest,
+      requestId,
+      refetchMyBookingRequestDetail,
+    ]
+  );
 
   const attachedFileColumns = useMemo(
     () => [
@@ -213,6 +351,18 @@ const MySingleBookingRequestDetail = () => {
               <p className="mt-4 text-sm text-slate-600">
                 Xem chi tiết thông tin đơn, hợp đồng và thanh toán.
               </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="primary"
+                  icon={<Edit3 size={16} />}
+                  className="!h-11 !rounded-xl !bg-indigo-600 !px-5 !font-semibold hover:!bg-indigo-500"
+                  onClick={handleTriggerInlineUpdate}
+                  disabled={!detail}
+                  loading={isUpdatingMySingleBookingRequest}
+                >
+                  Thao tác
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -235,9 +385,6 @@ const MySingleBookingRequestDetail = () => {
               <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
                 <Space direction="vertical" size="large" className="w-full">
                   <Descriptions bordered size="middle" column={1}>
-                    <Descriptions.Item label="Mã đơn">
-                      {detail?.id ?? "--"}
-                    </Descriptions.Item>
                     <Descriptions.Item label="Trạng thái">
                       {status ? (
                         <Tag color={STATUS_TAG_COLOR[status] ?? "default"}>
@@ -250,18 +397,116 @@ const MySingleBookingRequestDetail = () => {
                     <Descriptions.Item label="Thời gian thực hiện">
                       {composeExecutionTime(detail)}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Địa điểm">
-                      {detail?.location?.trim?.() || "--"}
-                    </Descriptions.Item>
                     <Descriptions.Item label="Ngày tạo">
                       {formatDateTime(detail?.createdAt)}
                     </Descriptions.Item>
-                    <Descriptions.Item label="Ghi chú">
-                      <Text style={{ whiteSpace: "pre-wrap" }}>
-                        {detail?.description?.trim?.() || "--"}
-                      </Text>
-                    </Descriptions.Item>
                   </Descriptions>
+
+                  <Form
+                    form={updateForm}
+                    layout="vertical"
+                    initialValues={updateFormInitialValues}
+                    onFinish={handleSubmitUpdate}
+                    requiredMark={false}
+                    className="w-full"
+                  >
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Form.Item
+                        label="Người liên hệ"
+                        name="fullName"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng nhập người liên hệ",
+                          },
+                        ]}
+                      >
+                        <Input placeholder="Nhập tên người liên hệ" />
+                      </Form.Item>
+                      <Form.Item
+                        label="Số điện thoại"
+                        name="phone"
+                        rules={[
+                          {
+                            required: true,
+                            message: "Vui lòng nhập số điện thoại",
+                          },
+                        ]}
+                      >
+                        <Input placeholder="Nhập số điện thoại liên hệ" />
+                      </Form.Item>
+                      <Form.Item
+                        label="Email"
+                        name="email"
+                        rules={[
+                          { required: true, message: "Vui lòng nhập email" },
+                          { type: "email", message: "Email không hợp lệ" },
+                        ]}
+                      >
+                        <Input placeholder="Nhập email liên hệ" />
+                      </Form.Item>
+                      <Form.Item label="Địa điểm" name="location">
+                        <Input placeholder="Nhập địa điểm thực hiện" />
+                      </Form.Item>
+                    </div>
+
+                    <Form.Item label="Ghi chú" name="description">
+                      <Input.TextArea
+                        rows={4}
+                        placeholder="Mô tả chi tiết yêu cầu hoặc ghi chú"
+                      />
+                    </Form.Item>
+
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">
+                          Tệp đính kèm hiện có
+                        </p>
+                        <p className="mb-3 text-xs text-slate-500">
+                          Chọn các tệp bạn muốn xóa khi cập nhật.
+                        </p>
+                        {deletableAttachmentOptions.length > 0 ? (
+                          <Checkbox.Group
+                            options={deletableAttachmentOptions}
+                            value={fileIdsToDelete}
+                            onChange={handleSelectFilesToDelete}
+                            className="flex flex-col gap-2"
+                          />
+                        ) : (
+                          <div className="text-sm text-slate-500">
+                            Không có tệp đính kèm.
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">
+                          Thêm tệp mới
+                        </p>
+                        <p className="mb-3 text-xs text-slate-500">
+                          Các tệp này sẽ được đính kèm khi cập nhật.
+                        </p>
+                        <Upload
+                          beforeUpload={() => false}
+                          multiple
+                          fileList={newAttachments}
+                          onChange={handleUploadChange}
+                        >
+                          <Button icon={<UploadOutlined />}>Chọn tệp</Button>
+                        </Upload>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-end">
+                      <Button
+                        type="primary"
+                        htmlType="submit"
+                        loading={isUpdatingMySingleBookingRequest}
+                        className="!h-11 !rounded-xl !bg-indigo-600 !px-6 hover:!bg-indigo-500"
+                      >
+                        Cập nhật booking
+                      </Button>
+                    </div>
+                  </Form>
                 </Space>
               </section>
 

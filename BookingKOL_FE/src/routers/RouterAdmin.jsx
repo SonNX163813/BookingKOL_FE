@@ -16,6 +16,7 @@ import BookingRequestDetail from "../pages/admin/booking/BookingRequestDetail";
 
 import EditKOL from "../pages/admin/management-user/management-kol/EditKOL";
 import KolPortfolioPage from "../pages/admin/management-user/management-kol/KolPortfolioPage"; // 👈 thêm import
+import CreateKOL from "../pages/admin/management-user/management-kol/CreateKOL";
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -41,6 +42,7 @@ export const routerAdmin = [
       { path: "view-detail-course/:id", element: <ViewDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },
       { path: "create-course", element: <CreateCoursePage /> },
+      { path: "kols/create", element: <CreateKOL /> },
       { path: "kols/:kolId/edit", element: <EditKOL /> },
       { path: "kols/:kolId/portfolio", element: <KolPortfolioPage /> }, // 👈 bỏ dấu '/' đầu
     ],

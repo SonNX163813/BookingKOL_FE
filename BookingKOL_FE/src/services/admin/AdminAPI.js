@@ -4,6 +4,43 @@ import { API_PATHS } from "../../constants/apiPath";
 
 const PATHS = API_PATHS.MANAGEMENT_USER;
 
+/* ================== KOL CREATE (ADMIN) ================== */
+export const adminCreateKol = async ({ fileAvatar, newKolDTO }) => {
+  if (!fileAvatar) throw new Error("fileAvatar is required");
+  if (!newKolDTO || typeof newKolDTO !== "object")
+    throw new Error("newKolDTO object is required");
+
+  const form = new FormData();
+  form.append("fileAvatar", fileAvatar);
+
+  const kolPayload = {
+    ...newKolDTO,
+    minBookingPrice:
+      typeof newKolDTO.minBookingPrice === "number"
+        ? newKolDTO.minBookingPrice
+        : Number(newKolDTO.minBookingPrice ?? 0) || 0,
+  };
+
+  form.append(
+    "newKolDTO",
+    new Blob([JSON.stringify(kolPayload)], {
+      type: "application/json",
+    })
+  );
+
+  const payload = await post({
+    url: PATHS.adminKolCreate,
+    data: form,
+    config: {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  });
+
+  return payload?.data ?? payload ?? null;
+};
+
 /* ================== KOL LIST (ADMIN) ================== */
 const ADMIN_KOL_LIST_ALLOWED_PARAMS = new Set([
   "page",

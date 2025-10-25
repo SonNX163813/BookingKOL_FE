@@ -15,6 +15,7 @@ export const API_PATHS = {
     adminKolMediasUpload: "/v1/admin/kol/medias/upload",  // + /{kolId}
     adminKolMediaDelete: "/v1/admin/kol/medias/delete",   // + /{fileId}
     adminKolCoverChange: "/v1/admin/kol/cover-image",     // + /{kolId}?fileId=...
+    adminKolCreate: "/v1/admin/kol/create-new-kol",
   },
   COURSE: {
     getAllCourse: "/v1/courses/all",

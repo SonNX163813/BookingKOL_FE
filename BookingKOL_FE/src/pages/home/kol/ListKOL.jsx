@@ -4,8 +4,13 @@ import {
   Button,
   Chip,
   Container,
+  FormControl,
   Grid,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Pagination,
+  Select,
   Skeleton,
   Stack,
   Typography,
@@ -29,8 +34,10 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 
 const BASE_QUERY_PARAMS = {
   page: 0,
-  size: 10,
+  size: 20,
 };
+
+const PAGE_SIZE_OPTIONS = Object.freeze([10, 20, 30]);
 
 const DEFAULT_FILTER_VALUES = Object.freeze({
   minPrice: "",
@@ -55,9 +62,22 @@ const parseNumericInput = (value) => {
   return Number.isFinite(numeric) ? numeric : undefined;
 };
 
-const sanitizeFilters = (rawFilters) => {
+const sanitizeFilters = (rawFilters, pagination) => {
   const filters = rawFilters ?? DEFAULT_FILTER_VALUES;
   const params = { ...BASE_QUERY_PARAMS };
+
+  if (pagination && typeof pagination === "object") {
+    if (Number.isInteger(pagination.page) && pagination.page >= 0) {
+      params.page = pagination.page;
+    }
+    if (
+      typeof pagination.size === "number" &&
+      Number.isFinite(pagination.size) &&
+      pagination.size > 0
+    ) {
+      params.size = pagination.size;
+    }
+  }
 
   const minPrice = parseNumericInput(filters.minPrice);
   if (minPrice !== undefined && minPrice >= 0) {
@@ -421,6 +441,10 @@ const ListKOL = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+  const [page, setPage] = useState(BASE_QUERY_PARAMS.page);
+  const [size, setSize] = useState(BASE_QUERY_PARAMS.size);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [filters, setFilters] = useState(createDefaultFilters);
   const [formFilters, setFormFilters] = useState(createDefaultFilters);
   const [categories, setCategories] = useState([]);
@@ -438,7 +462,10 @@ const ListKOL = () => {
     );
   }, [filters]);
 
-  const queryParams = useMemo(() => sanitizeFilters(filters), [filters]);
+  const queryParams = useMemo(
+    () => sanitizeFilters(filters, { page, size }),
+    [filters, page, size]
+  );
 
   const categoryOptions = useMemo(
     () =>
@@ -475,7 +502,8 @@ const ListKOL = () => {
 
   const handleApplyFilters = useCallback(() => {
     setFilters(() => ({ ...formFilters }));
-  }, [formFilters]);
+    setPage(BASE_QUERY_PARAMS.page);
+  }, [formFilters, setPage]);
 
   const handleRoleChange = useCallback(
     (_event, value) => {
@@ -489,7 +517,33 @@ const ListKOL = () => {
     const defaults = createDefaultFilters();
     setFilters(defaults);
     setFormFilters(defaults);
-  }, []);
+    setPage(BASE_QUERY_PARAMS.page);
+    setSize(BASE_QUERY_PARAMS.size);
+  }, [setPage, setSize]);
+
+  const handlePageChange = useCallback(
+    (_event, value) => {
+      const numericValue = Number(value);
+      const nextPage = Number.isNaN(numericValue) ? 0 : numericValue - 1;
+      if (nextPage < 0 || nextPage === page) {
+        return;
+      }
+      setPage(nextPage);
+    },
+    [page, setPage]
+  );
+
+  const handlePageSizeChange = useCallback(
+    (event) => {
+      const nextSize = Number(event.target.value);
+      if (!Number.isFinite(nextSize) || nextSize <= 0 || nextSize === size) {
+        return;
+      }
+      setSize(nextSize);
+      setPage(BASE_QUERY_PARAMS.page);
+    },
+    [size, setPage, setSize]
+  );
 
   // useEffect(() => {
   //   let isActive = true;
@@ -534,7 +588,37 @@ const ListKOL = () => {
           : Array.isArray(response)
           ? response
           : [];
+        let nextTotalPages = content.length > 0 ? 1 : 0;
+        let nextTotalElements = content.length;
+        if (
+          response &&
+          typeof response === "object" &&
+          !Array.isArray(response)
+        ) {
+          const parsedTotalPages = Number(response.totalPages);
+          if (Number.isFinite(parsedTotalPages) && parsedTotalPages >= 0) {
+            nextTotalPages = parsedTotalPages;
+          }
+          const parsedTotalElements = Number(
+            response.totalElements ?? response.total ?? response.totalRecords
+          );
+          if (
+            Number.isFinite(parsedTotalElements) &&
+            parsedTotalElements >= 0
+          ) {
+            nextTotalElements = parsedTotalElements;
+          }
+        }
+        if (
+          nextTotalPages > 0 &&
+          queryParams.page >= nextTotalPages &&
+          Math.max(nextTotalPages - 1, 0) !== queryParams.page
+        ) {
+          setPage(Math.max(nextTotalPages - 1, 0));
+        }
         setKolProfiles(content);
+        setTotalPages(nextTotalPages);
+        setTotalElements(nextTotalElements);
       } catch (err) {
         if (signal?.aborted) {
           return;
@@ -548,7 +632,7 @@ const ListKOL = () => {
         }
       }
     },
-    [queryParams]
+    [queryParams, setKolProfiles, setTotalElements, setTotalPages, setPage]
   );
 
   useEffect(() => {
@@ -577,6 +661,14 @@ const ListKOL = () => {
   const handleRetry = useCallback(() => {
     loadKolProfiles();
   }, [loadKolProfiles]);
+
+  const safeTotalPages =
+    totalPages > 0 ? totalPages : decoratedKols.length > 0 ? 1 : 0;
+  const pageStart = totalElements > 0 ? page * size + 1 : 0;
+  const pageEnd =
+    totalElements > 0
+      ? Math.min(totalElements, page * size + decoratedKols.length)
+      : 0;
 
   const topKol = decoratedKols[0];
 
@@ -664,10 +756,86 @@ const ListKOL = () => {
               ) : decoratedKols.length === 0 ? (
                 <KOLEmptyState onRetry={handleRetry} />
               ) : (
-                <KOLGrid
-                  kols={decoratedKols}
-                  onSelectKol={handleNavigateDetail}
-                />
+                <Stack spacing={{ xs: 4, md: 5 }}>
+                  <KOLGrid
+                    kols={decoratedKols}
+                    onSelectKol={handleNavigateDetail}
+                  />
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={{ xs: 2, sm: 3 }}
+                    alignItems={{ xs: "stretch", sm: "center" }}
+                    justifyContent="space-between"
+                    sx={{
+                      borderTop: "1px solid rgba(148, 163, 184, 0.25)",
+                      pt: { xs: 2, sm: 3 },
+                    }}
+                  >
+                    {totalElements > 0 ? (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: "rgba(15, 23, 42, 0.7)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {`Dang hien thi ${pageStart.toLocaleString(
+                          "vi-VN"
+                        )} - ${pageEnd.toLocaleString(
+                          "vi-VN"
+                        )} tren tong ${totalElements.toLocaleString(
+                          "vi-VN"
+                        )} KOL`}
+                      </Typography>
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: "rgba(15, 23, 42, 0.6)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Khong co KOL nao de hien thi.
+                      </Typography>
+                    )}
+
+                    <Stack
+                      direction="row"
+                      spacing={{ xs: 1.5, sm: 2 }}
+                      alignItems="center"
+                      justifyContent={{ xs: "flex-start", sm: "flex-end" }}
+                      sx={{ width: { xs: "100%", sm: "auto" } }}
+                    >
+                      <FormControl size="small" sx={{ minWidth: 140 }}>
+                        <InputLabel id="kol-page-size-label">
+                          KOL / trang
+                        </InputLabel>
+                        <Select
+                          labelId="kol-page-size-label"
+                          id="kol-page-size"
+                          value={size}
+                          label="KOL / trang"
+                          onChange={handlePageSizeChange}
+                        >
+                          {PAGE_SIZE_OPTIONS.map((option) => (
+                            <MenuItem key={option} value={option}>
+                              {`${option.toLocaleString("vi-VN")} / trang`}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <Pagination
+                        count={Math.max(safeTotalPages, 1)}
+                        page={page + 1}
+                        onChange={handlePageChange}
+                        color="primary"
+                        shape="rounded"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Stack>
+                  </Stack>
+                </Stack>
               )}
             </Box>
           </Box>

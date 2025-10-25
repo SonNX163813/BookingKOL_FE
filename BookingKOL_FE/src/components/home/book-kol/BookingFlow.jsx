@@ -280,10 +280,16 @@ const BookingFlow = ({
 
     const note = contact.note?.trim();
     const location = contact.location?.trim();
+    const fullName = contact.fullName?.trim();
+    const email = contact.email?.trim();
+    const phone = contact.phone?.trim();
 
     try {
       const bookingSingleReqDTO = {
         kolId,
+        fullName: fullName || "",
+        phone: phone || "",
+        email: email || "",
         startAt: startIso,
         endAt: endIso,
         description: note || "",

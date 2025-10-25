@@ -1,4 +1,4 @@
-import { post } from "../../config/axios-config";
+import { patch, post } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
 const extractFileList = (files) => {
@@ -65,5 +65,47 @@ export const holdBookingSlot = async ({
       startTimeIso,
       endTimeIso,
     },
+  });
+};
+
+export const updateSingleBookingRequest = async ({
+  requestId,
+  updateBookingReqDTO,
+  attachedFiles,
+  fileIdsToDelete,
+} = {}) => {
+  if (!requestId) {
+    throw new Error("requestId is required to update single booking request");
+  }
+
+  const formData = new FormData();
+
+  extractFileList(attachedFiles).forEach((file) => {
+    formData.append("attachedFiles", file);
+  });
+
+  if (updateBookingReqDTO !== undefined && updateBookingReqDTO !== null) {
+    const bookingJson = JSON.stringify(updateBookingReqDTO);
+    const bookingBlob = new Blob([bookingJson], {
+      type: "application/json",
+    });
+    formData.append("updateBookingReqDTO", bookingBlob);
+  }
+
+  const idsToDelete = Array.isArray(fileIdsToDelete)
+    ? fileIdsToDelete
+    : fileIdsToDelete
+    ? [fileIdsToDelete]
+    : [];
+
+  idsToDelete
+    .filter((id) => typeof id === "string" && id.trim().length > 0)
+    .forEach((id) => {
+      formData.append("fileIdsToDelete", id);
+    });
+
+  return patch({
+    url: `${CLIENT_API_PATHS.BOOKING.updateMySingleRequest}/${requestId}`,
+    data: formData,
   });
 };
