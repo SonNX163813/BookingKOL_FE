@@ -7,7 +7,7 @@ import ManagementCustomer from "../pages/admin/management-user/management-custom
 import UserDetailPage from "../pages/admin/management-user/management-customer/UserDetailPage";
 import ManagementKOL from "../pages/admin/management-user/management-kol/ManagementKOL";
 import ManagementCourse from "../pages/admin/course/ManagementCourse";
-import ViewDetailCourse from "../pages/admin/course/ViewDetailCourse";
+import ViewDetailCourse from "../pages/admin/course/EditDetailCourse";
 import ManagementCategory from "../pages/admin/category/ManagementCategory";
 import CreateCoursePage from "../pages/admin/course/CreateCoursePage";
 
@@ -16,7 +16,10 @@ import BookingRequestDetail from "../pages/admin/booking/BookingRequestDetail";
 
 import EditKOL from "../pages/admin/management-user/management-kol/EditKOL";
 import KolPortfolioPage from "../pages/admin/management-user/management-kol/KolPortfolioPage"; // 👈 thêm import
+
 import CreateKOL from "../pages/admin/management-user/management-kol/CreateKOL";
+
+import EditDetailCourse from "../pages/admin/course/EditDetailCourse";
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -39,7 +42,7 @@ export const routerAdmin = [
         element: <BookingRequestDetail />,
       },
       { path: "management-course", element: <ManagementCourse /> },
-      { path: "view-detail-course/:id", element: <ViewDetailCourse /> },
+      { path: "edit-detail-course/:id", element: <EditDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },
       { path: "create-course", element: <CreateCoursePage /> },
       { path: "kols/create", element: <CreateKOL /> },
