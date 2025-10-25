@@ -109,3 +109,26 @@ export const updateSingleBookingRequest = async ({
     data: formData,
   });
 };
+
+export const cancelSingleBookingRequest = async ({
+  requestId,
+  cancelReason,
+} = {}) => {
+  if (!requestId) {
+    throw new Error(
+      "requestId is required to cancel single booking request"
+    );
+  }
+
+  const payload =
+    typeof cancelReason === "string" && cancelReason.trim().length > 0
+      ? { cancelReason: cancelReason.trim() }
+      : typeof cancelReason === "object" && cancelReason !== null
+      ? cancelReason
+      : null;
+
+  return patch({
+    url: `${CLIENT_API_PATHS.BOOKING.cancelMySingleRequest}/${requestId}`,
+    data: payload ?? {},
+  });
+};
