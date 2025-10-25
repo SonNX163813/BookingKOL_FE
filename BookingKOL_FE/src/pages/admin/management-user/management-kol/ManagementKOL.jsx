@@ -1,8 +1,10 @@
+// src/pages/admin/management-user/ManagementKOL.jsx
 import { Search, Trash2, Eye, Pencil } from "lucide-react";
 import {
   Button,
   Form,
   Input,
+  InputNumber,
   Pagination,
   Table,
   Tag,
@@ -11,11 +13,20 @@ import {
   Image,
   Select,
 } from "antd";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetAllKol } from "../../../../hook/admin/management-user/useGetAllKol";
+import { adminGetKolsByCategory } from "../../../../services/admin/AdminAPI";
+import { getAllCategory } from "../../../../services/CategoryServices";
 import imgdef from "../../../../assets/default.png";
 import { VerifiedUserOutlined } from "@mui/icons-material";
+
+const viNormalize = (s) =>
+  (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
 const ManagementKOL = () => {
   const navigate = useNavigate();
@@ -23,19 +34,90 @@ const ManagementKOL = () => {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const [form] = Form.useForm();
-  const [searchValue, setSearchValue] = useState(undefined);
-  const [searchMinBookingPrice, setSearchMinBookingPrice] = useState(undefined);
+
+  const [searchValue, setSearchValue] = useState(); // tên (displayName)
+  const [searchMinBookingPrice, setSearchMinBookingPrice] = useState();
   const [minRating, setMinRating] = useState(null);
 
+  // Category
+  const [categoryId, setCategoryId] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // Dữ liệu từ BE khi không lọc category
   const { isLoadingGetALlKol, ResponseGetAllKol } = useGetAllKol(
     page,
     size,
     searchMinBookingPrice,
     minRating,
-    searchValue
+    searchValue // -> BE param 'search' (displayName)
   );
 
-  const dataResponse = ResponseGetAllKol?.data?.content;
+  // Dữ liệu khi lọc theo category
+  const [loadingByCategory, setLoadingByCategory] = useState(false);
+  const [listByCategory, setListByCategory] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingCategories(true);
+        const res = await getAllCategory();
+        if (!mounted) return;
+        const opts =
+          res?.data?.map((c) => ({ label: c?.name, value: c?.id })) ?? [];
+        setCategories(opts);
+      } finally {
+        setLoadingCategories(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!categoryId) {
+      setListByCategory(null);
+      return;
+    }
+    (async () => {
+      try {
+        setLoadingByCategory(true);
+        const list = await adminGetKolsByCategory(categoryId, { page, size });
+        if (!mounted) return;
+        setListByCategory(list || []);
+      } finally {
+        if (mounted) setLoadingByCategory(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, page, size]);
+
+  // Nguồn dữ liệu thô (tùy theo có category hay không)
+  const rawList = useMemo(() => {
+    if (categoryId) return listByCategory ?? [];
+    return ResponseGetAllKol?.data?.content ?? [];
+  }, [categoryId, listByCategory, ResponseGetAllKol]);
+
+  // Lọc FE (contains + bỏ dấu) để đồng bộ UX ở cả 2 luồng
+  const filteredData = useMemo(() => {
+    const needle = viNormalize(searchValue);
+    const minPrice = Number(searchMinBookingPrice || 0);
+    const star = Number(minRating || 0);
+
+    return (rawList || []).filter((it) => {
+      const okName = needle
+        ? viNormalize(it?.displayName).includes(needle)
+        : true;
+      const okPrice = minPrice
+        ? Number(it?.minBookingPrice || 0) >= minPrice
+        : true;
+      const okRating = star ? Number(it?.overallRating || 0) >= star : true;
+      return okName && okPrice && okRating;
+    });
+  }, [rawList, searchValue, searchMinBookingPrice, minRating]);
 
   const handleEdit = (record) => {
     navigate(`/admin/kols/${record.id}/edit`, { state: { kol: record } });
@@ -46,8 +128,13 @@ const ManagementKOL = () => {
   };
 
   const handleSearch = (values) => {
-    setSearchValue(values.search);
-    setSearchMinBookingPrice(values.minBookingPrice);
+    const vSearch = values?.search?.trim() || undefined;
+    // InputNumber dùng parser -> values.minBookingPrice là chuỗi số (stringMode)
+    const raw = values?.minBookingPrice;
+    const num = raw ? Number(String(raw)) : undefined;
+
+    setSearchValue(vSearch);
+    setSearchMinBookingPrice(Number.isFinite(num) ? num : undefined);
     setPage(0);
   };
 
@@ -56,6 +143,7 @@ const ManagementKOL = () => {
     setSearchValue(undefined);
     setSearchMinBookingPrice(undefined);
     setMinRating(null);
+    setCategoryId(null);
     setPage(0);
   };
 
@@ -95,16 +183,8 @@ const ManagementKOL = () => {
         );
       },
     },
-    {
-      title: "Tên KOL",
-      key: "displayName",
-      dataIndex: "displayName",
-    },
-    {
-      title: "Quốc gia",
-      key: "country",
-      dataIndex: "country",
-    },
+    { title: "Tên KOL", key: "displayName", dataIndex: "displayName" },
+    { title: "Quốc gia", key: "country", dataIndex: "country" },
     {
       title: "Chuyên mục",
       key: "categories",
@@ -163,6 +243,8 @@ const ManagementKOL = () => {
     },
   ];
 
+  const tableLoading = categoryId ? loadingByCategory : isLoadingGetALlKol;
+
   return (
     <div className="relative h-full">
       <div className="flex gap-2 items-center">
@@ -176,24 +258,66 @@ const ManagementKOL = () => {
       </div>
 
       <div className="flex gap-3 py-3">
-        <Form form={form} className="flex gap-3" onFinish={handleSearch}>
+        <Form
+          form={form}
+          className="flex gap-3 flex-wrap"
+          onFinish={handleSearch}
+        >
+          {/* Tên KOL (contains, bỏ dấu) */}
           <Form.Item name="search">
-            <Input className="h-12!" placeholder="Tìm tên KOL" />
-          </Form.Item>
-          <Form.Item name="minBookingPrice">
             <Input
               className="h-12!"
-              placeholder="Tìm với giá Booking nhỏ nhất"
-              inputMode="numeric"
+              placeholder="Tìm tên KOL (chứa ký tự)"
+              onPressEnter={() => form.submit()}
+              allowClear
             />
           </Form.Item>
 
+          {/* Giá booking tối thiểu (InputNumber chuẩn, có . và 'đ') */}
+          <Form.Item
+            name="minBookingPrice"
+            rules={[
+              {
+                validator: (_, value) => {
+                  if (value === undefined || value === "" || value === null) {
+                    return Promise.resolve(); // optional
+                  }
+                  const num = Number(String(value).replace(/\D/g, ""));
+                  if (!Number.isFinite(num))
+                    return Promise.reject("Chỉ nhập số.");
+                  if (num < 10000) return Promise.reject("Tối thiểu 10.000 đ.");
+                  if (num >= 1000000000)
+                    return Promise.reject("Nhỏ hơn 1.000.000.000 đ.");
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <InputNumber
+              className="!h-12 !w-64"
+              placeholder="Giá booking tối thiểu"
+              controls={false}
+              stringMode
+              formatter={(val) => {
+                if (!val) return "";
+                const v = String(val).replace(/[^\d]/g, "");
+                return v.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " đ";
+              }}
+              parser={(val) => (val ? val.replace(/[^\d]/g, "") : "")}
+              onPressEnter={() => form.submit()}
+            />
+          </Form.Item>
+
+          {/* Đánh giá tối thiểu */}
           <Select
             placeholder="Đánh giá tối thiểu"
             value={minRating}
-            onChange={(value) => setMinRating(value)}
+            onChange={(v) => {
+              setMinRating(v);
+              setPage(0);
+            }}
             className="w-48 !h-12"
-            allowClear={false}
+            allowClear
             options={[
               { label: "Tất cả", value: null },
               { label: "1 sao trở lên", value: 1 },
@@ -202,6 +326,24 @@ const ManagementKOL = () => {
               { label: "4 sao trở lên", value: 4 },
               { label: "5 sao", value: 5 },
             ]}
+          />
+
+          {/* Lọc theo Category */}
+          <Select
+            showSearch
+            placeholder="Lọc theo chuyên mục"
+            value={categoryId}
+            onChange={(v) => {
+              setCategoryId(v ?? null);
+              setPage(0);
+            }}
+            className="min-w-60 !h-12"
+            allowClear
+            loading={loadingCategories}
+            filterOption={(input, option) =>
+              (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+            }
+            options={categories}
           />
 
           <Form.Item>
@@ -225,8 +367,8 @@ const ManagementKOL = () => {
 
       <Table
         columns={columns}
-        dataSource={dataResponse}
-        loading={isLoadingGetALlKol}
+        dataSource={filteredData}
+        loading={tableLoading}
         pagination={false}
         rowKey="id"
       />

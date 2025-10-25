@@ -14,7 +14,6 @@ import {
   Button,
   Divider,
   Popconfirm,
-  InputNumber,
   message,
 } from "antd";
 import {
@@ -26,7 +25,7 @@ import {
   LeftOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { getKolProfileById } from "../../../../services/kol/KolAPI"; // GET detail (client)
 import { getAllCategory } from "../../../../services/CategoryServices";
@@ -44,10 +43,8 @@ const { TextArea } = Input;
 const { Title, Text } = Typography;
 
 /* ========== Role mapping (UI <-> BE) ========== */
-// BE chỉ nhận enum LIVE, nên luôn map HOST/CO_HOST -> LIVE khi gửi
 const toBERole = (ui) =>
   ui === "HOST" || ui === "CO_HOST" ? "LIVE" : undefined;
-// Khi load từ BE (LIVE) thì hiển thị là HOST để người dùng hiểu (không phân biệt CO_HOST được)
 const toUIRole = (be) => (be === "LIVE" ? "HOST" : undefined);
 const roleLabel = (ui) =>
   ui === "HOST" ? "Host chính" : ui === "CO_HOST" ? "Trợ live" : "—";
@@ -69,9 +66,13 @@ const monthOptions = Array.from({ length: 12 }, (_, i) => ({
   label: `Tháng ${i + 1}`,
 }));
 
+// ===== helpers format/parse GIỐNG phần Giá gốc khoá học =====
+const toDigits = (s) => (s ?? "").toString().replace(/\D/g, ""); // giữ 0-9
+const addDots = (digits) =>
+  digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+
 export default function EditKOL() {
   const { kolId } = useParams();
-  const navigate = useNavigate();
 
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -84,7 +85,7 @@ export default function EditKOL() {
   const [settingCoverId, setSettingCoverId] = useState(null);
   const [deleting, setDeleting] = useState({}); // {[usageId]: boolean}
 
-  // track dirty state (enable Save only when changed)
+  // track dirty state
   const initialValuesRef = useRef({});
   const [dirty, setDirty] = useState(false);
 
@@ -145,10 +146,8 @@ export default function EditKOL() {
     categories: Array.isArray(vals.categories)
       ? [...vals.categories].sort()
       : [],
-    minBookingPrice:
-      typeof vals.minBookingPrice === "number"
-        ? vals.minBookingPrice
-        : undefined,
+    // so sánh dirty theo chuỗi số sạch để ổn định
+    minBookingPrice: toDigits(vals.minBookingPrice),
   });
   const isEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -174,7 +173,7 @@ export default function EditKOL() {
   const fetchKol = async () => {
     setLoading(true);
     try {
-      const res = await getKolProfileById(kolId); // <-- LẤY DETAIL như KolProfile
+      const res = await getKolProfileById(kolId);
       setKol(res || null);
 
       const dob = res?.dob ? dayjs(res.dob) : null;
@@ -191,9 +190,12 @@ export default function EditKOL() {
         categories: Array.isArray(res?.categories)
           ? res.categories.map((c) => c.id)
           : [],
+        // hiển thị có dấu chấm
         minBookingPrice:
           typeof res?.minBookingPrice === "number"
-            ? res.minBookingPrice
+            ? addDots(String(Math.floor(res.minBookingPrice)))
+            : res?.minBookingPrice != null
+            ? addDots(toDigits(String(res.minBookingPrice)))
             : undefined,
       };
       form.setFieldsValue(initFormVals);
@@ -292,16 +294,17 @@ export default function EditKOL() {
       const payload = {
         displayName: values.displayName?.trim() || undefined,
         dob: composedDob,
-        role: toBERole(values.role), // => "LIVE" (BE enum hợp lệ)
+        role: toBERole(values.role),
         experience: values.experience?.trim() || undefined,
         city: values.city?.trim() || undefined,
         country: values.country?.trim() || undefined,
         bio: values.bio?.trim() || undefined,
+        // parse "1.500.000" -> 1500000
         minBookingPrice:
-          typeof values.minBookingPrice === "number"
-            ? values.minBookingPrice
-            : undefined,
-        // ❌ Không gửi isAvailable nữa (đã bỏ nút)
+          values.minBookingPrice == null ||
+          String(values.minBookingPrice).trim() === ""
+            ? undefined
+            : Number(toDigits(values.minBookingPrice)),
       };
 
       // diff categories
@@ -314,19 +317,16 @@ export default function EditKOL() {
 
       setSaving(true);
 
-      // 1) cập nhật profile (ADMIN)
       await adminUpdateKolProfile(kolId, payload);
-
-      // 2) cập nhật categories (ADMIN)
       await Promise.all([
         ...toAdd.map((id) => adminAddKolCategory(kolId, id)),
         ...toRemove.map((id) => adminRemoveKolCategory(kolId, id)),
       ]);
 
       message.success("Đã lưu thay đổi.");
-      await fetchKol(); // reload lại để đồng bộ UI & reset dirty
+      await fetchKol();
     } catch (err) {
-      if (err?.errorFields) return; // lỗi validate form
+      if (err?.errorFields) return;
       console.error(err);
       message.error(err?.response?.data?.message || "Lưu thay đổi thất bại.");
     } finally {
@@ -401,6 +401,10 @@ export default function EditKOL() {
     }
   };
 
+  /* ===== Quay lại: hard reload list KOL ===== */
+  const KOL_LIST_ROUTE = "/admin/management-kol"; // Đổi nếu route list khác
+  const goBackToKolList = () => window.location.assign(KOL_LIST_ROUTE);
+
   /* ========== UI ========== */
   return (
     <div className="px-4 py-6" style={{ maxWidth: 1760, margin: "0 auto" }}>
@@ -413,7 +417,7 @@ export default function EditKOL() {
           <Text type="secondary">ID: {kolId || "—"}</Text>
         </div>
         <Space>
-          <Button icon={<LeftOutlined />} onClick={() => navigate(-1)}>
+          <Button icon={<LeftOutlined />} onClick={goBackToKolList}>
             Quay lại
           </Button>
           <Button
@@ -654,7 +658,7 @@ export default function EditKOL() {
             loading={loading}
             title={
               <Title level={4} className="!mb-0">
-                Giá & Trạng thái
+                Giá Booking
               </Title>
             }
             className="shadow-sm rounded-2xl"
@@ -662,32 +666,81 @@ export default function EditKOL() {
           >
             <Row gutter={16}>
               <Col xs={24} md={8}>
+                {/* GIÁ BOOKING TỐI THIỂU — giống phần Giá gốc khoá học */}
                 <Form.Item
-                  label="Giá booking tối thiểu"
+                  label="Giá booking theo giờ (VNĐ)"
                   name="minBookingPrice"
+                  validateTrigger="onChange"
+                  getValueFromEvent={(e) => {
+                    const raw = e?.target?.value ?? "";
+                    // Cảnh báo nếu có ký tự không phải số hoặc dấu chấm phân tách
+                    if (/[^0-9.]/.test(raw)) {
+                      message.warning(
+                        "Chỉ được nhập số (0–9). Ký tự khác sẽ bị bỏ."
+                      );
+                    }
+                    // Lấy số thuần và giới hạn 9 chữ số
+                    const digits = toDigits(raw);
+                    const clipped = digits.slice(0, 9);
+                    if (digits.length > 9) {
+                      message.warning("Chỉ nhập tối đa 9 chữ số.");
+                    }
+                    // Hiển thị với dấu chấm ngăn cách nghìn
+                    return addDots(clipped);
+                  }}
                   rules={[
-                    { required: true, message: "Vui lòng nhập giá tối thiểu" },
                     {
-                      validator: (_, v) =>
-                        typeof v === "number" && v > 0
-                          ? Promise.resolve()
-                          : Promise.reject(new Error("Giá phải lớn hơn 0")),
+                      validator: (_, v) => {
+                        const digits = toDigits(v); // "1.500.000" -> "1500000"
+                        if (!digits) {
+                          return Promise.reject(
+                            new Error("Vui lòng nhập giá tối thiểu")
+                          );
+                        }
+                        if (!/^\d{1,9}$/.test(digits)) {
+                          // đúng 1..9 chữ số
+                          return Promise.reject(
+                            new Error("Chỉ được nhập tối đa 9 chữ số")
+                          );
+                        }
+                        const n = Number(digits);
+                        if (!Number.isFinite(n)) {
+                          return Promise.reject(new Error("Giá không hợp lệ"));
+                        }
+                        if (n <= 10000) {
+                          return Promise.reject(
+                            new Error("Giá phải > 10.000đ")
+                          );
+                        }
+                        return Promise.resolve();
+                      },
                     },
                   ]}
                 >
-                  <InputNumber
-                    className="!w-full !h-12"
-                    min={0}
-                    step={10000}
-                    placeholder="VD: 500000"
-                    formatter={(v) =>
-                      `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                    }
-                    parser={(v) => v?.replace(/,/g, "")}
+                  <Input
+                    className="!h-12"
+                    placeholder="VD: 1.500.000"
+                    inputMode="numeric"
+                    pattern="\d*"
+                    onKeyDown={(e) => {
+                      // Chặn mọi phím không phải số và các phím điều hướng/hệ thống cho phép
+                      const allowKeys = [
+                        "Backspace",
+                        "Delete",
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "Tab",
+                        "Home",
+                        "End",
+                      ];
+                      const isDigit = /^[0-9]$/.test(e.key);
+                      if (!isDigit && !allowKeys.includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
-              {/* ĐÃ GỠ SWITCH SẴN SÀNG NHẬN BOOKING */}
             </Row>
           </Card>
 
@@ -913,7 +966,7 @@ export default function EditKOL() {
       {/* Footer */}
       <Divider style={{ margin: "24px 0 0" }} />
       <div className="flex items-center justify-end gap-2 mt-6">
-        <Button onClick={() => navigate(-1)}>Quay lại</Button>
+        <Button onClick={goBackToKolList}>Quay lại</Button>
         <Button
           type="primary"
           icon={<SaveOutlined />}

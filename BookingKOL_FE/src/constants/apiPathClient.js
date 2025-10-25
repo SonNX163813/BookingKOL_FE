@@ -34,8 +34,8 @@ export const CLIENT_API_PATHS = {
   },
 
   SCHEDULER: {
-    kolTimeline: (kolId) => `/v1/kol/availabilities/time-line/kol/${kolId}`,
+    kolTimeline: (kolId) => `/v1/availabilities/time-line/kol/${kolId}`,
     // ✅ đổi sang dạng có kolId trên path
-    kolSchedule: (id) => `/v1/kol/availabilities/schedule/${id}`,
+    kolSchedule: (kolId) => `/v1/availabilities/schedule/${kolId}`,
   },
 };

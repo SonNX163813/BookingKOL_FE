@@ -216,9 +216,7 @@ export const getKolTimeline = async ({
   signal,
 } = {}) => {
   if (!kolId) throw new Error("kolId is required");
-  const url = `/v1/kol/availabilities/time-line/kol/${encodeURIComponent(
-    kolId
-  )}`;
+  const url = `/v1/kol/availabilities/time-line/kol/${encodeURIComponent()}`;
   const payload = await get({
     url,
     params: { startDate, endDate, page, size },
@@ -246,23 +244,23 @@ const toISO = (dateObj, timeObj) =>
  * @returns {Promise<any[]>}
  */
 export const registerKolAvailabilities = async ({
-  id,
+  kolId,
   date,
   shifts,
   signal,
 }) => {
-  if (!id) throw new Error("Missing KOL id");
+  if (!kolId) throw new Error("Missing KOL id");
   if (!dayjs.isDayjs(date)) throw new Error("`date` must be a dayjs object");
   if (!Array.isArray(shifts) || shifts.length === 0)
     throw new Error("`shifts` must be a non-empty array");
 
-  const url = CLIENT_API_PATHS.SCHEDULER.kolSchedule(id); // /v1/kol/availabilities/schedule/{id}
+  const url = CLIENT_API_PATHS.SCHEDULER.kolSchedule(kolId); // /v1/kol/availabilities/schedule/{id}
 
   // Gửi tuần tự để dễ debug (có thể chuyển sang Promise.all nếu muốn)
   const results = [];
   for (const s of shifts) {
     const body = {
-      id, // BE không dùng ở body cũng không sao, giữ cho nhất quán
+      kolId, // BE không dùng ở body cũng không sao, giữ cho nhất quán
       startAt: toISO(date, s.start),
       endAt: toISO(date, s.end),
     };
