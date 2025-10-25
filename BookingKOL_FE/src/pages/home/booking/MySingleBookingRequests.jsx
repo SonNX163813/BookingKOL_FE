@@ -6,6 +6,7 @@ import {
   DatePicker,
   Form,
   Pagination,
+  Popconfirm,
   Select,
   Space,
   Table,
@@ -22,8 +23,10 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  XCircle,
 } from "lucide-react";
 import { useGetMySingleBookingRequests } from "../../../hook/user/booking/useGetMySingleBookingRequests";
+import { useCancelMySingleBookingRequest } from "../../../hook/user/booking/useCancelMySingleBookingRequest";
 
 const { RangePicker } = DatePicker;
 
@@ -85,6 +88,16 @@ const PAYMENT_STATUS_COLOR = {
   REFUNDED: "purple",
 };
 
+const CANCELABLE_BOOKING_STATUSES = new Set([
+  "DRAFT",
+  "REQUESTED",
+  "PENDING",
+  "NEGOTIATING",
+  "ACCEPTED",
+  "CONFIRMED",
+  "CONTRACT_SIGNED",
+]);
+
 /* ------------------- HELPERS ------------------- */
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
@@ -126,6 +139,9 @@ const deriveRowKey = (record) =>
 const getPrimaryContract = (r) => r?.contracts?.find(Boolean) ?? null;
 const getPrimaryPayment = (r) => getPrimaryContract(r)?.paymentDTO ?? null;
 
+const canCancelBookingRequest = (status) =>
+  status ? CANCELABLE_BOOKING_STATUSES.has(status.toUpperCase()) : false;
+
 /* ------------------- COMPONENT ------------------- */
 
 const MySingleBookingRequests = () => {
@@ -134,6 +150,15 @@ const MySingleBookingRequests = () => {
   const [size, setSize] = useState(20);
   const [filters, setFilters] = useState({});
   const navigate = useNavigate();
+  const [cancellingRequestId, setCancellingRequestId] = useState(null);
+
+  const {
+    isCancellingMySingleBookingRequest,
+    handleCancelMySingleBookingRequest,
+  } = useCancelMySingleBookingRequest({
+    successToastMessage: "Huỷ đơn booking thành công",
+    errorToastMessage: "Huỷ đơn booking thất bại",
+  });
 
   const {
     isLoadingMyBookingRequests,
@@ -269,6 +294,25 @@ const MySingleBookingRequests = () => {
     [navigate]
   );
 
+  const handleCancelRequest = useCallback(
+    async (requestId) => {
+      if (!requestId) return;
+      try {
+        setCancellingRequestId(requestId);
+        await handleCancelMySingleBookingRequest({ requestId });
+        await refetchMyBookingRequests();
+      } catch (error) {
+        // toast is handled globally
+      } finally {
+        setCancellingRequestId(null);
+      }
+    },
+    [
+      handleCancelMySingleBookingRequest,
+      refetchMyBookingRequests,
+    ]
+  );
+
   const columns = useMemo(
     () => [
       {
@@ -356,19 +400,64 @@ const MySingleBookingRequests = () => {
         title: "Thao tác",
         key: "actions",
         fixed: "right",
-        width: 110,
-        render: (_, record) => (
-          <Button
-            type="link"
-            onClick={() => handleViewDetail(record)}
-            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-          >
-            <Eye size={18} />
-          </Button>
-        ),
+        width: 190,
+        render: (_, record) => {
+          const requestId = record?.id;
+          const isCancelable = canCancelBookingRequest(record?.status);
+          const isProcessingThisRow =
+            isCancellingMySingleBookingRequest &&
+            cancellingRequestId === requestId;
+          const disableCancel =
+            !requestId ||
+            (isCancellingMySingleBookingRequest && !isProcessingThisRow);
+          const cancelButton = (
+            <Button
+              type="link"
+              danger
+              disabled={disableCancel}
+              loading={isProcessingThisRow}
+              className="!h-10 !rounded-xl !px-3 !text-red-600 hover:!bg-red-50 focus:!bg-red-100"
+            >
+              <XCircle size={18} />
+            </Button>
+          );
+
+          return (
+            <Space size="small">
+              <Button
+                type="link"
+                onClick={() => handleViewDetail(record)}
+                className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+              >
+                <Eye size={18} />
+              </Button>
+              {isCancelable && requestId ? (
+                <Popconfirm
+                  title="Huỷ đơn booking"
+                  description="Bạn có chắc chắn muốn huỷ đơn này? Thao tác không thể hoàn tác."
+                  okText="Huỷ đơn"
+                  cancelText="Bỏ qua"
+                  okButtonProps={{
+                    danger: true,
+                    loading: isProcessingThisRow,
+                  }}
+                  placement="left"
+                  onConfirm={() => handleCancelRequest(requestId)}
+                >
+                  {cancelButton}
+                </Popconfirm>
+              ) : null}
+            </Space>
+          );
+        },
       },
     ],
-    [handleViewDetail]
+    [
+      handleViewDetail,
+      handleCancelRequest,
+      cancellingRequestId,
+      isCancellingMySingleBookingRequest,
+    ]
   );
 
   return (
