@@ -77,17 +77,27 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
   /* -------------------- Xử lý chọn giờ -------------------- */
   const handleSelectHour = (hour) => {
+    // Nếu giờ không khả dụng
     if (!kolAvailableHours.has(hour)) {
       toast.error("KOL không có lịch cho giờ đó!");
       return;
     }
 
+    // Nếu chưa chọn gì -> đặt start
     if (startHour === null) {
       setStartHour(hour);
       setEndHour(null);
       return;
     }
 
+    // Nếu đang chọn 1 giờ bắt đầu, click lại cùng giờ => bỏ chọn
+    if (startHour !== null && endHour === null && startHour === hour) {
+      setStartHour(null);
+      setEndHour(null);
+      return;
+    }
+
+    // Nếu đã có start và chưa có end -> chọn end
     if (endHour === null) {
       const min = Math.min(startHour, hour);
       const max = Math.max(startHour, hour);
@@ -102,7 +112,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
         return;
       }
 
-      // kiểm tra có đủ slot cho toàn bộ khoảng
+      // Kiểm tra có đủ slot liên tục không
       for (let h = min; h < max; h++) {
         if (!kolAvailableHours.has(h)) {
           toast.error("KOL không có lịch cho giờ đó!");
@@ -112,8 +122,26 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
       setStartHour(min);
       setEndHour(max);
-    } else {
-      // reset nếu chọn lại
+      return;
+    }
+
+    // Nếu đã chọn cả start + end
+    if (startHour !== null && endHour !== null) {
+      // Nếu click lại đúng vào start hoặc end => bỏ chọn toàn bộ
+      if (hour === startHour || hour === endHour) {
+        setStartHour(null);
+        setEndHour(null);
+        return;
+      }
+
+      // Nếu click vào giữa khoảng => reset và chọn lại giờ đó làm start
+      if (hour > startHour && hour < endHour) {
+        setStartHour(hour);
+        setEndHour(null);
+        return;
+      }
+
+      // Nếu click ra ngoài khoảng => chọn lại start mới
       setStartHour(hour);
       setEndHour(null);
     }
