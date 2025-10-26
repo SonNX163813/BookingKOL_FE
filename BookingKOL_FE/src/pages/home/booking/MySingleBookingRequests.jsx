@@ -89,13 +89,14 @@ const PAYMENT_STATUS_COLOR = {
 };
 
 const CANCELABLE_BOOKING_STATUSES = new Set([
-  "DRAFT",
-  "REQUESTED",
-  "PENDING",
-  "NEGOTIATING",
-  "ACCEPTED",
-  "CONFIRMED",
-  "CONTRACT_SIGNED",
+  // "DRAFT",
+  // "REQUESTED",
+  // "PENDING",
+  // "NEGOTIATING",
+  // "ACCEPTED",
+  // "CONFIRMED",
+  // "CONTRACT_SIGNED",
+  "IN_PROGRESS",
 ]);
 
 /* ------------------- HELPERS ------------------- */
@@ -307,10 +308,7 @@ const MySingleBookingRequests = () => {
         setCancellingRequestId(null);
       }
     },
-    [
-      handleCancelMySingleBookingRequest,
-      refetchMyBookingRequests,
-    ]
+    [handleCancelMySingleBookingRequest, refetchMyBookingRequests]
   );
 
   const columns = useMemo(
@@ -461,13 +459,13 @@ const MySingleBookingRequests = () => {
   );
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-pink-50 py-12">
+    <div className="relative min-h-screen w-full overflow-hidden py-12 flex items-center justify-center">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-indigo-300/30 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 rounded-full bg-purple-300/20 blur-3xl" />
+        <div className="absolute -left-24 top-10 h-64 w-64 rounded-full " />
+        <div className="absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 rounded-full " />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 md:px-6 lg:px-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-10 px-4 md:px-6 lg:px-8">
         {/* ---------- HEADER ---------- */}
         {/* <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-rose-500/10" />
@@ -618,7 +616,7 @@ const MySingleBookingRequests = () => {
         </section>
 
         {/* ---------- TABLE ---------- */}
-        <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur">
+        <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.5)] backdrop-blur">
           <div className="relative p-4 sm:p-6">
             <div className="flex flex-col gap-3 border-b border-slate-200/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
               <div>

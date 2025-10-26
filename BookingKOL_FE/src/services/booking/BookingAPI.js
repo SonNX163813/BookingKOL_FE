@@ -1,4 +1,4 @@
-import { patch, post } from "../../config/axios-config";
+import { get, patch, post } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
 const extractFileList = (files) => {
@@ -131,4 +131,34 @@ export const cancelSingleBookingRequest = async ({
     url: `${CLIENT_API_PATHS.BOOKING.cancelMySingleRequest}/${requestId}`,
     data: payload ?? {},
   });
+};
+
+export const getKolFreeTimeSlots = async ({ kolId, signal } = {}) => {
+  if (!kolId) {
+    throw new Error("kolId is required to fetch KOL free time slots");
+  }
+
+  const payload = await get({
+    url: CLIENT_API_PATHS.SCHEDULE_KOL_FREETIME.kolFreeTime(kolId),
+    config: signal ? { signal } : undefined,
+  });
+
+  const rawData = Array.isArray(payload?.data) ? payload.data : [];
+
+  return rawData
+    .map((item) => ({
+      startAt:
+        typeof item?.startAt === "string"
+          ? item.startAt
+          : typeof item?.start_at === "string"
+          ? item.start_at
+          : null,
+      endAt:
+        typeof item?.endAt === "string"
+          ? item.endAt
+          : typeof item?.end_at === "string"
+          ? item.end_at
+          : null,
+    }))
+    .filter((slot) => slot.startAt && slot.endAt);
 };

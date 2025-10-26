@@ -22,7 +22,7 @@ const BookingSinglePaymentSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const paymentInfo = location.state?.payment;
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {
     if (!paymentInfo) {
@@ -32,7 +32,7 @@ const BookingSinglePaymentSuccess = () => {
 
     const redirectTimeout = setTimeout(() => {
       navigate("/", { replace: true });
-    }, 5000);
+    }, 10000);
 
     const countdownInterval = setInterval(() => {
       setCountdown((prev) => Math.max(prev - 1, 0));
@@ -82,11 +82,12 @@ const BookingSinglePaymentSuccess = () => {
         sx={{
           position: "absolute",
           inset: 0,
-          background: `
-            radial-gradient(80% 80% at 15% 20%, rgba(74, 116, 218, 0.25) 0%, rgba(74, 116, 218, 0) 60%),
-            radial-gradient(75% 75% at 85% 80%, rgba(255, 161, 218, 0.18) 0%, rgba(255, 161, 218, 0) 65%),
-            linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(147, 206, 246, 0.15) 100%)
-          `,
+          backgroundColor: "#ffffff",
+          // background: `
+          //   radial-gradient(80% 80% at 15% 20%, rgba(74, 116, 218, 0.25) 0%, rgba(74, 116, 218, 0) 60%),
+          //   radial-gradient(75% 75% at 85% 80%, rgba(255, 161, 218, 0.18) 0%, rgba(255, 161, 218, 0) 65%),
+          //   linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(147, 206, 246, 0.15) 100%)
+          // `,
         }}
       />
 

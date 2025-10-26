@@ -419,6 +419,7 @@ const BookingFlow = ({
         //   TEXT={TEXT}
         // />
         <BookingScheduleStep
+          kolId={kolId}
           STYLE={STYLE}
           TEXT={TEXT}
           onSelectSchedule={(start, end) => {

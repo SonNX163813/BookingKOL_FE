@@ -35,6 +35,11 @@ export const CLIENT_API_PATHS = {
     getDetail: "/v1/courses",
   },
 
+  SCHEDULE_KOL_FREETIME: {
+    kolFreeTime: (kolId) =>
+      `/v1/availabilities/free-time/${encodeURIComponent(kolId)}`,
+  },
+
   SCHEDULER: {
     kolTimeline: (kolId) => `/v1/availabilities/time-line/kol/${kolId}`,
     // ✅ đổi sang dạng có kolId trên path
