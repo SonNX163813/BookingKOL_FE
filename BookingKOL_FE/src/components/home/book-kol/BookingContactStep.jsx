@@ -287,7 +287,7 @@ const BookingContactStep = ({
       </Card>
 
       {/* Checkbox điều khoản */}
-      <FormControlLabel
+      {/* <FormControlLabel
         control={
           <Checkbox
             checked={agreeTerms}
@@ -310,7 +310,7 @@ const BookingContactStep = ({
             </Button>
           </Typography>
         }
-      />
+      /> */}
 
       {errors.terms && (
         <Alert severity="error" sx={{ borderRadius: "14px" }}>

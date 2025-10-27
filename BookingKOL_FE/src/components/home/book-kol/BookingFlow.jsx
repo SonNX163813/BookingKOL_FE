@@ -29,7 +29,7 @@ import {
 } from "../../../constants/bookingFlowTextStyles";
 import { useCreateBooking as useCreateSingleBooking } from "../../../hook/booking_single/useCreateBooking";
 import { useHoldBookingSlot } from "../../../hook/booking_single/useHoldBookingSlot";
-import { BOOKING_SINGLE_PAYMENT_STORAGE_KEY } from "../../../constants/storageKeys";
+import { BOOKING_SINGLE_REVIEW_STORAGE_KEY } from "../../../constants/storageKeys";
 
 /* ------------------------- CONSTANTS & HELPERS ------------------------- */
 
@@ -83,8 +83,6 @@ const BookingFlow = ({
   });
   const [attachments, setAttachments] = useState([]);
   const [errors, setErrors] = useState({});
-  const [agreeTerms, setAgreeTerms] = useState(false);
-  const [termsOpen, setTermsOpen] = useState(false);
   const [heldSlot, setHeldSlot] = useState(null);
 
   const { isLoadingCreateBooking: submitting, handleCreateBooking } =
@@ -114,8 +112,6 @@ const BookingFlow = ({
     });
     setAttachments([]);
     setErrors({});
-    setAgreeTerms(false);
-    setTermsOpen(false);
     setHeldSlot(null);
   }, [open, userProfile]);
 
@@ -139,7 +135,6 @@ const BookingFlow = ({
       if (contact.phone && !/^\d{9,15}$/.test(contact.phone)) {
         newErrors.phone = "So dien thoai chua hop le";
       }
-      if (!agreeTerms) newErrors.terms = "Vui long dong y dieu khoan";
     }
 
     if (touchErrors) setErrors(newErrors);
@@ -210,17 +205,6 @@ const BookingFlow = ({
     });
   };
 
-  const handleToggleTerms = (checked) => {
-    setAgreeTerms(checked);
-    if (errors.terms) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.terms;
-        return next;
-      });
-    }
-  };
-
   /* ---------------------- FILE HANDLERS ---------------------- */
   const handleAttachmentAdd = (fileList) => {
     const incoming = Array.isArray(fileList)
@@ -263,10 +247,6 @@ const BookingFlow = ({
   /* ---------------------- SUBMIT ---------------------- */
   const handleSubmit = async () => {
     if (submitting) return;
-    if (!agreeTerms) {
-      toast.error("Vui long dong y voi dieu khoan truoc khi gui!");
-      return;
-    }
 
     if (!validateStep(1, true)) return;
 
@@ -294,7 +274,6 @@ const BookingFlow = ({
         endAt: endIso,
         description: note || "",
         location: location || "",
-        isConfirmWithTerms: !!agreeTerms,
       };
 
       const payload = {
@@ -303,22 +282,24 @@ const BookingFlow = ({
       };
 
       const response = await handleCreateBooking(payload);
-      const paymentData = response?.data ?? null;
+      const responseData = response?.data ?? null;
+      const bookingRequestData = responseData?.data ?? responseData ?? null;
 
-      if (!paymentData) {
-        toast.error("Khong tim thay thong tin thanh toan.");
+      if (!bookingRequestData?.id) {
+        toast.error("Khong tim thay thong tin yeu cau dat lich.");
         return;
       }
 
-      if (paymentData) {
-        try {
-          sessionStorage.setItem(
-            BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
-            JSON.stringify({ payment: paymentData })
-          );
-        } catch (storageError) {
-          console.error("Cannot persist booking payment data", storageError);
-        }
+      try {
+        sessionStorage.setItem(
+          BOOKING_SINGLE_REVIEW_STORAGE_KEY,
+          JSON.stringify({
+            bookingRequest: bookingRequestData,
+            bookingSingleReqDTO,
+          })
+        );
+      } catch (storageError) {
+        console.error("Cannot persist booking review data", storageError);
       }
 
       onSubmit?.({
@@ -328,9 +309,9 @@ const BookingFlow = ({
       });
 
       onClose?.();
-      navigate("/thanh-toan-kol-le", {
+      navigate("/xac-nhan-dat-lich-kol-le", {
         state: {
-          payment: paymentData,
+          bookingRequest: bookingRequestData,
           bookingSingleReqDTO,
         },
       });
@@ -396,17 +377,6 @@ const BookingFlow = ({
   }, [kolName, startDateTime, endDateTime, kolMinPrice]);
 
   /* ---------------------- RENDER ---------------------- */
-  const isLastStep = activeStep === TEXT.steps.length - 1;
-  const primaryAction = isLastStep ? handleSubmit : handleHoldSlotClick;
-  const primaryLabel = isLastStep
-    ? submitting
-      ? "Dang xu ly..."
-      : TEXT.actions.apply
-    : TEXT.actions.continue;
-  const primaryDisabled = isLastStep
-    ? !agreeTerms || submitting
-    : !validateStep(activeStep);
-
   const renderStepContent = () => {
     if (activeStep === 0) {
       return (
@@ -436,9 +406,6 @@ const BookingFlow = ({
         errors={errors}
         onContactChange={handleContactChange}
         summary={summary}
-        agreeTerms={agreeTerms}
-        onToggleTerms={handleToggleTerms}
-        onOpenTerms={() => setTermsOpen(true)}
         attachments={attachments}
         onAddAttachments={handleAttachmentAdd}
         onRemoveAttachment={handleAttachmentRemove}
@@ -518,7 +485,7 @@ const BookingFlow = ({
               <Button
                 variant="contained"
                 onClick={handleSubmit}
-                disabled={!agreeTerms || submitting}
+                disabled={submitting}
                 sx={{
                   textTransform: "none",
                   borderRadius: "16px",
@@ -533,7 +500,7 @@ const BookingFlow = ({
                   },
                 }}
               >
-                {submitting ? "Đang chuyển trang..." : TEXT.actions.pay}
+                {submitting ? "Dang chuyen trang..." : TEXT.actions.confirm}
               </Button>
             </>
           )}
@@ -612,56 +579,6 @@ const BookingFlow = ({
           <DialogContent sx={{ p: 0 }}>{body}</DialogContent>
         </Dialog>
       )}
-
-      {/* Điều khoản */}
-      <Dialog
-        open={termsOpen}
-        onClose={() => setTermsOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: "24px" } }}
-      >
-        <DialogContent sx={{ p: 3 }}>
-          <Stack spacing={2}>
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Typography
-                variant="h6"
-                sx={{ color: STYLE.textPrimary, fontWeight: 700 }}
-              >
-                {TEXT.terms.heading}
-              </Typography>
-              <IconButton onClick={() => setTermsOpen(false)}>
-                <CloseRoundedIcon />
-              </IconButton>
-            </Stack>
-            <Typography
-              sx={{
-                color: STYLE.textSecondary,
-                lineHeight: 1.7,
-                whiteSpace: "pre-line",
-              }}
-            >
-              {TEXT.terms.body}
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={() => setTermsOpen(false)}
-              sx={{
-                alignSelf: "flex-end",
-                textTransform: "none",
-                borderRadius: "14px",
-                backgroundColor: STYLE.accent,
-              }}
-            >
-              {TEXT.terms.agree}
-            </Button>
-          </Stack>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
