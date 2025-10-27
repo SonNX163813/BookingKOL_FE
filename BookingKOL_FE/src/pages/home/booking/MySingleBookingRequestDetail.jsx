@@ -351,18 +351,6 @@ const MySingleBookingRequestDetail = () => {
               <p className="mt-4 text-sm text-slate-600">
                 Xem chi tiết thông tin đơn, hợp đồng và thanh toán.
               </p>
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  type="primary"
-                  icon={<Edit3 size={16} />}
-                  className="!h-11 !rounded-xl !bg-indigo-600 !px-5 !font-semibold hover:!bg-indigo-500"
-                  onClick={handleTriggerInlineUpdate}
-                  disabled={!detail}
-                  loading={isUpdatingMySingleBookingRequest}
-                >
-                  Thao tác
-                </Button>
-              </div>
             </div>
           </div>
         </section>
@@ -462,16 +450,29 @@ const MySingleBookingRequestDetail = () => {
                         <p className="text-sm font-semibold text-slate-700">
                           Tệp đính kèm hiện có
                         </p>
-                        <p className="mb-3 text-xs text-slate-500">
+                        <p className="mb-3  text-slate-500">
                           Chọn các tệp bạn muốn xóa khi cập nhật.
                         </p>
                         {deletableAttachmentOptions.length > 0 ? (
                           <Checkbox.Group
-                            options={deletableAttachmentOptions}
                             value={fileIdsToDelete}
                             onChange={handleSelectFilesToDelete}
                             className="flex flex-col gap-2"
-                          />
+                          >
+                            {deletableAttachmentOptions.map((item) => (
+                              <Checkbox key={item.value} value={item.value}>
+                                <span
+                                  className={`text-sm transition-all duration-200 ${
+                                    fileIdsToDelete.includes(item.value)
+                                      ? "line-through text-slate-700/60"
+                                      : "text-slate-700"
+                                  }`}
+                                >
+                                  {item.label}
+                                </span>
+                              </Checkbox>
+                            ))}
+                          </Checkbox.Group>
                         ) : (
                           <div className="text-sm text-slate-500">
                             Không có tệp đính kèm.
@@ -482,7 +483,7 @@ const MySingleBookingRequestDetail = () => {
                         <p className="text-sm font-semibold text-slate-700">
                           Thêm tệp mới
                         </p>
-                        <p className="mb-3 text-xs text-slate-500">
+                        <p className="mb-3  text-slate-500">
                           Các tệp này sẽ được đính kèm khi cập nhật.
                         </p>
                         <Upload

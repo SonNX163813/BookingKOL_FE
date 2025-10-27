@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   Alert,
@@ -13,8 +13,10 @@ import {
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { get } from "../../config/axios-config";
-import { BOOKING_SINGLE_PAYMENT_STORAGE_KEY } from "../../constants/storageKeys";
+import {
+  BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
+  BOOKING_SINGLE_REVIEW_STORAGE_KEY,
+} from "../../constants/storageKeys";
 import { BASE_URL } from "../../utils/config";
 
 const THOI_GIAN_DEM_NGUOC = 15 * 60 * 1000; // 15 phút = 900.000 ms
@@ -65,6 +67,7 @@ const BookingSinglePayment = () => {
           BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
           JSON.stringify({ payment: statePayment })
         );
+        sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
       } catch (err) {
         console.error("Không thể lưu dữ liệu thanh toán", err);
       }
@@ -79,6 +82,7 @@ const BookingSinglePayment = () => {
         const parsed = JSON.parse(duLieuLuu);
         if (parsed?.payment) {
           setThongTinThanhToan(parsed.payment);
+          sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
           return;
         }
       } catch (err) {
@@ -107,6 +111,7 @@ const BookingSinglePayment = () => {
     return () => clearInterval(intervalId);
   }, [thongTinThanhToan]);
 
+  // Kiểm tra trạng thái thanh toán định kỳ
   useEffect(() => {
     const contractId = thongTinThanhToan?.contractId;
     if (!contractId) return;
@@ -154,7 +159,7 @@ const BookingSinglePayment = () => {
           if (intervalId) clearInterval(intervalId);
 
           sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
-          // toast.success("Thanh toán thành công! 🎉");
+          toast.success("Thanh toán thành công 🎉");
           navigate("/thanh-toan-kol-le/thanh-cong", {
             replace: true,
             state: { payment: thongTinThanhToan },
@@ -191,12 +196,12 @@ const BookingSinglePayment = () => {
   return (
     <Container maxWidth="md" sx={{ py: { xs: 4, md: 6 } }}>
       <Stack spacing={4}>
+        {/* --- Tiêu đề và đồng hồ đếm ngược --- */}
         <Stack spacing={1} alignItems="center">
           <Typography variant="h4" fontWeight={700}>
             Thanh toán booking KOL
           </Typography>
 
-          {/* Thời gian đếm ngược hiển thị lớn */}
           <Typography
             variant="h3"
             sx={{
@@ -217,10 +222,11 @@ const BookingSinglePayment = () => {
           </Typography>
 
           <Typography variant="body1" color="text.secondary">
-            Mã QR sẽ hết hạn vào {thoiGianHetHanHienThi}.
+            Mã QR sẽ hết hạn vào lúc {thoiGianHetHanHienThi}.
           </Typography>
         </Stack>
 
+        {/* --- Thông tin thanh toán & mã QR --- */}
         <Paper
           elevation={0}
           sx={{
@@ -295,7 +301,7 @@ const BookingSinglePayment = () => {
                 sx={{ display: { xs: "none", md: "block" } }}
               />
 
-              {/* --- QR Thanh toán --- */}
+              {/* --- Mã QR thanh toán --- */}
               <Stack
                 spacing={2}
                 alignItems="center"
@@ -336,12 +342,12 @@ const BookingSinglePayment = () => {
               </Stack>
             </Stack>
 
-            {/* --- Cảnh báo --- */}
+            {/* --- Cảnh báo lưu ý --- */}
             <Alert severity="warning" sx={{ borderRadius: 3 }}>
               <Stack spacing={1}>
                 <Typography fontWeight={600}>Lưu ý khi thanh toán</Typography>
                 <Typography variant="body2">
-                  - Nhập đúng <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển tiền để
+                  - Nhập đúng <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển khoản để
                   hệ thống tự động kiểm tra trong vòng 1 - 5 phút.
                 </Typography>
                 <Typography variant="body2">

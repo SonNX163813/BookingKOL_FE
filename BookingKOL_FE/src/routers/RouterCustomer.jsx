@@ -30,6 +30,8 @@ import ServicePackagePage from "../pages/booking_package/ServicePackagePage.jsx"
 import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPackagePage.jsx";
 import BookingSinglePayment from "../pages/booking_single/BookingSinglePayment.jsx";
 import BookingSinglePaymentSuccess from "../pages/booking_single/BookingSinglePaymentSuccess.jsx";
+import BookingSinglePaymentFail from "../pages/booking_single/BookingSinglePaymentFail.jsx";
+import BookingSingleReview from "../pages/booking_single/BookingSingleReview.jsx";
 import MySingleBookingRequests from "../pages/home/booking/MySingleBookingRequests.jsx";
 import MySingleBookingRequestDetail from "../pages/home/booking/MySingleBookingRequestDetail.jsx";
 
@@ -63,10 +65,18 @@ export const routerCustomer = [
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
       { path: "/goi-chien-dich", element: <ServicePackagePage /> },
+      {
+        path: "/xac-nhan-dat-lich-kol-le",
+        element: <BookingSingleReview />,
+      },
       { path: "/thanh-toan-kol-le", element: <BookingSinglePayment /> },
       {
         path: "/thanh-toan-kol-le/thanh-cong",
         element: <BookingSinglePaymentSuccess />,
+      },
+      {
+        path: "/thanh-toan-kol-le/that-bai",
+        element: <BookingSinglePaymentFail />,
       },
       ...courseRoutes,
     ],

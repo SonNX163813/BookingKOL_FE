@@ -49,6 +49,26 @@ export const createSingleBooking = async ({
   });
 };
 
+export const confirmSingleBookingRequest = async ({ requestId } = {}) => {
+  if (!requestId) {
+    throw new Error("requestId is required to confirm single booking request");
+  }
+
+  return post({
+    url: `${CLIENT_API_PATHS.BOOKING.confirmSingleRequest}/${requestId}`,
+  });
+};
+
+export const cancelSingleBookingRequestById = async ({ requestId } = {}) => {
+  if (!requestId) {
+    throw new Error("requestId is required to cancel single booking request");
+  }
+
+  return patch({
+    url: `${CLIENT_API_PATHS.BOOKING.cancelSingleRequest}/${requestId}`,
+  });
+};
+
 export const holdBookingSlot = async ({
   kolId,
   startTimeIso,
