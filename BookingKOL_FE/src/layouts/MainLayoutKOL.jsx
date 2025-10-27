@@ -1,79 +1,75 @@
-// src/layouts/MainLayoutKOL.jsx
 import { useEffect, useMemo, useState } from "react";
-import { Link, Outlet, matchPath, useLocation } from "react-router-dom";
+import {
+  Link,
+  Outlet,
+  matchPath,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { Menu } from "antd";
 import {
   StackedBarChartOutlined,
   EventOutlined,
   ShoppingBagOutlined,
-  ChatBubbleOutlineOutlined,
   AccountCircleOutlined,
   PaidOutlined,
   SettingsOutlined,
   PersonOutline,
   CollectionsOutlined,
-  EditCalendarOutlined, // 👈 icon cho "Đăng ký lịch làm"
+  EditCalendarOutlined,
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
-import AdminHeader from "../components/admin/layout/AdminHeader";
+
+import TopBar from "../components/kol/TopBar";
+import { useAuth } from "../context/AuthContext";
 
 export default function MainLayoutKOL() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const auth = useAuth?.() || {};
+  const appUser = auth?.user || {};
+
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [pathname]);
 
-  // Map dùng để biết item nào đang active và group nào cần mở
   const routeKeyMap = useMemo(
     () => [
       { key: "kol", path: "/kol" },
-
-      // Lịch làm việc
       {
         key: "kol-schedule",
         path: "/kol/schedule",
         parentKey: "group-schedule",
       },
-      // 👉 thêm route cho trang Đăng ký lịch làm
       {
         key: "kol-schedule-register",
         path: "/kol/schedule/register",
         parentKey: "group-schedule",
       },
-
-      // Đơn
       { key: "kol-orders", path: "/kol/orders", parentKey: "group-orders" },
       {
         key: "kol-order-detail",
         path: "/kol/orders/:id",
         parentKey: "group-orders",
       },
-
-      // Tin nhắn (nếu dùng)
       {
         key: "kol-messages",
         path: "/kol/messages",
         parentKey: "group-messages",
       },
-
-      // Portfolio
       {
         key: "kol-portfolio",
         path: "/kol/portfolio",
         parentKey: "group-portfolio",
       },
-
-      // Hồ sơ
       { key: "kol-profile", path: "/kol/profile", parentKey: "group-profile" },
       {
         key: "kol-settings",
         path: "/kol/settings",
         parentKey: "group-profile",
       },
-
-      // Doanh thu
       {
         key: "kol-earnings",
         path: "/kol/earnings",
@@ -83,7 +79,6 @@ export default function MainLayoutKOL() {
     []
   );
 
-  // Xác định item đang active theo URL hiện tại
   const active = [...routeKeyMap]
     .sort((a, b) => b.path.length - a.path.length)
     .find((it) => matchPath({ path: it.path, end: false }, pathname)) || {
@@ -93,14 +88,12 @@ export default function MainLayoutKOL() {
   const selectedKeys = [active.key];
   const defaultOpenKeys = active.parentKey ? [active.parentKey] : [];
 
-  // Cấu hình menu bên trái
   const menuItems = [
     {
       key: "kol",
       icon: <StackedBarChartOutlined />,
       label: <Link to="/kol">Tổng quan</Link>,
     },
-
     {
       key: "group-schedule",
       icon: <EventOutlined />,
@@ -118,7 +111,6 @@ export default function MainLayoutKOL() {
         },
       ],
     },
-
     {
       key: "group-orders",
       icon: <ShoppingBagOutlined />,
@@ -131,7 +123,6 @@ export default function MainLayoutKOL() {
         },
       ],
     },
-
     {
       key: "group-portfolio",
       icon: <CollectionsOutlined />,
@@ -144,7 +135,6 @@ export default function MainLayoutKOL() {
         },
       ],
     },
-
     {
       key: "group-profile",
       icon: <PersonOutline />,
@@ -162,7 +152,6 @@ export default function MainLayoutKOL() {
         },
       ],
     },
-
     {
       key: "group-earnings",
       icon: <PaidOutlined />,
@@ -177,10 +166,31 @@ export default function MainLayoutKOL() {
     },
   ];
 
+  const handleProfile = () => navigate("/kol/profile");
+  const handleSettings = () => navigate("/kol/settings");
+  const handleLogout = () => {
+    auth?.dispatch?.({ type: "LOGOUT" });
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    navigate("/login", { replace: true });
+  };
+
+  const topbarUser = {
+    name: appUser?.fullName || appUser?.name || "KOL",
+    email: appUser?.email || "",
+    avatarUrl: appUser?.avatarUrl || appUser?.avatar || "",
+  };
+
   return (
     <>
-      <AdminHeader />
-      <div className="flex h-[calc(100vh-80px)]">
+      <TopBar
+        user={topbarUser}
+        onProfile={handleProfile}
+        onSettings={handleSettings}
+        onLogout={handleLogout}
+      />
+
+      <div className="flex h-[calc(100vh-64px)]">
         {/* Sidebar */}
         <aside
           className={`bg-white transition-all duration-300 ${

@@ -45,23 +45,19 @@ function getAuthUserFromStorage() {
   return readJSON(rawLocal) || readJSON(rawSession) || null;
 }
 
-/**
- * Cố gắng bóc ra **KOL primary id** từ object user trong auth.
- * Bổ sung/giảm các candidate theo payload thực tế.
- */
+/** Cố gắng bóc ra **KOL primary id** từ object user trong auth. */
 function extractKolPrimaryId(user) {
   if (!user || typeof user !== "object") return null;
 
   const candidates = [
-    user?.kolProfile?.id, // { kolProfile: { id } }
-    user?.kol?.id, // { kol: { id } }
-    user?.kolProfileId, // kolProfileId
-    user?.kol_primary_id, // tuỳ BE
-    user?.kolIdPrimary, // tuỳ BE
+    user?.kolProfile?.id,
+    user?.kol?.id,
+    user?.kolProfileId,
+    user?.kol_primary_id,
+    user?.kolIdPrimary,
     // user?.kolId, // thường là "kolid" (KHÔNG dùng nếu BE cần "id")
     user?.id, // fallback cuối
   ];
-
   return candidates.find(Boolean) || null;
 }
 
@@ -71,6 +67,23 @@ const dayOfWeekLabel = (d) => {
   if (w === 0) return "CN";
   return `T${w + 1}`;
 };
+
+// Lấy message từ lỗi axios (BE hay trả { message: string | string[] })
+function extractApiMessage(err) {
+  const data = err?.response?.data;
+  if (!data) return "";
+  if (typeof data?.message === "string") return data.message;
+  if (Array.isArray(data?.message) && data.message.length)
+    return data.message[0];
+  if (typeof data === "string") return data;
+  return "";
+}
+
+// Tạo label khung giờ đẹp
+const labelOf = (date, start, end) =>
+  `${start?.format("HH:mm")}–${end?.format("HH:mm")}, ${date?.format(
+    "DD/MM/YYYY"
+  )}`;
 
 export default function KolWorkRegistrationMui() {
   const { kolId: kolIdParam } = useParams();
@@ -166,18 +179,23 @@ export default function KolWorkRegistrationMui() {
   const removeShift = (idx) =>
     setShifts((arr) => arr.filter((_, i) => i !== idx));
 
+  // Kiểm tra ca hợp lệ (sort theo giờ bắt đầu để tránh pass nhầm do thứ tự)
   const validate = () => {
     if (!pickedDate) return "Vui lòng chọn ngày đăng ký (≥ 14 ngày).";
     if (!shifts.length) return "Vui lòng thêm ít nhất 1 ca.";
-    for (let i = 0; i < shifts.length; i++) {
-      const s = shifts[i];
+
+    const sorted = [...shifts].sort((a, b) => a.start.diff(b.start));
+    for (let i = 0; i < sorted.length; i++) {
+      const s = sorted[i];
       if (!s.start || !s.end) return "Thiếu thời gian cho một ca.";
       const duration = s.end.diff(s.start, "minute");
       if (duration < MIN_DURATION_MINUTES)
         return `Mỗi ca phải tối thiểu ${MIN_DURATION_MINUTES} phút.`;
+
       if (i > 0) {
-        const prev = shifts[i - 1];
-        if (s.start.diff(prev.end, "minute") < MIN_GAP_MINUTES)
+        const prev = sorted[i - 1];
+        const gap = s.start.diff(prev.end, "minute");
+        if (gap < MIN_GAP_MINUTES)
           return `Khoảng cách giữa các ca phải ≥ ${MIN_GAP_MINUTES} phút.`;
       }
     }
@@ -201,11 +219,25 @@ export default function KolWorkRegistrationMui() {
 
     try {
       setSaving(true);
-      await registerKolAvailabilities({
-        id: resolvedId, // primary id từ storage/fallback
+      const result = await registerKolAvailabilities({
+        kolId: resolvedId, // primary id từ storage/fallback
         date: pickedDate, // dayjs
         shifts, // [{start, end}]
       });
+
+      // Phòng hờ: nếu service chưa được sửa để throw khi app-status != 200
+      if (Array.isArray(result)) {
+        const bad = result.find(
+          (x) => typeof x?.status === "number" && x.status !== 200
+        );
+        if (bad) {
+          const beMsg =
+            (Array.isArray(bad?.message) && bad.message[0]) ||
+            bad?.message ||
+            "Khoảng thời gian này đã bị trùng với lịch làm việc khác";
+          throw new Error(beMsg);
+        }
+      }
 
       const rec = {
         date: pickedDate.format("YYYY-MM-DD"),
@@ -221,12 +253,38 @@ export default function KolWorkRegistrationMui() {
 
       setSnack({ open: true, type: "success", message: "Đăng ký thành công!" });
     } catch (e) {
-      console.error(e);
-      setSnack({
-        open: true,
-        type: "error",
-        message: "Gửi đăng ký thất bại. Vui lòng thử lại.",
-      });
+      // ====== HIỂN THỊ THÔNG BÁO TRÙNG LỊCH DỄ HIỂU ======
+      const httpStatus = e?.response?.status;
+      const appStatus = e?.appStatus; // nếu service có gắn
+      const isConflict =
+        httpStatus === 400 ||
+        httpStatus === 409 ||
+        appStatus === 400 ||
+        appStatus === 409;
+
+      if (isConflict) {
+        // Ưu tiên message từ BE hoặc từ service đã format
+        const beMsg = extractApiMessage(e);
+        const friendly =
+          e?.message ||
+          beMsg ||
+          `Khoảng thời gian này bị trùng với lịch khác. Vui lòng chọn khung giờ khác (ví dụ: ${labelOf(
+            pickedDate,
+            shifts[0]?.start,
+            shifts[0]?.end
+          )}).`;
+        setSnack({ open: true, type: "error", message: friendly });
+      } else {
+        console.error(e);
+        setSnack({
+          open: true,
+          type: "error",
+          message:
+            e?.message ||
+            "Không thể đăng ký ca làm. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
+        });
+      }
+      // ❗ KHÔNG cập nhật lịch sử ở nhánh lỗi
     } finally {
       setSaving(false);
     }
@@ -413,7 +471,7 @@ export default function KolWorkRegistrationMui() {
         {/* Snackbar thông báo success/fail */}
         <Snackbar
           open={snack.open}
-          autoHideDuration={3000}
+          autoHideDuration={snack.type === "error" ? 6000 : 3000}
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
