@@ -46,7 +46,11 @@ function buildMonthDaysMondayFirst(fromDate) {
   return days;
 }
 
-export default function MonthGrid({ dayDuties, range, fromDate }) {
+export default function MonthGrid({
+  dayDuties = { goalList: [] },
+  range,
+  fromDate,
+}) {
   const days = buildMonthDaysMondayFirst(fromDate);
 
   const { t } = useTranslation();
@@ -71,8 +75,6 @@ export default function MonthGrid({ dayDuties, range, fromDate }) {
     }
     return chunks;
   }, [days]);
-
-  if (!dayDuties) return null;
 
   const handleCloseAllPopups = (e) => {
     if (e) e.stopPropagation();

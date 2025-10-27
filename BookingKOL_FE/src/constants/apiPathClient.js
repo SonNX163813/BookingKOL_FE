@@ -35,6 +35,7 @@ export const CLIENT_API_PATHS = {
   },
 
   SCHEDULER: {
+    kolFreeTime: (kolId) => `/v1/availabilities/free-time/${kolId}`,
     kolTimeline: (kolId) => `/v1/availabilities/time-line/kol/${kolId}`,
     // ✅ đổi sang dạng có kolId trên path
     kolSchedule: (kolId) => `/v1/availabilities/schedule/${kolId}`,
