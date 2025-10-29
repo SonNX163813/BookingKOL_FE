@@ -24,7 +24,7 @@ import {
   BOOKING_SINGLE_REVIEW_STORAGE_KEY,
 } from "../../constants/storageKeys";
 
-const FALLBACK_TEXT = "Đang cập nhật";
+const FALLBACK_TEXT = "---";
 
 const formatDateTime = (value) => {
   if (!value) return FALLBACK_TEXT;
@@ -34,7 +34,7 @@ const formatDateTime = (value) => {
 };
 
 const STATUS_LABELS = {
-  DRAFT: "Nháp",
+  DRAFT: "Chờ thanh toán",
   WAITING_FOR_PAYMENT: "Chờ thanh toán",
   PENDING: "Đang xử lý",
   CONFIRMED: "Đã xác nhận",
@@ -45,7 +45,7 @@ const STATUS_LABELS = {
 };
 
 const CONTRACT_STATUS_LABELS = {
-  DRAFT: "Nháp",
+  DRAFT: "Chờ thanh toán",
   PENDING: "Đang xử lý",
   ACTIVE: "Đang hiệu lực",
   SIGNED: "Đã ký",
@@ -78,6 +78,26 @@ const formatCurrency = (value) => {
     return FALLBACK_TEXT;
   }
   return currencyFormatter.format(numeric);
+};
+
+const formatFileSize = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+  if (numeric < 1024) {
+    return `${numeric} B`;
+  }
+  const kb = numeric / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  const mb = kb / 1024;
+  if (mb < 1024) {
+    return `${mb.toFixed(1)} MB`;
+  }
+  const gb = mb / 1024;
+  return `${gb.toFixed(1)} GB`;
 };
 
 const formatLanguages = (languages) => {
@@ -196,6 +216,48 @@ const BookingSingleReview = () => {
     };
   }, [bookingRequest, bookingSingleReqDTO]);
 
+  const attachments = useMemo(() => {
+    const fromRequest = Array.isArray(bookingRequest?.attachedFiles)
+      ? bookingRequest.attachedFiles
+          .filter(Boolean)
+          .map((item, index) => {
+            const fileMeta = item?.file ?? item;
+            const fileUrl = fileMeta?.fileUrl ?? item?.fileUrl ?? "";
+            const fileName =
+              fileMeta?.fileName ??
+              fileMeta?.name ??
+              item?.fileName ??
+              `Tệp đính kèm ${index + 1}`;
+            return {
+              id: item?.id ?? fileMeta?.id ?? index,
+              name: fileName,
+              url: fileUrl,
+              size: fileMeta?.sizeBytes ?? item?.sizeBytes ?? null,
+            };
+          })
+          .filter((file) => file.name)
+      : [];
+    if (fromRequest.length > 0) {
+      return fromRequest;
+    }
+
+    const fromDto = Array.isArray(bookingSingleReqDTO?.attachedFiles)
+      ? bookingSingleReqDTO.attachedFiles
+          .filter(Boolean)
+          .map((item, index) => ({
+            id: item?.id ?? index,
+            name:
+              item?.fileName ??
+              item?.name ??
+              `Tệp đính kèm ${fromRequest.length + index + 1}`,
+            url: item?.fileUrl ?? item?.url ?? "",
+            size: item?.sizeBytes ?? item?.size ?? null,
+          }))
+          .filter((file) => file.name)
+      : [];
+
+    return fromDto;
+  }, [bookingRequest, bookingSingleReqDTO]);
   const kolDetails = useMemo(() => {
     if (!kolInfo) return [];
 
@@ -206,7 +268,7 @@ const BookingSingleReview = () => {
         label: "Khu vực",
         value: formatKolLocation(kolInfo.city, kolInfo.country),
       },
-      { label: "Ngôn ngữ", value: formatLanguages(kolInfo.languages) },
+      // { label: "Ngôn ngữ", value: formatLanguages(kolInfo.languages) },
       {
         label: "Giá booking tối thiểu",
         value: formatCurrency(kolInfo.minBookingPrice),
@@ -572,6 +634,75 @@ const BookingSingleReview = () => {
                       color: BOOKING_FLOW_STYLE.textPrimary,
                     }}
                   >
+                    Tệp đính kèm
+                  </Typography>
+                  {attachments.length > 0 ? (
+                    <Stack spacing={1.5}>
+                      {attachments.map((file) => (
+                        <Stack
+                          key={file.id ?? file.url ?? file.name}
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={{ xs: 1, sm: 2 }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: "flex-start", sm: "center" }}
+                        >
+                          <Stack spacing={0.25}>
+                            <Typography sx={{ fontWeight: 600 }}>
+                              {file.name}
+                            </Typography>
+                            {file.size ? (
+                              <Typography
+                                variant="caption"
+                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                              >
+                                {formatFileSize(file.size)}
+                              </Typography>
+                            ) : null}
+                          </Stack>
+                          {file.url ? (
+                            <Button
+                              component="a"
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                textTransform: "none",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              Xem tệp
+                            </Button>
+                          ) : (
+                            <Typography
+                              sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                            >
+                              Không có liên kết tệp
+                            </Typography>
+                          )}
+                        </Stack>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography
+                      sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                    >
+                      Không có tệp đính kèm
+                    </Typography>
+                  )}
+                </Stack>
+
+                <Divider />
+
+                <Stack spacing={2}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 600,
+                      color: BOOKING_FLOW_STYLE.textPrimary,
+                    }}
+                  >
                     Lịch trình dự kiến
                   </Typography>
                   <Stack spacing={1.5}>
@@ -710,11 +841,15 @@ const BookingSingleReview = () => {
 
             <Alert
               severity="warning"
-              sx={{ borderRadius: "18px", backgroundColor: "#fff8e1" }}
+              sx={{
+                borderRadius: "18px",
+                backgroundColor: "#fff8e1",
+                fontSize: 16,
+              }}
             >
               Lưu ý: Vui lòng không thoát khỏi trình duyệt hoặc tắt tab trong
-              quá trình thanh toán. Bạn sẽ không thể thanh toán và tạo lại đơn
-              hàng mới.
+              quá trình thanh toán để tránh gián đoạn. Nếu có vấn đề xảy ra, bạn
+              có thể hủy yêu cầu và tạo lại yêu cầu mới.
             </Alert>
 
             <Stack

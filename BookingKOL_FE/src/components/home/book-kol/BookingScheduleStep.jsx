@@ -6,13 +6,16 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
+import { PickersDay } from "@mui/x-date-pickers/PickersDay";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import { getKolFreeTimeSlots } from "../../../services/booking/BookingAPI";
+import "dayjs/locale/vi"; // import ngôn ngữ tiếng Việt cho dayjs
 
 const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
   const [selectedDate, setSelectedDate] = useState(dayjs().startOf("day"));
@@ -65,6 +68,10 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
   }, [freeTimeSlots]);
 
   const selectedDateKey = selectedDate.format("YYYY-MM-DD");
+  const highlightedDates = useMemo(
+    () => new Set(Object.keys(slotsByDate)),
+    [slotsByDate]
+  );
   const availableHours = useMemo(
     () => Array.from({ length: 24 }, (_, i) => i),
     []
@@ -74,6 +81,61 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     () => new Set(slotsByDate[selectedDateKey] || []),
     [slotsByDate, selectedDateKey]
   );
+
+  const HighlightedDay = useMemo(() => {
+    const accentColor = STYLE?.accent || "#1976d2";
+    const textPrimary = STYLE?.textPrimary;
+
+    return function HighlightedDay(dayProps) {
+      const { day, outsideCurrentMonth, disabled, selected } = dayProps;
+      const dateKey =
+        day && typeof day.format === "function"
+          ? day.format("YYYY-MM-DD")
+          : null;
+      const isHighlighted =
+        !!dateKey && highlightedDates.has(dateKey) && !outsideCurrentMonth;
+
+      const highlightStyles =
+        isHighlighted && !disabled
+          ? {
+              backgroundColor: selected
+                ? accentColor
+                : alpha(accentColor, 0.12),
+              color: selected ? "#fff" : textPrimary,
+              border: `1px solid ${alpha(accentColor, selected ? 0.48 : 0.28)}`,
+              "&:hover": {
+                backgroundColor: selected
+                  ? accentColor
+                  : alpha(accentColor, 0.24),
+              },
+            }
+          : {};
+
+      return (
+        <PickersDay
+          {...dayProps}
+          sx={{
+            position: "relative",
+            ...highlightStyles,
+            "&::after":
+              isHighlighted && !disabled
+                ? {
+                    // content: '""',
+                    // position: "absolute",
+                    // bottom: 6,
+                    // left: "50%",
+                    // transform: "translateX(-50%)",
+                    // width: 6,
+                    // height: 6,
+                    // borderRadius: "50%",
+                    // backgroundColor: selected ? "#fff" : accentColor,
+                  }
+                : undefined,
+          }}
+        />
+      );
+    };
+  }, [highlightedDates, STYLE?.accent, STYLE?.textPrimary]);
 
   /* -------------------- Xử lý chọn giờ -------------------- */
   const handleSelectHour = (hour) => {
@@ -161,7 +223,10 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
   /* -------------------- Render -------------------- */
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider
+      dateAdapter={AdapterDayjs}
+      adapterLocale="vi" // ✅ Bắt buộc để hiển thị tiếng Việt
+    >
       <Box
         sx={{
           borderRadius: STYLE.radius,
@@ -189,11 +254,27 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
             border: `1px solid ${STYLE.border}`,
             mb: 3,
             overflow: "hidden",
+            "& .MuiDayCalendar-weekDayLabel": {
+              fontSize: ".8rem",
+              "&:nth-of-type(1)::after": { content: '"2"' },
+              "&:nth-of-type(2)::after": { content: '"3"' },
+              "&:nth-of-type(3)::after": { content: '"4"' },
+              "&:nth-of-type(4)::after": { content: '"5"' },
+              "&:nth-of-type(5)::after": { content: '"6"' },
+              "&:nth-of-type(6)::after": { content: '"7"' },
+              "&:nth-of-type(7)::after": { content: '"N"' },
+            },
+            "& .MuiPickersDay-root": {
+              fontSize: ".8rem",
+            },
           }}
         >
           <DateCalendar
             disablePast
             value={selectedDate}
+            slots={{
+              day: HighlightedDay,
+            }}
             onChange={(date) => {
               if (!date) return;
               setSelectedDate(date.startOf("day"));

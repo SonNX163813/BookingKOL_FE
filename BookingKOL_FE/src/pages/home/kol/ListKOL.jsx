@@ -779,13 +779,13 @@ const ListKOL = () => {
                           fontWeight: 500,
                         }}
                       >
-                        {`Dang hien thi ${pageStart.toLocaleString(
+                        {/* {`Dang hien thi ${pageStart.toLocaleString(
                           "vi-VN"
                         )} - ${pageEnd.toLocaleString(
                           "vi-VN"
                         )} tren tong ${totalElements.toLocaleString(
                           "vi-VN"
-                        )} KOL`}
+                        )} KOL`} */}
                       </Typography>
                     ) : (
                       <Typography
@@ -795,7 +795,7 @@ const ListKOL = () => {
                           fontWeight: 500,
                         }}
                       >
-                        Khong co KOL nao de hien thi.
+                        {/* Khong co KOL nao de hien thi. */}
                       </Typography>
                     )}
 

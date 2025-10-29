@@ -22,6 +22,7 @@ export const getAllBookingRequests = async ({
   endAt,
   createdAtFrom,
   createdAtTo,
+  requestNumber,
 } = {}) => {
   return await get({
     url: API_PATHS.BOOKING_REQUEST.getAll,
@@ -33,6 +34,7 @@ export const getAllBookingRequests = async ({
       endAt: normalizeParam(endAt),
       createdAtFrom: normalizeParam(createdAtFrom),
       createdAtTo: normalizeParam(createdAtTo),
+      requestNumber: normalizeParam(requestNumber),
     },
   });
 };

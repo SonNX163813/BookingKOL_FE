@@ -307,7 +307,12 @@ const BookingRequestDetail = () => {
 
   const contractColumns = useMemo(
     () => [
-      { title: "ID hợp đồng", dataIndex: "id", key: "id", width: 220 },
+      {
+        title: "Mã hợp đồng",
+        key: "contractNumber",
+        width: 220,
+        render: (_, record) => record?.contractNumber ?? record?.id ?? "--",
+      },
       {
         title: "Trạng thái",
         dataIndex: "status",
@@ -342,19 +347,28 @@ const BookingRequestDetail = () => {
   const attachedFileColumns = useMemo(
     () => [
       { title: "ID", dataIndex: "id", key: "id", width: 220 },
-      { title: "Tên tệp", dataIndex: "fileName", key: "fileName" },
+      {
+        title: "Tên tệp",
+        key: "fileName",
+        render: (_, record) =>
+          record?.file?.fileName ?? record?.fileName ?? "--",
+      },
       {
         title: "Liên kết tệp",
-        dataIndex: "fileUrl",
         key: "fileUrl",
-        render: (fileUrl, record) =>
+        render: (_, record) =>
           renderFilePreviewCell({
-            fileType: record?.fileType,
-            fileUrl,
-            fileName: record?.fileName,
+            fileType: record?.file?.fileType ?? record?.fileType,
+            fileUrl: record?.file?.fileUrl ?? record?.fileUrl,
+            fileName: record?.file?.fileName ?? record?.fileName,
           }),
       },
-      { title: "Loại tệp", dataIndex: "fileType", key: "fileType" },
+      {
+        title: "Loại tệp",
+        key: "fileType",
+        render: (_, record) =>
+          record?.file?.fileType ?? record?.fileType ?? "--",
+      },
       {
         title: "Tạo lúc",
         dataIndex: "createdAt",
@@ -389,7 +403,10 @@ const BookingRequestDetail = () => {
             Chi tiết yêu cầu đặt chỗ
           </Title>
           <Text type="secondary">
-            Mã yêu cầu: <Text strong>{detail?.id ?? requestId ?? "--"}</Text>
+            Mã yêu cầu:{" "}
+            <Text strong>
+              {detail?.requestNumber ?? detail?.id ?? requestId ?? "--"}
+            </Text>
           </Text>
         </div>
       </div>
@@ -442,8 +459,8 @@ const BookingRequestDetail = () => {
               column={screens.lg ? 3 : screens.md ? 2 : 1}
               labelStyle={{ width: 180 }}
             >
-              <Descriptions.Item label="Mã đặt chỗ">
-                {detail?.id ?? "--"}
+              <Descriptions.Item label="Mã yêu cầu">
+                {detail?.requestNumber ?? detail?.id ?? "--"}
               </Descriptions.Item>
               <Descriptions.Item label="Mã chiến dịch">
                 {detail?.campaignId ?? "--"}
@@ -574,7 +591,7 @@ const BookingRequestDetail = () => {
               </Descriptions.Item>
             </Descriptions>
 
-            <Divider />
+            {/* <Divider />
 
             <Title level={5} className="!mb-2 flex items-center gap-2">
               <Layers size={16} /> Danh mục
@@ -589,11 +606,11 @@ const BookingRequestDetail = () => {
               ) : (
                 <Text type="secondary">Không có danh mục</Text>
               )}
-            </Space>
+            </Space> */}
 
-            <Divider />
+            {/* <Divider /> */}
 
-            <Title level={5} className="!mb-2 flex items-center gap-2">
+            {/* <Title level={5} className="!mb-2 flex items-center gap-2">
               <FileText size={16} /> Sử dụng tệp
             </Title>
             {detail?.kol?.fileUsageDtos && detail.kol.fileUsageDtos.length ? (
@@ -608,7 +625,7 @@ const BookingRequestDetail = () => {
               />
             ) : (
               <Empty description="Không có dữ liệu tệp" />
-            )}
+            )} */}
           </Card>
 
           {/* --- Thông tin người yêu cầu --- */}
@@ -686,7 +703,9 @@ const BookingRequestDetail = () => {
                 <Table
                   columns={contractColumns}
                   dataSource={detail.contracts}
-                  rowKey={(record) => record?.id ?? Math.random()}
+                  rowKey={(record) =>
+                    record?.contractNumber ?? record?.id ?? Math.random()
+                  }
                   pagination={false}
                   scroll={{ x: 720 }}
                 />
@@ -697,10 +716,16 @@ const BookingRequestDetail = () => {
                   );
                   return (
                     <Card
-                      key={contract?.id ?? Math.random()}
+                      key={
+                        contract?.contractNumber ??
+                        contract?.id ??
+                        Math.random()
+                      }
                       className="mb-4 last:mb-0"
                       type="inner"
-                      title={`Hợp đồng ${contract?.id ?? ""}`}
+                      title={`Hợp đồng ${
+                        contract?.contractNumber ?? contract?.id ?? ""
+                      }`}
                     >
                       <Descriptions
                         bordered
@@ -764,9 +789,6 @@ const BookingRequestDetail = () => {
                           ) : (
                             "--"
                           )}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Đơn vị tiền tệ">
-                          {contract?.paymentDTO?.currency ?? "--"}
                         </Descriptions.Item>
                         <Descriptions.Item label="Tổng tiền">
                           {formatCurrency(contract?.paymentDTO?.totalAmount)}
