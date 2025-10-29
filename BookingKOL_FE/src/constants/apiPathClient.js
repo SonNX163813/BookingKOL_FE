@@ -21,6 +21,14 @@ export const CLIENT_API_PATHS = {
   USER: {
     profile: "/v1/users/profile",
     updateProfile: "/v1/users/profile/update",
+    feedbacks: {
+      create: (contractId) =>
+        `/v1/user/feedbacks/create/${encodeURIComponent(contractId)}`,
+      update: (feedbackId) =>
+        `/v1/user/feedbacks/update/${encodeURIComponent(feedbackId)}`,
+      detail: (feedbackId) =>
+        `/v1/user/feedbacks/detail/${encodeURIComponent(feedbackId)}`,
+    },
   },
   BOOKING: {
     createSingle: "/v1/user/booking/request/single",

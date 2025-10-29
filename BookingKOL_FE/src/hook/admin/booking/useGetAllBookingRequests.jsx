@@ -10,6 +10,7 @@ export const useGetAllBookingRequests = (filters = {}) => {
     endAt,
     createdAtFrom,
     createdAtTo,
+    requestNumber,
   } = filters;
 
   const query = useQuery({
@@ -23,6 +24,7 @@ export const useGetAllBookingRequests = (filters = {}) => {
       endAt ?? null,
       createdAtFrom ?? null,
       createdAtTo ?? null,
+      requestNumber ?? null,
     ],
     queryFn: () =>
       getAllBookingRequests({
@@ -33,6 +35,7 @@ export const useGetAllBookingRequests = (filters = {}) => {
         endAt,
         createdAtFrom,
         createdAtTo,
+        requestNumber,
       }),
     retry: false,
     keepPreviousData: true,

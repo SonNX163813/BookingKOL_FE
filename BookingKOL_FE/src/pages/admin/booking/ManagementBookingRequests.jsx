@@ -5,6 +5,7 @@ import {
   Card,
   DatePicker,
   Form,
+  Input,
   Pagination,
   Select,
   Space,
@@ -129,6 +130,7 @@ const composeExecutionTime = (record) => {
 
 const composeRowKey = (record) => {
   const candidates = [
+    record?.requestNumber,
     record?.id,
     record?.bookingRequestId,
     record?.requestId,
@@ -195,6 +197,7 @@ const ManagementBookingRequests = () => {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const [filters, setFilters] = useState({
+    requestNumber: undefined,
     status: undefined,
     startAt: undefined,
     endAt: undefined,
@@ -248,6 +251,7 @@ const ManagementBookingRequests = () => {
       if (!record) return;
 
       const requestId =
+        record?.requestNumber ??
         record?.id ??
         record?.bookingRequestId ??
         record?.requestId ??
@@ -262,8 +266,14 @@ const ManagementBookingRequests = () => {
   );
 
   const handleFilter = (values) => {
-    const { status, executionRange, createdRange } = values;
+    const { status, executionRange, createdRange, requestNumber } = values;
+    const normalizedRequestNumber =
+      typeof requestNumber === "string" ? requestNumber.trim() : requestNumber;
     setFilters({
+      requestNumber:
+        normalizedRequestNumber && normalizedRequestNumber.length > 0
+          ? normalizedRequestNumber
+          : undefined,
       status: status ?? undefined,
       startAt: executionRange?.[0]
         ? executionRange[0].format("YYYY-MM-DD")
@@ -284,6 +294,7 @@ const ManagementBookingRequests = () => {
   const handleReset = () => {
     form.resetFields();
     setFilters({
+      requestNumber: undefined,
       status: undefined,
       startAt: undefined,
       endAt: undefined,
@@ -295,20 +306,25 @@ const ManagementBookingRequests = () => {
 
   const columns = useMemo(
     () => [
+      // {
+      //   title: "STT",
+      //   key: "index",
+      //   width: 80,
+      //   render: (_, __, index) => (
+      //     <span className="font-semibold">#{page * size + index + 1}</span>
+      //   ),
+      // },
       {
-        title: "STT",
-        key: "index",
-        width: 80,
-        render: (_, __, index) => (
-          <span className="font-semibold">#{page * size + index + 1}</span>
-        ),
+        title: "Mã hợp đồng",
+        key: "code-hopdong",
+        width: 180,
+        render: (_, record) => pickValue(record, ["contractNumber"]),
       },
       {
-        title: "Mã Booking",
-        key: "code",
+        title: "Mã yêu cầu",
+        key: "code-yc",
         width: 180,
-        render: (_, record) =>
-          pickValue(record, ["code", "bookingCode", "requestCode", "id"]),
+        render: (_, record) => pickValue(record, ["requestNumber"]),
       },
       // {
       //   title: "Khach hang",
@@ -463,6 +479,9 @@ const ManagementBookingRequests = () => {
           onFinish={handleFilter}
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
         >
+          <Form.Item label="Mã yêu cầu" name="requestNumber">
+            <Input allowClear placeholder="Nhập mã yêu cầu" maxLength={64} />
+          </Form.Item>
           <Form.Item label="Trạng thái" name="status">
             <Select
               allowClear
@@ -487,7 +506,7 @@ const ManagementBookingRequests = () => {
             />
           </Form.Item>
 
-          <div className="flex flex-col justify-end gap-2 sm:flex-row sm:items-end sm:justify-end">
+          <div>
             <Space size="middle" wrap>
               <Button
                 type="primary"

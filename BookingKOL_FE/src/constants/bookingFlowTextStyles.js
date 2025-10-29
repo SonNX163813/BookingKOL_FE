@@ -11,7 +11,7 @@ export const BOOKING_FLOW_STYLE = {
 };
 
 export const BOOKING_FLOW_TEXT = {
-  steps: ["Chọn lịch & giờ", "Thông tin liên hệ"],
+  steps: ["Chọn lịch & giờ", "Điền thông tin liên hệ"],
   actions: {
     continue: "Tiếp tục",
     hold: "Giữ chỗ",
