@@ -38,6 +38,25 @@ export default function MainLayoutKOL() {
   const routeKeyMap = useMemo(
     () => [
       { key: "kol", path: "/kol" },
+
+      // Orders (single requests)
+      {
+        key: "kol-single-requests",
+        path: "/kol/single-requests",
+        parentKey: "group-orders",
+      },
+      {
+        key: "kol-single-requests-all",
+        path: "/kol/single-requests/all",
+        parentKey: "group-orders",
+      },
+      {
+        key: "kol-single-request-detail",
+        path: "/kol/booking/single-requests/detail/:requestId",
+        parentKey: "group-orders",
+      },
+
+      // Schedule
       {
         key: "kol-schedule",
         path: "/kol/schedule",
@@ -48,17 +67,8 @@ export default function MainLayoutKOL() {
         path: "/kol/schedule/register",
         parentKey: "group-schedule",
       },
-      { key: "kol-orders", path: "/kol/orders", parentKey: "group-orders" },
-      {
-        key: "kol-order-detail",
-        path: "/kol/orders/:id",
-        parentKey: "group-orders",
-      },
-      {
-        key: "kol-messages",
-        path: "/kol/messages",
-        parentKey: "group-messages",
-      },
+
+      // Portfolio / Profile / Settings / Earnings
       {
         key: "kol-portfolio",
         path: "/kol/portfolio",
@@ -116,10 +126,11 @@ export default function MainLayoutKOL() {
       icon: <ShoppingBagOutlined />,
       label: "Đơn booking",
       children: [
+        // ✅ Link đúng
         {
-          key: "kol-orders",
+          key: "kol-single-requests-all",
           icon: <ShoppingBagOutlined />,
-          label: <Link to="orders">Tất cả đơn</Link>,
+          label: <Link to="single-requests/all">Tất cả đơn</Link>,
         },
       ],
     },

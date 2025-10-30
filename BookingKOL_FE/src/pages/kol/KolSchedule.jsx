@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
+import localeData from "dayjs/plugin/localeData";
+import updateLocale from "dayjs/plugin/updateLocale";
 import "dayjs/locale/vi";
-import { DatePicker, message } from "antd";
+import { ConfigProvider, DatePicker, message } from "antd";
+import viVN from "antd/locale/vi_VN";
 import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
 
 import SchedulerGrid from "../../components/kol/kol-schedule/SchedulerGrid";
@@ -13,8 +16,16 @@ import {
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
+/* ===== Việt hoá dayjs: T2..T7, CN và tuần bắt đầu từ Thứ Hai ===== */
 dayjs.extend(isoWeek);
+dayjs.extend(localeData);
+dayjs.extend(updateLocale);
 dayjs.locale("vi");
+dayjs.updateLocale("vi", {
+  weekStart: 1,
+  weekdaysShort: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
+  weekdaysMin: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
+});
 
 export default function KolSchedule() {
   const { kolId: kolIdParam } = useParams();
@@ -51,7 +62,6 @@ export default function KolSchedule() {
         )}`,
       };
     }
-    // MONTH: phủ đúng tháng đang xem (nếu muốn phủ cả tuần tràn: startOf('isoWeek')/endOf('isoWeek'))
     const from = anchorDate.startOf("month").startOf("day");
     const to = anchorDate.endOf("month").endOf("day");
     return {
@@ -92,7 +102,7 @@ export default function KolSchedule() {
       setDayDuties(data || { goalList: [] });
     } catch (e) {
       console.warn("[Schedule] load failed:", e);
-      setDayDuties({ goalList: [] }); // vẫn render bảng rỗng
+      setDayDuties({ goalList: [] });
       message.error("Không tải được lịch làm việc.");
     } finally {
       setLoading(false);
@@ -118,74 +128,76 @@ export default function KolSchedule() {
   const handleDateChange = (d) => d && setAnchorDate(d);
 
   return (
-    <div className="w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-4 mt-2">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handlePrev}
-            className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
-          >
-            <IoIosArrowBack className="text-[#7bb4fb] md:!text-[22px]" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
-          >
-            <IoIosArrowForward className="text-[#7bb4fb] md:!text-[22px]" />
-          </button>
+    <ConfigProvider locale={viVN}>
+      <div className="w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 mb-4 mt-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePrev}
+              className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <IoIosArrowBack className="text-[#7bb4fb] md:!text-[22px]" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <IoIosArrowForward className="text-[#7bb4fb] md:!text-[22px]" />
+            </button>
 
-          <DatePicker
-            value={anchorDate}
-            onChange={handleDateChange}
-            format="DD/MM/YYYY"
-            allowClear={false}
-          />
+            <DatePicker
+              value={anchorDate}
+              onChange={handleDateChange}
+              format="DD/MM/YYYY"
+              allowClear={false}
+            />
+          </div>
+
+          <p className="text-[#0050ab] text-xl md:text-2xl lg:text-3xl font-bold capitalize">
+            {headerLabel}
+          </p>
+
+          <div className="rounded-full border flex overflow-hidden">
+            <button
+              className={`px-4 py-1 ${
+                range === "day" ? "bg-[#0050ab] text-white" : ""
+              }`}
+              onClick={() => handleRangeChange("day")}
+            >
+              Ngày
+            </button>
+            <button
+              className={`px-4 py-1 ${
+                range === "week" ? "bg-[#0050ab] text-white" : ""
+              }`}
+              onClick={() => handleRangeChange("week")}
+            >
+              Tuần
+            </button>
+            <button
+              className={`px-4 py-1 ${
+                range === "month" ? "bg-[#0050ab] text-white" : ""
+              }`}
+              onClick={() => handleRangeChange("month")}
+            >
+              Tháng
+            </button>
+          </div>
         </div>
 
-        <p className="text-[#0050ab] text-xl md:text-2xl lg:text-3xl font-bold capitalize">
-          {headerLabel}
-        </p>
+        {/* Lưới lịch: luôn render ngay cả khi rỗng */}
+        <SchedulerGrid
+          range={range}
+          dayDuties={dayDuties}
+          fromDate={fromDate}
+          toDate={toDate}
+        />
 
-        <div className="rounded-full border flex overflow-hidden">
-          <button
-            className={`px-4 py-1 ${
-              range === "day" ? "bg-[#0050ab] text-white" : ""
-            }`}
-            onClick={() => handleRangeChange("day")}
-          >
-            Ngày
-          </button>
-          <button
-            className={`px-4 py-1 ${
-              range === "week" ? "bg-[#0050ab] text-white" : ""
-            }`}
-            onClick={() => handleRangeChange("week")}
-          >
-            Tuần
-          </button>
-          <button
-            className={`px-4 py-1 ${
-              range === "month" ? "bg-[#0050ab] text-white" : ""
-            }`}
-            onClick={() => handleRangeChange("month")}
-          >
-            Tháng
-          </button>
-        </div>
+        {loading && (
+          <div className="mt-2 text-sm text-gray-500">Đang tải lịch…</div>
+        )}
       </div>
-
-      {/* Lưới lịch: luôn render ngay cả khi rỗng */}
-      <SchedulerGrid
-        range={range}
-        dayDuties={dayDuties}
-        fromDate={fromDate}
-        toDate={toDate}
-      />
-
-      {loading && (
-        <div className="mt-2 text-sm text-gray-500">Đang tải lịch…</div>
-      )}
-    </div>
+    </ConfigProvider>
   );
 }

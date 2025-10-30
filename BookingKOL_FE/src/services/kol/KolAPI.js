@@ -1,3 +1,4 @@
+// src/services/kol/KolAPI.js
 import {
   get,
   patch,
@@ -9,7 +10,11 @@ import {
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 import dayjs from "dayjs";
 
-// ================== GIỮ NGUYÊN CŨ ==================
+/** ======= CẤU HÌNH BUSINESS RULE ======= */
+// Buffer tối thiểu giữa các ca (phút). Ví dụ 60 = ±1h quanh booking.
+const BOOKING_BUFFER_MINUTES = 60;
+
+/* ================== KOL LIST (CLIENT) ================== */
 const KOL_LIST_ALLOWED_PARAMS = new Set([
   "minRating",
   "categoryId",
@@ -55,9 +60,8 @@ export const getKolProfileById = async (kolId, { signal } = {}) => {
   });
   return payload?.data ?? null;
 };
-// ====================================================
 
-// ===== NEW: chỉ định rõ các field cho phép update (KHÔNG có giá) =====
+/* ================== UPDATE HỒ SƠ (không đụng tới giá) ================== */
 const KOL_UPDATE_ALLOWED_FIELDS = new Set([
   "fullName",
   "displayName",
@@ -67,12 +71,10 @@ const KOL_UPDATE_ALLOWED_FIELDS = new Set([
   "city",
   "country",
   "bio",
-  // nếu BE cho phép cập nhật list chuỗi: điểm mạnh, nền tảng, v.v.
-  "strengths", // array<string>
-  "platformProficiency", // array<object> (nếu bạn cần)
-  "categories", // array<{id|name...}> (tuỳ BE)
-  "avatarUrl", // nếu BE cho phép đổi metadata, KHÔNG upload file
-  // … thêm field nào BE cho phép, nhưng KHÔNG thêm giá
+  "strengths",
+  "platformProficiency",
+  "categories",
+  "avatarUrl",
 ]);
 
 const buildUpdatePayload = (body = {}) => {
@@ -86,10 +88,6 @@ const buildUpdatePayload = (body = {}) => {
   return cleaned;
 };
 
-/**
- * Update hồ sơ KOL của chính user đang đăng nhập.
- * KHÔNG gửi các trường giá (minBookingPrice, rateCard...) – đã loại bằng buildUpdatePayload.
- */
 export const updateMyKolProfile = async (body, { signal } = {}) => {
   const config = signal ? { signal } : undefined;
   const payload = await update({
@@ -100,6 +98,7 @@ export const updateMyKolProfile = async (body, { signal } = {}) => {
   return payload?.data ?? null;
 };
 
+/* ================== AUTH: Reset password với OTP ================== */
 export const resetPasswordWithOtp = async ({
   email,
   otp,
@@ -108,11 +107,13 @@ export const resetPasswordWithOtp = async ({
   signal,
 }) => {
   return await post({
-    url: "/password/reset", // 👈 theo yêu cầu
+    url: "/password/reset",
     data: { email, otp, newPassword, confirmPassword },
     config: signal ? { signal } : undefined,
   });
 };
+
+/* ================== PROFILE ================== */
 export const getKolProfileByUserId = async (userId, { signal } = {}) => {
   if (!userId) throw new Error("userId is required");
 
@@ -125,6 +126,7 @@ export const getKolProfileByUserId = async (userId, { signal } = {}) => {
   return payload?.data ?? null;
 };
 
+/* ================== MEDIA ================== */
 export const uploadKolMedias = async (files, opts = {}) => {
   const { onUploadProgress, signal, fileType, isCover, targetType } = opts;
   const form = new FormData();
@@ -132,8 +134,7 @@ export const uploadKolMedias = async (files, opts = {}) => {
   if (Array.isArray(files)) files.forEach((f) => f && form.append("files", f));
   else if (files) form.append("files", files);
 
-  // Nếu BE yêu cầu thêm metadata
-  if (fileType) form.append("fileType", fileType); // "IMAGE" | "VIDEO" (nếu cần)
+  if (fileType) form.append("fileType", fileType); // "IMAGE" | "VIDEO"
   if (typeof isCover === "boolean") form.append("isCover", String(isCover));
   if (targetType) form.append("targetType", targetType); // "PORTFOLIO" | ...
 
@@ -142,7 +143,7 @@ export const uploadKolMedias = async (files, opts = {}) => {
     data: form,
     config: {
       signal,
-      headers: { "Content-Type": "multipart/form-data" }, // override JSON
+      headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress,
     },
   });
@@ -159,7 +160,6 @@ export const addKolCategories = async (categoryIds = [], { signal } = {}) => {
     const res = await post({
       url: CLIENT_API_PATHS.KOL.categoryAdd, // "/v1/kol/category/add"
       data: null,
-      // post cho phép config.params => truyền query qua đây
       config: { params: { categoryId: id }, ...(signal ? { signal } : {}) },
     });
     results.push(res ?? null);
@@ -167,7 +167,6 @@ export const addKolCategories = async (categoryIds = [], { signal } = {}) => {
   return results;
 };
 
-// Remove nhiều categoryId (loop từng id) — DELETE /v1/kol/category/remove?categoryId=...
 export const removeKolCategories = async (
   categoryIds = [],
   { signal } = {}
@@ -179,37 +178,31 @@ export const removeKolCategories = async (
 
   const results = [];
   for (const id of ids) {
-    // Cách 1 (đơn giản): remove() chỉ nhận {url} => gắn query trực tiếp
     const url = `${
       CLIENT_API_PATHS.KOL.categoryRemove
     }?categoryId=${encodeURIComponent(id)}`;
     const res = await remove({ url });
-
-    // Nếu muốn truyền thêm signal/params qua config, dùng remove2 như dưới và bỏ 2 dòng trên:
+    // Hoặc dùng remove2 nếu muốn truyền signal/params qua config:
     // const res = await remove2({
     //   url: CLIENT_API_PATHS.KOL.categoryRemove,
     //   data: null,
     //   config: { params: { categoryId: id }, ...(signal ? { signal } : {}) },
     // });
-
     results.push(res ?? null);
   }
   return results;
 };
+
 export const setCoverImage = async (fileId, { signal } = {}) => {
   if (!fileId) throw new Error("fileId is required");
   const payload = await update({
     url: CLIENT_API_PATHS.KOL.medias.changeCover, // "/v1/kol/cover-image/change"
-    data: null, // không cần body
-    config: { params: { fileId }, signal }, // fileId ở query string
+    data: null,
+    config: { params: { fileId }, signal },
   });
-  // interceptor trả {status, message, data}; ta trả về 'data' cho tiện dùng ở UI
   return payload?.data ?? null;
 };
 
-/** Deactivate media (xoá khỏi hồ sơ mà không xoá file vật lý)
- *  /api/v1/kol/medias/deactivate  body: { fileUsageIds: [...] }
- */
 export const deactivateKolMedias = async (fileUsageIds, { signal } = {}) => {
   const ids = (
     Array.isArray(fileUsageIds) ? fileUsageIds : [fileUsageIds]
@@ -222,7 +215,15 @@ export const deactivateKolMedias = async (fileUsageIds, { signal } = {}) => {
   });
 };
 
-// ==== helpers chung (đặt gần đầu file KolAPI) ====
+export const deleteKolMedia = async (fileId, { signal } = {}) => {
+  if (!fileId) throw new Error("fileId is required");
+  return await patch({
+    url: CLIENT_API_PATHS.KOL.medias.delete(encodeURIComponent(fileId)),
+    config: signal ? { signal } : undefined,
+  });
+};
+
+/* ================== HELPERS CHUNG ================== */
 const extractAppMessage = (payload) => {
   if (!payload) return "";
   const msg = payload.message;
@@ -256,7 +257,7 @@ const fmtLabel = (startISO, endISO) =>
     startISO
   ).format("DD/MM/YYYY")}`;
 
-// ==== sửa hàm đăng ký ====
+/* ================== SCHEDULER: ĐĂNG KÝ ================== */
 export const registerKolAvailabilities = async ({
   kolId,
   date,
@@ -283,7 +284,7 @@ export const registerKolAvailabilities = async ({
         data: body,
         config: signal ? { signal } : undefined,
       });
-      const ok = assertAppOk(res); // kiểm tra app-status trong body
+      const ok = assertAppOk(res);
       results.push(ok);
     } catch (e) {
       const httpStatus = e?.response?.status;
@@ -305,20 +306,13 @@ export const registerKolAvailabilities = async ({
       err.appStatus = appStatus || httpStatus || 400;
       err.conflict = !!isConflict;
       err.conflictShift = { index: i, startAt: startISO, endAt: endISO };
-      throw err; // → FE sẽ rơi vào catch, KHÔNG cập nhật lịch sử
+      throw err;
     }
   }
   return results;
 };
-export const deleteKolMedia = async (fileId, { signal } = {}) => {
-  if (!fileId) throw new Error("fileId is required");
-  // remove() chỉ nhận {url} → gắn id vào path
-  return await patch({
-    url: CLIENT_API_PATHS.KOL.medias.delete(encodeURIComponent(fileId)),
-  });
-};
 
-/** Chuẩn hoá payload về mảng */
+/* ================== LẤY LỊCH (Free time & Timeline) ================== */
 const asArray = (payload) => {
   const d = payload?.data ?? payload ?? [];
   if (Array.isArray(d)) return d;
@@ -363,7 +357,22 @@ export const getKolTimeline = async ({
   return asArray(payload);
 };
 
-/* --- chuẩn hoá 1 slot từ API -> item cho UI --- */
+/* ================== CHUẨN HOÁ SLOT & FLATTEN workTimes ================== */
+const statusColor = (status) => {
+  const s = String(status || "").toUpperCase();
+  switch (s) {
+    case "IN_PROGRESS":
+      return "#f59e0b"; // amber
+    case "COMPLETED":
+    case "DONE":
+      return "#10b981"; // green
+    case "PENDING":
+      return "#60a5fa"; // light blue
+    default:
+      return "#4a74da"; // default blue
+  }
+};
+
 const normalizeSlot = (slot, { isBooking }) => {
   const startISO =
     slot?.startAt ||
@@ -373,14 +382,19 @@ const normalizeSlot = (slot, { isBooking }) => {
     slot?.from;
   const endISO =
     slot?.endAt || slot?.endTime || slot?.end || slot?.finishAt || slot?.to;
-  const s = dayjs(startISO),
-    e = dayjs(endISO);
+
+  const s = dayjs(startISO);
+  const e = dayjs(endISO);
 
   return {
     id: slot?.id || `${isBooking ? "B" : "F"}_${startISO}_${endISO}`,
     description:
-      slot?.title || slot?.description || (isBooking ? "Booking" : "Lịch rảnh"),
-    colorCode: slot?.colorCode || (isBooking ? "#4a74da" : "#34c759"),
+      slot?.title ||
+      slot?.description ||
+      slot?.note ||
+      (isBooking ? "Booking" : "Lịch rảnh"),
+    colorCode:
+      slot?.colorCode || (isBooking ? statusColor(slot?.status) : "#34c759"),
     status: isBooking ? slot?.status || "BOOKED" : "FREE",
     isBooking: !!isBooking,
     startISO,
@@ -390,7 +404,125 @@ const normalizeSlot = (slot, { isBooking }) => {
   };
 };
 
-/* --- tạo map ngày rỗng để luôn render bảng --- */
+const isCancelled = (st) => String(st || "").toUpperCase() === "CANCELLED";
+
+/** Flatten workTimes -> segments, bỏ CANCELLED; nếu không có workTimes => bỏ luôn */
+const expandWorkTimes = (item) => {
+  if (!Array.isArray(item?.workTimes) || item.workTimes.length === 0) {
+    return []; // không có workTimes thì không hiển thị
+  }
+  return item.workTimes
+    .filter((w) => !isCancelled(w?.status))
+    .map((w) => ({
+      parentId: item?.id ?? item?.requestId ?? item?.bookingId,
+      bookingId: item?.id ?? item?.requestId ?? item?.bookingId,
+      ...w,
+      startAt: w.startAt,
+      endAt: w.endAt,
+      id: w.id || `${item?.id}_${w.startAt}_${w.endAt}`,
+      title: item?.title || item?.requestNumber || item?.note || "Booking",
+      description: item?.note ?? w?.note ?? "Ca booking",
+      status: w?.status,
+    }));
+};
+
+/* ==== Interval helpers (chuẩn hoá + buffer + trừ free bằng booking) ==== */
+const toISOInterval = (slot) => {
+  const startISO =
+    slot?.startAt ||
+    slot?.startTime ||
+    slot?.start ||
+    slot?.beginAt ||
+    slot?.from;
+  const endISO =
+    slot?.endAt || slot?.endTime || slot?.end || slot?.finishAt || slot?.to;
+
+  const s = dayjs(startISO);
+  const e = dayjs(endISO);
+  if (!s.isValid() || !e.isValid() || !e.isAfter(s)) return null;
+  return { startISO: s.toISOString(), endISO: e.toISOString() };
+};
+
+const overlaps = (aStart, aEnd, bStart, bEnd) => {
+  const s = dayjs(aStart);
+  const e = dayjs(aEnd);
+  return e.isAfter(bStart) && s.isBefore(bEnd);
+};
+
+/** Mở rộng 1 khoảng theo buffer phút (±minutes) */
+const expandIntervalByMinutes = (iv, minutes) => {
+  const s = dayjs(iv.startISO).subtract(minutes, "minute");
+  const e = dayjs(iv.endISO).add(minutes, "minute");
+  return { startISO: s.toISOString(), endISO: e.toISOString() };
+};
+
+/** Merge các interval đã sort theo start (gộp cả trường hợp chạm nhau) */
+const mergeSortedIntervals = (arr) => {
+  if (!arr.length) return arr;
+  const out = [Object.assign({}, arr[0])];
+  for (let i = 1; i < arr.length; i++) {
+    const cur = arr[i];
+    const last = out[out.length - 1];
+    const lastEnd = dayjs(last.endISO);
+    const curStart = dayjs(cur.startISO);
+    const curEnd = dayjs(cur.endISO);
+
+    if (!curStart.isAfter(lastEnd)) {
+      // overlap hoặc tiếp giáp -> gộp
+      if (curEnd.isAfter(lastEnd)) {
+        last.endISO = cur.endISO;
+      }
+    } else {
+      out.push(Object.assign({}, cur));
+    }
+  }
+  return out;
+};
+
+/** Trừ 1 khoảng busy khỏi 1 khoảng free -> trả về 0..2 khoảng còn lại */
+const subtractInterval = (freeSeg, busySeg) => {
+  const fs = dayjs(freeSeg.startISO);
+  const fe = dayjs(freeSeg.endISO);
+  const bs = dayjs(busySeg.startISO);
+  const be = dayjs(busySeg.endISO);
+
+  // không chồng lấn
+  if (!(fe.isAfter(bs) && fs.isBefore(be))) return [freeSeg];
+
+  const out = [];
+  // phần trái: [fs, min(bs, fe))
+  if (bs.isAfter(fs)) {
+    const leftEnd = bs.isBefore(fe) ? bs : fe;
+    if (leftEnd.isAfter(fs)) {
+      out.push({ startISO: fs.toISOString(), endISO: leftEnd.toISOString() });
+    }
+  }
+  // phần phải: (max(be, fs), fe]
+  if (be.isBefore(fe)) {
+    const rightStart = be.isAfter(fs) ? be : fs;
+    if (fe.isAfter(rightStart)) {
+      out.push({
+        startISO: rightStart.toISOString(),
+        endISO: fe.toISOString(),
+      });
+    }
+  }
+  return out;
+};
+
+/** Trừ nhiều booking khỏi 1 free (booking đã sort theo start) */
+const subtractMany = (freeSeg, busyList) => {
+  let pieces = [freeSeg];
+  for (const b of busyList) {
+    const next = [];
+    for (const p of pieces) next.push(...subtractInterval(p, b));
+    pieces = next;
+    if (!pieces.length) break;
+  }
+  return pieces;
+};
+
+/** Map ngày rỗng để luôn render bảng */
 const emptyDayMap = (start, end) => {
   const map = new Map();
   for (
@@ -398,14 +530,16 @@ const emptyDayMap = (start, end) => {
     d.isBefore(end) || d.isSame(end, "day");
     d = d.add(1, "day")
   ) {
-    map.set(d.format("DD"), []); // key 'DD'
+    map.set(d.format("DD"), []);
   }
   return map;
 };
 
 /**
  * Gộp free-time + timeline thành dayDuties cho Grid
- * @param { kolId, range: 'day'|'week'|'month', fromDate, signal }
+ * - CHỈ dùng workTimes trong mỗi booking/timeline item
+ * - BỎ hoàn toàn các segment có status === "CANCELLED"
+ * - Free-time sẽ bị TRỪ các khoảng booking đã **mở rộng buffer ±BOOKING_BUFFER_MINUTES**
  */
 export const fetchDayDuties = async ({
   kolId,
@@ -443,17 +577,50 @@ export const fetchDayDuties = async ({
     }),
   ]);
 
-  const freeDescs = freeSlots.map((s) =>
-    normalizeSlot(s, { isBooking: false })
-  );
-  const bookedDescs = bookedSlots.map((s) =>
-    normalizeSlot(s, { isBooking: true })
+  // 1) Booking: flatten workTimes -> interval -> MỞ RỘNG theo buffer -> filter theo range -> sort -> MERGE
+  const bookedSegmentsRaw = (bookedSlots || [])
+    .flatMap(expandWorkTimes)
+    .map(toISOInterval)
+    .filter(Boolean)
+    .map((iv) => expandIntervalByMinutes(iv, BOOKING_BUFFER_MINUTES))
+    .filter((seg) => overlaps(seg.startISO, seg.endISO, start, end))
+    .sort((a, b) => a.startISO.localeCompare(b.startISO));
+
+  const bookedSegments = mergeSortedIntervals(bookedSegmentsRaw);
+
+  // 2) Free-time: normalize -> subtract với các booking (đã mở rộng + merge)
+  const freeIntervals = (freeSlots || []).map(toISOInterval).filter(Boolean);
+  const freeAfterSubtract = freeIntervals.flatMap((f) =>
+    subtractMany(f, bookedSegments)
   );
 
+  // 3) Chuẩn hoá thành desc cho UI
+  const freeDescs = freeAfterSubtract.map((iv) =>
+    normalizeSlot(
+      { startAt: iv.startISO, endAt: iv.endISO },
+      { isBooking: false }
+    )
+  );
+  // LƯU Ý: Booking hiển thị **giờ gốc**, không hiển thị phần buffer
+  const bookedDisplayIntervals = (bookedSlots || [])
+    .flatMap(expandWorkTimes)
+    .map(toISOInterval)
+    .filter(Boolean)
+    .filter((seg) => overlaps(seg.startISO, seg.endISO, start, end))
+    .sort((a, b) => a.startISO.localeCompare(b.startISO));
+
+  const bookedDescs = bookedDisplayIntervals.map((iv) =>
+    normalizeSlot(
+      { startAt: iv.startISO, endAt: iv.endISO },
+      { isBooking: true }
+    )
+  );
+
+  // 4) Build day map (luôn render)
   const map = emptyDayMap(start, end);
   const put = (desc) => {
     const k = dayjs(desc.startISO).format("DD");
-    map.get(k)?.push(desc);
+    if (map.has(k)) map.get(k).push(desc);
   };
   freeDescs.forEach(put);
   bookedDescs.forEach(put);
@@ -476,32 +643,146 @@ export const fetchDayDuties = async ({
   return { goalList };
 };
 
-const resolveAvatarUrl = (kol) => {
+/* ================== AVATAR RESOLVER (tiện dùng cho UI) ================== */
+export const resolveAvatarUrl = (kol) => {
   const raw = kol?.avatarUrl;
   const usages = kol?.fileUsageDtos || [];
 
-  // Nếu đã là URL http(s)
   if (raw && /^https?:\/\//i.test(raw)) return raw;
 
-  // Nếu raw là id của FileUsage → map sang file.fileUrl
   const byUsageId = raw ? usages.find((u) => u?.id === raw) : null;
   if (byUsageId?.file?.fileUrl) return byUsageId.file.fileUrl;
 
-  // Nếu raw là id của File → map theo file.id
   const byFileId = raw ? usages.find((u) => u?.file?.id === raw) : null;
   if (byFileId?.file?.fileUrl) return byFileId.file.fileUrl;
 
-  // Fallback: ưu tiên usage AVATAR đang active
   const avatarUsage = usages.find(
     (u) => u?.targetType === "AVATAR" && u?.isActive && u?.file?.fileUrl
   );
   if (avatarUsage?.file?.fileUrl) return avatarUsage.file.fileUrl;
 
-  // Fallback 2: cover image portfolio
   const cover = usages.find(
     (u) => u?.isCover && u?.isActive && u?.file?.fileUrl
   );
   if (cover?.file?.fileUrl) return cover.file.fileUrl;
 
   return "";
+};
+
+/* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
+const MY_SINGLE_REQUESTS_ALLOWED_PARAMS = new Set([
+  "status",
+  "startAt",
+  "endAt",
+  "createdAtFrom",
+  "createdAtTo",
+  "requestNumber",
+  "page",
+  "size",
+]);
+
+const MY_SINGLE_REQUESTS_DEFAULT_PARAMS = { page: 0, size: 20 };
+
+const buildMySingleRequestsParams = (params = {}) => {
+  const merged = { ...MY_SINGLE_REQUESTS_DEFAULT_PARAMS, ...(params ?? {}) };
+
+  const normalizeDate = (v) => {
+    if (!v) return v;
+    if (dayjs.isDayjs(v)) return v.format("YYYY-MM-DD");
+    const d = dayjs(v);
+    return d.isValid() ? d.format("YYYY-MM-DD") : v;
+  };
+
+  const normalized = {
+    ...merged,
+    startAt: normalizeDate(merged.startAt),
+    endAt: normalizeDate(merged.endAt),
+    createdAtFrom: normalizeDate(merged.createdAtFrom),
+    createdAtTo: normalizeDate(merged.createdAtTo),
+  };
+
+  return Object.entries(normalized).reduce((acc, [key, value]) => {
+    if (!MY_SINGLE_REQUESTS_ALLOWED_PARAMS.has(key)) return acc;
+    const skip =
+      value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim() === "");
+    if (!skip) acc[key] = value;
+    return acc;
+  }, {});
+};
+
+export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
+  const config = signal ? { signal } : undefined;
+
+  const payload = await get({
+    url: CLIENT_API_PATHS.BOOKING.mySingleRequestsAll,
+    params: buildMySingleRequestsParams(params),
+    config,
+  });
+
+  const data = payload?.data;
+  if (!data) return { content: [], totalElements: 0, page: 0, size: 20 };
+
+  const content = Array.isArray(data?.content)
+    ? data.content
+    : Array.isArray(data)
+    ? data
+    : Array.isArray(data?.items)
+    ? data.items
+    : [];
+
+  const total =
+    typeof data?.totalElements === "number"
+      ? data.totalElements
+      : typeof data?.total === "number"
+      ? data.total
+      : Array.isArray(data)
+      ? data.length
+      : content.length;
+
+  const page =
+    typeof data?.page === "number"
+      ? data.page
+      : typeof data?.number === "number"
+      ? data.number
+      : 0;
+
+  const size =
+    typeof data?.size === "number"
+      ? data.size
+      : MY_SINGLE_REQUESTS_DEFAULT_PARAMS.size;
+
+  return { ...data, content, totalElements: total, page, size };
+};
+
+/** GET chi tiết booking single của KOL
+ *  Endpoint: /v1/kol/booking/single-requests/detail/{requestId}
+ */
+export const getKolMySingleRequestDetail = async (
+  requestId,
+  { signal } = {}
+) => {
+  if (!requestId) throw new Error("requestId is required");
+
+  const url = CLIENT_API_PATHS.BOOKING.mySingleRequestDetail(
+    encodeURIComponent(requestId)
+  );
+
+  const payload = await get({
+    url,
+    config: signal ? { signal } : undefined,
+  });
+
+  const appStatus = typeof payload?.status === "number" ? payload.status : 200;
+  if (appStatus !== 200) {
+    const msg = Array.isArray(payload?.message)
+      ? payload.message[0]
+      : payload?.message;
+    const err = new Error(msg || "Không tải được chi tiết yêu cầu.");
+    err.appStatus = appStatus;
+    throw err;
+  }
+
+  return payload?.data ?? null;
 };

@@ -39,6 +39,9 @@ export const CLIENT_API_PATHS = {
     cancelMySingleRequest: "/v1/user/booking/single-requests/cancel",
     confirmSingleRequest: "/v1/user/booking/request/single/confirm",
     cancelSingleRequest: "/v1/user/booking/request/single/cancel",
+    mySingleRequestsAll: "/v1/kol/booking/single-requests/all",
+    mySingleRequestDetail: (requestId) =>
+      `/v1/kol/booking/single-requests/detail/${requestId}`,
   },
   COURSE: {
     getAll: "/v1/courses/all",
