@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../../context/AuthContext";
 import { getMySingleBookingRequests } from "../../../services/booking/BookingRequestUserService";
 
 export const useGetMySingleBookingRequests = (filters = {}) => {
+  const auth = useAuth();
+  const userId = auth?.user?.id ?? null;
+  const hasToken = Boolean(auth?.token);
+
   const {
     page = 0,
     size = 20,
@@ -16,6 +21,7 @@ export const useGetMySingleBookingRequests = (filters = {}) => {
     queryKey: [
       "user",
       "single-booking-requests",
+      userId,
       page,
       size,
       status ?? null,
@@ -36,6 +42,7 @@ export const useGetMySingleBookingRequests = (filters = {}) => {
       }),
     keepPreviousData: true,
     retry: false,
+    enabled: hasToken && Boolean(userId),
     refetchOnMount: false,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,

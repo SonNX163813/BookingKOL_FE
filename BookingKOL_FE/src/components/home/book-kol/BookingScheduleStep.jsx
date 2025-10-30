@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -23,6 +23,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
   const [loading, setLoading] = useState(false);
   const [startHour, setStartHour] = useState(null);
   const [endHour, setEndHour] = useState(null);
+  const [activeSlotId, setActiveSlotId] = useState(null);
 
   /* -------------------- Lấy lịch trống từ API -------------------- */
   useEffect(() => {
@@ -57,13 +58,35 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
       if (!start.isValid() || !end.isValid() || !end.isAfter(start)) return;
 
       const dateKey = start.format("YYYY-MM-DD");
-      map[dateKey] = map[dateKey] || new Set();
-      let time = start.clone();
-      while (time.isBefore(end) || time.hour() === end.hour()) {
-        map[dateKey].add(time.hour());
-        time = time.add(1, "hour");
+      map[dateKey] = map[dateKey] || [];
+
+      const slot = {
+        id: `${startAt}-${endAt}`,
+        start,
+        end,
+        startHour: start.hour(),
+        endHour: end.hour(),
+        displayHours: [],
+      };
+
+      let cursor = start.clone();
+      while (cursor.isBefore(end)) {
+        slot.displayHours.push(cursor.hour());
+        cursor = cursor.add(1, "hour");
       }
+
+      const endHour = end.hour();
+      if (slot.displayHours.at(-1) !== endHour) {
+        slot.displayHours.push(endHour);
+      }
+
+      map[dateKey].push(slot);
     });
+
+    Object.values(map).forEach((slots) => {
+      slots.sort((a, b) => a.startHour - b.startHour);
+    });
+
     return map;
   }, [freeTimeSlots]);
 
@@ -72,14 +95,42 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     () => new Set(Object.keys(slotsByDate)),
     [slotsByDate]
   );
-  const availableHours = useMemo(
-    () => Array.from({ length: 24 }, (_, i) => i),
-    []
+  const dailySlots = useMemo(
+    () => slotsByDate[selectedDateKey] || [],
+    [slotsByDate, selectedDateKey]
+  );
+  const activeSlot = useMemo(
+    () => dailySlots.find((slot) => slot.id === activeSlotId) || null,
+    [dailySlots, activeSlotId]
+  );
+  const slotsToRender = useMemo(
+    () => (activeSlot ? [activeSlot] : dailySlots),
+    [activeSlot, dailySlots]
   );
 
-  const kolAvailableHours = useMemo(
-    () => new Set(slotsByDate[selectedDateKey] || []),
-    [slotsByDate, selectedDateKey]
+  useEffect(() => {
+    if (!activeSlotId) return;
+    if (!dailySlots.some((slot) => slot.id === activeSlotId)) {
+      setActiveSlotId(null);
+      setStartHour(null);
+      setEndHour(null);
+    }
+  }, [dailySlots, activeSlotId]);
+
+  const resolveSlotForHour = useCallback(
+    (hour) => {
+      let fallback = null;
+      for (const slot of dailySlots) {
+        if (hour >= slot.startHour && hour < slot.endHour) {
+          return slot;
+        }
+        if (fallback === null && hour === slot.endHour) {
+          fallback = slot;
+        }
+      }
+      return fallback;
+    },
+    [dailySlots]
   );
 
   const HighlightedDay = useMemo(() => {
@@ -114,24 +165,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
       return (
         <PickersDay
           {...dayProps}
-          sx={{
-            position: "relative",
-            ...highlightStyles,
-            "&::after":
-              isHighlighted && !disabled
-                ? {
-                    // content: '""',
-                    // position: "absolute",
-                    // bottom: 6,
-                    // left: "50%",
-                    // transform: "translateX(-50%)",
-                    // width: 6,
-                    // height: 6,
-                    // borderRadius: "50%",
-                    // backgroundColor: selected ? "#fff" : accentColor,
-                  }
-                : undefined,
-          }}
+          sx={{ position: "relative", ...highlightStyles }}
         />
       );
     };
@@ -139,47 +173,65 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
   /* -------------------- Xử lý chọn giờ -------------------- */
   const handleSelectHour = (hour) => {
-    // Nếu giờ không khả dụng
-    if (!kolAvailableHours.has(hour)) {
-      toast.error("KOL không có lịch cho giờ đó!");
+    const currentSlot =
+      activeSlotId && dailySlots
+        ? dailySlots.find((slot) => slot.id === activeSlotId)
+        : null;
+    let slot = resolveSlotForHour(hour);
+
+    if (
+      currentSlot &&
+      startHour !== null &&
+      endHour === null &&
+      hour >= currentSlot.startHour &&
+      hour <= currentSlot.endHour
+    ) {
+      slot = currentSlot;
+    }
+
+    if (!slot) {
+      toast.error("KOL không có lịch trong giờ này!");
       return;
     }
 
-    // Nếu chưa chọn gì -> đặt start
+    if (!activeSlotId || activeSlotId !== slot.id) {
+      setActiveSlotId(slot.id);
+      setStartHour(hour);
+      setEndHour(null);
+      return;
+    }
+
     if (startHour === null) {
       setStartHour(hour);
       setEndHour(null);
       return;
     }
 
-    // Nếu đang chọn 1 giờ bắt đầu, click lại cùng giờ => bỏ chọn
-    if (startHour !== null && endHour === null && startHour === hour) {
+    if (endHour === null && startHour === hour) {
       setStartHour(null);
       setEndHour(null);
+      setActiveSlotId(null);
       return;
     }
 
-    // Nếu đã có start và chưa có end -> chọn end
     if (endHour === null) {
       const min = Math.min(startHour, hour);
       const max = Math.max(startHour, hour);
+
+      if (min < slot.startHour || max > slot.endHour) {
+        toast.error("Giờ bạn chọn không nằm trong cùng ca làm việc!");
+        return;
+      }
+
       const duration = max - min;
 
       if (duration < 1) {
-        toast.warn("Khoảng thời gian tối thiểu là 1 tiếng!");
+        toast.warn("Thời lượng tối thiểu là 1 tiếng!");
         return;
       }
       if (duration > 3) {
-        toast.warn("Khoảng thời gian tối đa là 3 tiếng!");
+        toast.warn("Thời lượng tối đa là 3 tiếng!");
         return;
-      }
-
-      // Kiểm tra có đủ slot liên tục không
-      for (let h = min; h < max; h++) {
-        if (!kolAvailableHours.has(h)) {
-          toast.error("KOL không có lịch cho giờ đó!");
-          return;
-        }
       }
 
       setStartHour(min);
@@ -187,26 +239,21 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
       return;
     }
 
-    // Nếu đã chọn cả start + end
-    if (startHour !== null && endHour !== null) {
-      // Nếu click lại đúng vào start hoặc end => bỏ chọn toàn bộ
-      if (hour === startHour || hour === endHour) {
-        setStartHour(null);
-        setEndHour(null);
-        return;
-      }
+    if (hour === startHour || hour === endHour) {
+      setStartHour(null);
+      setEndHour(null);
+      setActiveSlotId(null);
+      return;
+    }
 
-      // Nếu click vào giữa khoảng => reset và chọn lại giờ đó làm start
-      if (hour > startHour && hour < endHour) {
-        setStartHour(hour);
-        setEndHour(null);
-        return;
-      }
-
-      // Nếu click ra ngoài khoảng => chọn lại start mới
+    if (hour > startHour && hour < endHour) {
       setStartHour(hour);
       setEndHour(null);
+      return;
     }
+
+    setStartHour(hour);
+    setEndHour(null);
   };
 
   /* -------------------- Gửi dữ liệu ra ngoài -------------------- */
@@ -223,10 +270,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
   /* -------------------- Render -------------------- */
   return (
-    <LocalizationProvider
-      dateAdapter={AdapterDayjs}
-      adapterLocale="vi" // ✅ Bắt buộc để hiển thị tiếng Việt
-    >
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
       <Box
         sx={{
           borderRadius: STYLE.radius,
@@ -254,19 +298,6 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
             border: `1px solid ${STYLE.border}`,
             mb: 3,
             overflow: "hidden",
-            "& .MuiDayCalendar-weekDayLabel": {
-              fontSize: ".8rem",
-              "&:nth-of-type(1)::after": { content: '"2"' },
-              "&:nth-of-type(2)::after": { content: '"3"' },
-              "&:nth-of-type(3)::after": { content: '"4"' },
-              "&:nth-of-type(4)::after": { content: '"5"' },
-              "&:nth-of-type(5)::after": { content: '"6"' },
-              "&:nth-of-type(6)::after": { content: '"7"' },
-              "&:nth-of-type(7)::after": { content: '"N"' },
-            },
-            "& .MuiPickersDay-root": {
-              fontSize: ".8rem",
-            },
           }}
         >
           <DateCalendar
@@ -280,6 +311,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
               setSelectedDate(date.startOf("day"));
               setStartHour(null);
               setEndHour(null);
+              setActiveSlotId(null);
             }}
             shouldDisableDate={(date) => {
               if (!date) return true;
@@ -288,7 +320,8 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
             }}
           />
         </Box>
-        {/* Giờ livestream bắt đầu */}
+
+        {/* Giờ livestream */}
         <Typography
           sx={{
             fontWeight: 600,
@@ -297,94 +330,103 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
             fontSize: "1rem",
           }}
         >
-          Giờ livestream
+          Chọn khung giờ livestream
+          <Typography
+            sx={{ color: STYLE.textSecondary, fontSize: "0.85rem", mb: 1 }}
+          >
+            Chọn giờ bắt đầu và kết thúc (tối đa 3 tiếng)
+          </Typography>
         </Typography>
 
         {loading ? (
           <Stack direction="row" spacing={1} alignItems="center">
             <CircularProgress size={20} />
             <Typography sx={{ color: STYLE.textSecondary }}>
-              Đang tải...
+              Đang tải lịch trống...
             </Typography>
           </Stack>
+        ) : slotsToRender.length === 0 ? (
+          <Typography sx={{ color: STYLE.textSecondary }}>
+            Không có lịch trống trong ngày này.
+          </Typography>
         ) : (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
-              gap: 1.5,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            {availableHours.map((h) => {
-              const isStart = h === startHour;
-              const isEnd = h === endHour;
-              const isInRange =
-                startHour !== null &&
-                endHour !== null &&
-                h > startHour &&
-                h < endHour;
-              const active = isStart || isEnd || isInRange;
-              const available = kolAvailableHours.has(h);
-
-              return (
-                <Button
-                  key={h}
-                  onClick={() => handleSelectHour(h)}
-                  disabled={!available}
-                  variant={active ? "contained" : "outlined"}
+          <Stack spacing={2}>
+            {slotsToRender.map((slot, index) => (
+              <Box key={`${slot.id}-${index}`}>
+                <Typography
                   sx={{
-                    borderRadius:
-                      isStart && endHour !== null
-                        ? "12px 0 0 12px"
-                        : isEnd
-                        ? "0 12px 12px 0"
-                        : isInRange
-                        ? "0"
-                        : "12px",
-                    height: 48,
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
-                    color: active
-                      ? "#fff"
-                      : available
-                      ? STYLE.textPrimary
-                      : STYLE.textSecondary,
-                    backgroundColor: active
-                      ? STYLE.accent
-                      : available
-                      ? "#fff"
-                      : "rgba(0,0,0,0.05)",
-                    borderColor: available ? STYLE.border : "transparent",
-                    borderRight: isInRange || isStart ? "none" : undefined,
-                    opacity: available ? 1 : 0.4,
-                    transition: "all 0.2s ease",
-                    position: "relative",
-                    zIndex: active ? 2 : 1,
-                    "&:hover": {
-                      transform: available ? "translateY(-2px)" : "none",
-                      backgroundColor: available
-                        ? active
-                          ? STYLE.accentHover
-                          : STYLE.accentHover + "20"
-                        : "rgba(0,0,0,0.05)",
-                      zIndex: 3,
-                    },
+                    fontSize: "0.85rem",
+                    color: STYLE.textSecondary,
+                    fontWeight: 500,
+                    mb: 1,
                   }}
                 >
-                  {`${h.toString().padStart(2, "0")}:00`}
-                </Button>
-              );
-            })}
-          </Box>
+                  {`Khung giờ: ${slot.start.format(
+                    "HH:mm"
+                  )} - ${slot.end.format("HH:mm")}`}
+                </Typography>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+                    gap: 1.5,
+                  }}
+                >
+                  {slot.displayHours.map((h, idx) => {
+                    const isStart = h === startHour;
+                    const isEnd = h === endHour;
+                    const isInRange =
+                      startHour !== null &&
+                      endHour !== null &&
+                      h > startHour &&
+                      h < endHour;
+                    const active = isStart || isEnd || isInRange;
+                    const key = `${slot.id}-${h}-${idx}`;
+
+                    return (
+                      <Button
+                        key={key}
+                        onClick={() => handleSelectHour(h)}
+                        variant={active ? "contained" : "outlined"}
+                        sx={{
+                          borderRadius:
+                            isStart && endHour !== null
+                              ? "12px 0 0 12px"
+                              : isEnd
+                              ? "0 12px 12px 0"
+                              : isInRange
+                              ? "0"
+                              : "12px",
+                          height: 48,
+                          fontWeight: 600,
+                          fontSize: "0.9rem",
+                          color: active ? "#fff" : STYLE.textPrimary,
+                          backgroundColor: active ? STYLE.accent : "#fff",
+                          borderColor: STYLE.border,
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            transform: "translateY(-2px)",
+                            backgroundColor: active
+                              ? STYLE.accentHover
+                              : STYLE.accentHover + "20",
+                          },
+                        }}
+                      >
+                        {`${h.toString().padStart(2, "0")}:00`}
+                      </Button>
+                    );
+                  })}
+                </Box>
+              </Box>
+            ))}
+          </Stack>
         )}
 
         {/* Hiển thị thời gian chọn */}
         {startHour !== null && endHour !== null && (
           <Box sx={{ mt: 3, textAlign: "center" }}>
             <Typography sx={{ fontWeight: 600, color: STYLE.textPrimary }}>
-              Khoảng livestream:&nbsp;
+              Thời gian livestream:&nbsp;
               <Typography component="span" sx={{ color: STYLE.accent }}>
                 {`${startHour}:00 - ${endHour}:00, ${selectedDate.format(
                   "DD/MM"
@@ -393,20 +435,6 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
             </Typography>
           </Box>
         )}
-
-        {/* Hiển thị thời gian chọn */}
-        {/* {startHour !== null && endHour !== null && (
-          <Box sx={{ mt: 3 }}>
-            <Typography sx={{ fontWeight: 600, color: STYLE.textPrimary }}>
-              Khoảng livestream:&nbsp;
-              <Typography component="span" sx={{ color: STYLE.accent }}>
-                {`${startHour}:00 - ${endHour}:00, ${selectedDate.format(
-                  "DD/MM"
-                )}`}
-              </Typography>
-            </Typography>
-          </Box>
-        )} */}
       </Box>
     </LocalizationProvider>
   );
