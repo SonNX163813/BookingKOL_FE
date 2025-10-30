@@ -17,6 +17,7 @@ import {
   CloseOutlined,
   UploadOutlined,
   LockOutlined,
+  SendOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
@@ -89,34 +90,28 @@ const resolveAvatarUrl = (kol) => {
   const raw = kol?.avatarUrl;
   const usages = Array.isArray(kol?.fileUsageDtos) ? kol.fileUsageDtos : [];
 
-  // 1) Nếu đã là URL http(s): dùng luôn
-  if (raw && /^https?:\/\//i.test(raw)) return raw;
+  if (raw && /^https?:\/\//i.test(raw)) return raw; // 1) đã là URL
 
-  // 2) Nếu raw là fileUsageId
   const byUsageId = raw ? usages.find((u) => u?.id === raw) : null;
-  if (byUsageId?.file?.fileUrl) return byUsageId.file.fileUrl;
+  if (byUsageId?.file?.fileUrl) return byUsageId.file.fileUrl; // 2) fileUsageId
 
-  // 3) Nếu raw là fileId
   const byFileId = raw ? usages.find((u) => u?.file?.id === raw) : null;
-  if (byFileId?.file?.fileUrl) return byFileId.file.fileUrl;
+  if (byFileId?.file?.fileUrl) return byFileId.file.fileUrl; // 3) fileId
 
-  // 4) Ưu tiên usage dành cho AVATAR
   const avatarUsage = usages.find(
     (u) => u?.targetType === "AVATAR" && u?.isActive && u?.file?.fileUrl
   );
-  if (avatarUsage?.file?.fileUrl) return avatarUsage.file.fileUrl;
+  if (avatarUsage?.file?.fileUrl) return avatarUsage.file.fileUrl; // 4) AVATAR
 
-  // 5) Fallback cover của portfolio
   const cover = usages.find(
     (u) => u?.isCover && u?.isActive && u?.file?.fileUrl
   );
-  if (cover?.file?.fileUrl) return cover.file.fileUrl;
+  if (cover?.file?.fileUrl) return cover.file.fileUrl; // 5) cover
 
-  // 6) Fallback ảnh đầu tiên bất kỳ
   const firstImage = usages.find(
     (u) => u?.file?.fileType === "IMAGE" && u?.file?.fileUrl
   );
-  if (firstImage?.file?.fileUrl) return firstImage.file.fileUrl;
+  if (firstImage?.file?.fileUrl) return firstImage.file.fileUrl; // 6) ảnh đầu
 
   return "";
 };
@@ -139,18 +134,21 @@ export default function KolSettings() {
     /** @type {React.MutableRefObject<File|null>} */ null
   );
 
-  // ====== Password reset (OTP) ======
+  // ====== Password reset (OTP 1 endpoint) ======
   const [editingPwd, setEditingPwd] = useState(false);
   const [changingPwd, setChangingPwd] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSeconds, setOtpSeconds] = useState(0);
   const [formPwd] = Form.useForm();
+  const otpInputRef = useRef(null);
 
   const revokeObjectUrl = () => {
     if (avatarObjectUrl && avatarObjectUrl.startsWith("blob:")) {
       try {
         URL.revokeObjectURL(avatarObjectUrl);
       } catch (err) {
-        // ignore revoke errors (lint-safe)
-        // console.debug("revokeObjectURL failed", err);
+        // ignore
       }
     }
     setAvatarObjectUrl("");
@@ -195,6 +193,15 @@ export default function KolSettings() {
     return () => revokeObjectUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // OTP countdown
+  useEffect(() => {
+    if (otpSeconds <= 0) return;
+    const t = setInterval(() => {
+      setOtpSeconds((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [otpSeconds]);
 
   const onPickAvatar = (e) => {
     const file = e.target.files?.[0];
@@ -305,21 +312,68 @@ export default function KolSettings() {
     fetchMe();
   };
 
+  // ====== CHỈ DÙNG /password/reset CHO CẢ HAI BƯỚC ======
+  // Bấm "Gửi OTP": gửi kèm newPassword & confirmPassword để BE không bị null
+  const sendPasswordOtp = async () => {
+    try {
+      const email = formInfo.getFieldValue("email");
+      await formPwd.validateFields(["newPassword", "confirmPassword"]);
+      const newPassword = formPwd.getFieldValue("newPassword");
+      const confirmPassword = formPwd.getFieldValue("confirmPassword");
+      if (!email) return toast.error("Thiếu email.");
+      if (newPassword !== confirmPassword)
+        return toast.error("Mật khẩu xác nhận không khớp.");
+
+      setSendingOtp(true);
+
+      await post({
+        url: "v1/password/reset",
+        data: {
+          email,
+          newPassword,
+          confirmPassword,
+          requestOtp: true, // gợi ý (BE có thể bỏ qua)
+          phase: "SEND_OTP", // gợi ý (BE có thể bỏ qua)
+          otp: "", // tránh BE trim/equals trên chuỗi null
+        },
+      });
+
+      setOtpSent(true);
+      setOtpSeconds(120);
+      toast.success("Đã gửi OTP. Vui lòng kiểm tra email.");
+      setTimeout(() => otpInputRef.current?.focus?.(), 0);
+    } catch (e) {
+      if (!e?.errorFields) {
+        console.error(e);
+        toast.error(
+          e?.response?.data?.message || "Gửi OTP thất bại. Thử lại sau."
+        );
+      }
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  // Submit đổi mật khẩu: cần { email, otp, newPassword, confirmPassword }
   const onSavePassword = async () => {
     try {
-      const { email, otp, newPassword, confirmPassword } =
+      const email = formInfo.getFieldValue("email");
+      const { otp, newPassword, confirmPassword } =
         await formPwd.validateFields();
-      if (newPassword !== confirmPassword) {
-        toast.error("Mật khẩu xác nhận không khớp.");
-        return;
-      }
+      if (!otpSent) return toast.error("Vui lòng bấm 'Gửi OTP' trước.");
+      if (!email) return toast.error("Thiếu email.");
+      if (newPassword !== confirmPassword)
+        return toast.error("Mật khẩu xác nhận không khớp.");
+
       setChangingPwd(true);
       await post({
-        url: "/password/reset",
+        url: "v1/password/reset",
         data: { email, otp, newPassword, confirmPassword },
       });
       toast.success("Đổi mật khẩu thành công.");
       setEditingPwd(false);
+      setOtpSent(false);
+      setOtpSeconds(0);
       formPwd.resetFields();
     } catch (e) {
       if (!e?.errorFields) {
@@ -377,7 +431,7 @@ export default function KolSettings() {
           </Title>
         }
         className="shadow-sm rounded-2xl"
-        bodyStyle={{ padding: 24, paddingBottom: 16 }} // cân padding hai đầu
+        bodyStyle={{ padding: 24, paddingBottom: 16 }}
       >
         {/* Avatar */}
         <div className="w-full flex flex-col items-center mb-4">
@@ -387,7 +441,12 @@ export default function KolSettings() {
             onError={onAvatarError}
             style={{ border: "1px solid #e5e7eb" }}
           >
-            {initials()}
+            {(formInfo.getFieldValue("fullName") || "K O L")
+              .split(/\s+/)
+              .map((s) => s[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
           </Avatar>
         </div>
         <div className="w-full flex justify-center">
@@ -401,9 +460,7 @@ export default function KolSettings() {
           {editingInfo ? (
             <Button
               icon={<UploadOutlined />}
-              onClick={() =>
-                document.getElementById("kol-settings-avatar-input")?.click()
-              }
+              onClick={openPicker}
               className="rounded-xl mt-3"
             >
               Chọn ảnh từ máy
@@ -415,7 +472,7 @@ export default function KolSettings() {
           )}
         </div>
 
-        {/* Họ & tên + Email (chia đều 50/50, full chiều ngang card) */}
+        {/* Họ & tên + Email (chia đều 50/50) */}
         <Form
           form={formInfo}
           layout="vertical"
@@ -444,7 +501,7 @@ export default function KolSettings() {
         </Form>
       </Card>
 
-      {/* ===== Đổi mật khẩu (OTP) ===== */}
+      {/* ===== Đổi mật khẩu (Gửi OTP trước, rồi submit) ===== */}
       <Card
         title={
           <Title level={4} className="!mb-0 font-bold">
@@ -456,6 +513,9 @@ export default function KolSettings() {
                     icon={<LockOutlined />}
                     onClick={() => {
                       setEditingPwd(true);
+                      setOtpSent(false);
+                      setOtpSeconds(0);
+                      formPwd.resetFields();
                       formPwd.setFieldsValue({
                         email: formInfo.getFieldValue("email"),
                       });
@@ -465,11 +525,13 @@ export default function KolSettings() {
                     Chỉnh sửa
                   </Button>
                 ) : (
-                  <Space>
+                  <Space wrap>
                     <Button
                       icon={<CloseOutlined />}
                       onClick={() => {
                         setEditingPwd(false);
+                        setOtpSent(false);
+                        setOtpSeconds(0);
                         formPwd.resetFields();
                       }}
                       className="rounded-xl !h-10"
@@ -477,11 +539,24 @@ export default function KolSettings() {
                       Hủy
                     </Button>
                     <Button
+                      icon={<SendOutlined />}
+                      type="default"
+                      loading={sendingOtp}
+                      disabled={sendingOtp || otpSeconds > 0}
+                      onClick={sendPasswordOtp}
+                      className="rounded-xl !h-10"
+                    >
+                      {otpSeconds > 0
+                        ? `Gửi lại OTP (${otpSeconds}s)`
+                        : "Gửi OTP"}
+                    </Button>
+                    <Button
                       type="primary"
                       icon={<SaveOutlined />}
                       loading={changingPwd}
                       onClick={onSavePassword}
                       className="rounded-xl !h-10"
+                      disabled={!otpSent}
                     >
                       Lưu thay đổi
                     </Button>
@@ -514,7 +589,12 @@ export default function KolSettings() {
                   name="otp"
                   rules={[{ required: true, message: "Nhập mã OTP" }]}
                 >
-                  <Input className="!h-12" placeholder="Nhập mã OTP đã nhận" />
+                  <Input
+                    ref={otpInputRef}
+                    className="!h-12"
+                    placeholder="Nhập mã OTP đã nhận"
+                    disabled={!otpSent}
+                  />
                 </Form.Item>
               </Col>
             </Row>

@@ -22,10 +22,11 @@ import {
   getKolProfileByUserId,
   getKolProfileById,
   registerKolAvailabilities,
+  getKolTimeline, // ⬅️ thêm import để lấy booking đã có
 } from "../../services/kol/KolAPI";
 
-const MIN_GAP_MINUTES = 60;
-const MIN_DURATION_MINUTES = 60;
+const MIN_GAP_MINUTES = 60; // Khoảng cách tối thiểu giữa các ca
+const MIN_DURATION_MINUTES = 60; // Thời lượng tối thiểu 1 ca
 const MIN_DATE = dayjs().add(14, "day").startOf("day");
 
 // ===== Helpers: đọc user auth từ storage (local -> session) =====
@@ -85,6 +86,58 @@ const labelOf = (date, start, end) =>
     "DD/MM/YYYY"
   )}`;
 
+/* ===== Helpers cho “khoảng đệm 1 giờ quanh booking” (chỉ dùng cục bộ file này) ===== */
+const isCancelled = (st) => String(st || "").toUpperCase() === "CANCELLED";
+
+const toISOInterval = (slot) => {
+  const startISO =
+    slot?.startAt ||
+    slot?.startTime ||
+    slot?.start ||
+    slot?.beginAt ||
+    slot?.from;
+  const endISO =
+    slot?.endAt || slot?.endTime || slot?.end || slot?.finishAt || slot?.to;
+  const s = dayjs(startISO);
+  const e = dayjs(endISO);
+  if (!s.isValid() || !e.isValid() || !e.isAfter(s)) return null;
+  return { startISO: s.toISOString(), endISO: e.toISOString() };
+};
+
+const expandWorkTimesLocal = (item) => {
+  if (!Array.isArray(item?.workTimes) || item.workTimes.length === 0) return [];
+  return item.workTimes.filter((w) => !isCancelled(w?.status));
+};
+
+const expandIntervalByMinutes = (iv, minutes) => {
+  const s = dayjs(iv.startISO).subtract(minutes, "minute");
+  const e = dayjs(iv.endISO).add(minutes, "minute");
+  return { startISO: s.toISOString(), endISO: e.toISOString() };
+};
+
+const overlaps = (aStart, aEnd, bStart, bEnd) => {
+  const s = dayjs(aStart),
+    e = dayjs(aEnd);
+  return e.isAfter(bStart) && s.isBefore(bEnd);
+};
+
+const mergeSortedIntervals = (arr) => {
+  if (!arr.length) return arr;
+  const out = [Object.assign({}, arr[0])];
+  for (let i = 1; i < arr.length; i++) {
+    const cur = arr[i];
+    const last = out[out.length - 1];
+    if (!dayjs(cur.startISO).isAfter(dayjs(last.endISO))) {
+      if (dayjs(cur.endISO).isAfter(dayjs(last.endISO))) {
+        last.endISO = cur.endISO;
+      }
+    } else {
+      out.push(Object.assign({}, cur));
+    }
+  }
+  return out;
+};
+
 export default function KolWorkRegistrationMui() {
   const { kolId: kolIdParam } = useParams();
 
@@ -94,6 +147,10 @@ export default function KolWorkRegistrationMui() {
 
   // Loading khi gọi API Lưu
   const [saving, setSaving] = React.useState(false);
+
+  // ===== Blocked ranges theo booking + buffer cho ngày đang chọn =====
+  const [blocked, setBlocked] = React.useState([]); // [{startISO, endISO}]
+  const [loadingBlocked, setLoadingBlocked] = React.useState(false);
 
   React.useEffect(() => {
     let mounted = true;
@@ -149,6 +206,47 @@ export default function KolWorkRegistrationMui() {
     message: "",
   });
 
+  // Load blocked ranges (booking + buffer) mỗi khi đổi ngày hoặc đổi KOL
+  React.useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setBlocked([]);
+      if (!resolvedId || !pickedDate) return;
+      setLoadingBlocked(true);
+      try {
+        const start = pickedDate.startOf("day");
+        const end = pickedDate.endOf("day");
+        const booked = await getKolTimeline({
+          kolId: resolvedId,
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          page: 0,
+          size: 1000,
+        });
+
+        const intervals = (booked || [])
+          .flatMap(expandWorkTimesLocal)
+          .map(toISOInterval)
+          .filter(Boolean)
+          .map((iv) => expandIntervalByMinutes(iv, MIN_GAP_MINUTES)) // mở rộng ±1h
+          .filter((iv) => overlaps(iv.startISO, iv.endISO, start, end))
+          .sort((a, b) => a.startISO.localeCompare(b.startISO));
+
+        const merged = mergeSortedIntervals(intervals);
+        if (active) setBlocked(merged);
+      } catch (e) {
+        console.warn("[Register] load blocked failed:", e);
+        if (active) setBlocked([]);
+      } finally {
+        if (active) setLoadingBlocked(false);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [resolvedId, pickedDate]);
+
   const addShift = () => {
     if (!pickedDate) return;
     let start = pickedDate.hour(9).minute(0).second(0);
@@ -197,6 +295,22 @@ export default function KolWorkRegistrationMui() {
         const gap = s.start.diff(prev.end, "minute");
         if (gap < MIN_GAP_MINUTES)
           return `Khoảng cách giữa các ca phải ≥ ${MIN_GAP_MINUTES} phút.`;
+      }
+
+      // ❗NEW: chặn ca đè vào khoảng bị block (booking ± buffer 60')
+      const sIv = {
+        startISO: s.start.toISOString(),
+        endISO: s.end.toISOString(),
+      };
+      const hit = blocked.find((b) =>
+        overlaps(sIv.startISO, sIv.endISO, b.startISO, b.endISO)
+      );
+      if (hit) {
+        const msg =
+          `Ca ${i + 1} (${labelOf(pickedDate, s.start, s.end)}) ` +
+          `nằm trong khoảng không khả dụng do lịch đã đặt (bao gồm đệm ±${MIN_GAP_MINUTES}’). ` +
+          `Vui lòng chọn khung khác.`;
+        return msg;
       }
     }
     return null;
@@ -263,16 +377,11 @@ export default function KolWorkRegistrationMui() {
         appStatus === 409;
 
       if (isConflict) {
-        // Ưu tiên message từ BE hoặc từ service đã format
         const beMsg = extractApiMessage(e);
         const friendly =
           e?.message ||
           beMsg ||
-          `Khoảng thời gian này bị trùng với lịch khác. Vui lòng chọn khung giờ khác (ví dụ: ${labelOf(
-            pickedDate,
-            shifts[0]?.start,
-            shifts[0]?.end
-          )}).`;
+          `Khoảng thời gian này bị trùng với lịch khác hoặc vi phạm đệm ±${MIN_GAP_MINUTES}’.`;
         setSnack({ open: true, type: "error", message: friendly });
       } else {
         console.error(e);
@@ -284,9 +393,35 @@ export default function KolWorkRegistrationMui() {
             "Không thể đăng ký ca làm. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
         });
       }
-      // ❗ KHÔNG cập nhật lịch sử ở nhánh lỗi
     } finally {
       setSaving(false);
+      // Reload lại blocked để phản ánh ca mới vừa đăng ký (nếu BE trả kịp)
+      if (resolvedId && pickedDate) {
+        const start = pickedDate.startOf("day");
+        const end = pickedDate.endOf("day");
+        try {
+          setLoadingBlocked(true);
+          const booked = await getKolTimeline({
+            kolId: resolvedId,
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+            page: 0,
+            size: 1000,
+          });
+          const intervals = (booked || [])
+            .flatMap(expandWorkTimesLocal)
+            .map(toISOInterval)
+            .filter(Boolean)
+            .map((iv) => expandIntervalByMinutes(iv, MIN_GAP_MINUTES))
+            .filter((iv) => overlaps(iv.startISO, iv.endISO, start, end))
+            .sort((a, b) => a.startISO.localeCompare(b.startISO));
+          setBlocked(mergeSortedIntervals(intervals));
+        } catch {
+          /* ignore */
+        } finally {
+          setLoadingBlocked(false);
+        }
+      }
     }
   };
 
@@ -346,6 +481,29 @@ export default function KolWorkRegistrationMui() {
               </Stack>
 
               <Divider sx={{ my: 1.5 }} />
+
+              {/* Thông tin block để user biết (tuỳ chọn, có thể xoá nếu không muốn hiện) */}
+              {pickedDate && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
+                  {loadingBlocked
+                    ? "Đang kiểm tra lịch đã đặt..."
+                    : blocked.length
+                    ? `Khoảng KHÔNG khả dụng (đã gồm đệm ±${MIN_GAP_MINUTES}’): ` +
+                      blocked
+                        .map(
+                          (b) =>
+                            `${dayjs(b.startISO).format("HH:mm")}–${dayjs(
+                              b.endISO
+                            ).format("HH:mm")}`
+                        )
+                        .join("  •  ")
+                    : "Toàn ngày chưa có đặt trước (hoặc ngoài khung hiển thị)."}
+                </Typography>
+              )}
 
               <Stack spacing={1.5}>
                 {shifts.map((sh, idx) => {
