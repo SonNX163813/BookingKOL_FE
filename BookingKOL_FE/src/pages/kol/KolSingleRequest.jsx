@@ -32,35 +32,23 @@ dayjs.updateLocale("vi", {
   weekdaysMin: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
 });
 
-/* ------------------------- TRẠNG THÁI BOOKING ------------------------- */
+/* ------------------------- TRẠNG THÁI BOOKING (rút gọn) ------------------------- */
 const BOOKING_STATUS_OPTIONS = [
-  { label: "Chờ Thanh Toán", value: "DRAFT" },
-  { label: "Đã gửi yêu cầu", value: "REQUESTED" },
-  { label: "Đang thương lượng", value: "NEGOTIATING" },
-  { label: "Đã chấp nhận", value: "IN_PROGRESS" },
-  { label: "Từ chối", value: "REJECTED" },
-  { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã ký hợp đồng", value: "CONTRACT_SIGNED" },
+  { label: "Chờ Thanh TOán", value: "DRAFT" },
+  { label: "Đã yêu cầu", value: "REQUESTED" },
   { label: "Đang thực hiện", value: "IN_PROGRESS" },
-  { label: "Đã giao", value: "DELIVERED" },
-  { label: "Hoàn tất", value: "COMPLETED" },
-
-  { label: "Hết hạn", value: "EXPIRED" },
+  { label: "Đã hoàn thành", value: "COMPLETED" },
+  { label: "Đã hết hạn", value: "EXPIRED" },
+  { label: "Đã hủy", value: "CANCELLED" },
 ];
 
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
   REQUESTED: "processing",
-  NEGOTIATING: "cyan",
-  ACCEPTED: "success",
-  REJECTED: "error",
-  CANCELLED: "warning",
-  CONTRACT_SIGNED: "blue",
   IN_PROGRESS: "processing",
-  DELIVERED: "gold",
   COMPLETED: "success",
-  DISPUTED: "magenta",
   EXPIRED: "volcano",
+  CANCELLED: "error",
 };
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
@@ -136,7 +124,7 @@ export default function KolSingleRequest() {
   const token = auth?.token || null;
   const authLoading = auth?.loading ?? false;
 
-  // MẶC ĐỊNH GỬI ACCEPTED (ẩn với KOL)
+  // Mặc định hiển thị IN_PROGRESS theo yêu cầu mới
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const [filters, setFilters] = useState({
@@ -205,7 +193,6 @@ export default function KolSingleRequest() {
 
   const handleViewDetail = useCallback(
     (record) => {
-      // CHỈ dùng ID (không dùng requestNumber/code) để match BE
       const requestId =
         record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
       if (!requestId) {
@@ -262,14 +249,11 @@ export default function KolSingleRequest() {
         dataIndex: "status",
         render: (status) => {
           const normalized = status?.toString()?.toUpperCase?.();
-          const displayLabel =
-            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ||
-            normalized ||
-            "--";
+          const meta =
+            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized) || null;
+          const label = meta?.label || normalized || "--";
           return (
-            <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>
-              {displayLabel}
-            </Tag>
+            <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>{label}</Tag>
           );
         },
       },
