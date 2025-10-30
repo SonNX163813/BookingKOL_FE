@@ -37,46 +37,40 @@ const BookingContactStep = ({
   const limit = attachmentLimit ?? 5;
   const maxSize = maxAttachmentSizeMb ?? 10;
 
+  // Định dạng kích thước tệp
   const formatFileSize = (size) => {
-    if (!Number.isFinite(size)) {
-      return "";
-    }
-    if (size >= 1024 * 1024) {
-      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-    }
-    if (size >= 1024) {
-      return `${(size / 1024).toFixed(1)} KB`;
-    }
+    if (!Number.isFinite(size)) return "";
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
     return `${size} B`;
   };
 
+  // Xử lý khi chọn tệp
   const handleFileInputChange = (event) => {
     const { files } = event.target;
-    if (files && onAddAttachments) {
-      onAddAttachments(files);
-    }
-    if (event.target) {
-      event.target.value = "";
-    }
+    if (files && onAddAttachments) onAddAttachments(files);
+    if (event.target) event.target.value = "";
   };
 
+  // Gợi ý đính kèm tệp
   const attachmentHintTemplate = TEXT.messages.attachmentHint;
   const attachmentHint = attachmentHintTemplate
     ? attachmentHintTemplate
         .replace("{limit}", limit)
         .replace("{size}", maxSize)
-    : `Có thể đính kèm tối đa ${limit} tệp (mỗi tệp tối đa ${maxSize}MB).`;
+    : `Bạn có thể đính kèm tối đa ${limit} tệp (mỗi tệp tối đa ${maxSize}MB).`;
 
   return (
     <Stack spacing={3}>
-      {/* Thông tin liên hệ */}
+      {/* 🧾 Thông tin liên hệ */}
       <Stack spacing={2}>
         <TextField
-          label={TEXT.form.name}
+          label="Họ và tên"
           value={contact.fullName}
-          onChange={(event) => onContactChange("fullName", event.target.value)}
+          onChange={(e) => onContactChange("fullName", e.target.value)}
           error={Boolean(errors.fullName)}
           helperText={errors.fullName}
+          required
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -84,12 +78,14 @@ const BookingContactStep = ({
             },
           }}
         />
+
         <TextField
-          label={TEXT.form.email}
+          label="Email liên hệ"
           value={contact.email}
-          onChange={(event) => onContactChange("email", event.target.value)}
+          onChange={(e) => onContactChange("email", e.target.value)}
           error={Boolean(errors.email)}
           helperText={errors.email}
+          required
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -97,12 +93,14 @@ const BookingContactStep = ({
             },
           }}
         />
+
         <TextField
-          label={TEXT.form.phone}
+          label="Số điện thoại"
           value={contact.phone}
-          onChange={(event) => onContactChange("phone", event.target.value)}
+          onChange={(e) => onContactChange("phone", e.target.value)}
           error={Boolean(errors.phone)}
           helperText={errors.phone}
+          required
           inputProps={{ inputMode: "tel" }}
           sx={{
             "& .MuiOutlinedInput-root": {
@@ -111,14 +109,16 @@ const BookingContactStep = ({
             },
           }}
         />
+
         <TextField
-          label={TEXT.form.location}
+          label="Địa chỉ / Khu vực"
           value={contact.location}
-          onChange={(event) => onContactChange("location", event.target.value)}
-          // error={Boolean(errors.location)}
-          // helperText={errors.location}
+          onChange={(e) => onContactChange("location", e.target.value)}
+          error={Boolean(errors.location)}
+          helperText={errors.location}
           multiline
           minRows={3}
+          required
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -128,13 +128,14 @@ const BookingContactStep = ({
         />
 
         <TextField
-          label={TEXT.form.note}
+          label="Ghi chú thêm"
           value={contact.note}
-          onChange={(event) => onContactChange("note", event.target.value)}
+          onChange={(e) => onContactChange("note", e.target.value)}
           multiline
           minRows={3}
-          // error={!contact.note}
-          // helperText={!contact.note ? "Vui lòng nhập ghi chú!" : ""}
+          error={Boolean(errors.note)}
+          helperText={errors.note}
+          placeholder="Ví dụ: Mong muốn setup tại nhà, cần KOL hỗ trợ thiết bị..."
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -143,14 +144,15 @@ const BookingContactStep = ({
           }}
         />
 
-        {/* Khu vực đính kèm tệp */}
+        {/* 📎 Khu vực đính kèm tệp */}
         <Stack spacing={1.5}>
           <Typography
             variant="subtitle2"
             sx={{ color: STYLE.textPrimary, fontWeight: 600 }}
           >
-            {TEXT.form.attachments}
+            Tệp đính kèm (nếu có)
           </Typography>
+
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Button
               variant="outlined"
@@ -164,7 +166,7 @@ const BookingContactStep = ({
                 "&:hover": { borderColor: STYLE.accent },
               }}
             >
-              {TEXT.actions.upload}
+              Tải lên tệp
               <input
                 type="file"
                 hidden
@@ -176,6 +178,12 @@ const BookingContactStep = ({
               {attachmentHint}
             </Typography>
           </Stack>
+
+          {errors.attachments && (
+            <Alert severity="error" sx={{ borderRadius: "14px" }}>
+              {errors.attachments}
+            </Alert>
+          )}
 
           {attachments.length > 0 && (
             <Stack spacing={1}>
@@ -227,7 +235,7 @@ const BookingContactStep = ({
         </Stack>
       </Stack>
 
-      {/* Thông tin tóm tắt đơn đặt lịch */}
+      {/* 🧮 Thông tin tóm tắt đơn đặt lịch */}
       <Card
         variant="outlined"
         sx={{
@@ -243,55 +251,55 @@ const BookingContactStep = ({
             <Stack direction="row" alignItems="center" spacing={1}>
               <AssignmentTurnedInRoundedIcon sx={{ color: STYLE.accent }} />
               <Typography sx={{ color: STYLE.textPrimary, fontWeight: 600 }}>
-                {TEXT.form.summaryTitle}
+                Tóm tắt thông tin đặt lịch
               </Typography>
             </Stack>
+
             <Stack spacing={1}>
               <Typography sx={{ color: STYLE.textSecondary }}>
-                <strong>{TEXT.summary.kol}:</strong> {summary.kol}
-              </Typography>
-              {/* <Typography sx={{ color: STYLE.textSecondary }}>
-                <strong>{TEXT.summary.package}:</strong> {summary.package}
-              </Typography> */}
-              <Typography sx={{ color: STYLE.textSecondary }}>
-                <strong>{TEXT.summary.duration}:</strong> {summary.duration}
+                <strong>KOL:</strong> {summary.kol}
               </Typography>
               <Typography sx={{ color: STYLE.textSecondary }}>
-                <strong>{TEXT.summary.schedule}:</strong> {summary.schedule}
+                <strong>Thời lượng:</strong> {summary.duration}
+              </Typography>
+              <Typography sx={{ color: STYLE.textSecondary }}>
+                <strong>Lịch livestream:</strong> {summary.schedule}
               </Typography>
             </Stack>
+
             <Divider />
+
             <Stack spacing={0.5}>
               <Typography sx={{ color: STYLE.textSecondary, fontWeight: 500 }}>
-                {TEXT.summary.subtotal}: {formatCurrency(summary.subtotal)}
+                Tạm tính: {formatCurrency(summary.subtotal)}
               </Typography>
               {summary.extra > 0 && (
                 <Typography sx={{ color: STYLE.textSecondary }}>
-                  {TEXT.summary.extraFee}: +{formatCurrency(summary.extra)}
+                  Phụ phí thêm: +{formatCurrency(summary.extra)}
                 </Typography>
               )}
               {summary.discount > 0 && (
                 <Typography sx={{ color: "#ffa1da", fontWeight: 500 }}>
-                  {TEXT.summary.discount}: -{formatCurrency(summary.discount)}
+                  Giảm giá: -{formatCurrency(summary.discount)}
                 </Typography>
               )}
               <Typography
                 variant="subtitle1"
                 sx={{ color: STYLE.textPrimary, fontWeight: 700 }}
               >
-                {TEXT.summary.total}: {formatCurrency(summary.total)}
+                Tổng cộng: {formatCurrency(summary.total)}
               </Typography>
             </Stack>
           </Stack>
         </CardContent>
       </Card>
 
-      {/* Checkbox điều khoản */}
+      {/* ✅ Checkbox đồng ý điều khoản */}
       {/* <FormControlLabel
         control={
           <Checkbox
             checked={agreeTerms}
-            onChange={(event) => onToggleTerms(event.target.checked)}
+            onChange={(e) => onToggleTerms(e.target.checked)}
             sx={{
               color: STYLE.accent,
               "&.Mui-checked": { color: STYLE.accent },
@@ -306,7 +314,7 @@ const BookingContactStep = ({
               onClick={onOpenTerms}
               sx={{ color: STYLE.accent, textTransform: "none", p: 0 }}
             >
-              {TEXT.form.terms}
+              điều khoản & chính sách
             </Button>
           </Typography>
         }
