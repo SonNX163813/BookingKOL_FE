@@ -89,11 +89,11 @@ const CourseLivesteamDetail = () => {
   }, [loadCourseDetail]);
 
   const priceLabel = useMemo(() => {
-    if (!course?.price) {
+    if (!course?.currentPrice) {
       return "Liên hệ";
     }
 
-    return currencyFormatter.format(Number(course.price));
+    return currencyFormatter.format(Number(course.currentPrice));
   }, [course]);
 
   const media = useMemo(() => adaptCourseMedia(course ?? {}), [course]);

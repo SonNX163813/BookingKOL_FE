@@ -250,13 +250,7 @@ const ManagementBookingRequests = () => {
     (record) => {
       if (!record) return;
 
-      const requestId =
-        record?.requestNumber ??
-        record?.id ??
-        record?.bookingRequestId ??
-        record?.requestId ??
-        record?.code ??
-        record?.bookingCode;
+      const requestId = record?.id;
 
       if (requestId) {
         navigate(`/admin/management-booking-requests/${requestId}`);
@@ -318,7 +312,10 @@ const ManagementBookingRequests = () => {
         title: "Mã hợp đồng",
         key: "code-hopdong",
         width: 180,
-        render: (_, record) => pickValue(record, ["contractNumber"]),
+        render: (_, record) => {
+          const contract = getPrimaryContract(record);
+          return contract?.contractNumber ?? pickValue(record, ["contractNumber"]);
+        },
       },
       {
         title: "Mã yêu cầu",
