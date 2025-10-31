@@ -511,7 +511,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
                   Thời gian livestream:&nbsp;
                   <Typography component="span" sx={{ color: STYLE.accent }}>
                     {`${startHour}:00 - ${endHour}:00, ${selectedDate.format(
-                      "DD/MM"
+                      "DD/MM/YYYY"
                     )}`}
                   </Typography>
                 </>
