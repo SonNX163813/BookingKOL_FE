@@ -316,7 +316,7 @@ const MySingleBookingRequests = () => {
       {
         title: "Mã đơn",
         key: "requestNumber",
-        width: 260,
+        width: 150,
         render: (_, record) => record?.requestNumber ?? "--",
         // render: (_, record) => record?.contracts?.[0]?.contractNumber ?? "--",
       },
@@ -338,7 +338,7 @@ const MySingleBookingRequests = () => {
       {
         title: "Thời gian thực hiện",
         key: "executionTime",
-        width: 250,
+        width: 120,
         render: (_, r) => composeExecutionTime(r),
       },
       {
@@ -385,7 +385,7 @@ const MySingleBookingRequests = () => {
         title: "Ngày tạo",
         dataIndex: "createdAt",
         key: "createdAt",
-        width: 180,
+        width: 120,
         render: (v) => formatDateTime(v),
       },
       {
