@@ -786,3 +786,23 @@ export const getKolMySingleRequestDetail = async (
 
   return payload?.data ?? null;
 };
+export const changeKolAvatarExisting = async (
+  { fileUsageId, fileId },
+  { signal } = {}
+) => {
+  if (!fileUsageId && !fileId) {
+    throw new Error("Cần truyền fileUsageId hoặc fileId");
+  }
+
+  return await update({
+    url: CLIENT_API_PATHS.KOL.medias.avatarChangeExisting, // ✅ đúng key bạn đưa
+    data: null,
+    config: {
+      params: {
+        fileUsageId: fileUsageId ?? undefined,
+        fileId: fileId ?? undefined,
+      },
+      ...(signal ? { signal } : {}),
+    },
+  });
+};

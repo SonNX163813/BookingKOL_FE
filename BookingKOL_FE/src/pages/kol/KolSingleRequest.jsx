@@ -126,7 +126,7 @@ export default function KolSingleRequest() {
 
   // Mặc định hiển thị IN_PROGRESS theo yêu cầu mới
   const [page, setPage] = useState(0);
-  const [size, setSize] = useState(20);
+  const [size, setSize] = useState(10);
   const [filters, setFilters] = useState({
     status: "IN_PROGRESS",
     startAt: undefined,

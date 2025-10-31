@@ -16,7 +16,13 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { ArrowLeft, CalendarRange, FileText } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarRange,
+  FileText,
+  Layers,
+  UserCircle2,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
 import { getKolMySingleRequestDetail } from "../../services/kol/KolAPI";
@@ -24,40 +30,45 @@ import { getKolMySingleRequestDetail } from "../../services/kol/KolAPI";
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+/* ====== Chỉ dùng các trạng thái mới ====== */
 const BOOKING_STATUS_LABEL = {
-  DRAFT: "Bản nháp",
+  DRAFT: "Đang thanh toán",
   REQUESTED: "Đã yêu cầu",
-  NEGOTIATING: "Đang thương lượng",
-  ACCEPTED: "Đã chấp nhận",
-  REJECTED: "Từ chối",
-  CANCELLED: "Đã hủy",
-  CONTRACT_SIGNED: "Hợp đồng đã ký",
   IN_PROGRESS: "Đang thực hiện",
-  DELIVERED: "Đã bàn giao",
-  COMPLETED: "Hoàn thành",
-  DISPUTED: "Tranh chấp",
-  EXPIRED: "Hết hạn",
+  COMPLETED: "Đã hoàn thành",
+  EXPIRED: "Đã hết hạn",
+  CANCELLED: "Đã hủy",
 };
 
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
   REQUESTED: "processing",
-  NEGOTIATING: "cyan",
-  ACCEPTED: "success",
-  REJECTED: "error",
-  CANCELLED: "warning",
-  CONTRACT_SIGNED: "blue",
   IN_PROGRESS: "processing",
-  DELIVERED: "gold",
   COMPLETED: "success",
-  DISPUTED: "magenta",
   EXPIRED: "volcano",
+  CANCELLED: "error",
 };
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format(pattern) : String(value);
+};
+
+const formatBoolean = (value) => {
+  if (value === null || value === undefined) return "--";
+  return value ? "Yes" : "No";
+};
+
+const formatCurrency = (value, currency = "VND") => {
+  if (value === null || value === undefined || value === "") return "--";
+  const numeric = typeof value === "number" ? value : Number.parseFloat(value);
+  if (Number.isNaN(numeric)) return "--";
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(numeric);
 };
 
 const normalizeStatus = (status) =>
@@ -103,6 +114,22 @@ const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
   );
 };
 
+const renderImageField = (fileUrl, label) => {
+  if (!fileUrl) return "--";
+  return (
+    <Space direction="vertical" size={8}>
+      <Image
+        src={fileUrl}
+        alt={label ?? "image-preview"}
+        width={140}
+        height={140}
+        style={{ objectFit: "cover", borderRadius: 12 }}
+        preview={{ mask: "Xem ảnh" }}
+      />
+    </Space>
+  );
+};
+
 export default function KolSingleRequestDetail() {
   const { requestId } = useParams();
   const navigate = useNavigate();
@@ -131,6 +158,46 @@ export default function KolSingleRequestDetail() {
   const normalizedStatus = normalizeStatus(detail?.status);
   const statusLabel =
     BOOKING_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
+
+  const fileUsageColumns = useMemo(
+    () => [
+      { title: "ID", dataIndex: "id", key: "id", width: 220 },
+      { title: "Loại đối tượng", dataIndex: "targetType", key: "targetType" },
+      {
+        title: "ID đối tượng",
+        dataIndex: "targetId",
+        key: "targetId",
+        width: 220,
+      },
+      {
+        title: "Tạo lúc",
+        dataIndex: "createdAt",
+        key: "createdAt",
+        render: (v) => formatDateTime(v),
+      },
+      {
+        title: "Loại tệp",
+        key: "fileType",
+        render: (_, r) => r?.file?.fileType ?? "--",
+      },
+      {
+        title: "Liên kết tệp",
+        key: "fileUrl",
+        render: (_, record) =>
+          renderFilePreviewCell({
+            fileType: record?.file?.fileType,
+            fileUrl: record?.file?.fileUrl,
+            fileName: record?.file?.fileName,
+          }),
+      },
+      {
+        title: "Trạng thái tệp",
+        key: "fileStatus",
+        render: (_, r) => r?.file?.status ?? "--",
+      },
+    ],
+    []
+  );
 
   const attachedFileColumns = useMemo(
     () => [
@@ -257,6 +324,120 @@ export default function KolSingleRequestDetail() {
                 {formatDateTime(detail?.updatedAt)}
               </Descriptions.Item>
             </Descriptions>
+          </Card>
+
+          {/* --- Thông tin KOL --- */}
+          <Card
+            className="shadow-sm"
+            bordered={false}
+            title={
+              <Space>
+                <UserCircle2 size={18} />
+                <span>Thông tin KOL</span>
+              </Space>
+            }
+          >
+            <Descriptions
+              bordered
+              size="middle"
+              column={screens.lg ? 3 : screens.md ? 2 : 1}
+              labelStyle={{ width: 180 }}
+            >
+              <Descriptions.Item label="Mã KOL">
+                {detail?.kol?.id ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Họ tên đầy đủ">
+                {detail?.kol?.fullName ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tên hiển thị">
+                {detail?.kol?.displayName ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ảnh đại diện" span={screens.lg ? 3 : 1}>
+                {renderImageField(
+                  detail?.kol?.avatarUrl,
+                  detail?.kol?.displayName ?? detail?.kol?.fullName
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày sinh">
+                {formatDateTime(detail?.kol?.dob, "DD/MM/YYYY")}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tiểu sử" span={screens.lg ? 3 : 1}>
+                <Text style={{ whiteSpace: "pre-wrap" }}>
+                  {detail?.kol?.bio ?? "--"}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 3 : 1}>
+                <Text style={{ whiteSpace: "pre-wrap" }}>
+                  {detail?.kol?.experience ?? "--"}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Quốc gia">
+                {detail?.kol?.country ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Thành phố">
+                {detail?.kol?.city ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngôn ngữ">
+                {detail?.kol?.languages ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Giá đặt tối thiểu">
+                {formatCurrency(detail?.kol?.minBookingPrice)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Khả dụng">
+                {formatBoolean(detail?.kol?.isAvailable)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Đánh giá tổng thể">
+                {detail?.kol?.overallRating ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số lượng phản hồi">
+                {detail?.kol?.feedbackCount ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Vai trò">
+                {detail?.kol?.role ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tạo lúc">
+                {formatDateTime(detail?.kol?.createdAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Cập nhật lúc">
+                {formatDateTime(detail?.kol?.updatedAt)}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Divider />
+
+            <Title level={5} className="!mb-2 flex items-center gap-2">
+              <Layers size={16} /> Danh mục
+            </Title>
+            <Space size={[8, 8]} wrap>
+              {detail?.kol?.categories && detail.kol.categories.length > 0 ? (
+                detail.kol.categories.map((category) => (
+                  <Tag color="blue" key={category?.id ?? category?.key}>
+                    {category?.name ?? category?.key ?? "--"}
+                  </Tag>
+                ))
+              ) : (
+                <Text type="secondary">Không có danh mục</Text>
+              )}
+            </Space>
+
+            <Divider />
+
+            <Title level={5} className="!mb-2 flex items-center gap-2">
+              <FileText size={16} /> Sử dụng tệp
+            </Title>
+            {detail?.kol?.fileUsageDtos && detail.kol.fileUsageDtos.length ? (
+              <Table
+                columns={fileUsageColumns}
+                dataSource={detail.kol.fileUsageDtos}
+                rowKey={(record) =>
+                  record?.id ?? record?.file?.id ?? Math.random()
+                }
+                pagination={false}
+                scroll={{ x: 960 }}
+              />
+            ) : (
+              <Empty description="Không có dữ liệu tệp" />
+            )}
           </Card>
 
           {/* --- Tệp đính kèm --- */}

@@ -1,3 +1,4 @@
+// src/pages/kol/KolSettings.jsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   Card,
@@ -17,7 +18,6 @@ import {
   CloseOutlined,
   UploadOutlined,
   LockOutlined,
-  SendOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
@@ -26,94 +26,30 @@ import {
   updateMyKolProfile,
   getKolProfileByUserId,
   uploadKolMedias,
+  resetPasswordWithOtp,
+  resolveAvatarUrl,
+  changeKolAvatarExisting, // ✅ dùng API chọn avatar từ ảnh đã upload
 } from "../../services/kol/KolAPI";
-import { post } from "../../config/axios-config"; // /password/reset
 
 const { Title, Text } = Typography;
 
-/* ---------- Utils: nén/resize ảnh để giảm nguy cơ 413 ---------- */
-async function downscaleImage(
-  file,
-  { maxW = 800, maxH = 800, quality = 0.85 } = {}
-) {
-  const src = URL.createObjectURL(file);
-  const img = await new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => {
-      URL.revokeObjectURL(src);
-      res(i);
-    };
-    i.onerror = (err) => {
-      URL.revokeObjectURL(src);
-      rej(err);
-    };
-    i.src = src;
-  });
-  const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
-  const w = Math.round(img.width * ratio);
-  const h = Math.round(img.height * ratio);
+/** Rút tham chiếu ảnh vừa upload: usageId / fileId / fileUrl */
+const extractUploadedAvatarRef = (resp) => {
+  const body = resp?.data ?? resp;
+  const data = body?.data ?? body;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, w, h);
+  const normalize = (x) => {
+    if (!x) return null;
+    const usageId = x.id || x.usageId || null;
+    const fileId = x?.file?.id || x.fileId || null;
+    const fileUrl = x?.file?.fileUrl || x.fileUrl || x.url || null;
+    return { usageId, fileId, fileUrl };
+  };
 
-  const blob = await new Promise((res) =>
-    canvas.toBlob(res, "image/jpeg", quality)
-  );
-  return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), {
-    type: "image/jpeg",
-  });
-}
-
-/* ---------- Utils: chuẩn hoá response upload (lấy URL/ID) ---------- */
-function extractUploadedRef(uploaded) {
-  const d = uploaded?.data ?? uploaded;
-  const first =
-    (Array.isArray(d) && d[0]) || d?.files?.[0] || d?.file || d?.data?.[0] || d;
-
-  const url =
-    first?.url ||
-    first?.publicUrl ||
-    first?.location ||
-    first?.path ||
-    first?.file?.url;
-
-  const id = first?.id || first?.fileId || first?.fid || first?.file?.id;
-
-  return { url, id, raw: first };
-}
-
-/* ---------- Utils: resolve avatarUrl (id -> file.fileUrl) ---------- */
-const resolveAvatarUrl = (kol) => {
-  const raw = kol?.avatarUrl;
-  const usages = Array.isArray(kol?.fileUsageDtos) ? kol.fileUsageDtos : [];
-
-  if (raw && /^https?:\/\//i.test(raw)) return raw; // 1) đã là URL
-
-  const byUsageId = raw ? usages.find((u) => u?.id === raw) : null;
-  if (byUsageId?.file?.fileUrl) return byUsageId.file.fileUrl; // 2) fileUsageId
-
-  const byFileId = raw ? usages.find((u) => u?.file?.id === raw) : null;
-  if (byFileId?.file?.fileUrl) return byFileId.file.fileUrl; // 3) fileId
-
-  const avatarUsage = usages.find(
-    (u) => u?.targetType === "AVATAR" && u?.isActive && u?.file?.fileUrl
-  );
-  if (avatarUsage?.file?.fileUrl) return avatarUsage.file.fileUrl; // 4) AVATAR
-
-  const cover = usages.find(
-    (u) => u?.isCover && u?.isActive && u?.file?.fileUrl
-  );
-  if (cover?.file?.fileUrl) return cover.file.fileUrl; // 5) cover
-
-  const firstImage = usages.find(
-    (u) => u?.file?.fileType === "IMAGE" && u?.file?.fileUrl
-  );
-  if (firstImage?.file?.fileUrl) return firstImage.file.fileUrl; // 6) ảnh đầu
-
-  return "";
+  if (Array.isArray(data) && data.length) return normalize(data[0]);
+  if (Array.isArray(data?.content) && data.content.length)
+    return normalize(data.content[0]);
+  return normalize(data);
 };
 
 export default function KolSettings() {
@@ -123,60 +59,57 @@ export default function KolSettings() {
 
   const [loading, setLoading] = useState(false);
 
-  // ====== Info (fullName / email / avatarUrl) ======
+  // ====== Info (fullName / email / avatar) ======
   const [editingInfo, setEditingInfo] = useState(false);
   const [savingInfo, setSavingInfo] = useState(false);
   const [formInfo] = Form.useForm();
+  const [avatarPreview, setAvatarPreview] = useState(""); // ảnh đang hiển thị
+  const avatarFileRef = useRef(null); // file được chọn (nếu có)
+  const objectUrlRef = useRef(null); // để revoke
+  const [uploadPct, setUploadPct] = useState(0);
 
-  const [avatarPreview, setAvatarPreview] = useState(""); // url http/https hoặc blob:
-  const [avatarObjectUrl, setAvatarObjectUrl] = useState("");
-  const avatarFileRef = useRef(
-    /** @type {React.MutableRefObject<File|null>} */ null
-  );
-
-  // ====== Password reset (OTP 1 endpoint) ======
+  // ====== Password reset (OTP) ======
   const [editingPwd, setEditingPwd] = useState(false);
   const [changingPwd, setChangingPwd] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpSeconds, setOtpSeconds] = useState(0);
   const [formPwd] = Form.useForm();
-  const otpInputRef = useRef(null);
 
-  const revokeObjectUrl = () => {
-    if (avatarObjectUrl && avatarObjectUrl.startsWith("blob:")) {
-      try {
-        URL.revokeObjectURL(avatarObjectUrl);
-      } catch (err) {
-        // ignore
+  // cleanup object URL khi unmount
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
-    }
-    setAvatarObjectUrl("");
-  };
+    };
+  }, []);
 
   const fetchMe = async () => {
     setLoading(true);
     try {
-      let avatarUrl = user?.avatarUrl || user?.avatar || "";
       let fullName = user?.fullName || user?.name || "";
-      const email = user?.email || "";
+      let email = user?.email || "";
+      let avatarUrl = user?.avatarUrl || user?.avatar || "";
 
       if (userId) {
         const kol = await getKolProfileByUserId(userId);
-        const resolved = resolveAvatarUrl(kol);
-        avatarUrl = resolved || kol?.avatarUrl || avatarUrl;
-        if (kol?.fullName) fullName = kol.fullName;
+        if (kol) {
+          fullName = kol.fullName || fullName;
+          // dùng resolver để hiện đúng ảnh dù avatarUrl là URL/usageId/fileId
+          const resolved = resolveAvatarUrl(kol);
+          avatarUrl = resolved || avatarUrl;
+        }
       }
 
       formInfo.setFieldsValue({ fullName, email });
-      revokeObjectUrl();
       setAvatarPreview(avatarUrl || "");
-      avatarFileRef.current = null;
 
-      auth?.dispatch?.({
-        type: "UPDATE_PROFILE",
-        payload: { fullName, avatar: avatarUrl },
-      });
+      // reset tạm
+      avatarFileRef.current = null;
+      setUploadPct(0);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -189,20 +122,6 @@ export default function KolSettings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  useEffect(() => {
-    return () => revokeObjectUrl();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // OTP countdown
-  useEffect(() => {
-    if (otpSeconds <= 0) return;
-    const t = setInterval(() => {
-      setOtpSeconds((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
-    return () => clearInterval(t);
-  }, [otpSeconds]);
-
   const onPickAvatar = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -212,33 +131,21 @@ export default function KolSettings() {
       toast.error("Vui lòng chọn đúng định dạng ảnh.");
       return;
     }
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error("Ảnh quá lớn (>20MB). Vui lòng chọn ảnh nhỏ hơn.");
+    // Có thể giảm limit phía FE tuỳ cấu hình Nginx/BE; tạm để 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Ảnh quá lớn (>5MB). Vui lòng chọn ảnh nhỏ hơn.");
       return;
     }
 
-    revokeObjectUrl();
     avatarFileRef.current = file;
-    const objUrl = URL.createObjectURL(file);
-    setAvatarObjectUrl(objUrl);
-    setAvatarPreview(objUrl);
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(file);
+    objectUrlRef.current = url;
+    setAvatarPreview(url);
   };
 
   const openPicker = () =>
     document.getElementById("kol-settings-avatar-input")?.click();
-
-  const onAvatarError = () => {
-    setAvatarPreview(""); // để Avatar fallback sang initials
-    return false; // yêu cầu của antd để dùng children làm fallback
-  };
-
-  const initials = () =>
-    (formInfo.getFieldValue("fullName") || "K O L")
-      .split(/\s+/)
-      .map((s) => s[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
 
   const onSaveInfo = async () => {
     try {
@@ -247,60 +154,53 @@ export default function KolSettings() {
 
       setSavingInfo(true);
 
-      // Nếu có file mới → upload multipart trước (có nén), lấy URL/ID
+      // 1) Nếu có file avatar mới → UPLOAD ẢNH
       if (avatarFileRef.current) {
-        let fileToUpload = avatarFileRef.current;
-
-        if (fileToUpload.size > 1024 * 1024) {
-          try {
-            fileToUpload = await downscaleImage(fileToUpload, {
-              maxW: 800,
-              maxH: 800,
-              quality: 0.85,
-            });
-          } catch (err) {
-            console.warn("Downscale ảnh thất bại, vẫn dùng file gốc.", err);
-          }
-        }
-
-        const uploaded = await uploadKolMedias(fileToUpload, {
+        const res = await uploadKolMedias(avatarFileRef.current, {
           fileType: "IMAGE",
           targetType: "AVATAR",
+          onUploadProgress: (e) => {
+            if (!e.total) return;
+            setUploadPct(Math.round((e.loaded * 100) / e.total));
+          },
         });
 
-        const { url, id } = extractUploadedRef(uploaded);
-        if (url) {
-          payload.avatarUrl = url; // tốt nhất: dùng URL
-        } else if (id) {
-          payload.avatarUrl = id; // BE chấp nhận id thì dùng id
-        } else {
-          throw new Error(
-            "Upload OK nhưng không tìm thấy URL/ID trong response."
-          );
+        // 2) Lấy usageId/fileId → GỌI API CHỌN AVATAR TỪ ẢNH ĐÃ CÓ
+        const ref = extractUploadedAvatarRef(res);
+        if (!ref?.usageId && !ref?.fileId) {
+          throw new Error("Không lấy được usageId/fileId sau khi upload.");
         }
+        await changeKolAvatarExisting({
+          fileUsageId: ref.usageId ?? undefined,
+          fileId: ref.fileId ?? undefined,
+        });
       }
 
-      // PUT JSON nhỏ gọn /kol/profile/update
-      await updateMyKolProfile(payload);
+      // 3) Cập nhật các field text
+      await updateMyKolProfile(payload); // /v1/kol/profile/update
 
       toast.success("Đã lưu thay đổi.");
       setEditingInfo(false);
+
+      // dọn state
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+      avatarFileRef.current = null;
+      setUploadPct(0);
+
       await fetchMe();
+
+      // cập nhật nhẹ local auth store
+      auth?.dispatch?.({
+        type: "UPDATE_PROFILE",
+        payload: { fullName: payload.fullName },
+      });
     } catch (e) {
       if (!e?.errorFields) {
-        const httpStatus = e?.response?.status;
-        if (httpStatus === 413) {
-          toast.error(
-            "Upload bị 413 (quá lớn). Đã bật nén ảnh; nếu vẫn lỗi, hãy chọn ảnh nhỏ hơn."
-          );
-        } else if (httpStatus === 415) {
-          toast.error(
-            "BE không chấp nhận kiểu dữ liệu. Kiểm tra cấu hình upload hoặc header."
-          );
-        } else {
-          console.error(e);
-          toast.error(e?.response?.data?.message || "Lưu thay đổi thất bại.");
-        }
+        console.error(e);
+        toast.error(e?.response?.data?.message || "Lưu thay đổi thất bại.");
       }
     } finally {
       setSavingInfo(false);
@@ -312,68 +212,23 @@ export default function KolSettings() {
     fetchMe();
   };
 
-  // ====== CHỈ DÙNG /password/reset CHO CẢ HAI BƯỚC ======
-  // Bấm "Gửi OTP": gửi kèm newPassword & confirmPassword để BE không bị null
-  const sendPasswordOtp = async () => {
-    try {
-      const email = formInfo.getFieldValue("email");
-      await formPwd.validateFields(["newPassword", "confirmPassword"]);
-      const newPassword = formPwd.getFieldValue("newPassword");
-      const confirmPassword = formPwd.getFieldValue("confirmPassword");
-      if (!email) return toast.error("Thiếu email.");
-      if (newPassword !== confirmPassword)
-        return toast.error("Mật khẩu xác nhận không khớp.");
-
-      setSendingOtp(true);
-
-      await post({
-        url: "v1/password/reset",
-        data: {
-          email,
-          newPassword,
-          confirmPassword,
-          requestOtp: true, // gợi ý (BE có thể bỏ qua)
-          phase: "SEND_OTP", // gợi ý (BE có thể bỏ qua)
-          otp: "", // tránh BE trim/equals trên chuỗi null
-        },
-      });
-
-      setOtpSent(true);
-      setOtpSeconds(120);
-      toast.success("Đã gửi OTP. Vui lòng kiểm tra email.");
-      setTimeout(() => otpInputRef.current?.focus?.(), 0);
-    } catch (e) {
-      if (!e?.errorFields) {
-        console.error(e);
-        toast.error(
-          e?.response?.data?.message || "Gửi OTP thất bại. Thử lại sau."
-        );
-      }
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  // Submit đổi mật khẩu: cần { email, otp, newPassword, confirmPassword }
   const onSavePassword = async () => {
     try {
-      const email = formInfo.getFieldValue("email");
-      const { otp, newPassword, confirmPassword } =
+      const { email, otp, newPassword, confirmPassword } =
         await formPwd.validateFields();
-      if (!otpSent) return toast.error("Vui lòng bấm 'Gửi OTP' trước.");
-      if (!email) return toast.error("Thiếu email.");
-      if (newPassword !== confirmPassword)
-        return toast.error("Mật khẩu xác nhận không khớp.");
-
+      if (newPassword !== confirmPassword) {
+        toast.error("Mật khẩu xác nhận không khớp.");
+        return;
+      }
       setChangingPwd(true);
-      await post({
-        url: "v1/password/reset",
-        data: { email, otp, newPassword, confirmPassword },
+      await resetPasswordWithOtp({
+        email,
+        otp,
+        newPassword,
+        confirmPassword,
       });
       toast.success("Đổi mật khẩu thành công.");
       setEditingPwd(false);
-      setOtpSent(false);
-      setOtpSeconds(0);
       formPwd.resetFields();
     } catch (e) {
       if (!e?.errorFields) {
@@ -431,25 +286,15 @@ export default function KolSettings() {
           </Title>
         }
         className="shadow-sm rounded-2xl"
-        bodyStyle={{ padding: 24, paddingBottom: 16 }}
+        bodyStyle={{ paddingBottom: 16 }}
       >
-        {/* Avatar */}
+        {/* Avatar ở giữa trên cùng */}
         <div className="w-full flex flex-col items-center mb-4">
           <Avatar
-            src={avatarPreview || undefined}
+            src={avatarPreview}
             size={128}
-            onError={onAvatarError}
             style={{ border: "1px solid #e5e7eb" }}
-          >
-            {(formInfo.getFieldValue("fullName") || "K O L")
-              .split(/\s+/)
-              .map((s) => s[0])
-              .join("")
-              .slice(0, 2)
-              .toUpperCase()}
-          </Avatar>
-        </div>
-        <div className="w-full flex justify-center">
+          />
           <input
             id="kol-settings-avatar-input"
             type="file"
@@ -458,13 +303,20 @@ export default function KolSettings() {
             onChange={onPickAvatar}
           />
           {editingInfo ? (
-            <Button
-              icon={<UploadOutlined />}
-              onClick={openPicker}
-              className="rounded-xl mt-3"
-            >
-              Chọn ảnh từ máy
-            </Button>
+            <div className="flex flex-col items-center">
+              <Button
+                icon={<UploadOutlined />}
+                onClick={openPicker}
+                className="rounded-xl mt-3"
+              >
+                Chọn ảnh từ máy
+              </Button>
+              {savingInfo && uploadPct > 0 && uploadPct < 100 && (
+                <div className="text-sm text-gray-500 mt-2">
+                  Đang tải ảnh… {uploadPct}%
+                </div>
+              )}
+            </div>
           ) : (
             <Text type="secondary" className="mt-3">
               Ảnh đại diện
@@ -472,15 +324,15 @@ export default function KolSettings() {
           )}
         </div>
 
-        {/* Họ & tên + Email (chia đều 50/50) */}
+        {/* Họ & tên + Email cùng một hàng */}
         <Form
           form={formInfo}
           layout="vertical"
           disabled={!editingInfo}
-          className="w-full"
+          className="max-w-3xl mx-auto"
         >
-          <Row gutter={[24, 16]}>
-            <Col xs={24} md={12} flex="1 1 0%">
+          <Row gutter={16} justify="center">
+            <Col xs={24} md={12}>
               <Form.Item
                 label="Họ và tên"
                 name="fullName"
@@ -492,7 +344,7 @@ export default function KolSettings() {
                 <Input placeholder="Họ và tên" className="!h-12" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={12} flex="1 1 0%">
+            <Col xs={24} md={12}>
               <Form.Item label="Email" name="email">
                 <Input disabled className="!h-12" />
               </Form.Item>
@@ -501,7 +353,7 @@ export default function KolSettings() {
         </Form>
       </Card>
 
-      {/* ===== Đổi mật khẩu (Gửi OTP trước, rồi submit) ===== */}
+      {/* ===== Đổi mật khẩu (OTP) ===== */}
       <Card
         title={
           <Title level={4} className="!mb-0 font-bold">
@@ -513,9 +365,6 @@ export default function KolSettings() {
                     icon={<LockOutlined />}
                     onClick={() => {
                       setEditingPwd(true);
-                      setOtpSent(false);
-                      setOtpSeconds(0);
-                      formPwd.resetFields();
                       formPwd.setFieldsValue({
                         email: formInfo.getFieldValue("email"),
                       });
@@ -525,13 +374,11 @@ export default function KolSettings() {
                     Chỉnh sửa
                   </Button>
                 ) : (
-                  <Space wrap>
+                  <Space>
                     <Button
                       icon={<CloseOutlined />}
                       onClick={() => {
                         setEditingPwd(false);
-                        setOtpSent(false);
-                        setOtpSeconds(0);
                         formPwd.resetFields();
                       }}
                       className="rounded-xl !h-10"
@@ -539,24 +386,11 @@ export default function KolSettings() {
                       Hủy
                     </Button>
                     <Button
-                      icon={<SendOutlined />}
-                      type="default"
-                      loading={sendingOtp}
-                      disabled={sendingOtp || otpSeconds > 0}
-                      onClick={sendPasswordOtp}
-                      className="rounded-xl !h-10"
-                    >
-                      {otpSeconds > 0
-                        ? `Gửi lại OTP (${otpSeconds}s)`
-                        : "Gửi OTP"}
-                    </Button>
-                    <Button
                       type="primary"
                       icon={<SaveOutlined />}
                       loading={changingPwd}
                       onClick={onSavePassword}
                       className="rounded-xl !h-10"
-                      disabled={!otpSent}
                     >
                       Lưu thay đổi
                     </Button>
@@ -567,13 +401,13 @@ export default function KolSettings() {
           </Title>
         }
         className="shadow-sm rounded-2xl"
-        bodyStyle={{ padding: 24, paddingBottom: 16 }}
+        bodyStyle={{ paddingBottom: 16 }}
       >
         {!editingPwd ? (
           <div className="text-gray-500">**********</div>
         ) : (
           <Form form={formPwd} layout="vertical" className="max-w-2xl">
-            <Row gutter={[24, 16]}>
+            <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Email"
@@ -589,16 +423,11 @@ export default function KolSettings() {
                   name="otp"
                   rules={[{ required: true, message: "Nhập mã OTP" }]}
                 >
-                  <Input
-                    ref={otpInputRef}
-                    className="!h-12"
-                    placeholder="Nhập mã OTP đã nhận"
-                    disabled={!otpSent}
-                  />
+                  <Input className="!h-12" placeholder="Nhập mã OTP đã nhận" />
                 </Form.Item>
               </Col>
             </Row>
-            <Row gutter={[24, 16]}>
+            <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Mật khẩu mới"
