@@ -31,7 +31,7 @@ import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
 
 const ROLE_LABELS = {
   LIVE: "Trợ live",
-  KOL: "KOL",
+  KOL: "Host chính",
 };
 
 const buildRoleInfo = (role) => {

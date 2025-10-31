@@ -773,9 +773,9 @@ const BookingRequestDetail = () => {
                         column={screens.lg ? 3 : screens.md ? 2 : 1}
                         labelStyle={{ width: 180 }}
                       >
-                        <Descriptions.Item label="Mã thanh toán">
+                        {/* <Descriptions.Item label="Mã thanh toán">
                           {contract?.paymentDTO?.id ?? "--"}
-                        </Descriptions.Item>
+                        </Descriptions.Item> */}
                         <Descriptions.Item label="Trạng thái">
                           {paymentStatus ? (
                             <Tag

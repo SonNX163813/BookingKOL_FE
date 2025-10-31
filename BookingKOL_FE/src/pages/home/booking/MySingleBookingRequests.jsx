@@ -315,9 +315,10 @@ const MySingleBookingRequests = () => {
     () => [
       {
         title: "Mã đơn",
-        key: "contractId",
+        key: "requestNumber",
         width: 260,
-        render: (_, record) => record?.contracts?.[0]?.id ?? "--",
+        render: (_, record) => record?.requestNumber ?? "--",
+        // render: (_, record) => record?.contracts?.[0]?.contractNumber ?? "--",
       },
       {
         title: "Trạng thái",

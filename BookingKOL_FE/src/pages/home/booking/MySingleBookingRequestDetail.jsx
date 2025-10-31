@@ -28,6 +28,7 @@ import {
 import { useGetMySingleBookingRequestDetail } from "../../../hook/user/booking/useGetMySingleBookingRequestDetail";
 import { UploadOutlined } from "@ant-design/icons";
 import { useUpdateMySingleBookingRequest } from "../../../hook/user/booking/useUpdateMySingleBookingRequest";
+import UserKolFeedbackSection from "../../../components/home/booking/UserKolFeedbackSection";
 
 const { Text } = Typography;
 
@@ -607,11 +608,12 @@ const MySingleBookingRequestDetail = () => {
                       const paymentStatus = normalizeStatus(
                         c?.paymentDTO?.status
                       );
+                      const contractStatus = normalizeStatus(c?.status);
                       return (
                         <Card
                           key={c?.id}
                           type="inner"
-                          title={`Hợp đồng ${c?.id ?? ""}`}
+                          title={`Hợp đồng ${c?.contractNumber ?? ""}`}
                           className="shadow-sm"
                         >
                           <Descriptions bordered size="middle" column={1}>
@@ -650,10 +652,22 @@ const MySingleBookingRequestDetail = () => {
                                 c?.paymentDTO?.currency ?? "VND"
                               )}
                             </Descriptions.Item>
+                            <Descriptions.Item label="Thời gian cập nhật">
+                              {formatDateTime(c?.paymentDTO?.updatedAt)}
+                            </Descriptions.Item>
                             <Descriptions.Item label="Hết hạn thanh toán">
                               {formatDateTime(c?.paymentDTO?.expiresAt)}
                             </Descriptions.Item>
                           </Descriptions>
+                          {contractStatus === "COMPLETED" && (
+                            <UserKolFeedbackSection
+                              contract={c}
+                              kol={detail?.kol}
+                              onFeedbackUpdated={() =>
+                                refetchMyBookingRequestDetail()
+                              }
+                            />
+                          )}
                         </Card>
                       );
                     })}

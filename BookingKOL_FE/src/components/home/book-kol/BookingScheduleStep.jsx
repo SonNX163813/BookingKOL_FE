@@ -71,13 +71,27 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
       let cursor = start.clone();
       while (cursor.isBefore(end)) {
-        slot.displayHours.push(cursor.hour());
+        const hourValue = cursor.hour();
+        slot.displayHours.push({
+          hour: hourValue,
+          position: hourValue === slot.startHour ? "start" : "middle",
+        });
         cursor = cursor.add(1, "hour");
       }
 
-      const endHour = end.hour();
-      if (slot.displayHours.at(-1) !== endHour) {
-        slot.displayHours.push(endHour);
+      const endHourValue = end.hour();
+      const lastEntry = slot.displayHours.at(-1);
+
+      if (!lastEntry || lastEntry.hour !== endHourValue) {
+        slot.displayHours.push({
+          hour: endHourValue,
+          position: "end",
+        });
+      } else {
+        slot.displayHours[slot.displayHours.length - 1] = {
+          hour: lastEntry.hour,
+          position: "end",
+        };
       }
 
       map[dateKey].push(slot);
@@ -99,15 +113,6 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     () => slotsByDate[selectedDateKey] || [],
     [slotsByDate, selectedDateKey]
   );
-  const activeSlot = useMemo(
-    () => dailySlots.find((slot) => slot.id === activeSlotId) || null,
-    [dailySlots, activeSlotId]
-  );
-  const slotsToRender = useMemo(
-    () => (activeSlot ? [activeSlot] : dailySlots),
-    [activeSlot, dailySlots]
-  );
-
   useEffect(() => {
     if (!activeSlotId) return;
     if (!dailySlots.some((slot) => slot.id === activeSlotId)) {
@@ -256,6 +261,12 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     setEndHour(null);
   };
 
+  const handleResetSelection = useCallback(() => {
+    setStartHour(null);
+    setEndHour(null);
+    setActiveSlotId(null);
+  }, []);
+
   /* -------------------- Gửi dữ liệu ra ngoài -------------------- */
   useEffect(() => {
     if (typeof onSelectSchedule !== "function") return;
@@ -269,6 +280,9 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
   }, [startHour, endHour, selectedDate, onSelectSchedule]);
 
   /* -------------------- Render -------------------- */
+  const hasSelection = startHour !== null;
+  const hasCompletedSelection = startHour !== null && endHour !== null;
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
       <Box
@@ -322,21 +336,52 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
         </Box>
 
         {/* Giờ livestream */}
-        <Typography
+        <Box
           sx={{
-            fontWeight: 600,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center", // ✅ căn giữa theo trục dọc
+            flexWrap: "wrap", // ✅ giúp responsive nếu nhỏ
+            gap: 1.5, // ✅ thêm khoảng cách giữa phần trái/phải
             mb: 1.5,
-            color: STYLE.textPrimary,
-            fontSize: "1rem",
           }}
         >
-          Chọn khung giờ livestream
-          <Typography
-            sx={{ color: STYLE.textSecondary, fontSize: "0.85rem", mb: 1 }}
+          <Box>
+            <Typography
+              sx={{
+                fontWeight: 600,
+                color: STYLE.textPrimary,
+                fontSize: "1rem",
+              }}
+            >
+              Chọn khung giờ livestream
+            </Typography>
+            <Typography
+              sx={{ color: STYLE.textSecondary, fontSize: "0.85rem", mt: 0.5 }}
+            >
+              Chọn giờ bắt đầu và giờ kết thúc (tối đa 3 tiếng)
+            </Typography>
+          </Box>
+
+          <Button
+            variant="outlined"
+            onClick={handleResetSelection}
+            sx={{
+              fontWeight: 600,
+              px: 2.5,
+              py: 0.8,
+              borderRadius: 2,
+              textTransform: "none",
+              color: STYLE.accent,
+              borderColor: STYLE.accent,
+              "&:hover": {
+                backgroundColor: alpha(STYLE.accent, 0.08),
+              },
+            }}
           >
-            Chọn giờ bắt đầu và kết thúc (tối đa 3 tiếng)
-          </Typography>
-        </Typography>
+            Đặt lại
+          </Button>
+        </Box>
 
         {loading ? (
           <Stack direction="row" spacing={1} alignItems="center">
@@ -345,95 +390,141 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
               Đang tải lịch trống...
             </Typography>
           </Stack>
-        ) : slotsToRender.length === 0 ? (
+        ) : dailySlots.length === 0 ? (
           <Typography sx={{ color: STYLE.textSecondary }}>
             Không có lịch trống trong ngày này.
           </Typography>
         ) : (
           <Stack spacing={2}>
-            {slotsToRender.map((slot, index) => (
-              <Box key={`${slot.id}-${index}`}>
-                <Typography
-                  sx={{
-                    fontSize: "0.85rem",
-                    color: STYLE.textSecondary,
-                    fontWeight: 500,
-                    mb: 1,
-                  }}
-                >
-                  {`Khung giờ: ${slot.start.format(
-                    "HH:mm"
-                  )} - ${slot.end.format("HH:mm")}`}
-                </Typography>
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
-                    gap: 1.5,
-                  }}
-                >
-                  {slot.displayHours.map((h, idx) => {
-                    const isStart = h === startHour;
-                    const isEnd = h === endHour;
-                    const isInRange =
-                      startHour !== null &&
-                      endHour !== null &&
-                      h > startHour &&
-                      h < endHour;
-                    const active = isStart || isEnd || isInRange;
-                    const key = `${slot.id}-${h}-${idx}`;
+            {dailySlots.map((slot, index) => {
+              const slotDisabled =
+                !!activeSlotId &&
+                activeSlotId !== slot.id &&
+                startHour !== null;
+              return (
+                <Box key={`${slot.id}-${index}`}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.85rem",
+                      color: STYLE.textSecondary,
+                      fontWeight: 500,
+                      mb: 1,
+                    }}
+                  >
+                    {`Khung giờ: ${slot.start.format(
+                      "HH:mm"
+                    )} - ${slot.end.format("HH:mm")}`}
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(80px, 1fr))",
+                      gap: 1.5,
+                    }}
+                  >
+                    {slot.displayHours.map(({ hour, position }, idx) => {
+                      const belongsToActiveSlot = slot.id === activeSlotId;
+                      const isStart =
+                        belongsToActiveSlot &&
+                        startHour !== null &&
+                        hour === startHour;
+                      const isEnd =
+                        belongsToActiveSlot &&
+                        endHour !== null &&
+                        hour === endHour;
+                      const isInRange =
+                        belongsToActiveSlot &&
+                        startHour !== null &&
+                        endHour !== null &&
+                        hour > startHour &&
+                        hour < endHour;
+                      const active = isStart || isEnd || isInRange;
+                      const key = `${slot.id}-${hour}-${position}-${idx}`;
+                      const baseBg = slotDisabled
+                        ? "#f2f2f2"
+                        : active
+                        ? STYLE.accent
+                        : "#fff";
 
-                    return (
-                      <Button
-                        key={key}
-                        onClick={() => handleSelectHour(h)}
-                        variant={active ? "contained" : "outlined"}
-                        sx={{
-                          borderRadius:
-                            isStart && endHour !== null
-                              ? "12px 0 0 12px"
-                              : isEnd
-                              ? "0 12px 12px 0"
-                              : isInRange
-                              ? "0"
-                              : "12px",
-                          height: 48,
-                          fontWeight: 600,
-                          fontSize: "0.9rem",
-                          color: active ? "#fff" : STYLE.textPrimary,
-                          backgroundColor: active ? STYLE.accent : "#fff",
-                          borderColor: STYLE.border,
-                          transition: "all 0.2s ease",
-                          "&:hover": {
-                            transform: "translateY(-2px)",
-                            backgroundColor: active
-                              ? STYLE.accentHover
-                              : STYLE.accentHover + "20",
-                          },
-                        }}
-                      >
-                        {`${h.toString().padStart(2, "0")}:00`}
-                      </Button>
-                    );
-                  })}
+                      return (
+                        <Button
+                          key={key}
+                          onClick={() => handleSelectHour(hour)}
+                          variant={active ? "contained" : "outlined"}
+                          disabled={slotDisabled}
+                          sx={{
+                            borderRadius:
+                              !belongsToActiveSlot || !active
+                                ? "12px"
+                                : isStart && endHour !== null
+                                ? "12px 0 0 12px"
+                                : isEnd
+                                ? "0 12px 12px 0"
+                                : isInRange
+                                ? "0"
+                                : "12px",
+                            height: 48,
+                            fontWeight: 600,
+                            fontSize: "0.9rem",
+                            color: slotDisabled
+                              ? STYLE.textSecondary
+                              : active
+                              ? "#fff"
+                              : STYLE.textPrimary,
+                            backgroundColor: baseBg,
+
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              transform: slotDisabled
+                                ? "none"
+                                : "translateY(-2px)",
+                              backgroundColor: slotDisabled
+                                ? "#e8e8e8"
+                                : active
+                                ? STYLE.accentHover
+                                : alpha(STYLE.textSecondary, 0.12),
+                            },
+                          }}
+                        >
+                          {`${hour.toString().padStart(2, "0")}:00`}
+                        </Button>
+                      );
+                    })}
+                  </Box>
                 </Box>
-              </Box>
-            ))}
+              );
+            })}
           </Stack>
         )}
 
         {/* Hiển thị thời gian chọn */}
-        {startHour !== null && endHour !== null && (
-          <Box sx={{ mt: 3, textAlign: "center" }}>
+        {hasSelection && (
+          <Stack
+            spacing={1.5}
+            alignItems="center"
+            sx={{ mt: 3, textAlign: "center" }}
+          >
             <Typography sx={{ fontWeight: 600, color: STYLE.textPrimary }}>
-              Thời gian livestream:&nbsp;
-              <Typography component="span" sx={{ color: STYLE.accent }}>
-                {`${startHour}:00 - ${endHour}:00, ${selectedDate.format(
-                  "DD/MM"
-                )}`}
-              </Typography>
+              {hasCompletedSelection ? (
+                <>
+                  Thời gian livestream:&nbsp;
+                  <Typography component="span" sx={{ color: STYLE.accent }}>
+                    {`${startHour}:00 - ${endHour}:00, ${selectedDate.format(
+                      "DD/MM"
+                    )}`}
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  Giờ bắt đầu:&nbsp;
+                  <Typography component="span" sx={{ color: STYLE.accent }}>
+                    {`${startHour}:00, ${selectedDate.format("DD/MM")}`}
+                  </Typography>
+                </>
+              )}
             </Typography>
-          </Box>
+          </Stack>
         )}
       </Box>
     </LocalizationProvider>
