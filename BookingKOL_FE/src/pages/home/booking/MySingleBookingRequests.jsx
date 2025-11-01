@@ -9,7 +9,6 @@ import {
   Popconfirm,
   Select,
   Space,
-  Table,
   Tag,
 } from "antd";
 import {
@@ -27,6 +26,7 @@ import {
 } from "lucide-react";
 import { useGetMySingleBookingRequests } from "../../../hook/user/booking/useGetMySingleBookingRequests";
 import { useCancelMySingleBookingRequest } from "../../../hook/user/booking/useCancelMySingleBookingRequest";
+import { BOOKING_FLOW_STYLE } from "../../../constants/bookingFlowTextStyles";
 
 const { RangePicker } = DatePicker;
 
@@ -86,6 +86,28 @@ const PAYMENT_STATUS_COLOR = {
   EXPIRED: "volcano",
   CANCELLED: "warning",
   REFUNDED: "purple",
+};
+
+const resolveBookingStatus = (status) => {
+  const normalized = status?.toUpperCase();
+  const label =
+    BOOKING_STATUS_OPTIONS.find((option) => option.value === normalized)
+      ?.label ??
+    normalized ??
+    "--";
+  const color = STATUS_TAG_COLOR[normalized] ?? "default";
+  return { label, color };
+};
+
+const resolvePaymentStatus = (status) => {
+  const normalized = status?.toUpperCase();
+  const label =
+    PAYMENT_STATUS_OPTIONS.find((option) => option.value === normalized)
+      ?.label ??
+    normalized ??
+    "--";
+  const color = PAYMENT_STATUS_COLOR[normalized] ?? "default";
+  return { label, color };
 };
 
 const CANCELABLE_BOOKING_STATUSES = new Set([
@@ -195,6 +217,13 @@ const MySingleBookingRequests = () => {
       Array.isArray(rawData) ? rawData.length : dataSource.length,
       inferredTotal
     );
+
+  const hasData = Array.isArray(dataSource) && dataSource.length > 0;
+  const isInitialLoading = isLoadingMyBookingRequests && !hasData;
+  const skeletonItems = useMemo(
+    () => Array.from({ length: Math.min(size, 6) }, (_, index) => index),
+    [size]
+  );
 
   const pageRange = useMemo(() => {
     if (!totalElements) return null;
@@ -311,146 +340,67 @@ const MySingleBookingRequests = () => {
     [handleCancelMySingleBookingRequest, refetchMyBookingRequests]
   );
 
-  const columns = useMemo(
-    () => [
-      {
-        title: "Mã đơn",
-        key: "requestNumber",
-        width: 150,
-        render: (_, record) => record?.requestNumber ?? "--",
-        // render: (_, record) => record?.contracts?.[0]?.contractNumber ?? "--",
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        width: 150,
-        render: (v) => {
-          const normalized = v?.toUpperCase();
-          const label =
-            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
-            normalized;
-          return (
-            <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>{label}</Tag>
-          );
-        },
-      },
-      {
-        title: "Thời gian thực hiện",
-        key: "executionTime",
-        width: 120,
-        render: (_, r) => composeExecutionTime(r),
-      },
-      {
-        title: "Địa điểm",
-        dataIndex: "location",
-        key: "location",
-        width: 200,
-        render: (v) => v || "--",
-      },
-      {
-        title: "Thanh toán",
-        key: "paymentStatus",
-        width: 160,
-        render: (_, r) => {
-          const payment = getPrimaryPayment(r);
-          const normalized = payment?.status?.toUpperCase();
-          const label =
-            PAYMENT_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
-            normalized ??
-            "--";
-          return (
-            <Tag color={PAYMENT_STATUS_COLOR[normalized] ?? "default"}>
-              {label}
-            </Tag>
-          );
-        },
-      },
-      {
-        title: "Tổng tiền",
-        key: "totalAmount",
-        width: 150,
-        render: (_, r) => {
-          const payment = getPrimaryPayment(r);
-          const amount =
-            payment?.totalAmount ??
-            payment?.paidAmount ??
-            r?.totalAmount ??
-            r?.budget ??
-            null;
-          return formatCurrency(amount);
-        },
-      },
-      {
-        title: "Ngày tạo",
-        dataIndex: "createdAt",
-        key: "createdAt",
-        width: 120,
-        render: (v) => formatDateTime(v),
-      },
-      {
-        title: "Ghi chú",
-        dataIndex: "description",
-        key: "description",
-        ellipsis: true,
-        render: (v) => v?.trim() || "--",
-      },
-      {
-        title: "Thao tác",
-        key: "actions",
-        fixed: "right",
-        width: 190,
-        render: (_, record) => {
-          const requestId = record?.id;
-          const isCancelable = canCancelBookingRequest(record?.status);
-          const isProcessingThisRow =
-            isCancellingMySingleBookingRequest &&
-            cancellingRequestId === requestId;
-          const disableCancel =
-            !requestId ||
-            (isCancellingMySingleBookingRequest && !isProcessingThisRow);
-          const cancelButton = (
-            <Button
-              type="link"
-              danger
-              disabled={disableCancel}
-              loading={isProcessingThisRow}
-              className="!h-10 !rounded-xl !px-3 !text-red-600 hover:!bg-red-50 focus:!bg-red-100"
-            >
-              <XCircle size={18} />
-            </Button>
-          );
+  const renderBookingActions = useCallback(
+    (record) => {
+      const requestId = record?.id;
+      const isCancelable = canCancelBookingRequest(record?.status);
+      const isProcessingThisRow =
+        isCancellingMySingleBookingRequest && cancellingRequestId === requestId;
+      const disableCancel =
+        !requestId ||
+        (isCancellingMySingleBookingRequest && !isProcessingThisRow);
 
-          return (
-            <Space size="small">
-              <Button
-                type="link"
-                onClick={() => handleViewDetail(record)}
-                className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-              >
-                <Eye size={18} />
-              </Button>
-              {isCancelable && requestId ? (
-                <Popconfirm
-                  title="Huỷ đơn booking"
-                  description="Bạn có chắc chắn muốn huỷ đơn này? Thao tác không thể hoàn tác."
-                  okText="Huỷ đơn"
-                  cancelText="Bỏ qua"
-                  okButtonProps={{
-                    danger: true,
-                    loading: isProcessingThisRow,
-                  }}
-                  placement="left"
-                  onConfirm={() => handleCancelRequest(requestId)}
-                >
-                  {cancelButton}
-                </Popconfirm>
-              ) : null}
-            </Space>
-          );
-        },
-      },
-    ],
+      const cancelButton = (
+        <Button
+          danger
+          disabled={disableCancel}
+          loading={isProcessingThisRow}
+          style={{
+            height: "2.5rem",
+            fontWeight: 600,
+            borderRadius: "16px",
+            color: "#dc2626",
+            "&:hover": { backgroundColor: "#dc2626" },
+          }}
+        >
+          {/* <XCircle size={18} /> */}
+          Hủy đơn
+        </Button>
+      );
+
+      return (
+        <Space size="small">
+          <Button
+            onClick={() => handleViewDetail(record)}
+            style={{
+              color: "#ffffff",
+              height: "2.5rem",
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "16px",
+              backgroundColor: BOOKING_FLOW_STYLE.accent,
+              "&:hover": { backgroundColor: "#3a5ec4" },
+            }}
+          >
+            {/* <Eye size={18} /> */}
+            Xem chi tiết
+          </Button>
+          {isCancelable && requestId ? (
+            <Popconfirm
+              title="Hủy đơn booking"
+              description="Bạn có chắc chắn muốn hủy đơn này? Thao tác không thể hoàn tác."
+              okText="Hủy đơn"
+              cancelText="Bỏ qua"
+              okButtonProps={{ danger: true, loading: isProcessingThisRow }}
+              placement="left"
+              onConfirm={() => handleCancelRequest(requestId)}
+            >
+              {cancelButton}
+            </Popconfirm>
+          ) : null}
+        </Space>
+      );
+    },
     [
       handleViewDetail,
       handleCancelRequest,
@@ -616,7 +566,7 @@ const MySingleBookingRequests = () => {
           </div>
         </section>
 
-        {/* ---------- TABLE ---------- */}
+        {/* ---------- REQUESTS ---------- */}
         <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.5)] backdrop-blur">
           <div className="relative p-4 sm:p-6">
             <div className="flex flex-col gap-3 border-b border-slate-200/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
@@ -647,17 +597,133 @@ const MySingleBookingRequests = () => {
               )}
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/70 shadow-sm">
-              <Table
-                columns={columns}
-                dataSource={dataSource}
-                loading={isLoadingMyBookingRequests}
-                pagination={false}
-                rowKey={deriveRowKey}
-                scroll={{ x: "auto" }}
-                locale={{ emptyText: "Không có dữ liệu" }}
-                className="modern-soft-table"
-              />
+            <div className="mt-4">
+              {isInitialLoading ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {skeletonItems.map((index) => (
+                    <div
+                      key={`booking-skeleton-${index}`}
+                      className="animate-pulse rounded-2xl border border-slate-200/70 bg-white/80 p-6 shadow-sm"
+                    >
+                      <div className="mb-4 h-5 w-32 rounded bg-slate-200/80" />
+                      <div className="mb-3 h-4 w-24 rounded bg-slate-200/70" />
+                      <div className="space-y-3">
+                        <div className="h-4 w-full rounded bg-slate-200/60" />
+                        <div className="h-4 w-3/4 rounded bg-slate-200/60" />
+                        <div className="h-4 w-2/3 rounded bg-slate-200/60" />
+                      </div>
+                      <div className="mt-6 h-10 w-28 rounded bg-slate-200/70" />
+                    </div>
+                  ))}
+                </div>
+              ) : hasData ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {dataSource.map((record) => {
+                    const key = deriveRowKey(record);
+                    const statusMeta = resolveBookingStatus(record?.status);
+                    const payment = getPrimaryPayment(record);
+                    const paymentMeta = resolvePaymentStatus(payment?.status);
+                    const totalAmount =
+                      payment?.totalAmount ??
+                      payment?.paidAmount ??
+                      record?.totalAmount ??
+                      record?.budget ??
+                      null;
+                    const description = record?.description?.trim();
+                    const executionTime = composeExecutionTime(record);
+                    const createdAtLabel = formatDateTime(record?.createdAt);
+                    const updatedAtLabel = formatDateTime(
+                      record?.updatedAt ??
+                        record?.modifiedAt ??
+                        record?.createdAt
+                    );
+                    const locationLabel = record?.location?.trim() || "--";
+                    return (
+                      <article
+                        key={key}
+                        className="group flex h-full flex-col justify-between gap-5 rounded-2xl border border-slate-200/70 bg-white/95 p-6 shadow-[0_30px_60px_-40px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_40px_80px_-40px_rgba(79,70,229,0.5)]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                              Mã đơn
+                            </p>
+                            <h3 className="text-xl font-semibold text-slate-900">
+                              {record?.requestNumber ?? "--"}
+                            </h3>
+                            <p className="text-xs text-slate-500">
+                              Tạo lúc {createdAtLabel}
+                            </p>
+                          </div>
+                          <Tag
+                            color={statusMeta.color}
+                            className="rounded-full px-3 py-1 text-sm font-medium"
+                          >
+                            {statusMeta.label}
+                          </Tag>
+                        </div>
+
+                        <div className="grid gap-3 text-sm text-slate-600">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Thời gian</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {executionTime}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Địa điểm</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {locationLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Thanh toán</span>
+                            <Tag
+                              color={paymentMeta.color}
+                              className="rounded-full px-3 py-1 text-sm font-medium"
+                            >
+                              {paymentMeta.label}
+                            </Tag>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Tổng tiền</span>
+                            <span className="text-right font-semibold text-indigo-600">
+                              {formatCurrency(totalAmount)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {description ? (
+                          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            {description}
+                          </div>
+                        ) : null}
+
+                        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-xs text-slate-500">
+                            Cập nhật:{" "}
+                            <span className="font-medium text-slate-700">
+                              {updatedAtLabel}
+                            </span>
+                          </div>
+                          {renderBookingActions(record)}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-6 py-10 text-center">
+                  <Sparkles size={28} className="mb-3 text-indigo-500" />
+                  <p className="text-sm font-medium text-slate-600">
+                    Bạn chưa có đơn booking nào phù hợp.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Hãy thử điều chỉnh bộ lọc hoặc nhấn Làm mới để lấy dữ liệu
+                    mới nhất.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-center">

@@ -9,34 +9,35 @@ import {
 } from "@mui/material";
 import HighlightOffRoundedIcon from "@mui/icons-material/HighlightOffRounded";
 import { useLocation, useNavigate } from "react-router-dom";
-import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
-const BookingSinglePaymentFail = () => {
+import { BOOKING_FLOW_STYLE } from "../../../constants/bookingFlowTextStyles";
+
+const CoursePurchaseFail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [countdown, setCountdown] = useState(15);
 
   useEffect(() => {
-    if (!location.state?.bookingRequest) {
+    if (!location.state?.course && !location.state?.purchase) {
       navigate("/", { replace: true });
       return;
     }
 
-    const redirectTimeout = setTimeout(() => {
+    const timeout = setTimeout(() => {
       navigate("/", { replace: true });
     }, 15000);
 
-    const countdownInterval = setInterval(() => {
+    const interval = setInterval(() => {
       setCountdown((prev) => Math.max(prev - 1, 0));
     }, 1000);
 
     return () => {
-      clearTimeout(redirectTimeout);
-      clearInterval(countdownInterval);
+      clearTimeout(timeout);
+      clearInterval(interval);
     };
   }, [location.state, navigate]);
 
-  if (!location.state?.bookingRequest) {
+  if (!location.state?.course && !location.state?.purchase) {
     return null;
   }
 
@@ -91,7 +92,6 @@ const BookingSinglePaymentFail = () => {
             >
               <HighlightOffRoundedIcon
                 sx={{ fontSize: 52, color: "#d03737" }}
-                data-testid="payment-fail-icon"
               />
             </Box>
 
@@ -100,7 +100,7 @@ const BookingSinglePaymentFail = () => {
                 variant="h5"
                 sx={{ fontWeight: 700, color: BOOKING_FLOW_STYLE.textPrimary }}
               >
-                Yêu cầu đặt lịch đã bị hủy
+                Yêu cầu mua khóa học đã bị hủy
               </Typography>
               <Typography
                 sx={{
@@ -109,8 +109,7 @@ const BookingSinglePaymentFail = () => {
                   mx: "auto",
                 }}
               >
-                Bạn đã hủy yêu cầu đặt lịch. Hệ thống sẽ tự động chuyển bạn về
-                trang chủ sau{" "}
+                Hệ thống sẽ tự động chuyển bạn về trang chủ sau{" "}
                 <Typography component="span" sx={{ fontWeight: 600 }}>
                   {countdown} giây
                 </Typography>
@@ -142,7 +141,9 @@ const BookingSinglePaymentFail = () => {
               <Button
                 fullWidth
                 variant="outlined"
-                onClick={() => navigate("/danh-sach-kol", { replace: true })}
+                onClick={() =>
+                  navigate("/danh-sach-khoa-hoc", { replace: true })
+                }
                 sx={{
                   textTransform: "none",
                   fontWeight: 600,
@@ -157,7 +158,7 @@ const BookingSinglePaymentFail = () => {
                   },
                 }}
               >
-                Xem danh sách KOL
+                Xem thêm khóa học
               </Button>
             </Stack>
           </Stack>
@@ -167,4 +168,4 @@ const BookingSinglePaymentFail = () => {
   );
 };
 
-export default BookingSinglePaymentFail;
+export default CoursePurchaseFail;
