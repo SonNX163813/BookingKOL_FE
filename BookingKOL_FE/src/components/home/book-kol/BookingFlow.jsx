@@ -139,6 +139,7 @@ const BookingFlow = ({
         newErrors.email = "Vui lòng nhập email.";
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         newErrors.email = "Email không hợp lệ.";
+        toast.error("Email không hợp lệ.");
       }
       if (!phone) {
         newErrors.phone = "Vui lòng nhập số điện thoại.";

@@ -42,4 +42,7 @@ export const API_PATHS = {
     getAll: "/v1/admin/booking/single-requests/all",
     getDetail: "/v1/admin/booking/single-requests/detail",
   },
+  REFUND: {
+    getAll: "/v1/admin/refunds/all",
+  },
 };

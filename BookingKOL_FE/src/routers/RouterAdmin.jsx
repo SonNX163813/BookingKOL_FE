@@ -12,6 +12,7 @@ import ManagementCategory from "../pages/admin/category/ManagementCategory";
 import CreateCoursePage from "../pages/admin/course/CreateCoursePage";
 
 import ManagementBookingRequests from "../pages/admin/booking/ManagementBookingRequests";
+import ManagementRefundRequests from "../pages/admin/booking/ManagementRefundRequests";
 import BookingRequestDetail from "../pages/admin/booking/BookingRequestDetail";
 
 import EditKOL from "../pages/admin/management-user/management-kol/EditKOL";
@@ -36,6 +37,10 @@ export const routerAdmin = [
       {
         path: "management-booking-requests",
         element: <ManagementBookingRequests />,
+      },
+      {
+        path: "management-refunds",
+        element: <ManagementRefundRequests />,
       },
       {
         path: "management-booking-requests/:requestId",

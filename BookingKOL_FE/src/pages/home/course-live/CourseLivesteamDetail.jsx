@@ -1,21 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Box,
-  Container,
-  Typography,
-  Stack,
-  Button,
-  IconButton,
-} from "@mui/material";
+import { Box, Container, Typography, Stack, Button } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import AppSnackbar from "../../../components/UI/AppSnackbar";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   adaptCourseMedia,
+  createCoursePurchase,
   getCoursePackageById,
 } from "../../../services/course/CourseAPI";
 import hotkolimg from "../../../assets/hotkol.png";
 import CourseDetailHero from "../../../components/home/course-detail/CourseDetailHero";
+import CoursePurchaseContactDialog from "../../../components/home/course-detail/CoursePurchaseContactDialog";
 import CourseDetailOverview from "../../../components/home/course-detail/CourseDetailOverview";
 import CourseDetailLoading from "../../../components/home/course-detail/CourseDetailLoading";
 import CourseDetailEmpty from "../../../components/home/course-detail/CourseDetailEmpty";
@@ -25,6 +19,9 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
   maximumFractionDigits: 0,
 });
+
+const sanitizeContactValue = (value) =>
+  typeof value === "string" ? value.trim() : "";
 
 const CourseLivesteamDetail = () => {
   const navigate = useNavigate();
@@ -38,22 +35,32 @@ const CourseLivesteamDetail = () => {
 
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+  const [creatingPurchase, setCreatingPurchase] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [contactInfo, setContactInfo] = useState({
+    email: "",
+    phone: "",
+  });
+  const [contactErrors, setContactErrors] = useState({
+    email: "",
+    phone: "",
+  });
+
+  const coursePackageId = useMemo(
+    () => course?.id ?? courseId,
+    [course, courseId]
+  );
 
   const loadCourseDetail = useCallback(
     async (signal) => {
       if (!courseId) {
         setCourse(null);
-        setError("Không tìm thấy khoá học");
-        setShowErrorSnackbar(true);
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        setError(null);
         const response = await getCoursePackageById(courseId, { signal });
         if (!signal?.aborted) {
           setCourse(response);
@@ -62,9 +69,7 @@ const CourseLivesteamDetail = () => {
         if (signal?.aborted) {
           return;
         }
-        const message = err?.message ?? "Không thể tải nội dung khoá học";
-        setError(message);
-        setShowErrorSnackbar(true);
+        console.error("Failed to load course detail", err);
       } finally {
         if (!signal?.aborted) {
           setLoading(false);
@@ -84,9 +89,90 @@ const CourseLivesteamDetail = () => {
     navigate("/danh-sach-khoa-hoc");
   }, [navigate]);
 
-  const handleSnackbarRetry = useCallback(() => {
-    loadCourseDetail();
-  }, [loadCourseDetail]);
+  const validateContact = useCallback((info) => {
+    const email = sanitizeContactValue(info.email);
+    const phone = sanitizeContactValue(info.phone);
+
+    const errors = {
+      email: "",
+      phone: "",
+    };
+
+    if (!email) {
+      errors.email = "Vui long nhap email.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Email khong hop le.";
+    }
+
+    if (!phone) {
+      errors.phone = "Vui long nhap so dien thoai.";
+    } else if (!/^\+?\d{8,15}$/.test(phone.replace(/\s+/g, ""))) {
+      errors.phone = "So dien thoai khong hop le.";
+    }
+
+    return {
+      errors,
+      values: { email, phone },
+    };
+  }, []);
+
+  const handleContactChange = useCallback((field, value) => {
+    setContactInfo((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    setContactErrors((prev) => ({
+      ...prev,
+      [field]: "",
+    }));
+  }, []);
+
+  const handleOpenContactDialog = useCallback(() => {
+    setContactDialogOpen(true);
+  }, []);
+
+  const handleCloseContactDialog = useCallback(() => {
+    if (!creatingPurchase) {
+      setContactDialogOpen(false);
+    }
+  }, [creatingPurchase]);
+
+  const handlePurchaseCourse = useCallback(async () => {
+    if (!coursePackageId || creatingPurchase) {
+      return;
+    }
+
+    const { errors, values } = validateContact(contactInfo);
+    if (errors.email || errors.phone) {
+      setContactErrors(errors);
+      return;
+    }
+
+    setContactErrors({
+      email: "",
+      phone: "",
+    });
+    setContactInfo(values);
+    setContactDialogOpen(false);
+    try {
+      setCreatingPurchase(true);
+      const purchase = await createCoursePurchase(coursePackageId, {
+        phone: values.phone,
+        email: values.email,
+      });
+      navigate(`/khoa-hoc/review/${encodeURIComponent(coursePackageId)}`, {
+        state: {
+          course,
+          purchase,
+          contact: values,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to create course purchase", err);
+    } finally {
+      setCreatingPurchase(false);
+    }
+  }, [contactInfo, course, coursePackageId, creatingPurchase, navigate, validateContact]);
 
   const priceLabel = useMemo(() => {
     if (!course?.currentPrice) {
@@ -104,6 +190,11 @@ const CourseLivesteamDetail = () => {
     }
     return fallbackCourseName ?? "Khoá học livestream";
   }, [course, fallbackCourseName]);
+
+  const canPurchaseCourse = useMemo(
+    () => Boolean(course?.isAvailable && coursePackageId),
+    [course?.isAvailable, coursePackageId]
+  );
 
   const coverImage = useMemo(() => media.cover ?? hotkolimg, [media]);
 
@@ -206,6 +297,11 @@ const CourseLivesteamDetail = () => {
                 discountChip={discountChip}
                 coverImage={coverImage}
                 onSeeOtherPackages={handleBack}
+                onPurchase={
+                  canPurchaseCourse ? handleOpenContactDialog : undefined
+                }
+                purchaseDisabled={!canPurchaseCourse}
+                purchaseLoading={creatingPurchase}
               />
               <CourseDetailOverview
                 descriptionBlocks={descriptionBlocks}
@@ -218,31 +314,19 @@ const CourseLivesteamDetail = () => {
           )}
         </Stack>
       </Container>
-
-      {/* <AppSnackbar
-        open={showErrorSnackbar}
-        onClose={() => setShowErrorSnackbar(false)}
-        severity="error"
-        message={error ?? "Không thể kết nối tới máy chủ"}
-        action={
-          <IconButton
-            size="small"
-            aria-label="retry"
-            color="inherit"
-            onClick={() => {
-              setShowErrorSnackbar(false);
-              handleSnackbarRetry();
-            }}
-            sx={{ mr: 1 }}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              Thử lại
-            </Typography>
-          </IconButton>
-        }
-      /> */}
+      <CoursePurchaseContactDialog
+        open={contactDialogOpen}
+        contact={contactInfo}
+        errors={contactErrors}
+        onFieldChange={handleContactChange}
+        onSubmit={handlePurchaseCourse}
+        onClose={handleCloseContactDialog}
+        submitting={creatingPurchase}
+      />
     </Box>
   );
 };
 
 export default CourseLivesteamDetail;
+
+

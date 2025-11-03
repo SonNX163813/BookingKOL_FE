@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 import {
@@ -9,7 +9,6 @@ import {
   Popconfirm,
   Select,
   Space,
-  Table,
   Tag,
 } from "antd";
 import {
@@ -25,67 +24,47 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { useGetMySingleBookingRequests } from "../../../hook/user/booking/useGetMySingleBookingRequests";
 import { useCancelMySingleBookingRequest } from "../../../hook/user/booking/useCancelMySingleBookingRequest";
+import { useCancelMySingleBookingPayment } from "../../../hook/user/booking/useCancelMySingleBookingPayment";
+import { useContinueMySingleBookingPayment } from "../../../hook/user/booking/useContinueMySingleBookingPayment";
+import { useGetBankList } from "../../../hook/payment/useGetBankList";
+import { BOOKING_FLOW_STYLE } from "../../../constants/bookingFlowTextStyles";
+import RefundRequestModal from "../../../components/home/booking/RefundRequestModal";
+import {
+  BOOKING_STATUS_OPTIONS,
+  STATUS_TAG_COLOR,
+  PAYMENT_STATUS_OPTIONS,
+  PAYMENT_STATUS_COLOR,
+} from "../../../constants/mySingleBookingStatuses";
+import {
+  BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
+  BOOKING_SINGLE_REVIEW_STORAGE_KEY,
+} from "../../../constants/storageKeys";
 
 const { RangePicker } = DatePicker;
 
-/* ------------------- CONSTANTS ------------------- */
-
-const BOOKING_STATUS_OPTIONS = [
-  { label: "Bản nháp", value: "DRAFT" },
-  { label: "Đang yêu cầu", value: "REQUESTED" },
-  { label: "Chờ xử lý", value: "PENDING" },
-  { label: "Đang đàm phán", value: "NEGOTIATING" },
-  { label: "Đã chấp nhận", value: "ACCEPTED" },
-  { label: "Đã xác nhận", value: "CONFIRMED" },
-  { label: "Đang thực hiện", value: "IN_PROGRESS" },
-  { label: "Đã giao", value: "DELIVERED" },
-  { label: "Hoàn thành", value: "COMPLETED" },
-  { label: "Đang tranh chấp", value: "DISPUTED" },
-  { label: "Đã từ chối", value: "REJECTED" },
-  { label: "Đã huỷ", value: "CANCELLED" },
-  { label: "Đã ký hợp đồng", value: "CONTRACT_SIGNED" },
-  { label: "Hết hạn", value: "EXPIRED" },
-];
-
-const STATUS_TAG_COLOR = {
-  DRAFT: "default",
-  REQUESTED: "processing",
-  PENDING: "processing",
-  NEGOTIATING: "cyan",
-  ACCEPTED: "success",
-  CONFIRMED: "blue",
-  IN_PROGRESS: "processing",
-  DELIVERED: "gold",
-  COMPLETED: "success",
-  DISPUTED: "magenta",
-  REJECTED: "error",
-  CANCELLED: "warning",
-  CONTRACT_SIGNED: "purple",
-  EXPIRED: "volcano",
+const resolveBookingStatus = (status) => {
+  const normalized = status?.toUpperCase();
+  const label =
+    BOOKING_STATUS_OPTIONS.find((option) => option.value === normalized)
+      ?.label ??
+    normalized ??
+    "--";
+  const color = STATUS_TAG_COLOR[normalized] ?? "default";
+  return { label, color };
 };
 
-const PAYMENT_STATUS_OPTIONS = [
-  { label: "Đã thanh toán", value: "PAID" },
-  { label: "Chờ thanh toán", value: "PENDING" },
-  { label: "Đang xử lý", value: "PROCESSING" },
-  { label: "Hoàn tất", value: "COMPLETED" },
-  { label: "Thất bại", value: "FAILED" },
-  { label: "Hết hạn", value: "EXPIRED" },
-  { label: "Đã huỷ", value: "CANCELLED" },
-  { label: "Đã hoàn tiền", value: "REFUNDED" },
-];
-
-const PAYMENT_STATUS_COLOR = {
-  PAID: "success",
-  PENDING: "processing",
-  PROCESSING: "processing",
-  COMPLETED: "success",
-  FAILED: "error",
-  EXPIRED: "volcano",
-  CANCELLED: "warning",
-  REFUNDED: "purple",
+const resolvePaymentStatus = (status) => {
+  const normalized = status?.toUpperCase();
+  const label =
+    PAYMENT_STATUS_OPTIONS.find((option) => option.value === normalized)
+      ?.label ??
+    normalized ??
+    "--";
+  const color = PAYMENT_STATUS_COLOR[normalized] ?? "default";
+  return { label, color };
 };
 
 const CANCELABLE_BOOKING_STATUSES = new Set([
@@ -147,11 +126,18 @@ const canCancelBookingRequest = (status) =>
 
 const MySingleBookingRequests = () => {
   const [form] = Form.useForm();
+  const [refundForm] = Form.useForm();
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const [filters, setFilters] = useState({});
   const navigate = useNavigate();
   const [cancellingRequestId, setCancellingRequestId] = useState(null);
+  const [cancellingPaymentRequestId, setCancellingPaymentRequestId] =
+    useState(null);
+  const [continuingPaymentRequestId, setContinuingPaymentRequestId] =
+    useState(null);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundContext, setRefundContext] = useState(null);
 
   const {
     isCancellingMySingleBookingRequest,
@@ -162,6 +148,19 @@ const MySingleBookingRequests = () => {
   });
 
   const {
+    isCancellingMySingleBookingPayment,
+    handleCancelMySingleBookingPayment,
+  } = useCancelMySingleBookingPayment({
+    successToastMessage: "Hủy thanh toán thành công.",
+    errorToastMessage: "Không thể hủy thanh toán. Vui lòng thử lại.",
+  });
+  const {
+    isContinuingMySingleBookingPayment,
+    handleContinueMySingleBookingPayment,
+  } = useContinueMySingleBookingPayment({
+    errorToastMessage: "Không thể tiếp tục thanh toán. Vui lòng thử lại.",
+  });
+  const {
     isLoadingMyBookingRequests,
     isFetchingMyBookingRequests,
     myBookingRequestsResponse,
@@ -171,6 +170,32 @@ const MySingleBookingRequests = () => {
     size,
     ...filters,
   });
+
+  const { bankList, isLoadingBankList, bankListError } = useGetBankList();
+
+  const bankOptions = useMemo(
+    () =>
+      bankList.map((bank) => {
+        const name =
+          typeof bank?.name === "string" && bank.name.trim().length > 0
+            ? bank.name.trim()
+            : bank?.name ?? "";
+        const shortName =
+          typeof bank?.shortName === "string" &&
+          bank.shortName.trim().length > 0
+            ? bank.shortName.trim()
+            : "";
+
+        return {
+          label: shortName ? `${shortName} - ${name}` : name,
+          value: name,
+          key: bank?.code || bank?.id || name,
+          code: bank?.code,
+          shortName,
+        };
+      }),
+    [bankList]
+  );
 
   const rawData = myBookingRequestsResponse?.data;
   const dataSource = Array.isArray(rawData)
@@ -195,6 +220,13 @@ const MySingleBookingRequests = () => {
       Array.isArray(rawData) ? rawData.length : dataSource.length,
       inferredTotal
     );
+
+  const hasData = Array.isArray(dataSource) && dataSource.length > 0;
+  const isInitialLoading = isLoadingMyBookingRequests && !hasData;
+  const skeletonItems = useMemo(
+    () => Array.from({ length: Math.min(size, 6) }, (_, index) => index),
+    [size]
+  );
 
   const pageRange = useMemo(() => {
     if (!totalElements) return null;
@@ -296,14 +328,23 @@ const MySingleBookingRequests = () => {
   );
 
   const handleCancelRequest = useCallback(
-    async (requestId) => {
-      if (!requestId) return;
+    async (requestId, extraPayload = null) => {
+      if (!requestId) return false;
       try {
         setCancellingRequestId(requestId);
-        await handleCancelMySingleBookingRequest({ requestId });
+        const payload =
+          extraPayload && typeof extraPayload === "object"
+            ? extraPayload
+            : null;
+        await handleCancelMySingleBookingRequest({
+          requestId,
+          ...(payload ?? {}),
+        });
         await refetchMyBookingRequests();
+        return true;
       } catch (error) {
         // toast is handled globally
+        return false;
       } finally {
         setCancellingRequestId(null);
       }
@@ -311,151 +352,340 @@ const MySingleBookingRequests = () => {
     [handleCancelMySingleBookingRequest, refetchMyBookingRequests]
   );
 
-  const columns = useMemo(
-    () => [
-      {
-        title: "Mã đơn",
-        key: "requestNumber",
-        width: 260,
-        render: (_, record) => record?.requestNumber ?? "--",
-        // render: (_, record) => record?.contracts?.[0]?.contractNumber ?? "--",
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        width: 150,
-        render: (v) => {
-          const normalized = v?.toUpperCase();
-          const label =
-            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
-            normalized;
-          return (
-            <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>{label}</Tag>
-          );
-        },
-      },
-      {
-        title: "Thời gian thực hiện",
-        key: "executionTime",
-        width: 250,
-        render: (_, r) => composeExecutionTime(r),
-      },
-      {
-        title: "Địa điểm",
-        dataIndex: "location",
-        key: "location",
-        width: 200,
-        render: (v) => v || "--",
-      },
-      {
-        title: "Thanh toán",
-        key: "paymentStatus",
-        width: 160,
-        render: (_, r) => {
-          const payment = getPrimaryPayment(r);
-          const normalized = payment?.status?.toUpperCase();
-          const label =
-            PAYMENT_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
-            normalized ??
-            "--";
-          return (
-            <Tag color={PAYMENT_STATUS_COLOR[normalized] ?? "default"}>
-              {label}
-            </Tag>
-          );
-        },
-      },
-      {
-        title: "Tổng tiền",
-        key: "totalAmount",
-        width: 150,
-        render: (_, r) => {
-          const payment = getPrimaryPayment(r);
-          const amount =
-            payment?.totalAmount ??
-            payment?.paidAmount ??
-            r?.totalAmount ??
-            r?.budget ??
-            null;
-          return formatCurrency(amount);
-        },
-      },
-      {
-        title: "Ngày tạo",
-        dataIndex: "createdAt",
-        key: "createdAt",
-        width: 180,
-        render: (v) => formatDateTime(v),
-      },
-      {
-        title: "Ghi chú",
-        dataIndex: "description",
-        key: "description",
-        ellipsis: true,
-        render: (v) => v?.trim() || "--",
-      },
-      {
-        title: "Thao tác",
-        key: "actions",
-        fixed: "right",
-        width: 190,
-        render: (_, record) => {
-          const requestId = record?.id;
-          const isCancelable = canCancelBookingRequest(record?.status);
-          const isProcessingThisRow =
-            isCancellingMySingleBookingRequest &&
-            cancellingRequestId === requestId;
-          const disableCancel =
-            !requestId ||
-            (isCancellingMySingleBookingRequest && !isProcessingThisRow);
-          const cancelButton = (
-            <Button
-              type="link"
-              danger
-              disabled={disableCancel}
-              loading={isProcessingThisRow}
-              className="!h-10 !rounded-xl !px-3 !text-red-600 hover:!bg-red-50 focus:!bg-red-100"
-            >
-              <XCircle size={18} />
-            </Button>
-          );
+  const handleCancelPayment = useCallback(
+    async (requestId) => {
+      if (!requestId) return false;
+      try {
+        setCancellingPaymentRequestId(requestId);
+        await handleCancelMySingleBookingPayment({ requestId });
+        await refetchMyBookingRequests();
+        return true;
+      } catch (error) {
+        return false;
+      } finally {
+        setCancellingPaymentRequestId(null);
+      }
+    },
+    [handleCancelMySingleBookingPayment, refetchMyBookingRequests]
+  );
 
-          return (
-            <Space size="small">
-              <Button
-                type="link"
-                onClick={() => handleViewDetail(record)}
-                className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-              >
-                <Eye size={18} />
-              </Button>
-              {isCancelable && requestId ? (
-                <Popconfirm
-                  title="Huỷ đơn booking"
-                  description="Bạn có chắc chắn muốn huỷ đơn này? Thao tác không thể hoàn tác."
-                  okText="Huỷ đơn"
-                  cancelText="Bỏ qua"
-                  okButtonProps={{
-                    danger: true,
-                    loading: isProcessingThisRow,
-                  }}
-                  placement="left"
-                  onConfirm={() => handleCancelRequest(requestId)}
-                >
-                  {cancelButton}
-                </Popconfirm>
-              ) : null}
-            </Space>
+  const handleContinuePayment = useCallback(
+    async (record) => {
+      const requestId = record?.id ?? record;
+      if (!requestId) {
+        return false;
+      }
+
+      try {
+        setContinuingPaymentRequestId(requestId);
+        const response = await handleContinueMySingleBookingPayment({
+          requestId,
+        });
+
+        const paymentData = response?.data ?? null;
+        if (!paymentData) {
+          toast.error("Không tìm thấy thông tin thanh toán.");
+          return false;
+        }
+
+        try {
+          sessionStorage.setItem(
+            BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
+            JSON.stringify({ payment: paymentData })
           );
-        },
-      },
-    ],
+          sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
+        } catch (storageError) {
+          console.error("Không thể lưu thông tin thanh toán", storageError);
+        }
+
+        navigate("/thanh-toan-kol-le", {
+          state: { payment: paymentData, bookingRequest: record, requestId },
+        });
+
+        return true;
+      } catch (error) {
+        const fallbackMessage =
+          "Không thể tiếp tục thanh toán. Vui lòng thử lại.";
+        const rawMessage = error?.response?.data?.message ?? error?.message;
+
+        if (Array.isArray(rawMessage)) {
+          toast.error(rawMessage[0] ?? fallbackMessage);
+        } else if (rawMessage) {
+          toast.error(rawMessage);
+        } else {
+          toast.error(fallbackMessage);
+        }
+
+        return false;
+      } finally {
+        setContinuingPaymentRequestId(null);
+      }
+    },
+    [handleContinueMySingleBookingPayment, refetchMyBookingRequests, navigate]
+  );
+
+  const isSubmittingRefund = Boolean(
+    refundContext &&
+      isCancellingMySingleBookingRequest &&
+      cancellingRequestId === refundContext.requestId
+  );
+
+  const resetRefundState = useCallback(() => {
+    refundForm.resetFields();
+    setIsRefundModalOpen(false);
+    setRefundContext(null);
+  }, [refundForm]);
+
+  const handleOpenRefundModal = useCallback(
+    (record) => {
+      const requestId = record?.id;
+      if (!requestId) return;
+
+      refundForm.resetFields();
+
+      const payment = getPrimaryPayment(record);
+      const totalAmount =
+        payment?.totalAmount ??
+        payment?.paidAmount ??
+        record?.totalAmount ??
+        record?.budget ??
+        null;
+
+      if (bankOptions.length > 0) {
+        refundForm.setFieldsValue({
+          bankName: bankOptions[0]?.value,
+        });
+      }
+
+      setRefundContext({
+        requestId,
+        totalAmount,
+        requestNumber: record?.requestNumber ?? record?.code ?? `#${requestId}`,
+      });
+      setIsRefundModalOpen(true);
+    },
+    [bankOptions, refundForm]
+  );
+
+  const handleCloseRefundModal = useCallback(() => {
+    if (isSubmittingRefund) return;
+    resetRefundState();
+  }, [isSubmittingRefund, resetRefundState]);
+
+  const handleSubmitRefund = useCallback(async () => {
+    try {
+      const values = await refundForm.validateFields();
+      if (!refundContext?.requestId) {
+        return;
+      }
+
+      const bankName =
+        typeof values.bankName === "string" ? values.bankName.trim() : "";
+      const bankNumber =
+        typeof values.bankNumber === "string" ? values.bankNumber.trim() : "";
+      const selectedBank = bankOptions.find(
+        (option) => option.value === bankName
+      );
+      const bankShortName =
+        typeof selectedBank?.shortName === "string" &&
+        selectedBank.shortName.trim().length > 0
+          ? selectedBank.shortName.trim()
+          : "";
+
+      const requestPayload = {
+        bankName,
+        bankNumber,
+      };
+
+      if (bankShortName) {
+        requestPayload.bankShortName = bankShortName;
+      }
+
+      const success = await handleCancelRequest(
+        refundContext.requestId,
+        requestPayload
+      );
+
+      if (success) {
+        resetRefundState();
+      }
+    } catch (error) {
+      if (error?.errorFields) {
+        return;
+      }
+    }
+  }, [bankOptions, refundContext, refundForm, handleCancelRequest, resetRefundState]);
+
+  const renderBookingActions = useCallback(
+    (record) => {
+      const requestId = record?.id;
+      const isCancelable = canCancelBookingRequest(record?.status);
+      const isProcessingRequestThisRow =
+        isCancellingMySingleBookingRequest && cancellingRequestId === requestId;
+      const paymentStatusSource =
+        getPrimaryPayment(record)?.status ??
+        record?.paymentStatus ??
+        record?.payment?.status ??
+        null;
+      const normalizedPaymentStatus = paymentStatusSource
+        ? paymentStatusSource.toString().toUpperCase()
+        : null;
+      const isRefundable = normalizedPaymentStatus === "PAID";
+      const isPaymentPending = normalizedPaymentStatus === "PENDING";
+      const isProcessingPaymentCancelThisRow =
+        isCancellingMySingleBookingPayment &&
+        cancellingPaymentRequestId === requestId;
+      const isProcessingPaymentContinueThisRow =
+        isContinuingMySingleBookingPayment &&
+        continuingPaymentRequestId === requestId;
+      const disableAction =
+        !requestId ||
+        (isCancellingMySingleBookingRequest && !isProcessingRequestThisRow) ||
+        (isContinuingMySingleBookingPayment &&
+          !isProcessingPaymentContinueThisRow);
+      const disableCancelPayment =
+        !requestId ||
+        (isCancellingMySingleBookingPayment &&
+          !isProcessingPaymentCancelThisRow) ||
+        (isContinuingMySingleBookingPayment &&
+          !isProcessingPaymentContinueThisRow);
+      const disableContinuePayment =
+        !requestId ||
+        (isContinuingMySingleBookingPayment &&
+          !isProcessingPaymentContinueThisRow) ||
+        (isCancellingMySingleBookingPayment &&
+          !isProcessingPaymentCancelThisRow);
+
+      // const cancelButton = (
+      //   <Button
+      //     danger
+      //     disabled={disableAction}
+      //     loading={isProcessingThisRow && !isRefundable}
+      //     style={{
+      //       height: "2.5rem",
+      //       fontWeight: 600,
+      //       borderRadius: "16px",
+      //       color: "#dc2626",
+      //       "&:hover": { backgroundColor: "#dc2626" },
+      //     }}
+      //   >
+      //     {/* <XCircle size={18} /> */}
+      //     Hủy đơn
+      //   </Button>
+      // );
+
+      const continuePaymentButton = isPaymentPending ? (
+        <Button
+          type="primary"
+          disabled={disableContinuePayment}
+          loading={isProcessingPaymentContinueThisRow}
+          style={{
+            height: "2.5rem",
+            fontWeight: 600,
+            borderRadius: "16px",
+          }}
+          onClick={() => handleContinuePayment(record)}
+        >
+          Tiếp tục thanh toán
+        </Button>
+      ) : null;
+
+      const cancelPaymentButton = isPaymentPending ? (
+        <Popconfirm
+          title="Hủy thanh toán"
+          description="Bạn có chắc chắn muốn hủy thanh toán này? Thao tác này không thể hoàn tác."
+          okText="Hủy"
+          cancelText="Bỏ qua"
+          okButtonProps={{
+            danger: true,
+            loading: isProcessingPaymentCancelThisRow,
+          }}
+          placement="left"
+          onConfirm={() => handleCancelPayment(requestId)}
+        >
+          <Button
+            danger
+            disabled={disableCancelPayment}
+            loading={isProcessingPaymentCancelThisRow}
+            style={{
+              height: "2.5rem",
+              fontWeight: 600,
+              borderRadius: "16px",
+            }}
+          >
+            Hủy thanh toán
+          </Button>
+        </Popconfirm>
+      ) : null;
+
+      const refundButton = isRefundable ? (
+        <Button
+          type="primary"
+          ghost
+          disabled={disableAction}
+          loading={isProcessingRequestThisRow && isRefundable}
+          style={{
+            height: "2.5rem",
+            fontWeight: 600,
+            borderRadius: "16px",
+          }}
+          onClick={() => handleOpenRefundModal(record)}
+        >
+          Hoàn tiền
+        </Button>
+      ) : null;
+
+      return (
+        <Space size="small">
+          <Button
+            onClick={() => handleViewDetail(record)}
+            style={{
+              color: "#ffffff",
+              height: "2.5rem",
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "16px",
+              backgroundColor: BOOKING_FLOW_STYLE.accent,
+              "&:hover": { backgroundColor: "#3a5ec4" },
+            }}
+          >
+            {/* <Eye size={18} /> */}
+            Xem chi tiết
+          </Button>
+          {continuePaymentButton}
+          {cancelPaymentButton}
+          {refundButton}
+          {/* {isCancelable && requestId ? (
+            <Popconfirm
+              title="Hủy đơn booking"
+              description="Bạn có chắc chắn muốn hủy đơn này? Thao tác không thể hoàn tác."
+              okText="Hủy đơn"
+              cancelText="Bỏ qua"
+              okButtonProps={{
+                danger: true,
+                loading: isProcessingRequestThisRow && !isRefundable,
+              }}
+              placement="left"
+              onConfirm={() => handleCancelRequest(requestId)}
+            >
+              {cancelButton}
+            </Popconfirm>
+          ) : null} */}
+        </Space>
+      );
+    },
     [
       handleViewDetail,
-      handleCancelRequest,
+      handleContinuePayment,
+      handleCancelPayment,
+      // handleCancelRequest,
+      handleOpenRefundModal,
       cancellingRequestId,
       isCancellingMySingleBookingRequest,
+      cancellingPaymentRequestId,
+      isCancellingMySingleBookingPayment,
+      continuingPaymentRequestId,
+      isContinuingMySingleBookingPayment,
     ]
   );
 
@@ -616,7 +846,7 @@ const MySingleBookingRequests = () => {
           </div>
         </section>
 
-        {/* ---------- TABLE ---------- */}
+        {/* ---------- REQUESTS ---------- */}
         <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.5)] backdrop-blur">
           <div className="relative p-4 sm:p-6">
             <div className="flex flex-col gap-3 border-b border-slate-200/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
@@ -647,17 +877,135 @@ const MySingleBookingRequests = () => {
               )}
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/70 shadow-sm">
-              <Table
-                columns={columns}
-                dataSource={dataSource}
-                loading={isLoadingMyBookingRequests}
-                pagination={false}
-                rowKey={deriveRowKey}
-                scroll={{ x: "auto" }}
-                locale={{ emptyText: "Không có dữ liệu" }}
-                className="modern-soft-table"
-              />
+            <div className="mt-4">
+              {isInitialLoading ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {skeletonItems.map((index) => (
+                    <div
+                      key={`booking-skeleton-${index}`}
+                      className="animate-pulse rounded-2xl border border-slate-200/70 bg-white/80 p-6 shadow-sm"
+                    >
+                      <div className="mb-4 h-5 w-32 rounded bg-slate-200/80" />
+                      <div className="mb-3 h-4 w-24 rounded bg-slate-200/70" />
+                      <div className="space-y-3">
+                        <div className="h-4 w-full rounded bg-slate-200/60" />
+                        <div className="h-4 w-3/4 rounded bg-slate-200/60" />
+                        <div className="h-4 w-2/3 rounded bg-slate-200/60" />
+                      </div>
+                      <div className="mt-6 h-10 w-28 rounded bg-slate-200/70" />
+                    </div>
+                  ))}
+                </div>
+              ) : hasData ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {dataSource.map((record) => {
+                    const key = deriveRowKey(record);
+                    const statusMeta = resolveBookingStatus(record?.status);
+                    const payment = getPrimaryPayment(record);
+                    const paymentMeta = resolvePaymentStatus(payment?.status);
+                    const totalAmount =
+                      payment?.totalAmount ??
+                      payment?.paidAmount ??
+                      record?.totalAmount ??
+                      record?.budget ??
+                      null;
+                    const description = record?.description?.trim();
+                    const executionTime = composeExecutionTime(record);
+                    const createdAtLabel = formatDateTime(record?.createdAt);
+                    const updatedAtLabel = formatDateTime(
+                      record?.updatedAt ??
+                        record?.modifiedAt ??
+                        record?.createdAt
+                    );
+                    const locationLabel = record?.location?.trim() || "--";
+                    return (
+                      <article
+                        key={key}
+                        className="group flex h-full flex-col justify-between gap-5 rounded-2xl border border-slate-200/70 bg-white/95 p-6 shadow-[0_30px_60px_-40px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_40px_80px_-40px_rgba(79,70,229,0.5)]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                              Mã đơn
+                            </p>
+                            <h3 className="text-xl font-semibold text-slate-900">
+                              {record?.requestNumber ?? "--"}
+                            </h3>
+                            <p className="text-xs text-slate-500">
+                              Tạo lúc {createdAtLabel}
+                            </p>
+                          </div>
+                          <Tag
+                            color={statusMeta.color}
+                            className="rounded-full px-3 py-1 text-sm font-medium"
+                          >
+                            {statusMeta.label}
+                          </Tag>
+                        </div>
+
+                        <div className="grid gap-3 text-sm text-slate-600">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Thời gian</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {executionTime}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Địa điểm</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {locationLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Thanh toán</span>
+                            <Tag
+                              color={paymentMeta.color}
+                              className="rounded-full px-3 py-1 text-sm font-medium"
+                            >
+                              {paymentMeta.label}
+                            </Tag>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Tổng tiền</span>
+                            <span className="text-right font-semibold text-indigo-600">
+                              {formatCurrency(totalAmount)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Ghi chú</span>
+                          </div>
+                          {description ? (
+                            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                              {description}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-xs text-slate-500">
+                            Cập nhật:{" "}
+                            <span className="font-medium text-slate-700">
+                              {updatedAtLabel}
+                            </span>
+                          </div>
+                          {renderBookingActions(record)}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-6 py-10 text-center">
+                  <Sparkles size={28} className="mb-3 text-indigo-500" />
+                  <p className="text-sm font-medium text-slate-600">
+                    Bạn chưa có đơn booking nào phù hợp.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Hãy thử điều chỉnh bộ lọc hoặc nhấn Làm mới để lấy dữ liệu
+                    mới nhất.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-center">
@@ -677,6 +1025,19 @@ const MySingleBookingRequests = () => {
             </div>
           </div>
         </section>
+
+        <RefundRequestModal
+          open={isRefundModalOpen}
+          refundContext={refundContext}
+          bankOptions={bankOptions}
+          bankListError={bankListError}
+          isLoadingBankList={isLoadingBankList}
+          isSubmitting={isSubmittingRefund}
+          refundForm={refundForm}
+          formatCurrency={formatCurrency}
+          onCancel={handleCloseRefundModal}
+          onSubmit={handleSubmitRefund}
+        />
       </div>
     </div>
   );

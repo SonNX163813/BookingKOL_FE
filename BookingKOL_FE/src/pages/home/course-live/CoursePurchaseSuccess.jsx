@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
 import {
   Box,
   Button,
@@ -9,58 +10,78 @@ import {
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useLocation, useNavigate } from "react-router-dom";
-import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
-const dinhDangTien = (value) =>
+import { BOOKING_FLOW_STYLE } from "../../../constants/bookingFlowTextStyles";
+
+/* ------------------------- ĐỊNH DẠNG TIỀN TỆ ------------------------- */
+const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
 
-const BookingSinglePaymentSuccess = () => {
+/* ------------------------- COMPONENT CHÍNH ------------------------- */
+const CoursePurchaseSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const paymentInfo = location.state?.payment;
-  const [countdown, setCountdown] = useState(15);
+
+  const purchase = location?.state?.purchase ?? null;
+  const payment = location?.state?.payment ?? null;
+  const course = location?.state?.course ?? null;
+
+  const [redirectCountdown, setRedirectCountdown] = useState(15);
 
   useEffect(() => {
-    if (!paymentInfo) {
+    if (!purchase || !payment) {
       navigate("/", { replace: true });
       return;
     }
 
-    const redirectTimeout = setTimeout(() => {
+    const timeout = setTimeout(() => {
       navigate("/", { replace: true });
     }, 15000);
 
-    const countdownInterval = setInterval(() => {
-      setCountdown((prev) => Math.max(prev - 1, 0));
+    const interval = setInterval(() => {
+      setRedirectCountdown((prev) => Math.max(prev - 1, 0));
     }, 1000);
 
     return () => {
-      clearTimeout(redirectTimeout);
-      clearInterval(countdownInterval);
+      clearTimeout(timeout);
+      clearInterval(interval);
     };
-  }, [navigate, paymentInfo]);
+  }, [navigate, payment, purchase]);
 
-  if (!paymentInfo) {
+  const amount = formatCurrency(
+    payment?.amount ?? purchase?.currentPrice ?? purchase?.price ?? 0
+  );
+
+  const purchaseStartDate = (() => {
+    if (!purchase?.startDate) return null;
+    const parsed = dayjs(purchase.startDate);
+    return parsed.isValid() ? parsed.format("HH:mm:ss DD/MM/YYYY") : null;
+  })();
+
+  const courseName =
+    course?.name ??
+    course?.title ??
+    purchase?.courseName ??
+    purchase?.courseTitle ??
+    null;
+
+  const purchaseNumber = purchase?.purchasedCourseNumber ?? null;
+  const purchaseEmail = purchase?.email ?? null;
+
+  if (!purchase || !payment) {
     return null;
   }
 
   const detailRows = [
-    {
-      label: "Số tiền",
-      value: dinhDangTien(paymentInfo.amount),
-    },
-    {
-      label: "Nội dung chuyển khoản",
-      value: paymentInfo.transferContent,
-    },
-    {
-      label: "Mã hợp đồng",
-      value: paymentInfo.contractId,
-    },
+    { label: "Số tiền", value: amount },
+    { label: "Khóa học", value: courseName },
+    { label: "Mã yêu cầu", value: purchaseNumber },
+    { label: "Email nhận thông tin", value: purchaseEmail },
+    { label: "Bắt đầu từ", value: purchaseStartDate },
   ].filter((row) => Boolean(row.value));
 
   return (
@@ -83,11 +104,6 @@ const BookingSinglePaymentSuccess = () => {
           position: "absolute",
           inset: 0,
           backgroundColor: "#ffffff",
-          // background: `
-          //   radial-gradient(80% 80% at 15% 20%, rgba(74, 116, 218, 0.25) 0%, rgba(74, 116, 218, 0) 60%),
-          //   radial-gradient(75% 75% at 85% 80%, rgba(255, 161, 218, 0.18) 0%, rgba(255, 161, 218, 0) 65%),
-          //   linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(147, 206, 246, 0.15) 100%)
-          // `,
         }}
       />
 
@@ -104,6 +120,7 @@ const BookingSinglePaymentSuccess = () => {
           }}
         >
           <Stack spacing={4} alignItems="center">
+            {/* Icon thành công */}
             <Box
               sx={{
                 width: 96,
@@ -119,10 +136,10 @@ const BookingSinglePaymentSuccess = () => {
             >
               <CheckCircleOutlineIcon
                 sx={{ fontSize: 52, color: BOOKING_FLOW_STYLE.accent }}
-                data-testid="payment-success-icon"
               />
             </Box>
 
+            {/* Tiêu đề và mô tả */}
             <Stack spacing={1.5} textAlign="center">
               <Typography
                 variant="h5"
@@ -137,15 +154,16 @@ const BookingSinglePaymentSuccess = () => {
                   mx: "auto",
                 }}
               >
-                Cảm ơn bạn đã tin tưởng lựa chọn dịch vụ của KOL Booking. Hệ
-                thống sẽ tự động chuyển bạn về trang chủ sau{" "}
+                Cảm ơn bạn đã hoàn tất thanh toán khóa học. Hệ thống sẽ tự động
+                chuyển bạn về trang chủ sau{" "}
                 <Typography component="span" sx={{ fontWeight: 600 }}>
-                  {countdown} giây
+                  {redirectCountdown} giây
                 </Typography>
                 .
               </Typography>
             </Stack>
 
+            {/* Thông tin chi tiết khóa học */}
             <Paper
               variant="outlined"
               sx={{
@@ -166,7 +184,7 @@ const BookingSinglePaymentSuccess = () => {
                     textAlign: "left",
                   }}
                 >
-                  Chi tiết thanh toán
+                  Thông tin khóa học
                 </Typography>
                 <Stack spacing={1.75}>
                   {detailRows.map((row) => (
@@ -202,6 +220,7 @@ const BookingSinglePaymentSuccess = () => {
               </Stack>
             </Paper>
 
+            {/* Nút điều hướng */}
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
@@ -226,7 +245,9 @@ const BookingSinglePaymentSuccess = () => {
               <Button
                 fullWidth
                 variant="outlined"
-                onClick={() => navigate("/danh-sach-kol", { replace: true })}
+                onClick={() =>
+                  navigate("/danh-sach-khoa-hoc", { replace: true })
+                }
                 sx={{
                   textTransform: "none",
                   fontWeight: 600,
@@ -241,7 +262,7 @@ const BookingSinglePaymentSuccess = () => {
                   },
                 }}
               >
-                Khám phá thêm KOL
+                Xem thêm khóa học
               </Button>
             </Stack>
           </Stack>
@@ -251,4 +272,4 @@ const BookingSinglePaymentSuccess = () => {
   );
 };
 
-export default BookingSinglePaymentSuccess;
+export default CoursePurchaseSuccess;

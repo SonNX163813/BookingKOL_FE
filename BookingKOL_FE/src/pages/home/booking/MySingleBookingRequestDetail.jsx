@@ -29,64 +29,14 @@ import { useGetMySingleBookingRequestDetail } from "../../../hook/user/booking/u
 import { UploadOutlined } from "@ant-design/icons";
 import { useUpdateMySingleBookingRequest } from "../../../hook/user/booking/useUpdateMySingleBookingRequest";
 import UserKolFeedbackSection from "../../../components/home/booking/UserKolFeedbackSection";
+import {
+  BOOKING_STATUS_LABEL,
+  STATUS_TAG_COLOR,
+  PAYMENT_STATUS_LABEL,
+  PAYMENT_STATUS_COLOR,
+} from "../../../constants/mySingleBookingStatuses";
 
 const { Text } = Typography;
-
-const BOOKING_STATUS_LABEL = {
-  DRAFT: "Bản nháp",
-  REQUESTED: "Đang yêu cầu",
-  PENDING: "Chờ xử lý",
-  NEGOTIATING: "Đang đàm phán",
-  ACCEPTED: "Đã chấp nhận",
-  CONFIRMED: "Đã xác nhận",
-  IN_PROGRESS: "Đang thực hiện",
-  DELIVERED: "Đã giao",
-  COMPLETED: "Hoàn thành",
-  DISPUTED: "Đang tranh chấp",
-  REJECTED: "Đã từ chối",
-  CANCELLED: "Đã hủy",
-  CONTRACT_SIGNED: "Đã ký hợp đồng",
-  EXPIRED: "Hết hạn",
-};
-
-const STATUS_TAG_COLOR = {
-  DRAFT: "default",
-  REQUESTED: "processing",
-  PENDING: "processing",
-  NEGOTIATING: "cyan",
-  ACCEPTED: "success",
-  CONFIRMED: "blue",
-  IN_PROGRESS: "processing",
-  DELIVERED: "gold",
-  COMPLETED: "success",
-  DISPUTED: "magenta",
-  REJECTED: "error",
-  CANCELLED: "warning",
-  CONTRACT_SIGNED: "purple",
-  EXPIRED: "volcano",
-};
-
-const PAYMENT_STATUS_LABEL = {
-  PAID: "Đã thanh toán",
-  PENDING: "Chờ thanh toán",
-  PROCESSING: "Đang xử lý",
-  COMPLETED: "Hoàn tất",
-  FAILED: "Thất bại",
-  EXPIRED: "Hết hạn",
-  CANCELLED: "Đã hủy",
-  REFUNDED: "Đã hoàn tiền",
-};
-
-const PAYMENT_STATUS_COLOR = {
-  PAID: "success",
-  PENDING: "processing",
-  PROCESSING: "processing",
-  COMPLETED: "success",
-  FAILED: "error",
-  EXPIRED: "volcano",
-  CANCELLED: "warning",
-  REFUNDED: "purple",
-};
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
   value ? (dayjs(value).isValid() ? dayjs(value).format(pattern) : "--") : "--";

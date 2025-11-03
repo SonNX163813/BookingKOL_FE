@@ -11,13 +11,14 @@ const CourseDetailHero = ({
   discountChip,
   coverImage,
   onSeeOtherPackages,
+  onPurchase,
+  purchaseDisabled = false,
+  purchaseLoading = false,
 }) => (
   <Box
     sx={{
       position: "relative",
       borderRadius: { xs: 4, md: 6 },
-      // background:
-      //   "linear-gradient(135deg, rgba(74, 116, 218, 0.12), rgba(147, 206, 246, 0.08))",
       border: "1px solid rgba(74, 116, 218, 0.16)",
       overflow: "hidden",
       boxShadow: "0 32px 80px rgba(74, 116, 218, 0.18)",
@@ -101,18 +102,6 @@ const CourseDetailHero = ({
             {courseTitle}
           </Typography>
 
-          <Typography
-            sx={{
-              color: "rgba(15, 23, 42, 0.7)",
-              fontSize: { xs: "1rem", md: "1.08rem" },
-              lineHeight: 1.7,
-            }}
-          >
-            Khung đào tạo livestream nâng cao, hướng dẫn chi tiết từ khâu thiết
-            lập cho tới tối ưu doanh thu, phù hợp cho đội ngũ đang muốn tăng tốc
-            livestream xây dựng thương hiệu.
-          </Typography>
-
           <Stack
             direction="row"
             spacing={3}
@@ -148,7 +137,9 @@ const CourseDetailHero = ({
             <Button
               variant="contained"
               size="large"
-              endIcon={<PlayArrowRoundedIcon />}
+              endIcon={purchaseLoading ? null : <PlayArrowRoundedIcon />}
+              onClick={onPurchase}
+              disabled={purchaseDisabled || purchaseLoading}
               sx={{
                 textTransform: "none",
                 fontWeight: 700,
@@ -164,7 +155,7 @@ const CourseDetailHero = ({
                 },
               }}
             >
-              Đăng ký tư vấn
+              {purchaseLoading ? "Đang xử lý..." : "Đăng ký tư vấn"}
             </Button>
             <Button
               variant="outlined"
@@ -194,3 +185,4 @@ const CourseDetailHero = ({
 );
 
 export default CourseDetailHero;
+

@@ -34,6 +34,10 @@ import BookingSinglePaymentFail from "../pages/booking_single/BookingSinglePayme
 import BookingSingleReview from "../pages/booking_single/BookingSingleReview.jsx";
 import MySingleBookingRequests from "../pages/home/booking/MySingleBookingRequests.jsx";
 import MySingleBookingRequestDetail from "../pages/home/booking/MySingleBookingRequestDetail.jsx";
+import CoursePurchaseReview from "../pages/home/course-live/CoursePurchaseReview.jsx";
+import CoursePurchasePayment from "../pages/home/course-live/CoursePurchasePayment.jsx";
+import CoursePurchaseSuccess from "../pages/home/course-live/CoursePurchaseSuccess.jsx";
+import CoursePurchaseFail from "../pages/home/course-live/CoursePurchaseFail.jsx";
 
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
@@ -95,6 +99,22 @@ export const routerCustomer = [
           {
             path: "/don-booking-kol/:requestId",
             element: <MySingleBookingRequestDetail />,
+          },
+          {
+            path: "/khoa-hoc/review/:coursePackageId",
+            element: <CoursePurchaseReview />,
+          },
+          {
+            path: "/khoa-hoc/thanh-toan/:purchaseId",
+            element: <CoursePurchasePayment />,
+          },
+          {
+            path: "/khoa-hoc/thanh-toan/thanh-cong",
+            element: <CoursePurchaseSuccess />,
+          },
+          {
+            path: "/khoa-hoc/thanh-toan/that-bai",
+            element: <CoursePurchaseFail />,
           },
         ],
       },

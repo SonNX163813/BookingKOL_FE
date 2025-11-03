@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import AdminHeader from "../components/admin/layout/AdminHeader";
 import { Menu } from "antd";
@@ -17,6 +17,7 @@ import {
   PlayCircleOutline,
   CalendarMonthOutlined,
   EventNoteOutlined,
+  MonetizationOnOutlined,
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 
@@ -65,6 +66,10 @@ const MainLayoutAdmin = () => {
     {
       pattern: /^\/admin\/management-booking-requests(\/)?$/,
       key: "management-booking-requests",
+    },
+    {
+      pattern: /^\/admin\/management-refunds(\/)?$/,
+      key: "management-refunds",
     },
   ];
 
@@ -142,10 +147,20 @@ const MainLayoutAdmin = () => {
           key: "management-booking-requests",
           icon: <CalendarMonthOutlined />,
           label: (
-            <Link to="management-booking-requests">
-              Quản lý booking lẻ
-            </Link>
+            <Link to="management-booking-requests">Quản lý booking lẻ</Link>
           ),
+        },
+      ],
+    },
+    {
+      key: "management-refund",
+      icon: <EventNoteOutlined />,
+      label: "Quản lý tiền",
+      children: [
+        {
+          key: "management-refunds",
+          icon: <MonetizationOnOutlined />,
+          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
         },
       ],
     },

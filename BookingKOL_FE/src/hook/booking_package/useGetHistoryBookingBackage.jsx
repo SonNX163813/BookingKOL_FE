@@ -5,6 +5,7 @@ export const useGetHistoryBookingBackage = (page, size) => {
   const {
     isPending: isGetHistoryBookingBackage,
     data: ResponseGetHistoryBookingPackage,
+    refetch: refetchHistoryBookingPackage,
   } = useQuery({
     queryKey: ["useGetHistoryBookingBackage", page, size],
     queryFn: () => getHistoryBookingPackage(page, size),
@@ -17,5 +18,6 @@ export const useGetHistoryBookingBackage = (page, size) => {
   return {
     isGetHistoryBookingBackage,
     ResponseGetHistoryBookingPackage,
+    refetchHistoryBookingPackage,
   };
 };

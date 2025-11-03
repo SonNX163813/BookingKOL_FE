@@ -39,6 +39,8 @@ export const CLIENT_API_PATHS = {
     cancelMySingleRequest: "/v1/user/booking/single-requests/cancel",
     confirmSingleRequest: "/v1/user/booking/request/single/confirm",
     cancelSingleRequest: "/v1/user/booking/request/single/cancel",
+    cancelSinglePayment: "/v1/user/booking/request/single/payment/cancel",
+    continueSinglePayment: "/v1/user/booking/request/single/payment/continue",
     mySingleRequestsAll: "/v1/kol/booking/single-requests/all",
     mySingleRequestDetail: (requestId) =>
       `/v1/kol/booking/single-requests/detail/${requestId}`,
@@ -46,6 +48,12 @@ export const CLIENT_API_PATHS = {
   COURSE: {
     getAll: "/v1/courses/all",
     getDetail: "/v1/courses",
+    purchase: (coursePackageId) =>
+      `/v1/courses/purchase/${encodeURIComponent(coursePackageId)}`,
+    confirmPurchase: (purchaseId) =>
+      `/v1/courses/purchase/confirm/${encodeURIComponent(purchaseId)}`,
+    cancelPurchase: (purchaseId) =>
+      `/v1/courses/purchase/cancel/${encodeURIComponent(purchaseId)}`,
   },
 
   SCHEDULE_KOL_FREETIME: {
