@@ -69,6 +69,24 @@ export const cancelSingleBookingRequestById = async ({ requestId } = {}) => {
   });
 };
 
+export const cancelSingleBookingPayment = async ({ requestId } = {}) => {
+  if (!requestId) {
+    throw new Error("requestId is required to cancel single booking payment");
+  }
+  return patch({
+    url: `${CLIENT_API_PATHS.BOOKING.cancelSinglePayment}/${requestId}`,
+  });
+};
+
+export const continueSingleBookingPayment = async ({ requestId } = {}) => {
+  if (!requestId) {
+    throw new Error("requestId is required to continue single booking payment");
+  }
+  return post({
+    url: `${CLIENT_API_PATHS.BOOKING.continueSinglePayment}/${requestId}`,
+  });
+};
+
 export const holdBookingSlot = async ({
   kolId,
   startTimeIso,
@@ -133,11 +151,11 @@ export const updateSingleBookingRequest = async ({
 export const cancelSingleBookingRequest = async ({
   requestId,
   cancelReason,
+  bankName,
+  bankNumber,
 } = {}) => {
   if (!requestId) {
-    throw new Error(
-      "requestId is required to cancel single booking request"
-    );
+    throw new Error("requestId is required to cancel single booking request");
   }
 
   const payload =
@@ -147,9 +165,21 @@ export const cancelSingleBookingRequest = async ({
       ? cancelReason
       : null;
 
-  return patch({
+  const data = {
+    ...(payload ?? {}),
+  };
+
+  if (typeof bankName === "string" && bankName.trim().length > 0) {
+    data.bankName = bankName.trim();
+  }
+
+  if (typeof bankNumber === "string" && bankNumber.trim().length > 0) {
+    data.bankNumber = bankNumber.trim();
+  }
+
+  return post({
     url: `${CLIENT_API_PATHS.BOOKING.cancelMySingleRequest}/${requestId}`,
-    data: payload ?? {},
+    data,
   });
 };
 

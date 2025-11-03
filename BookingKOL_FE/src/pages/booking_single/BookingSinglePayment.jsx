@@ -54,18 +54,28 @@ const BookingSinglePayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [thongTinThanhToan, setThongTinThanhToan] = useState(null);
+  const [yeuCauDatLich, setYeuCauDatLich] = useState(
+    () => location.state?.bookingRequest ?? null
+  );
   const [thoiGianConLai, setThoiGianConLai] = useState(THOI_GIAN_DEM_NGUOC);
 
   // Lấy dữ liệu thanh toán từ location hoặc sessionStorage
   useEffect(() => {
     const statePayment = location.state?.payment;
+    const stateBookingRequest = location.state?.bookingRequest ?? null;
 
     if (statePayment) {
       setThongTinThanhToan(statePayment);
+      if (stateBookingRequest) {
+        setYeuCauDatLich(stateBookingRequest);
+      }
       try {
         sessionStorage.setItem(
           BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
-          JSON.stringify({ payment: statePayment })
+          JSON.stringify({
+            payment: statePayment,
+            bookingRequest: stateBookingRequest,
+          })
         );
         sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
       } catch (err) {
@@ -82,6 +92,9 @@ const BookingSinglePayment = () => {
         const parsed = JSON.parse(duLieuLuu);
         if (parsed?.payment) {
           setThongTinThanhToan(parsed.payment);
+          if (parsed?.bookingRequest) {
+            setYeuCauDatLich(parsed.bookingRequest);
+          }
           sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
           return;
         }
@@ -110,6 +123,17 @@ const BookingSinglePayment = () => {
     const intervalId = setInterval(capNhatThoiGian, 1000);
     return () => clearInterval(intervalId);
   }, [thongTinThanhToan]);
+
+  useEffect(() => {
+    if (!thongTinThanhToan || thoiGianConLai > 0) return;
+
+    sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
+
+    navigate("/thanh-toan-kol-le/that-bai", {
+      replace: true,
+      state: yeuCauDatLich ? { bookingRequest: yeuCauDatLich } : undefined,
+    });
+  }, [navigate, thoiGianConLai, thongTinThanhToan, yeuCauDatLich]);
 
   // Kiểm tra trạng thái thanh toán định kỳ
   useEffect(() => {

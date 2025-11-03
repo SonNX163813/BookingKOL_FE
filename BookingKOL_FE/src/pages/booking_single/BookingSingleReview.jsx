@@ -269,10 +269,10 @@ const BookingSingleReview = () => {
         value: formatKolLocation(kolInfo.city, kolInfo.country),
       },
       // { label: "Ngôn ngữ", value: formatLanguages(kolInfo.languages) },
-      {
-        label: "Giá booking tối thiểu",
-        value: formatCurrency(kolInfo.minBookingPrice),
-      },
+      // {
+      //   label: "Giá booking tối thiểu",
+      //   value: formatCurrency(kolInfo.minBookingPrice),
+      // },
       {
         label: "Đánh giá",
         value: formatKolRating(kolInfo.overallRating, kolInfo.feedbackCount),

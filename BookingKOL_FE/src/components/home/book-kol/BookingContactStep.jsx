@@ -150,7 +150,7 @@ const BookingContactStep = ({
             variant="subtitle2"
             sx={{ color: STYLE.textPrimary, fontWeight: 600 }}
           >
-            Tệp đính kèm (nếu có)
+            Tệp đính kèm
           </Typography>
 
           <Stack direction="row" spacing={1.5} alignItems="center">
