@@ -15,11 +15,11 @@ import ManagementBookingRequests from "../pages/admin/booking/ManagementBookingR
 import BookingRequestDetail from "../pages/admin/booking/BookingRequestDetail";
 
 import EditKOL from "../pages/admin/management-user/management-kol/EditKOL";
-import KolPortfolioPage from "../pages/admin/management-user/management-kol/KolPortfolioPage"; // 👈 thêm import
-
+import KolPortfolioPage from "../pages/admin/management-user/management-kol/KolPortfolioPage";
 import CreateKOL from "../pages/admin/management-user/management-kol/CreateKOL";
-
-import EditDetailCourse from "../pages/admin/course/EditDetailCourse";
+import AdminKolBookingById from "../pages/admin/management-user/management-kol/AdminKolBookingById";
+// 👇 thêm import trang xem lịch KOL (đặt file ở đúng folder bạn dùng)
+import AdminViewKolSchedule from "../pages/admin/management-user/management-kol/AdminViewKolSchedule";
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -32,7 +32,15 @@ export const routerAdmin = [
       { path: "management-log-chat-ai", element: <ManagementLogAI /> },
       { path: "management-customer", element: <ManagementCustomer /> },
       { path: "management-customer/:id", element: <UserDetailPage /> },
+
       { path: "management-kol", element: <ManagementKOL /> },
+      // 👇 route mới để Admin xem lịch của KOL
+      { path: "kols/:kolId/schedule", element: <AdminViewKolSchedule /> },
+
+      { path: "kols/create", element: <CreateKOL /> },
+      { path: "kols/:kolId/edit", element: <EditKOL /> },
+      { path: "kols/:kolId/portfolio", element: <KolPortfolioPage /> },
+
       {
         path: "management-booking-requests",
         element: <ManagementBookingRequests />,
@@ -42,12 +50,10 @@ export const routerAdmin = [
         element: <BookingRequestDetail />,
       },
       { path: "management-course", element: <ManagementCourse /> },
-      { path: "edit-detail-course/:id", element: <EditDetailCourse /> },
+      { path: "edit-detail-course/:id", element: <ViewDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },
       { path: "create-course", element: <CreateCoursePage /> },
-      { path: "kols/create", element: <CreateKOL /> },
-      { path: "kols/:kolId/edit", element: <EditKOL /> },
-      { path: "kols/:kolId/portfolio", element: <KolPortfolioPage /> }, // 👈 bỏ dấu '/' đầu
+      { path: "kols/:kolId/bookings", element: <AdminKolBookingById /> },
     ],
   },
 

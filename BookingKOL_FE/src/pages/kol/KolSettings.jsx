@@ -25,32 +25,12 @@ import { toast } from "react-toastify";
 import {
   updateMyKolProfile,
   getKolProfileByUserId,
-  uploadKolMedias,
   resetPasswordWithOtp,
   resolveAvatarUrl,
-  changeKolAvatarExisting, // ✅ dùng API chọn avatar từ ảnh đã upload
+  changeKolAvatarNew, // ✅ /v1/kol/avatar/change/new-image
 } from "../../services/kol/KolAPI";
 
 const { Title, Text } = Typography;
-
-/** Rút tham chiếu ảnh vừa upload: usageId / fileId / fileUrl */
-const extractUploadedAvatarRef = (resp) => {
-  const body = resp?.data ?? resp;
-  const data = body?.data ?? body;
-
-  const normalize = (x) => {
-    if (!x) return null;
-    const usageId = x.id || x.usageId || null;
-    const fileId = x?.file?.id || x.fileId || null;
-    const fileUrl = x?.file?.fileUrl || x.fileUrl || x.url || null;
-    return { usageId, fileId, fileUrl };
-  };
-
-  if (Array.isArray(data) && data.length) return normalize(data[0]);
-  if (Array.isArray(data?.content) && data.content.length)
-    return normalize(data.content[0]);
-  return normalize(data);
-};
 
 export default function KolSettings() {
   const auth = useAuth?.() || {};
@@ -63,9 +43,9 @@ export default function KolSettings() {
   const [editingInfo, setEditingInfo] = useState(false);
   const [savingInfo, setSavingInfo] = useState(false);
   const [formInfo] = Form.useForm();
-  const [avatarPreview, setAvatarPreview] = useState(""); // ảnh đang hiển thị
-  const avatarFileRef = useRef(null); // file được chọn (nếu có)
-  const objectUrlRef = useRef(null); // để revoke
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const avatarFileRef = useRef(null);
+  const objectUrlRef = useRef(null);
   const [uploadPct, setUploadPct] = useState(0);
 
   // ====== Password reset (OTP) ======
@@ -131,7 +111,6 @@ export default function KolSettings() {
       toast.error("Vui lòng chọn đúng định dạng ảnh.");
       return;
     }
-    // Có thể giảm limit phía FE tuỳ cấu hình Nginx/BE; tạm để 5MB
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Ảnh quá lớn (>5MB). Vui lòng chọn ảnh nhỏ hơn.");
       return;
@@ -154,30 +133,18 @@ export default function KolSettings() {
 
       setSavingInfo(true);
 
-      // 1) Nếu có file avatar mới → UPLOAD ẢNH
+      // 1) Nếu có file avatar mới → gọi API đổi avatar
       if (avatarFileRef.current) {
-        const res = await uploadKolMedias(avatarFileRef.current, {
-          fileType: "IMAGE",
-          targetType: "AVATAR",
+        await changeKolAvatarNew(avatarFileRef.current, {
           onUploadProgress: (e) => {
-            if (!e.total) return;
+            if (!e?.total) return;
             setUploadPct(Math.round((e.loaded * 100) / e.total));
           },
         });
-
-        // 2) Lấy usageId/fileId → GỌI API CHỌN AVATAR TỪ ẢNH ĐÃ CÓ
-        const ref = extractUploadedAvatarRef(res);
-        if (!ref?.usageId && !ref?.fileId) {
-          throw new Error("Không lấy được usageId/fileId sau khi upload.");
-        }
-        await changeKolAvatarExisting({
-          fileUsageId: ref.usageId ?? undefined,
-          fileId: ref.fileId ?? undefined,
-        });
       }
 
-      // 3) Cập nhật các field text
-      await updateMyKolProfile(payload); // /v1/kol/profile/update
+      // 2) Cập nhật các field text
+      await updateMyKolProfile(payload);
 
       toast.success("Đã lưu thay đổi.");
       setEditingInfo(false);
@@ -242,236 +209,256 @@ export default function KolSettings() {
 
   return (
     <div
-      className="px-4 py-6 space-y-6"
+      className="px-4 md:px-6 py-6"
       style={{ maxWidth: 960, margin: "0 auto" }}
     >
-      {/* ===== Thông tin tài khoản ===== */}
-      <Card
-        loading={loading}
-        title={
-          <Title level={4} className="!mb-0 font-bold">
-            <div className="flex justify-between items-center py-2">
-              <span>Cài đặt tài khoản</span>
-              <div className="flex items-center gap-2">
-                {!editingInfo ? (
-                  <Button
-                    icon={<EditOutlined />}
-                    onClick={() => setEditingInfo(true)}
-                    className="rounded-xl !h-10"
-                  >
-                    Chỉnh sửa
-                  </Button>
-                ) : (
-                  <Space>
-                    <Button
-                      icon={<CloseOutlined />}
-                      onClick={onCancelInfo}
-                      className="rounded-xl !h-10"
-                    >
-                      Hủy
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      loading={savingInfo}
-                      onClick={onSaveInfo}
-                      className="rounded-xl !h-10"
-                    >
-                      Lưu thay đổi
-                    </Button>
-                  </Space>
-                )}
-              </div>
-            </div>
-          </Title>
-        }
-        className="shadow-sm rounded-2xl"
-        bodyStyle={{ paddingBottom: 16 }}
+      {/* === TÁCH CARD GIỐNG KolProfile: dùng Space vertical size=24 === */}
+      <Space
+        direction="vertical"
+        size={24}
+        style={{ width: "100%", display: "flex" }}
       >
-        {/* Avatar ở giữa trên cùng */}
-        <div className="w-full flex flex-col items-center mb-4">
-          <Avatar
-            src={avatarPreview}
-            size={128}
-            style={{ border: "1px solid #e5e7eb" }}
-          />
-          <input
-            id="kol-settings-avatar-input"
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={onPickAvatar}
-          />
-          {editingInfo ? (
-            <div className="flex flex-col items-center">
-              <Button
-                icon={<UploadOutlined />}
-                onClick={openPicker}
-                className="rounded-xl mt-3"
-              >
-                Chọn ảnh từ máy
-              </Button>
-              {savingInfo && uploadPct > 0 && uploadPct < 100 && (
-                <div className="text-sm text-gray-500 mt-2">
-                  Đang tải ảnh… {uploadPct}%
+        {/* ===== Thông tin tài khoản ===== */}
+        <Card
+          loading={loading}
+          title={
+            <Title level={4} className="!mb-0 font-bold">
+              <div className="flex justify-between items-center py-2">
+                <span>Cài đặt tài khoản</span>
+                <div className="flex items-center gap-2">
+                  {!editingInfo ? (
+                    <Button
+                      icon={<EditOutlined />}
+                      onClick={() => setEditingInfo(true)}
+                      className="rounded-xl !h-10"
+                    >
+                      Chỉnh sửa
+                    </Button>
+                  ) : (
+                    <Space>
+                      <Button
+                        icon={<CloseOutlined />}
+                        onClick={onCancelInfo}
+                        className="rounded-xl !h-10"
+                      >
+                        Hủy
+                      </Button>
+                      <Button
+                        type="primary"
+                        icon={<SaveOutlined />}
+                        loading={savingInfo}
+                        onClick={onSaveInfo}
+                        className="rounded-xl !h-10"
+                      >
+                        Lưu thay đổi
+                      </Button>
+                    </Space>
+                  )}
                 </div>
-              )}
-            </div>
-          ) : (
-            <Text type="secondary" className="mt-3">
-              Ảnh đại diện
-            </Text>
-          )}
-        </div>
-
-        {/* Họ & tên + Email cùng một hàng */}
-        <Form
-          form={formInfo}
-          layout="vertical"
-          disabled={!editingInfo}
-          className="max-w-3xl mx-auto"
+              </div>
+            </Title>
+          }
+          className="shadow-sm rounded-2xl"
+          headStyle={{ padding: "16px 24px" }}
+          bodyStyle={{ padding: 24 }} // padding trong card để không bị “dính”
         >
-          <Row gutter={16} justify="center">
-            <Col xs={24} md={12}>
-              <Form.Item
-                label="Họ và tên"
-                name="fullName"
-                rules={[
-                  { required: true, message: "Vui lòng nhập họ và tên" },
-                  { min: 2, max: 60, message: "Độ dài 2–60 ký tự" },
-                ]}
-              >
-                <Input placeholder="Họ và tên" className="!h-12" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item label="Email" name="email">
-                <Input disabled className="!h-12" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Card>
-
-      {/* ===== Đổi mật khẩu (OTP) ===== */}
-      <Card
-        title={
-          <Title level={4} className="!mb-0 font-bold">
-            <div className="flex justify-between items-center py-2">
-              <span>Đổi mật khẩu</span>
-              <div className="flex items-center gap-2">
-                {!editingPwd ? (
-                  <Button
-                    icon={<LockOutlined />}
-                    onClick={() => {
-                      setEditingPwd(true);
-                      formPwd.setFieldsValue({
-                        email: formInfo.getFieldValue("email"),
-                      });
-                    }}
-                    className="rounded-xl !h-10"
-                  >
-                    Chỉnh sửa
-                  </Button>
-                ) : (
-                  <Space>
-                    <Button
-                      icon={<CloseOutlined />}
-                      onClick={() => {
-                        setEditingPwd(false);
-                        formPwd.resetFields();
-                      }}
-                      className="rounded-xl !h-10"
-                    >
-                      Hủy
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      loading={changingPwd}
-                      onClick={onSavePassword}
-                      className="rounded-xl !h-10"
-                    >
-                      Lưu thay đổi
-                    </Button>
-                  </Space>
+          {/* Avatar giữa trên cùng */}
+          <div className="w-full flex flex-col items-center mb-4">
+            <Avatar
+              src={avatarPreview}
+              size={128}
+              style={{ border: "1px solid #e5e7eb" }}
+            />
+            <input
+              id="kol-settings-avatar-input"
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={onPickAvatar}
+            />
+            {editingInfo ? (
+              <div className="flex flex-col items-center">
+                <Button
+                  icon={<UploadOutlined />}
+                  onClick={openPicker}
+                  className="rounded-xl mt-3"
+                >
+                  Chọn ảnh từ máy
+                </Button>
+                {savingInfo && uploadPct > 0 && uploadPct < 100 && (
+                  <div className="text-sm text-gray-500 mt-2">
+                    Đang tải ảnh… {uploadPct}%
+                  </div>
                 )}
               </div>
-            </div>
-          </Title>
-        }
-        className="shadow-sm rounded-2xl"
-        bodyStyle={{ paddingBottom: 16 }}
-      >
-        {!editingPwd ? (
-          <div className="text-gray-500">**********</div>
-        ) : (
-          <Form form={formPwd} layout="vertical" className="max-w-2xl">
-            <Row gutter={16}>
+            ) : (
+              <Text type="secondary" className="mt-3">
+                Ảnh đại diện
+              </Text>
+            )}
+          </div>
+
+          {/* Họ & Tên + Email: cân đối, padding trái/phải đều nhau */}
+          <Form
+            form={formInfo}
+            layout="vertical"
+            disabled={!editingInfo}
+            className="w-full" // ❌ bỏ max-w-3xl, mx-auto, px-*
+          >
+            <Row gutter={24}>
+              {" "}
+              {/* ❌ bỏ justify / style marginLeft=0 */}
               <Col xs={24} md={12}>
                 <Form.Item
-                  label="Email"
-                  name="email"
-                  rules={[{ required: true, message: "Nhập email" }]}
-                >
-                  <Input className="!h-12" disabled />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Mã OTP"
-                  name="otp"
-                  rules={[{ required: true, message: "Nhập mã OTP" }]}
-                >
-                  <Input className="!h-12" placeholder="Nhập mã OTP đã nhận" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Mật khẩu mới"
-                  name="newPassword"
+                  label="Họ và tên"
+                  name="fullName"
                   rules={[
-                    { required: true, message: "Nhập mật khẩu mới" },
-                    { min: 8, message: "Tối thiểu 8 ký tự" },
+                    { required: true, message: "Vui lòng nhập họ và tên" },
+                    { min: 2, max: 60, message: "Độ dài 2–60 ký tự" },
                   ]}
                 >
-                  <Input.Password
-                    className="!h-12"
-                    placeholder="Mật khẩu mới"
-                  />
+                  <Input placeholder="Họ và tên" className="!h-12" />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
-                <Form.Item
-                  label="Xác nhận mật khẩu"
-                  name="confirmPassword"
-                  dependencies={["newPassword"]}
-                  rules={[
-                    { required: true, message: "Nhập lại mật khẩu" },
-                    ({ getFieldValue }) => ({
-                      validator(_, v) {
-                        if (!v || getFieldValue("newPassword") === v)
-                          return Promise.resolve();
-                        return Promise.reject(
-                          new Error("Không khớp mật khẩu.")
-                        );
-                      },
-                    }),
-                  ]}
-                >
-                  <Input.Password
-                    className="!h-12"
-                    placeholder="Nhập lại mật khẩu"
-                  />
+                <Form.Item label="Email" name="email">
+                  <Input disabled className="!h-12" />
                 </Form.Item>
               </Col>
             </Row>
           </Form>
-        )}
-      </Card>
+        </Card>
 
+        {/* ===== Đổi mật khẩu (OTP) ===== */}
+        <Card
+          title={
+            <Title level={4} className="!mb-0 font-bold">
+              <div className="flex justify-between items-center py-2">
+                <span>Đổi mật khẩu</span>
+                <div className="flex items-center gap-2">
+                  {!editingPwd ? (
+                    <Button
+                      icon={<LockOutlined />}
+                      onClick={() => {
+                        setEditingPwd(true);
+                        formPwd.setFieldsValue({
+                          email: formInfo.getFieldValue("email"),
+                        });
+                      }}
+                      className="rounded-xl !h-10"
+                    >
+                      Chỉnh sửa
+                    </Button>
+                  ) : (
+                    <Space>
+                      <Button
+                        icon={<CloseOutlined />}
+                        onClick={() => {
+                          setEditingPwd(false);
+                          formPwd.resetFields();
+                        }}
+                        className="rounded-xl !h-10"
+                      >
+                        Hủy
+                      </Button>
+                      <Button
+                        type="primary"
+                        icon={<SaveOutlined />}
+                        loading={changingPwd}
+                        onClick={onSavePassword}
+                        className="rounded-xl !h-10"
+                      >
+                        Lưu thay đổi
+                      </Button>
+                    </Space>
+                  )}
+                </div>
+              </div>
+            </Title>
+          }
+          className="shadow-sm rounded-2xl"
+          headStyle={{ padding: "16px 24px" }}
+          bodyStyle={{ padding: 24 }} // đồng bộ padding với card trên
+        >
+          {!editingPwd ? (
+            <div className="text-gray-500">**********</div>
+          ) : (
+            <Form
+              form={formPwd}
+              layout="vertical"
+              className="w-full" // ❌ bỏ max-w-2xl, mx-auto, px-*
+            >
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="Email"
+                    name="email"
+                    rules={[{ required: true, message: "Nhập email" }]}
+                  >
+                    <Input className="!h-12" disabled />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="Mã OTP"
+                    name="otp"
+                    rules={[{ required: true, message: "Nhập mã OTP" }]}
+                  >
+                    <Input
+                      className="!h-12"
+                      placeholder="Nhập mã OTP đã nhận"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={24}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="Mật khẩu mới"
+                    name="newPassword"
+                    rules={[
+                      { required: true, message: "Nhập mật khẩu mới" },
+                      { min: 8, message: "Tối thiểu 8 ký tự" },
+                    ]}
+                  >
+                    <Input.Password
+                      className="!h-12"
+                      placeholder="Mật khẩu mới"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="Xác nhận mật khẩu"
+                    name="confirmPassword"
+                    dependencies={["newPassword"]}
+                    rules={[
+                      { required: true, message: "Nhập lại mật khẩu" },
+                      ({ getFieldValue }) => ({
+                        validator(_, v) {
+                          if (!v || getFieldValue("newPassword") === v)
+                            return Promise.resolve();
+                          return Promise.reject(
+                            new Error("Không khớp mật khẩu.")
+                          );
+                        },
+                      }),
+                    ]}
+                  >
+                    <Input.Password
+                      className="!h-12"
+                      placeholder="Nhập lại mật khẩu"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Form>
+          )}
+        </Card>
+      </Space>
+
+      {/* Ngăn cách nhẹ cuối trang (tuỳ chọn) */}
       <Divider style={{ margin: 0 }} />
     </div>
   );

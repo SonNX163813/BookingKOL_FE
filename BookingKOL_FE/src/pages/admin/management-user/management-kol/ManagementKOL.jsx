@@ -1,6 +1,15 @@
-import { Search, Trash2, Eye, Pencil, Plus } from "lucide-react";
+import {
+  Search,
+  Trash2,
+  Eye,
+  Pencil,
+  Plus,
+  CalendarRange,
+  CalendarDays,
+  CheckCircle2,
+} from "lucide-react";
 
-// src/pages/admin/management-user/ManagementKOL.jsx
+// src/pages/admin/management-user/management-kol/ManagementKOL.jsx
 
 import {
   Button,
@@ -60,6 +69,7 @@ const ManagementKOL = () => {
 
   const dataResponse = ResponseGetAllKol?.data?.content;
   const totalElements = ResponseGetAllKol?.data?.totalElements ?? 0;
+
   useEffect(() => {
     refetchGetAllKol();
   }, [
@@ -147,6 +157,16 @@ const ManagementKOL = () => {
 
   const handleCreateKol = () => {
     navigate("/admin/kols/create");
+  };
+
+  // 👉 Nút lịch: Admin xem lịch KOL (mặc định view=month)
+  const handleOpenSchedule = (record) => {
+    navigate(`/admin/kols/${record?.id}/schedule?view=month`);
+  };
+
+  // 👉 Nút mới: Lịch sử booking của KOL
+  const handleOpenBookingHistory = (record) => {
+    navigate(`/admin/kols/${record?.id}/bookings`);
   };
 
   const handleSearch = (values) => {
@@ -264,21 +284,53 @@ const ManagementKOL = () => {
       title: "Thao tác",
       key: "action",
       align: "center",
-      width: 160,
+      width: 320,
       render: (record) => (
         <div className="w-full flex justify-center gap-2">
-          <Button
-            onClick={() => handleViewDetail(record)}
-            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-          >
-            <Eye size={18} className="font-semibold" />
-          </Button>
-          <Button
-            onClick={() => handleEdit(record)}
-            className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
-          >
-            <Pencil size={18} className="font-semibold" />
-          </Button>
+          <Tooltip title="Xem portfolio">
+            <Button
+              onClick={() => handleViewDetail(record)}
+              className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+            >
+              <Eye size={18} className="font-semibold" />
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Sửa thông tin">
+            <Button
+              onClick={() => handleEdit(record)}
+              className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
+            >
+              <Pencil size={18} className="font-semibold" />
+            </Button>
+          </Tooltip>
+
+          {/* ✅ Nút lịch sử booking (icon lịch + tick giống ảnh mẫu) */}
+          <Tooltip title="Lịch sử booking">
+            <Button
+              onClick={() => handleOpenBookingHistory(record)}
+              className="!h-10 !bg-amber-600 !text-white !border-none hover:!bg-amber-700 transition-all"
+            >
+              <span className="relative inline-block">
+                <CalendarDays size={18} className="align-middle" />
+                <CheckCircle2
+                  size={12}
+                  strokeWidth={2}
+                  className="absolute -right-1 -bottom-1 rounded-full bg-amber-600"
+                />
+              </span>
+            </Button>
+          </Tooltip>
+
+          {/* ✅ Nút lịch (mặc định theo Tháng) */}
+          <Tooltip title="Xem lịch làm việc">
+            <Button
+              onClick={() => handleOpenSchedule(record)}
+              className="!h-10 !bg-purple-600 !text-white !border-none hover:!bg-purple-700 transition-all"
+            >
+              <CalendarRange size={18} className="font-semibold" />
+            </Button>
+          </Tooltip>
         </div>
       ),
     },
@@ -316,14 +368,14 @@ const ManagementKOL = () => {
             />
           </Form.Item>
 
-          {/* Giá booking tối thiểu (InputNumber chuẩn, có . và 'đ') */}
+          {/* Giá booking tối thiểu */}
           <Form.Item
             name="minBookingPrice"
             rules={[
               {
                 validator: (_, value) => {
                   if (value === undefined || value === "" || value === null) {
-                    return Promise.resolve(); // optional
+                    return Promise.resolve();
                   }
                   const num = Number(String(value).replace(/\D/g, ""));
                   if (!Number.isFinite(num))

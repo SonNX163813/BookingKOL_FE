@@ -18,14 +18,37 @@ import {
   MapPin,
   Calendar,
   Globe,
-  Lock,
-  Unlock,
-  PencilLine,
 } from "lucide-react";
 import { useAdminGetViewProfileUser } from "../../../../hook/admin/management-user/useAdminGetViewProfileUser";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
+
+const STATUS_VI = {
+  ACTIVE: "Đang hoạt động",
+  SUSPENDED: "Tạm khóa",
+  INACTIVE: "Chưa kích hoạt",
+  PENDING: "Chờ duyệt",
+};
+
+// ===== Map giới tính sang tiếng Việt + màu Tag =====
+const toGenderVI = (g) => {
+  if (!g) return "—";
+  const v = String(g).trim().toUpperCase();
+  if (v === "MALE" || v === "NAM" || v === "M") return "Nam";
+  if (v === "FEMALE" || v === "NỮ" || v === "NU" || v === "F") return "Nữ";
+  if (v === "OTHER" || v === "KHÁC") return "Khác";
+  return "Khác";
+};
+
+const genderColor = (g) => {
+  const v = String(g || "")
+    .trim()
+    .toUpperCase();
+  if (v === "MALE" || v === "NAM" || v === "M") return "green";
+  if (v === "FEMALE" || v === "NỮ" || v === "NU" || v === "F") return "magenta";
+  return "default";
+};
 
 export default function UserDetailPage() {
   const { id } = useParams();
@@ -76,14 +99,33 @@ export default function UserDetailPage() {
                       ? `Thương hiệu: ${data?.brandName}`
                       : "Không có thương hiệu"}
                   </Tag>
+
+                  {/* Trạng thái (tiếng Việt) */}
+                  {data?.status && (
+                    <Tag
+                      color={
+                        data.status === "ACTIVE"
+                          ? "green"
+                          : data.status === "SUSPENDED"
+                          ? "red"
+                          : "default"
+                      }
+                      className="rounded-full !h-8 !flex !items-center"
+                    >
+                      {STATUS_VI[data.status] ?? data.status}
+                    </Tag>
+                  )}
+
+                  {/* Giới tính (tiếng Việt) */}
                   {data?.gender && (
                     <Tag
                       className="rounded-full !h-8 !flex !items-center"
-                      color={data.gender === "Male" ? "green" : "magenta"}
+                      color={genderColor(data.gender)}
                     >
-                      {data.gender}
+                      {toGenderVI(data.gender)}
                     </Tag>
                   )}
+
                   {data?.country && (
                     <Tag className="rounded-full !h-8 !flex !items-center">
                       {data.country}
@@ -93,30 +135,7 @@ export default function UserDetailPage() {
               </div>
             </div>
 
-            <Space size="middle" wrap>
-              <Button
-                type="default"
-                icon={<PencilLine size={18} />}
-                className="rounded-xl !h-10"
-              >
-                Cập nhật
-              </Button>
-              <Button
-                danger
-                ghost
-                icon={<Lock size={18} />}
-                className="rounded-xl !h-10"
-              >
-                Khóa
-              </Button>
-              <Button
-                type="primary"
-                icon={<Unlock size={18} />}
-                className="rounded-xl !h-10"
-              >
-                Mở khóa
-              </Button>
-            </Space>
+            {/* ĐÃ BỎ: Cập nhật / Khóa / Mở khóa */}
           </div>
         </Skeleton>
 

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+// src/pages/kol/KolSingleRequest.jsx
+import { useCallback, useMemo, useState, useEffect } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import localeData from "dayjs/plugin/localeData";
@@ -14,7 +15,13 @@ import {
   ConfigProvider,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
-import { CalendarRange, Eye, RefreshCcw, RotateCcw } from "lucide-react";
+import {
+  CalendarRange,
+  Eye,
+  RefreshCcw,
+  RotateCcw,
+  BarChart3,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
@@ -22,7 +29,7 @@ import { getMySingleBookingRequests } from "../../services/kol/KolAPI";
 
 const { RangePicker } = DatePicker;
 
-/* ===== Việt hoá dayjs: T2..T7, CN và tuần bắt đầu từ Thứ Hai ===== */
+/* ===== Việt hoá dayjs ===== */
 dayjs.extend(localeData);
 dayjs.extend(updateLocale);
 dayjs.locale("vi");
@@ -32,14 +39,15 @@ dayjs.updateLocale("vi", {
   weekdaysMin: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
 });
 
-/* ------------------------- TRẠNG THÁI BOOKING (rút gọn) ------------------------- */
+/* ===== Nhãn trạng thái ===== */
 const BOOKING_STATUS_OPTIONS = [
-  { label: "Chờ Thanh TOán", value: "DRAFT" },
+  { label: "Chờ Thanh Toán", value: "DRAFT" },
   { label: "Đã yêu cầu", value: "REQUESTED" },
   { label: "Đang thực hiện", value: "IN_PROGRESS" },
   { label: "Đã hoàn thành", value: "COMPLETED" },
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
+  { label: "Đã thanh toán", value: "PAID" },
 ];
 
 const STATUS_TAG_COLOR = {
@@ -49,7 +57,22 @@ const STATUS_TAG_COLOR = {
   COMPLETED: "success",
   EXPIRED: "volcano",
   CANCELLED: "error",
+  PAID: "success",
 };
+
+/** ✅ Chỉ hiển thị các trạng thái này (lọc tại BE) */
+const STATUS_QUERY = [
+  "IN_PROGRESS",
+  "REQUESTED",
+  "COMPLETED",
+  "PAID",
+  "CANCELLED",
+];
+
+const normalize = (v) => (v == null ? "" : String(v).trim());
+const toUpper = (v) => normalize(v).toUpperCase();
+const getStatus = (r) =>
+  toUpper(r?.status ?? r?.bookingStatus ?? r?.state ?? r?.requestStatus ?? "");
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
@@ -57,64 +80,31 @@ const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   return parsed.isValid() ? parsed.format(pattern) : "--";
 };
 
-const composeExecutionTime = (record) => {
-  const start =
-    record?.startAt ?? record?.startTime ?? record?.executionStart ?? null;
-  const end = record?.endAt ?? record?.endTime ?? record?.executionEnd ?? null;
-
+const composeExecutionTime = (rec) => {
+  const start = rec?.startAt ?? rec?.startTime ?? rec?.executionStart ?? null;
+  const end = rec?.endAt ?? rec?.endTime ?? rec?.executionEnd ?? null;
   if (!start && !end) return "--";
-
-  const startLabel = formatDateTime(start);
-  const endLabel = formatDateTime(end);
-
-  if (!start) return endLabel;
-  if (!end) return startLabel;
-
+  const s = formatDateTime(start);
+  const e = formatDateTime(end);
+  if (!start) return e;
+  if (!end) return s;
   const sameDay =
     dayjs(start).isValid() &&
     dayjs(end).isValid() &&
     dayjs(start).isSame(dayjs(end), "day");
-
-  if (sameDay) {
-    return `${dayjs(start).format("DD/MM/YYYY HH:mm")} -> ${dayjs(end).format(
-      "HH:mm"
-    )}`;
-  }
-  return `${startLabel} -> ${endLabel}`;
+  return sameDay
+    ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} -> ${dayjs(end).format(
+        "HH:mm"
+      )}`
+    : `${s} -> ${e}`;
 };
 
 const pickValue = (record, keys, fallback = "--") => {
-  if (!record) return fallback;
-  for (const key of keys) {
-    const v = record[key];
+  for (const k of keys) {
+    const v = record?.[k];
     if (v !== undefined && v !== null && v !== "") return v;
   }
   return fallback;
-};
-
-const composeRowKey = (record) => {
-  const candidates = [
-    record?.id,
-    record?.requestId,
-    record?.bookingRequestId,
-    record?.requestNumber,
-    record?.code,
-    record?.bookingCode,
-  ]
-    .map((v) => (v == null ? undefined : String(v)))
-    .filter(Boolean);
-  if (candidates.length) return candidates[0];
-
-  const fallback = [
-    record?.kolId,
-    record?.createdAt,
-    record?.startAt,
-    record?.endAt,
-  ]
-    .filter((v) => v != null)
-    .map(String)
-    .join("-");
-  return fallback || `req-${Math.random().toString(36).slice(2, 9)}`;
 };
 
 export default function KolSingleRequest() {
@@ -124,27 +114,32 @@ export default function KolSingleRequest() {
   const token = auth?.token || null;
   const authLoading = auth?.loading ?? false;
 
-  // Mặc định hiển thị IN_PROGRESS theo yêu cầu mới
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
   const [filters, setFilters] = useState({
-    status: "IN_PROGRESS",
     startAt: undefined,
     endAt: undefined,
   });
 
+  /** Gửi page/size + status; chỉ thêm khoảng ngày khi đủ cả 2 */
+  const buildParams = useCallback(() => {
+    const { startAt, endAt } = filters || {};
+    const params = { page, size, status: STATUS_QUERY }; // mảng
+    if (startAt && endAt) {
+      params.startAt = startAt;
+      params.endAt = endAt;
+    }
+    return params;
+  }, [page, size, filters]);
+
   const {
-    data: mySingleRequestsResponse,
-    isLoading: isLoadingMySingleRequests,
-    isFetching: isFetchingMySingleRequests,
-    refetch: refetchMySingleRequests,
-    error,
+    data: resp,
+    isLoading,
+    isFetching,
+    refetch,
   } = useQuery({
     queryKey: ["kol-my-single-requests", token, { page, size, ...filters }],
-    queryFn: () =>
-      getMySingleBookingRequests({
-        params: { page, size, ...filters },
-      }),
+    queryFn: () => getMySingleBookingRequests({ params: buildParams() }),
     keepPreviousData: true,
     staleTime: 30_000,
     enabled: !!token && !authLoading,
@@ -156,72 +151,45 @@ export default function KolSingleRequest() {
   });
 
   useEffect(() => {
-    if (token && !authLoading) {
-      refetchMySingleRequests();
-    }
-  }, [token, authLoading, refetchMySingleRequests]);
+    if (token && !authLoading) refetch();
+  }, [token, authLoading, refetch]);
 
-  const rawData = mySingleRequestsResponse;
-  const dataSource = Array.isArray(rawData?.content)
-    ? rawData.content
-    : Array.isArray(rawData)
-    ? rawData
-    : Array.isArray(rawData?.items)
-    ? rawData.items
+  const raw = resp?.data ?? resp ?? {};
+  const serverList = Array.isArray(raw?.content)
+    ? raw.content
+    : Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.items)
+    ? raw.items
     : [];
 
-  const explicitTotal =
-    typeof rawData?.totalElements === "number"
-      ? rawData.totalElements
-      : typeof rawData?.total === "number"
-      ? rawData.total
-      : undefined;
+  const serverTotal =
+    (typeof raw?.totalElements === "number" && raw.totalElements) ||
+    (typeof raw?.total === "number" && raw.total) ||
+    0;
 
-  const inferredTotal =
-    page * size +
-    dataSource.length +
-    (explicitTotal === undefined && dataSource.length === size ? 1 : 0);
+  const dataSource = serverList;
 
-  const totalElements =
-    explicitTotal ?? Math.max(dataSource.length, inferredTotal);
-
-  useEffect(() => {
-    if (page > 0 && dataSource.length === 0) {
-      setPage((prev) => Math.max(0, prev - 1));
-    }
-  }, [dataSource.length, page]);
-
-  const handleViewDetail = useCallback(
-    (record) => {
-      const requestId =
-        record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
-      if (!requestId) {
-        console.warn("Không tìm thấy ID hợp lệ trong record:", record);
-        return;
-      }
-      navigate(`/kol/booking/single-requests/detail/${requestId}`);
-    },
-    [navigate]
-  );
+  const totalElements = useMemo(() => {
+    if (serverTotal > 0) return serverTotal;
+    const currentCount = Array.isArray(serverList) ? serverList.length : 0;
+    const loadedSoFar = page * size + currentCount;
+    const maybeHasNext = currentCount === size;
+    return loadedSoFar + (maybeHasNext ? 1 : 0);
+  }, [serverTotal, serverList, page, size]);
 
   const handleExecutionChange = (range) => {
     const [start, end] = range || [];
-    setFilters((prev) => ({
-      ...prev,
-      status: "IN_PROGRESS",
+    setFilters({
       startAt: start ? start.format("YYYY-MM-DD") : undefined,
       endAt: end ? end.format("YYYY-MM-DD") : undefined,
-    }));
+    });
     setPage(0);
   };
 
   const handleReset = () => {
     form.resetFields();
-    setFilters({
-      status: "IN_PROGRESS",
-      startAt: undefined,
-      endAt: undefined,
-    });
+    setFilters({ startAt: undefined, endAt: undefined });
     setPage(0);
   };
 
@@ -229,10 +197,10 @@ export default function KolSingleRequest() {
     () => [
       {
         title: "STT",
-        key: "index",
-        width: 80,
+        key: "stt",
+        width: "6%",
         render: (_, __, index) => (
-          <span className="font-semibold">#{page * size + index + 1}</span>
+          <div className="font-bold">#{page * size + index + 1}</div>
         ),
       },
       {
@@ -246,9 +214,8 @@ export default function KolSingleRequest() {
         title: "Trạng thái",
         key: "status",
         width: 160,
-        dataIndex: "status",
-        render: (status) => {
-          const normalized = status?.toString()?.toUpperCase?.();
+        render: (_, record) => {
+          const normalized = getStatus(record);
           const meta =
             BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized) || null;
           const label = meta?.label || normalized || "--";
@@ -272,41 +239,63 @@ export default function KolSingleRequest() {
       },
       {
         title: "Thao tác",
-        key: "actions",
-        fixed: "right",
-        width: 100,
-        render: (_, record) => (
-          <Button
-            type="link"
-            onClick={() => handleViewDetail(record)}
-            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-          >
-            <Eye size={18} className="font-semibold" />
-          </Button>
-        ),
+        key: "action",
+        align: "center",
+        width: 220,
+        render: (record) => {
+          const requestId =
+            record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
+          const normalized = getStatus(record);
+          const isInProgress = normalized === "IN_PROGRESS";
+          return (
+            <div className="w-full flex justify-center gap-3">
+              <Button
+                onClick={() =>
+                  requestId &&
+                  navigate(`/kol/booking/single-requests/detail/${requestId}`)
+                }
+                className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+              >
+                <Eye size={18} className="font-semibold" />
+              </Button>
+              {isInProgress && requestId && (
+                <Button
+                  className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
+                  onClick={() =>
+                    navigate(
+                      `/kol/booking/single-requests/detail/${requestId}?metrics=1`
+                    )
+                  }
+                >
+                  <BarChart3 size={18} />
+                </Button>
+              )}
+            </div>
+          );
+        },
       },
     ],
-    [handleViewDetail, page, size]
+    [navigate, page, size]
   );
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex gap-2 items-center">
         <div className="border-2 border-gray-300 p-2 rounded-md w-fit">
           <CalendarRange className="text-gray-500" size={20} />
         </div>
-        <div>
+        <section>
           <h1 className="text-[18px] font-bold uppercase">
             Booking lẻ của tôi
           </h1>
           <p className="text-[14px] text-gray-600">
             Tra cứu &amp; lọc yêu cầu booking bạn nhận được.
           </p>
-        </div>
+        </section>
       </div>
 
       <Card bordered={false} className="shadow-sm">
-        <Form form={form} layout="vertical" className="grid gap-4">
+        <Form form={form} layout="vertical">
           <Form.Item label="Khoảng thực hiện" name="executionRange">
             <div className="flex flex-wrap items-center gap-2">
               <ConfigProvider locale={viVN}>
@@ -322,8 +311,8 @@ export default function KolSingleRequest() {
               </Button>
               <Button
                 icon={<RefreshCcw size={16} />}
-                onClick={() => refetchMySingleRequests()}
-                loading={isFetchingMySingleRequests}
+                onClick={() => refetch()}
+                loading={isFetching}
               >
                 Làm mới
               </Button>
@@ -336,24 +325,37 @@ export default function KolSingleRequest() {
         <Table
           columns={columns}
           dataSource={dataSource}
-          loading={isLoadingMySingleRequests}
+          loading={isLoading}
           pagination={false}
-          rowKey={composeRowKey}
+          rowKey={(r) =>
+            r?.id ??
+            r?.requestId ??
+            r?.bookingRequestId ??
+            r?.requestNumber ??
+            r?.code ??
+            r?.bookingCode ??
+            `${r?.createdAt}-${r?.startAt}-${r?.endAt}`
+          }
           scroll={{ x: "auto" }}
+          locale={{
+            emptyText:
+              "Không có booking phù hợp trên trang này. Hãy đổi ngày hoặc chuyển trang.",
+          }}
         />
 
-        <div className="mt-4 flex justify-end">
+        <div className="!my-4 py-5 flex justify-center">
           <Pagination
+            align="center"
             current={page + 1}
             pageSize={size}
-            total={totalElements}
-            pageSizeOptions={["10", "20", "50", "100"]}
-            showSizeChanger
-            onChange={(nextPage, nextSize) => {
-              const sizeChanged = nextSize !== size;
-              setSize(nextSize);
-              setPage(sizeChanged ? 0 : nextPage - 1);
+            pageSizeOptions={["5", "10", "20", "50", "100"]}
+            onChange={(pageNumber, sizeNumber) => {
+              setPage(pageNumber - 1);
+              setSize(sizeNumber);
             }}
+            total={totalElements}
+            showSizeChanger
+            showTotal={(total, range) => `${range[0]}-${range[1]} / ${total}`}
           />
         </div>
       </Card>
