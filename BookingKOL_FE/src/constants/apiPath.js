@@ -41,6 +41,13 @@ export const API_PATHS = {
   BOOKING_REQUEST: {
     getAll: "/v1/admin/booking/single-requests/all",
     getDetail: "/v1/admin/booking/single-requests/detail",
+    getAllByKol: "/v1/admin/booking/single-requests/all/by-kol",
+  },
+  SCHEDULER_ADMIN: {
+    // Admin xem free-time của KOL
+    kolFreeTime: "/v1/availabilities/free-time", // + /{kolId}
+    // Admin xem timeline (booking) của KOL
+    kolTimeline: "/v1/availabilities/time-line/kol", // + /{kolId}
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",

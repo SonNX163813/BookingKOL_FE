@@ -670,6 +670,7 @@ export const resolveAvatarUrl = (kol) => {
 };
 
 /* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
+/* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
 const MY_SINGLE_REQUESTS_ALLOWED_PARAMS = new Set([
   "status",
   "startAt",
@@ -713,16 +714,48 @@ const buildMySingleRequestsParams = (params = {}) => {
 };
 
 export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
-  const config = signal ? { signal } : undefined;
+  const reqParams = buildMySingleRequestsParams(params);
 
   const payload = await get({
     url: CLIENT_API_PATHS.BOOKING.mySingleRequestsAll,
-    params: buildMySingleRequestsParams(params),
-    config,
+    params: reqParams, // ví dụ: { page, size, status: ['IN_PROGRESS','REQUESTED',...] }
+    config: {
+      ...(signal ? { signal } : {}),
+      // ✅ serialize mảng theo dạng repeat, không cần qs
+      paramsSerializer: {
+        serialize: (p) => {
+          const u = new URLSearchParams();
+          Object.entries(p || {}).forEach(([k, v]) => {
+            if (v == null) return;
+            if (Array.isArray(v)) {
+              v.forEach((it) => {
+                if (it == null || String(it).trim() === "") return;
+                u.append(k, it);
+              });
+            } else {
+              if (typeof v === "string" && v.trim() === "") return;
+              u.append(k, v);
+            }
+          });
+          return u.toString();
+        },
+      },
+    },
   });
 
-  const data = payload?.data;
-  if (!data) return { content: [], totalElements: 0, page: 0, size: 20 };
+  // payload?.data có thể là envelope {status, message, data} hoặc page object hoặc array
+  const raw = payload?.data;
+  const data = raw?.data ?? raw;
+
+  if (!data) {
+    const empty = {
+      content: [],
+      totalElements: 0,
+      page: 0,
+      size: MY_SINGLE_REQUESTS_DEFAULT_PARAMS.size,
+    };
+    return { ...empty, data: { ...empty } };
+  }
 
   const content = Array.isArray(data?.content)
     ? data.content
@@ -753,56 +786,38 @@ export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
       ? data.size
       : MY_SINGLE_REQUESTS_DEFAULT_PARAMS.size;
 
-  return { ...data, content, totalElements: total, page, size };
+  const normalized = { content, totalElements: total, page, size };
+  const originalObject =
+    data && typeof data === "object" && !Array.isArray(data) ? data : {};
+
+  return {
+    ...originalObject,
+    ...normalized,
+    data: {
+      ...originalObject,
+      ...normalized,
+    },
+  };
 };
 
-/** GET chi tiết booking single của KOL
- *  Endpoint: /v1/kol/booking/single-requests/detail/{requestId}
- */
-export const getKolMySingleRequestDetail = async (
-  requestId,
-  { signal } = {}
-) => {
-  if (!requestId) throw new Error("requestId is required");
+export const changeKolAvatarNew = async (file, opts = {}) => {
+  if (!file) throw new Error("file is required");
 
-  const url = CLIENT_API_PATHS.BOOKING.mySingleRequestDetail(
-    encodeURIComponent(requestId)
-  );
+  const { onUploadProgress, signal } = opts;
+  const form = new FormData();
 
-  const payload = await get({
-    url,
-    config: signal ? { signal } : undefined,
-  });
+  // BE yêu cầu @RequestParam("fileAvatar")
+  form.append("fileAvatar", file, file.name || "avatar.jpg");
 
-  const appStatus = typeof payload?.status === "number" ? payload.status : 200;
-  if (appStatus !== 200) {
-    const msg = Array.isArray(payload?.message)
-      ? payload.message[0]
-      : payload?.message;
-    const err = new Error(msg || "Không tải được chi tiết yêu cầu.");
-    err.appStatus = appStatus;
-    throw err;
-  }
-
-  return payload?.data ?? null;
-};
-export const changeKolAvatarExisting = async (
-  { fileUsageId, fileId },
-  { signal } = {}
-) => {
-  if (!fileUsageId && !fileId) {
-    throw new Error("Cần truyền fileUsageId hoặc fileId");
-  }
-
-  return await update({
-    url: CLIENT_API_PATHS.KOL.medias.avatarChangeExisting, // ✅ đúng key bạn đưa
-    data: null,
+  const payload = await post({
+    url: CLIENT_API_PATHS.KOL.medias.avatarChangeNew, // /v1/kol/avatar/change/new-image
+    data: form,
     config: {
-      params: {
-        fileUsageId: fileUsageId ?? undefined,
-        fileId: fileId ?? undefined,
-      },
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress,
       ...(signal ? { signal } : {}),
     },
   });
+
+  return payload?.data ?? null;
 };

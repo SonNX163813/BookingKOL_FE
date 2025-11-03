@@ -1,0 +1,108 @@
+/* Header chữ HOA + đậm nhẹ */
+.kol-range-popover .ant-picker-header {
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
+/* Tên thứ viết hoa & đậm */
+.kol-range-popover .ant-picker-content th {
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* Màu thứ 7 / CN ở header */
+.kol-range-popover .ant-picker-content th:nth-child(6) {
+  /* T7 */
+  color: #2563eb;
+}
+.kol-range-popover .ant-picker-content th:nth-child(7) {
+  /* CN */
+  color: #e11d48;
+}
+
+/* Ô ngày tuỳ biến (khớp dateRender) */
+.kol-range-popover .kol-cell {
+  width: 100%;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+.kol-range-popover .kol-cell .kol-cell-main {
+  line-height: 28px;
+  font-size: 12px;
+}
+
+/* Tô số T7/CN */
+.kol-range-popover .kol-cell.sat .kol-cell-main {
+  color: #2563eb;
+  font-weight: 600;
+}
+.kol-range-popover .kol-cell.sun .kol-cell-main {
+  color: #e11d48;
+  font-weight: 600;
+}
+
+/* Dấu chấm "hôm nay" */
+.kol-range-popover .kol-cell.today .kol-cell-main::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* ===== Range: chỉ mờ nhẹ, KHÔNG che chữ số ngày ===== */
+.kol-range-popover .ant-picker-cell-in-view.ant-picker-cell-in-range::before {
+  background: rgba(22, 119, 255, 0.06); /* rất nhẹ */
+}
+
+.kol-range-popover
+  .ant-picker-cell-in-view.ant-picker-cell-in-range
+  .ant-picker-cell-inner {
+  background: transparent !important;
+  color: inherit;
+}
+
+/* Viền mảnh để dễ nhìn dải range */
+.kol-range-popover
+  .ant-picker-cell-in-view.ant-picker-cell-in-range:not(
+    .ant-picker-cell-range-start
+  ):not(.ant-picker-cell-range-end)
+  .ant-picker-cell-inner {
+  box-shadow: inset 0 0 0 1px rgba(22, 119, 255, 0.12);
+  border-radius: 6px;
+}
+
+/* Start/End của range: nhẹ hơn */
+.kol-range-popover .ant-picker-cell-range-start .ant-picker-cell-inner,
+.kol-range-popover .ant-picker-cell-range-end .ant-picker-cell-inner {
+  background: rgba(22, 119, 255, 0.22);
+  border-radius: 8px !important;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Chọn đúng 1 ngày (start=end) */
+.kol-range-popover .ant-picker-cell-selected .ant-picker-cell-inner {
+  background: #1677ff;
+  color: #fff;
+  border-radius: 8px;
+}
+
+/* Hover range: rất nhẹ */
+.kol-range-popover .ant-picker-cell-in-view.ant-picker-cell-range-hover::before,
+.kol-range-popover
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover-start::before,
+.kol-range-popover
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover-end::before {
+  background: rgba(22, 119, 255, 0.08);
+}
+
+/* Bo panel mềm */
+.kol-range-popover .ant-picker-panel {
+  border-radius: 10px;
+}

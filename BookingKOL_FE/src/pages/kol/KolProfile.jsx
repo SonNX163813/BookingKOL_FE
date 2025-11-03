@@ -53,16 +53,19 @@ const { Title, Text } = Typography;
 
 /* ================== ROLE MAPPING (UI <-> BE) ================== */
 const mapUiRoleToBackend = (ui) => {
-  if (ui === "HOST" || ui === "CO_HOST") return "LIVE";
+  if (ui === "KOL" || ui === "HOST") return "KOL"; // KOL = Host chính
+  if (ui === "LIVE" || ui === "CO_HOST") return "LIVE"; // LIVE = Trợ live
   return undefined;
 };
-const mapBackendToUi = (be) => {
-  if (be === "LIVE") return "HOST";
-  return undefined;
-};
-const roleLabel = (ui) =>
-  ui === "HOST" ? "Host chính" : ui === "CO_HOST" ? "Trợ live" : "—";
 
+const mapBackendToUi = (be) => {
+  if (be === "KOL" || be === "HOST") return "KOL";
+  if (be === "LIVE" || be === "CO_HOST") return "LIVE";
+  return undefined;
+};
+
+const roleLabel = (ui) =>
+  ui === "KOL" ? "Host chính" : ui === "LIVE" ? "Trợ live" : "—";
 /* ================== Helpers ================== */
 const notOnlySpacesRule = (msg) => ({
   validator: (_, v) =>
@@ -700,7 +703,7 @@ export default function KolProfile() {
                         { required: true, message: "Vui lòng chọn vị trí" },
                         {
                           validator: (_, v) =>
-                            v === "HOST" || v === "CO_HOST"
+                            v === "KOL" || v === "LIVE"
                               ? Promise.resolve()
                               : Promise.reject(
                                   new Error("Vị trí không hợp lệ.")
@@ -712,8 +715,8 @@ export default function KolProfile() {
                         className="!h-12"
                         size="large"
                         options={[
-                          { value: "HOST", label: "Host chính" },
-                          { value: "CO_HOST", label: "Trợ live" },
+                          { value: "KOL", label: "Host chính" },
+                          { value: "LIVE", label: "Trợ live" },
                         ]}
                         allowClear
                         placeholder="Chọn vị trí"
