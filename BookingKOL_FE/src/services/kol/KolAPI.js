@@ -800,6 +800,37 @@ export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
   };
 };
 
+export const getKolMySingleRequestDetail = async (
+  requestId,
+  { signal } = {}
+) => {
+  if (!requestId) throw new Error("requestId is required");
+
+  const url = CLIENT_API_PATHS.BOOKING.mySingleRequestDetail(
+    encodeURIComponent(requestId)
+  );
+
+  // axios-config `get` thường trả về envelope { status, message, data }
+  // nhưng vẫn xử lý an toàn nếu nhận thẳng `data`
+  const payload = await get({
+    url,
+    config: signal ? { signal } : undefined,
+  });
+
+  const raw = payload?.data ?? payload; // hỗ trợ cả 2 dạng
+  const appStatus = typeof raw?.status === "number" ? raw.status : 200;
+
+  if (appStatus !== 200) {
+    const msg = Array.isArray(raw?.message) ? raw.message[0] : raw?.message;
+    const err = new Error(msg || "Không tải được chi tiết yêu cầu.");
+    err.appStatus = appStatus;
+    throw err;
+  }
+
+  // Nếu là envelope → trả raw.data; nếu BE trả thẳng object → trả raw
+  return raw?.data ?? raw ?? null;
+};
+
 export const changeKolAvatarNew = async (file, opts = {}) => {
   if (!file) throw new Error("file is required");
 
