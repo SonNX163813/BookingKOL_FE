@@ -8,6 +8,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -33,9 +34,28 @@ const BookingContactStep = ({
   onRemoveAttachment,
   attachmentLimit,
   maxAttachmentSizeMb,
+  platformOptions = [],
+  platformLoading = false,
+  platformError = null,
+  onReloadPlatforms,
 }) => {
   const limit = attachmentLimit ?? 5;
   const maxSize = maxAttachmentSizeMb ?? 10;
+  const platformHelperText =
+    errors.platform ??
+    (platformError ? "Lỗi tải danh sách nền tảng. Vui lòng thử lại." : "");
+  const selectedPlatformOption = platformOptions.find(
+    (option) => option.value === contact.platform
+  );
+  const isOtherSelected = selectedPlatformOption?.isOther === true;
+
+  const handlePlatformChange = (value) => {
+    onContactChange("platform", value);
+    const nextOption = platformOptions.find((option) => option.value === value);
+    if (!nextOption?.isOther) {
+      onContactChange("platformCustom", "");
+    }
+  };
 
   // Định dạng kích thước tệp
   const formatFileSize = (size) => {
@@ -110,6 +130,60 @@ const BookingContactStep = ({
           }}
         />
 
+        <TextField
+          label="Nền tảng livestream"
+          value={contact.platform}
+          onChange={(e) => handlePlatformChange(e.target.value)}
+          error={Boolean(errors.platform) || Boolean(platformError)}
+          helperText={platformHelperText || undefined}
+          required
+          select
+          disabled={platformLoading && platformOptions.length === 0}
+          SelectProps={{
+            displayEmpty: true,
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: "16px",
+              backgroundColor: STYLE.subtleSurface,
+            },
+          }}
+        >
+          <MenuItem value="" disabled={platformOptions.length > 0}>
+            {platformLoading ? "Đang tải..." : "Chọn nền tảng"}
+          </MenuItem>
+          {platformOptions.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+        {platformError && onReloadPlatforms ? (
+          <Button
+            variant="text"
+            size="small"
+            onClick={onReloadPlatforms}
+            sx={{ alignSelf: "flex-start", textTransform: "none", px: 0 }}
+          >
+            Thử tải lại danh sách nền tảng
+          </Button>
+        ) : null}
+        {isOtherSelected ? (
+          <TextField
+            label="Nền tảng cụ thể"
+            value={contact.platformCustom}
+            onChange={(e) => onContactChange("platformCustom", e.target.value)}
+            error={Boolean(errors.platformCustom)}
+            helperText={errors.platformCustom}
+            required
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "16px",
+                backgroundColor: STYLE.subtleSurface,
+              },
+            }}
+          />
+        ) : null}
         <TextField
           label="Địa chỉ / Khu vực"
           value={contact.location}

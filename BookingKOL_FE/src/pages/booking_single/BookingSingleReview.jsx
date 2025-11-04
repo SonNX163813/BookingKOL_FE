@@ -206,6 +206,7 @@ const BookingSingleReview = () => {
       phone: bookingRequest.phone ?? bookingSingleReqDTO?.phone ?? "",
       email: bookingRequest.email ?? bookingSingleReqDTO?.email ?? "",
       location: bookingRequest.location ?? bookingSingleReqDTO?.location ?? "",
+      platform: bookingRequest.platform ?? bookingSingleReqDTO?.platform ?? "",
       description:
         bookingRequest.description ?? bookingSingleReqDTO?.description ?? "",
       status: getStatusLabel(bookingRequest.status),
@@ -599,6 +600,16 @@ const BookingSingleReview = () => {
                       </Typography>
                       <Typography sx={{ fontWeight: 600 }}>
                         {contactInfo?.phone || FALLBACK_TEXT}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography
+                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                      >
+                        Nền tảng LIVE
+                      </Typography>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {contactInfo?.platform || FALLBACK_TEXT}
                       </Typography>
                     </Stack>
                     <Stack direction="row" justifyContent="space-between">

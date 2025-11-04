@@ -62,6 +62,10 @@ export const CLIENT_API_PATHS = {
       `/v1/courses/purchase/cancel/${encodeURIComponent(purchaseId)}`,
   },
 
+  PLATFORM: {
+    all: "/v1/platforms/all",
+  },
+
   SCHEDULE_KOL_FREETIME: {
     kolFreeTime: (kolId) =>
       `/v1/availabilities/free-time/${encodeURIComponent(kolId)}`,

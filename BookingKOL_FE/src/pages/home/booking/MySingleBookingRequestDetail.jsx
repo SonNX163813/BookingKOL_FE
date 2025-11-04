@@ -10,6 +10,7 @@ import {
   Empty,
   Form,
   Input,
+  Select,
   Skeleton,
   Space,
   Table,
@@ -29,6 +30,7 @@ import { useGetMySingleBookingRequestDetail } from "../../../hook/user/booking/u
 import { UploadOutlined } from "@ant-design/icons";
 import { useUpdateMySingleBookingRequest } from "../../../hook/user/booking/useUpdateMySingleBookingRequest";
 import UserKolFeedbackSection from "../../../components/home/booking/UserKolFeedbackSection";
+import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
 import {
   BOOKING_STATUS_LABEL,
   STATUS_TAG_COLOR,
@@ -37,6 +39,8 @@ import {
 } from "../../../constants/mySingleBookingStatuses";
 
 const { Text } = Typography;
+
+const OTHER_PLATFORM_VALUE = "__OTHER_PLATFORM__";
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
   value ? (dayjs(value).isValid() ? dayjs(value).format(pattern) : "--") : "--";
@@ -88,9 +92,65 @@ const MySingleBookingRequestDetail = () => {
     isUpdatingMySingleBookingRequest,
     handleUpdateMySingleBookingRequest,
   } = useUpdateMySingleBookingRequest();
+  const {
+    platforms,
+    isLoadingPlatforms,
+  } = useGetPlatforms();
   const [updateForm] = Form.useForm();
   const [newAttachments, setNewAttachments] = useState([]);
   const [fileIdsToDelete, setFileIdsToDelete] = useState([]);
+
+  const platformOptions = useMemo(() => {
+    const unique = new Map();
+    (platforms ?? []).forEach((item) => {
+      const labelRaw =
+        typeof item?.name === "string" && item.name.trim().length > 0
+          ? item.name.trim()
+          : typeof item?.key === "string" && item.key.trim().length > 0
+          ? item.key.trim()
+          : "";
+      if (!labelRaw) return;
+      const normalizedKey = labelRaw.toLowerCase();
+      if (!unique.has(normalizedKey)) {
+        unique.set(normalizedKey, {
+          value: labelRaw,
+          label: labelRaw,
+        });
+      }
+    });
+    return Array.from(unique.values());
+  }, [platforms]);
+
+  const platformValueMap = useMemo(() => {
+    const map = new Map();
+    platformOptions.forEach((option) => {
+      map.set(option.value.toLowerCase(), option.value);
+    });
+    return map;
+  }, [platformOptions]);
+
+  const platformSelectOptions = useMemo(
+    () => [
+      ...platformOptions,
+      {
+        value: OTHER_PLATFORM_VALUE,
+        label: "Khác (nhập tay)",
+      },
+    ],
+    [platformOptions]
+  );
+
+  const selectedPlatform = Form.useWatch("platform", updateForm);
+  const showCustomPlatformInput = selectedPlatform === OTHER_PLATFORM_VALUE;
+
+  const handlePlatformChange = useCallback(
+    (value) => {
+      if (value !== OTHER_PLATFORM_VALUE) {
+        updateForm.setFieldsValue({ platformOther: "" });
+      }
+    },
+    [updateForm]
+  );
 
   const detail = myBookingRequestDetailResponse?.data ?? null;
   const contracts = Array.isArray(detail?.contracts)
@@ -141,8 +201,18 @@ const MySingleBookingRequestDetail = () => {
     navigate("/don-booking-kol");
   }, [navigate]);
 
-  const updateFormInitialValues = useMemo(
-    () => ({
+  const updateFormInitialValues = useMemo(() => {
+    const rawPlatform =
+      typeof detail?.platform === "string" && detail.platform.trim().length > 0
+        ? detail.platform.trim()
+        : typeof detail?.contact?.platform === "string" &&
+          detail.contact.platform.trim().length > 0
+        ? detail.contact.platform.trim()
+        : "";
+    const matchedPlatform =
+      rawPlatform && platformValueMap.get(rawPlatform.toLowerCase());
+
+    return {
       fullName:
         detail?.fullName ??
         detail?.contact?.fullName ??
@@ -154,9 +224,14 @@ const MySingleBookingRequestDetail = () => {
         detail?.email ?? detail?.contact?.email ?? detail?.user?.email ?? "",
       description: detail?.description ?? "",
       location: detail?.location ?? "",
-    }),
-    [detail]
-  );
+      platform: matchedPlatform
+        ? matchedPlatform
+        : rawPlatform
+        ? OTHER_PLATFORM_VALUE
+        : undefined,
+      platformOther: matchedPlatform ? "" : rawPlatform,
+    };
+  }, [detail, platformValueMap]);
 
   useEffect(() => {
     if (!detail) return;
@@ -190,18 +265,33 @@ const MySingleBookingRequestDetail = () => {
         .map((file) => file?.originFileObj)
         .filter(Boolean);
 
+      const resolvedPlatform =
+        values?.platform === OTHER_PLATFORM_VALUE
+          ? values?.platformOther
+          : values?.platform;
+
+      const valuesWithPlatform = {
+        ...values,
+        platform: resolvedPlatform,
+      };
+
       const payloadDto = {};
-      ["fullName", "phone", "email", "description", "location"].forEach(
-        (key) => {
-          const raw = values?.[key];
-          if (raw === undefined || raw === null) return;
-          if (typeof raw === "string") {
-            payloadDto[key] = raw.trim();
-          } else {
-            payloadDto[key] = raw;
-          }
+      [
+        "fullName",
+        "phone",
+        "email",
+        "description",
+        "location",
+        "platform",
+      ].forEach((key) => {
+        const raw = valuesWithPlatform?.[key];
+        if (raw === undefined || raw === null) return;
+        if (typeof raw === "string") {
+          payloadDto[key] = raw.trim();
+        } else {
+          payloadDto[key] = raw;
         }
-      );
+      });
 
       const sanitizedIds = fileIdsToDelete.filter(
         (id) => typeof id === "string" && id.trim().length > 0
@@ -386,6 +476,48 @@ const MySingleBookingRequestDetail = () => {
                       </Form.Item>
                       <Form.Item label="Địa điểm" name="location">
                         <Input placeholder="Nhập địa điểm thực hiện" />
+                      </Form.Item>
+
+                      <Form.Item
+                        label="Nền tảng"
+                        className="md:col-span-2"
+                        required
+                      >
+                        <Space direction="vertical" size={8} className="w-full">
+                          <Form.Item
+                            name="platform"
+                            noStyle
+                            rules={[
+                              {
+                                required: true,
+                                message: "Vui lòng chọn nền tảng",
+                              },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              placeholder="Chọn nền tảng"
+                              options={platformSelectOptions}
+                              optionFilterProp="label"
+                              loading={isLoadingPlatforms}
+                              onChange={handlePlatformChange}
+                            />
+                          </Form.Item>
+                          {showCustomPlatformInput ? (
+                            <Form.Item
+                              name="platformOther"
+                              noStyle
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Vui lòng nhập nền tảng",
+                                },
+                              ]}
+                            >
+                              <Input placeholder="Nhập nền tảng khác" />
+                            </Form.Item>
+                          ) : null}
+                        </Space>
                       </Form.Item>
                     </div>
 

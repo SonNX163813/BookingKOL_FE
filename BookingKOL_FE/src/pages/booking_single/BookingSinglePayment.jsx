@@ -223,7 +223,7 @@ const BookingSinglePayment = () => {
         {/* --- Tiêu đề và đồng hồ đếm ngược --- */}
         <Stack spacing={1} alignItems="center">
           <Typography variant="h4" fontWeight={700}>
-            Thanh toán booking KOL
+            Thanh toán đặt KOL
           </Typography>
 
           <Typography

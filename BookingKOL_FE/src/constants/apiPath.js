@@ -51,5 +51,6 @@ export const API_PATHS = {
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",
+    getDetail: "/v1/admin/refunds/detail",
   },
 };

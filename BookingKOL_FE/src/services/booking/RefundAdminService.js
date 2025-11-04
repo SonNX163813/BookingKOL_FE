@@ -28,3 +28,13 @@ export const getAllRefundRequests = async ({
     },
   });
 };
+
+export const getRefundRequestDetail = async (refundId) => {
+  if (!refundId) {
+    throw new Error("refundId is required to fetch refund detail");
+  }
+
+  return await get({
+    url: `${API_PATHS.REFUND.getDetail}/${refundId}`,
+  });
+};
