@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -24,61 +24,15 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { useGetBookingRequestDetail } from "../../../hook/admin/booking/useGetBookingRequestDetail";
+import {
+  BOOKING_STATUS_LABEL,
+  STATUS_TAG_COLOR,
+  PAYMENT_STATUS_LABEL,
+  PAYMENT_STATUS_COLOR,
+} from "../../../constants/mySingleBookingStatuses";
 
 const { Title, Text, Paragraph } = Typography;
 const { useBreakpoint } = Grid;
-
-const BOOKING_STATUS_LABEL = {
-  DRAFT: "Bản nháp",
-  REQUESTED: "Đã yêu cầu",
-  NEGOTIATING: "Đang thương lượng",
-  ACCEPTED: "Đã chấp nhận",
-  REJECTED: "Từ chối",
-  CANCELLED: "Đã hủy",
-  CONTRACT_SIGNED: "Hợp đồng đã ký",
-  IN_PROGRESS: "Đang thực hiện",
-  DELIVERED: "Đã bàn giao",
-  COMPLETED: "Hoàn thành",
-  DISPUTED: "Tranh chấp",
-  EXPIRED: "Hết hạn",
-};
-
-const STATUS_TAG_COLOR = {
-  DRAFT: "default",
-  REQUESTED: "processing",
-  NEGOTIATING: "cyan",
-  ACCEPTED: "success",
-  REJECTED: "error",
-  CANCELLED: "warning",
-  CONTRACT_SIGNED: "blue",
-  IN_PROGRESS: "processing",
-  DELIVERED: "gold",
-  COMPLETED: "success",
-  DISPUTED: "magenta",
-  EXPIRED: "volcano",
-};
-
-const PAYMENT_STATUS_LABEL = {
-  PAID: "Đã thanh toán",
-  PENDING: "Đang chờ",
-  PROCESSING: "Đang xử lý",
-  COMPLETED: "Hoàn tất",
-  FAILED: "Thất bại",
-  EXPIRED: "Hết hạn",
-  CANCELLED: "Đã hủy",
-  REFUNDED: "Đã hoàn tiền",
-};
-
-const PAYMENT_STATUS_COLOR = {
-  PAID: "success",
-  PENDING: "processing",
-  PROCESSING: "processing",
-  COMPLETED: "success",
-  FAILED: "error",
-  EXPIRED: "volcano",
-  CANCELLED: "warning",
-  REFUNDED: "purple",
-};
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
@@ -243,7 +197,11 @@ const BookingRequestDetail = () => {
   const fileUsageColumns = useMemo(
     () => [
       { title: "ID", dataIndex: "id", key: "id", width: 220 },
-      { title: "Loại đối tượng", dataIndex: "targetType", key: "targetType" },
+      {
+        title: "Loại đối tượng",
+        dataIndex: "targetType",
+        key: "targetType",
+      },
       {
         title: "ID đối tượng",
         dataIndex: "targetId",
@@ -317,7 +275,16 @@ const BookingRequestDetail = () => {
         title: "Trạng thái",
         dataIndex: "status",
         key: "status",
-        render: (v) => normalizeStatus(v) ?? "--",
+        render: (v) => {
+          const status = v;
+          if (!status) return "--";
+
+          return (
+            <Tag color={PAYMENT_STATUS_COLOR[status] ?? "default"}>
+              {PAYMENT_STATUS_LABEL[status] ?? status}
+            </Tag>
+          );
+        },
       },
       {
         title: "Tạo lúc",
@@ -328,7 +295,16 @@ const BookingRequestDetail = () => {
       {
         title: "Trạng thái thanh toán",
         key: "paymentStatus",
-        render: (_, r) => normalizeStatus(r?.paymentDTO?.status) ?? "--",
+        render: (_, r) => {
+          const status = r?.paymentDTO?.status;
+          if (!status) return "--";
+
+          return (
+            <Tag color={PAYMENT_STATUS_COLOR[status] ?? "default"}>
+              {PAYMENT_STATUS_LABEL[status] ?? status}
+            </Tag>
+          );
+        },
       },
       {
         title: "Tổng tiền",
@@ -520,43 +496,50 @@ const BookingRequestDetail = () => {
               <Descriptions.Item label="Mã KOL">
                 {detail?.kol?.id ?? "--"}
               </Descriptions.Item>
-              {/* <Descriptions.Item label="Mã người dùng">
-                {detail?.kol?.userId ?? "--"}
-              </Descriptions.Item> */}
+
               <Descriptions.Item label="Họ tên đầy đủ">
                 {detail?.kol?.fullName ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Tên hiển thị">
                 {detail?.kol?.displayName ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Ảnh đại diện" span={screens.lg ? 3 : 1}>
                 {renderImageField(
                   detail?.kol?.avatarUrl,
                   detail?.kol?.displayName ?? detail?.kol?.fullName
                 )}
               </Descriptions.Item>
+
               <Descriptions.Item label="Ngày sinh">
                 {formatDateTime(detail?.kol?.dob, "DD/MM/YYYY")}
               </Descriptions.Item>
+
               <Descriptions.Item label="Tiểu sử" span={screens.lg ? 3 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.bio ?? "--"}
                 </Text>
               </Descriptions.Item>
+
               <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 3 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.experience ?? "--"}
                 </Text>
               </Descriptions.Item>
+
               <Descriptions.Item label="Quốc gia">
                 {detail?.kol?.country ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Thành phố">
                 {detail?.kol?.city ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Ngôn ngữ">
                 {detail?.kol?.languages ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item
                 label="Ghi chú bảng giá"
                 span={screens.lg ? 3 : 1}
@@ -565,67 +548,76 @@ const BookingRequestDetail = () => {
                   {detail?.kol?.rateCardNote ?? "--"}
                 </Text>
               </Descriptions.Item>
+
               <Descriptions.Item label="Giá đặt tối thiểu">
                 {formatCurrency(detail?.kol?.minBookingPrice)}
               </Descriptions.Item>
+
               <Descriptions.Item label="Khả dụng">
                 {formatBoolean(detail?.kol?.isAvailable)}
               </Descriptions.Item>
+
               <Descriptions.Item label="Đánh giá tổng thể">
                 {detail?.kol?.overallRating ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Số lượng phản hồi">
                 {detail?.kol?.feedbackCount ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Vai trò">
                 {detail?.kol?.role ?? "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Tạo lúc">
                 {formatDateTime(detail?.kol?.createdAt)}
               </Descriptions.Item>
+
               <Descriptions.Item label="Cập nhật lúc">
                 {formatDateTime(detail?.kol?.updatedAt)}
               </Descriptions.Item>
+
               <Descriptions.Item label="Xóa lúc">
                 {formatDateTime(detail?.kol?.deletedAt)}
               </Descriptions.Item>
             </Descriptions>
 
-            {/* <Divider />
+            {/* 
+  <Divider />
+  <Title level={5} className="!mb-2 flex items-center gap-2">
+    <Layers size={16} /> Danh mục
+  </Title>
+  <Space size={[8, 8]} wrap>
+    {detail?.kol?.categories && detail.kol.categories.length > 0 ? (
+      detail.kol.categories.map((category) => (
+        <Tag color="blue" key={category?.id ?? category?.key}>
+          {category?.name ?? category?.key ?? "--"}
+        </Tag>
+      ))
+    ) : (
+      <Text type="secondary">Không có danh mục</Text>
+    )}
+  </Space>
 
-            <Title level={5} className="!mb-2 flex items-center gap-2">
-              <Layers size={16} /> Danh mục
-            </Title>
-            <Space size={[8, 8]} wrap>
-              {detail?.kol?.categories && detail.kol.categories.length > 0 ? (
-                detail.kol.categories.map((category) => (
-                  <Tag color="blue" key={category?.id ?? category?.key}>
-                    {category?.name ?? category?.key ?? "--"}
-                  </Tag>
-                ))
-              ) : (
-                <Text type="secondary">Không có danh mục</Text>
-              )}
-            </Space> */}
+  <Divider />
 
-            {/* <Divider /> */}
-
-            {/* <Title level={5} className="!mb-2 flex items-center gap-2">
-              <FileText size={16} /> Sử dụng tệp
-            </Title>
-            {detail?.kol?.fileUsageDtos && detail.kol.fileUsageDtos.length ? (
-              <Table
-                columns={fileUsageColumns}
-                dataSource={detail.kol.fileUsageDtos}
-                rowKey={(record) =>
-                  record?.id ?? record?.file?.id ?? Math.random()
-                }
-                pagination={false}
-                scroll={{ x: 960 }}
-              />
-            ) : (
-              <Empty description="Không có dữ liệu tệp" />
-            )} */}
+  <Title level={5} className="!mb-2 flex items-center gap-2">
+    <FileText size={16} /> Sử dụng tệp
+  </Title>
+  {detail?.kol?.fileUsageDtos && detail.kol.fileUsageDtos.length ? (
+    <Table
+      columns={fileUsageColumns}
+      dataSource={detail.kol.fileUsageDtos}
+      rowKey={(record) =>
+        record?.id ?? record?.file?.id ?? Math.random()
+      }
+      pagination={false}
+      scroll={{ x: 960 }}
+    />
+  ) : (
+    <Empty description="Không có dữ liệu tệp" />
+  )}
+  */}
           </Card>
 
           {/* --- Thông tin người yêu cầu --- */}
@@ -658,7 +650,11 @@ const BookingRequestDetail = () => {
                 {detail?.user?.phone ?? "--"}
               </Descriptions.Item>
               <Descriptions.Item label="Giới tính">
-                {detail?.user?.gender ?? "--"}
+                {detail?.user?.gender === "Male"
+                  ? "Nam"
+                  : detail?.user?.gender === "Female"
+                  ? "Nữ"
+                  : "--"}
               </Descriptions.Item>
               <Descriptions.Item label="Địa chỉ">
                 {detail?.user?.address ?? "--"}
@@ -774,8 +770,8 @@ const BookingRequestDetail = () => {
                         labelStyle={{ width: 180 }}
                       >
                         {/* <Descriptions.Item label="Mã thanh toán">
-                          {contract?.paymentDTO?.id ?? "--"}
-                        </Descriptions.Item> */}
+                {contract?.paymentDTO?.id ?? "--"}
+              </Descriptions.Item> */}
                         <Descriptions.Item label="Trạng thái">
                           {paymentStatus ? (
                             <Tag
@@ -841,7 +837,7 @@ const BookingRequestDetail = () => {
             )}
           </Card>
 
-          {/* --- Tệp đính kèm --- */}
+          {/* ---------------------- TỆP ĐÍNH KÈM ---------------------- */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -856,7 +852,7 @@ const BookingRequestDetail = () => {
               <Table
                 columns={attachedFileColumns}
                 dataSource={detail.attachedFiles}
-                rowKey={(record) => record?.id ?? Math.random()}
+                rowKey={(record) => record?.id}
                 pagination={false}
                 scroll={{ x: 720 }}
               />

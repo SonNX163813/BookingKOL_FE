@@ -27,6 +27,7 @@ export const BOOKING_STATUS_LABEL = {
   PAID: "Đã thanh toán",
   WAIT_FOR_REFUND: "Đợi hoàn tiền",
   REFUNDED: "Đã hoàn tiền",
+  OVERPAID: "Thanh toán thừa",
 };
 
 export const STATUS_TAG_COLOR = {
@@ -70,6 +71,7 @@ export const PAYMENT_STATUS_LABEL = {
   CANCELLED: "Đã huỷ thanh toán",
   REFUNDED: "Đã hoàn tiền",
   WAIT_FOR_REFUND: "Đợi hoàn tiền",
+  OVERPAID: "Thanh toán thừa",
 };
 
 export const PAYMENT_STATUS_COLOR = {
