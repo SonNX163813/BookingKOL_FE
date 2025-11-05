@@ -30,6 +30,7 @@ import {
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_COLOR,
 } from "../../../constants/mySingleBookingStatuses";
+import { useGetWorktimeLivestreamMetrics } from "../../../hook/admin/booking/useGetWorktimeLivestreamMetrics";
 
 const { Title, Text, Paragraph } = Typography;
 const { useBreakpoint } = Grid;
@@ -162,6 +163,44 @@ const renderImageField = (fileUrl, label) => {
   );
 };
 
+const LIVESTREAM_METRIC_LABELS = [
+  { key: "revenue", label: "Tổng doanh thu" },
+  { key: "gpm", label: "GPM" },
+  { key: "avgOrderValue", label: "Giá trị TB mỗi đơn" },
+  { key: "totalOrders", label: "Tổng đơn hàng" },
+  { key: "buyers", label: "Số người mua" },
+  { key: "productsSold", label: "Các mặt hàng được bán" },
+  { key: "totalViews", label: "Tổng lượt xem" },
+  { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút" },
+  { key: "viewsUnder1min", label: "Lượt xem < 1 phút" },
+  { key: "pcu", label: "PCU (đồng xem cao nhất)" },
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)" },
+  { key: "commentsIn1min", label: "BL trong 1 phút" },
+  { key: "totalComments", label: "Tổng bình luận" },
+  { key: "productClickRate", label: "Tỷ lệ click SP" },
+  { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn" },
+];
+
+const formatLivestreamMetricValue = (key, value) => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  if (key === "revenue" || key === "avgOrderValue") {
+    return formatCurrency(value);
+  }
+
+  if (key === "isConfirmed") {
+    return formatBoolean(value);
+  }
+
+  if (key === "createdAt" || key === "confirmedAt") {
+    return formatDateTime(value);
+  }
+
+  return value;
+};
+
 const BookingRequestDetail = () => {
   const { requestId } = useParams();
   const navigate = useNavigate();
@@ -178,6 +217,34 @@ const BookingRequestDetail = () => {
   const detail = bookingRequestDetailResponse?.data ?? null;
   const responseMessage = bookingRequestDetailResponse?.message ?? null;
   const responseTimestamp = bookingRequestDetailResponse?.timestamp ?? null;
+  const worktimeIds = useMemo(
+    () =>
+      Array.isArray(detail?.kolWorkTimes)
+        ? detail.kolWorkTimes
+            .map((worktime) => worktime?.id)
+            .filter((id) => id !== null && id !== undefined)
+        : [],
+    [detail?.kolWorkTimes]
+  );
+
+  const {
+    worktimeLivestreamMetricsMap,
+    worktimeLivestreamMetricQueries,
+    resolvedWorktimeIds,
+  } = useGetWorktimeLivestreamMetrics(worktimeIds, {
+    enabled: worktimeIds.length > 0,
+    retry: false,
+  });
+
+  const worktimeMetricsQueryMap = useMemo(() => {
+    const queryMap = new Map();
+
+    resolvedWorktimeIds.forEach((id, index) => {
+      queryMap.set(id, worktimeLivestreamMetricQueries[index]);
+    });
+
+    return queryMap;
+  }, [resolvedWorktimeIds, worktimeLivestreamMetricQueries]);
 
   const normalizedStatus = normalizeStatus(detail?.status);
   const statusLabel =
@@ -834,6 +901,118 @@ const BookingRequestDetail = () => {
               </>
             ) : (
               <Empty description="Không có hợp đồng" />
+            )}
+          </Card>
+
+          {/* --- Livestream Metrics --- */}
+          <Card
+            className="shadow-sm"
+            bordered={false}
+            title={
+              <Space>
+                <Layers size={18} />
+                <span>Thống kê Livestream</span>
+              </Space>
+            }
+          >
+            {detail?.kolWorkTimes && detail.kolWorkTimes.length > 0 ? (
+              detail.kolWorkTimes.map((worktime, index) => {
+                const worktimeId = worktime?.id;
+                const metrics = worktimeId
+                  ? worktimeLivestreamMetricsMap.get(worktimeId)
+                  : null;
+                const queryState = worktimeId
+                  ? worktimeMetricsQueryMap.get(worktimeId)
+                  : null;
+                const isMetricsLoading =
+                  queryState?.isPending || queryState?.isFetching;
+                const metricsError = queryState?.error;
+                const errorMessage =
+                  metricsError?.response?.data?.message ??
+                  metricsError?.message;
+
+                return (
+                  <Card
+                    key={worktimeId ?? index}
+                    className="mb-4 last:mb-0"
+                    type="inner"
+                    title={`Phiên làm việc ${worktimeId ?? ""}`}
+                  >
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 180 }}
+                    >
+                      <Descriptions.Item label="Bắt đầu lúc">
+                        {formatDateTime(worktime?.startAt)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Kết thúc lúc">
+                        {formatDateTime(worktime?.endAt)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Trạng thái">
+                        {/* {normalizeStatus(worktime?.status) ?? "--"} */}
+                        {worktime?.status ? (
+                          <Tag
+                            color={
+                              STATUS_TAG_COLOR[worktime?.status] ?? "default"
+                            }
+                          >
+                            {BOOKING_STATUS_LABEL[worktime?.status] ??
+                              worktime?.status}
+                          </Tag>
+                        ) : (
+                          "--"
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item
+                        label="Ghi chú"
+                        span={screens.lg ? 3 : 1}
+                      >
+                        <Text style={{ whiteSpace: "pre-wrap" }}>
+                          {worktime?.note ?? "--"}
+                        </Text>
+                      </Descriptions.Item>
+                    </Descriptions>
+
+                    <Divider />
+
+                    <Title level={5} className="!mb-2">
+                      Thống kê chi tiết
+                    </Title>
+
+                    {isMetricsLoading ? (
+                      <Skeleton active paragraph={{ rows: 6 }} />
+                    ) : metricsError ? (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message="Không thể tải thống kê livestream."
+                        description={
+                          errorMessage ? String(errorMessage) : undefined
+                        }
+                      />
+                    ) : metrics ? (
+                      <Descriptions
+                        bordered
+                        size="middle"
+                        column={screens.lg ? 3 : screens.md ? 2 : 1}
+                        labelStyle={{ width: 200 }}
+                      >
+                        {LIVESTREAM_METRIC_LABELS.map(({ key, label }) => (
+                          <Descriptions.Item key={key} label={label}>
+                            {formatLivestreamMetricValue(key, metrics?.[key])}
+                          </Descriptions.Item>
+                        ))}
+                      </Descriptions>
+                    ) : (
+                      <Empty description="Không có dữ liệu thống kê" />
+                    )}
+                  </Card>
+                );
+              })
+            ) : (
+              <Empty description="Không có phiên làm việc" />
             )}
           </Card>
 

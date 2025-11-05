@@ -17,6 +17,7 @@ import {
   Tag,
   Typography,
   Upload,
+  Grid,
 } from "antd";
 import {
   ArrowLeft,
@@ -31,6 +32,8 @@ import { UploadOutlined } from "@ant-design/icons";
 import { useUpdateMySingleBookingRequest } from "../../../hook/user/booking/useUpdateMySingleBookingRequest";
 import UserKolFeedbackSection from "../../../components/home/booking/UserKolFeedbackSection";
 import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
+import { useGetWorktimeLivestreamMetrics } from "../../../hook/user/booking/useGetWorktimeLivestreamMetrics";
+import { useConfirmMyWorktimeLivestreamMetrics } from "../../../hook/user/booking/useConfirmMyWorktimeLivestreamMetrics";
 import {
   BOOKING_STATUS_LABEL,
   STATUS_TAG_COLOR,
@@ -39,6 +42,7 @@ import {
 } from "../../../constants/mySingleBookingStatuses";
 
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const OTHER_PLATFORM_VALUE = "__OTHER_PLATFORM__";
 
@@ -77,9 +81,60 @@ const formatArray = (v) => (Array.isArray(v) && v.length ? v.join(", ") : "--");
 const normalizeStatus = (s) =>
   s && typeof s === "string" ? s.toUpperCase() : s;
 
+const formatBoolean = (value) => {
+  if (value === null || value === undefined) return "--";
+  return value ? "Yes" : "No";
+};
+
+const LIVESTREAM_METRIC_LABELS = [
+  { key: "revenue", label: "Tổng doanh thu" },
+  { key: "gpm", label: "GPM" },
+  { key: "avgOrderValue", label: "Giá trị TB mỗi đơn" },
+  { key: "totalOrders", label: "Tổng đơn hàng" },
+  { key: "buyers", label: "Số người mua" },
+  { key: "productsSold", label: "Các mặt hàng được bán" },
+  { key: "totalViews", label: "Tổng lượt xem" },
+  { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút" },
+  { key: "viewsUnder1min", label: "Lượt xem < 1 phút" },
+  { key: "pcu", label: "PCU (đồng xem cao nhất)" },
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)" },
+  { key: "commentsIn1min", label: "BL trong 1 phút" },
+  { key: "totalComments", label: "Tổng bình luận" },
+  { key: "productClickRate", label: "Tỷ lệ click SP" },
+  { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn" },
+];
+
+const formatLivestreamMetricValue = (key, value) => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  if (key === "revenue" || key === "avgOrderValue") {
+    return formatCurrency(value);
+  }
+
+  if (key === "isConfirmed") {
+    return formatBoolean(value);
+  }
+
+  if (key === "createdAt" || key === "confirmedAt") {
+    return formatDateTime(value);
+  }
+
+  return value;
+};
+
+const resolveWorktimeId = (worktime) =>
+  worktime?.id ??
+  worktime?.worktimeId ??
+  worktime?.workTimeId ??
+  worktime?.work_time_id ??
+  null;
+
 const MySingleBookingRequestDetail = () => {
   const navigate = useNavigate();
   const { requestId } = useParams();
+  const screens = useBreakpoint();
 
   const {
     isLoadingMyBookingRequestDetail,
@@ -92,13 +147,11 @@ const MySingleBookingRequestDetail = () => {
     isUpdatingMySingleBookingRequest,
     handleUpdateMySingleBookingRequest,
   } = useUpdateMySingleBookingRequest();
-  const {
-    platforms,
-    isLoadingPlatforms,
-  } = useGetPlatforms();
+  const { platforms, isLoadingPlatforms } = useGetPlatforms();
   const [updateForm] = Form.useForm();
   const [newAttachments, setNewAttachments] = useState([]);
   const [fileIdsToDelete, setFileIdsToDelete] = useState([]);
+  const [confirmingWorktimeId, setConfirmingWorktimeId] = useState(null);
 
   const platformOptions = useMemo(() => {
     const unique = new Map();
@@ -159,6 +212,71 @@ const MySingleBookingRequestDetail = () => {
   const attachedFiles = Array.isArray(detail?.attachedFiles)
     ? detail.attachedFiles.filter(Boolean)
     : [];
+  const worktimes = useMemo(
+    () =>
+      Array.isArray(detail?.kolWorkTimes)
+        ? detail.kolWorkTimes.filter(Boolean)
+        : [],
+    [detail?.kolWorkTimes]
+  );
+  const worktimeIds = useMemo(
+    () =>
+      worktimes
+        .map((worktime) => resolveWorktimeId(worktime))
+        .filter((id) => id !== null && id !== undefined),
+    [worktimes]
+  );
+
+  const {
+    worktimeLivestreamMetricsMap,
+    worktimeLivestreamMetricQueries,
+    resolvedWorktimeIds,
+    isLoadingWorktimeLivestreamMetrics,
+    isFetchingWorktimeLivestreamMetrics,
+  } = useGetWorktimeLivestreamMetrics(worktimeIds, {
+    enabled: worktimeIds.length > 0,
+    retry: false,
+  });
+
+  const findQueryByWorktimeId = useCallback(
+    (worktimeId) => {
+      if (worktimeId === null || worktimeId === undefined) {
+        return null;
+      }
+
+      const normalizedTarget = String(worktimeId);
+      const index = resolvedWorktimeIds.findIndex(
+        (id) => String(id) === normalizedTarget
+      );
+
+      return index >= 0 ? worktimeLivestreamMetricQueries[index] : null;
+    },
+    [resolvedWorktimeIds, worktimeLivestreamMetricQueries]
+  );
+
+  const {
+    isConfirmingWorktimeLivestreamMetrics,
+    handleConfirmWorktimeLivestreamMetrics,
+  } = useConfirmMyWorktimeLivestreamMetrics();
+
+  const handleConfirmMetrics = useCallback(
+    async (worktimeId, query) => {
+      if (worktimeId === null || worktimeId === undefined) return;
+      setConfirmingWorktimeId(worktimeId);
+      try {
+        await handleConfirmWorktimeLivestreamMetrics(worktimeId);
+        if (query?.refetch) {
+          await query.refetch();
+        }
+        await refetchMyBookingRequestDetail();
+      } catch (error) {
+        // handled by interceptors
+      } finally {
+        setConfirmingWorktimeId(null);
+      }
+    },
+    [handleConfirmWorktimeLivestreamMetrics, refetchMyBookingRequestDetail]
+  );
   const formattedAttachments = useMemo(
     () =>
       attachedFiles
@@ -592,6 +710,213 @@ const MySingleBookingRequestDetail = () => {
                     </div>
                   </Form>
                 </Space>
+              </section>
+
+              {/* Worktimes & Metrics */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <CalendarRange size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Thống kê livestream theo phiên
+                  </span>
+                </Space>
+
+                {worktimes.length > 0 ? (
+                  <Space
+                    direction="vertical"
+                    size="large"
+                    className="w-full mt-4"
+                  >
+                    {worktimes.map((worktime, index) => {
+                      const rawWorktimeId = resolveWorktimeId(worktime);
+                      const worktimeKey =
+                        rawWorktimeId !== null && rawWorktimeId !== undefined
+                          ? rawWorktimeId
+                          : `worktime-${index}`;
+                      const metrics =
+                        rawWorktimeId !== null && rawWorktimeId !== undefined
+                          ? worktimeLivestreamMetricsMap.get(rawWorktimeId)
+                          : null;
+                      const queryState = findQueryByWorktimeId(rawWorktimeId);
+                      const isMetricsLoading =
+                        !!(queryState?.isPending || queryState?.isFetching) ||
+                        (!queryState &&
+                          (isLoadingWorktimeLivestreamMetrics ||
+                            isFetchingWorktimeLivestreamMetrics));
+                      const metricsError = queryState?.error;
+                      const errorMessage =
+                        metricsError?.response?.data?.message ??
+                        metricsError?.message;
+                      const worktimeStatus = normalizeStatus(worktime?.status);
+                      const worktimeStatusLabel = worktimeStatus
+                        ? BOOKING_STATUS_LABEL[worktimeStatus] ?? worktimeStatus
+                        : null;
+                      const isButtonLoading =
+                        confirmingWorktimeId === rawWorktimeId &&
+                        isConfirmingWorktimeLivestreamMetrics;
+                      const showConfirmTag =
+                        typeof metrics?.isConfirmed === "boolean";
+                      const isConfirmedValue = showConfirmTag
+                        ? metrics.isConfirmed
+                        : Boolean(metrics?.confirmedAt);
+
+                      return (
+                        <Card
+                          key={worktimeKey}
+                          type="inner"
+                          className="shadow-sm"
+                          title={`Phiên làm việc ${rawWorktimeId ?? ""}`}
+                        >
+                          <Descriptions bordered size="middle" column={1}>
+                            <Descriptions.Item label="Bắt đầu">
+                              {formatDateTime(
+                                worktime?.startAt ?? worktime?.startTime
+                              )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Kết thúc">
+                              {formatDateTime(
+                                worktime?.endAt ?? worktime?.endTime
+                              )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Trạng thái">
+                              {worktimeStatusLabel ? (
+                                <Tag
+                                  color={
+                                    STATUS_TAG_COLOR[worktimeStatus] ??
+                                    "default"
+                                  }
+                                >
+                                  {worktimeStatusLabel}
+                                </Tag>
+                              ) : (
+                                "--"
+                              )}
+                            </Descriptions.Item>
+                            {worktime?.note ? (
+                              <Descriptions.Item label="Ghi chú">
+                                <Text style={{ whiteSpace: "pre-wrap" }}>
+                                  {worktime.note}
+                                </Text>
+                              </Descriptions.Item>
+                            ) : null}
+                          </Descriptions>
+
+                          <div className="mt-4">
+                            <Space
+                              direction="vertical"
+                              size="middle"
+                              className="w-full"
+                            >
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <span className="text-base font-semibold text-slate-900">
+                                  Thống kê livestream
+                                </span>
+                                <Space size="small" wrap>
+                                  {showConfirmTag ? (
+                                    <Tag
+                                      color={
+                                        isConfirmedValue ? "green" : "orange"
+                                      }
+                                    >
+                                      {isConfirmedValue
+                                        ? "Đã xác nhận"
+                                        : "Chưa xác nhận"}
+                                    </Tag>
+                                  ) : null}
+                                  {metrics?.confirmedAt ? (
+                                    <Text type="secondary">
+                                      Xác nhận lúc:{" "}
+                                      {formatDateTime(metrics.confirmedAt)}
+                                    </Text>
+                                  ) : null}
+                                </Space>
+                              </div>
+
+                              {isMetricsLoading ? (
+                                <Skeleton active paragraph={{ rows: 6 }} />
+                              ) : metricsError ? (
+                                <Alert
+                                  type="error"
+                                  showIcon
+                                  message="Không thể tải thống kê livestream"
+                                  description={
+                                    errorMessage
+                                      ? String(errorMessage)
+                                      : undefined
+                                  }
+                                />
+                              ) : metrics ? (
+                                <>
+                                  <Descriptions
+                                    bordered
+                                    size="middle"
+                                    column={screens.lg ? 3 : screens.md ? 2 : 1}
+                                    labelStyle={{ width: 220 }}
+                                  >
+                                    {LIVESTREAM_METRIC_LABELS.map(
+                                      ({ key, label }) => (
+                                        <Descriptions.Item
+                                          key={key}
+                                          label={label}
+                                        >
+                                          {formatLivestreamMetricValue(
+                                            key,
+                                            metrics?.[key]
+                                          )}
+                                        </Descriptions.Item>
+                                      )
+                                    )}
+                                  </Descriptions>
+
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <Space size="small" wrap>
+                                      {metrics?.createdAt ? (
+                                        <Text type="secondary">
+                                          Cập nhật lúc:{" "}
+                                          {formatDateTime(metrics.createdAt)}
+                                        </Text>
+                                      ) : null}
+                                      {metrics?.confirmedAt ? (
+                                        <Text type="secondary">
+                                          Xác nhận lúc:{" "}
+                                          {formatDateTime(metrics.confirmedAt)}
+                                        </Text>
+                                      ) : null}
+                                    </Space>
+                                    <Button
+                                      type="primary"
+                                      ghost
+                                      onClick={() =>
+                                        handleConfirmMetrics(
+                                          rawWorktimeId,
+                                          queryState
+                                        )
+                                      }
+                                      loading={isButtonLoading}
+                                      disabled={
+                                        isButtonLoading ||
+                                        isMetricsLoading ||
+                                        !metrics ||
+                                        rawWorktimeId === null ||
+                                        rawWorktimeId === undefined
+                                      }
+                                    >
+                                      Xác nhận thống kê
+                                    </Button>
+                                  </div>
+                                </>
+                              ) : (
+                                <Empty description="Chưa có thống kê livestream" />
+                              )}
+                            </Space>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </Space>
+                ) : (
+                  <Empty description="Chưa có phiên làm việc" />
+                )}
               </section>
 
               {/* User Info */}
