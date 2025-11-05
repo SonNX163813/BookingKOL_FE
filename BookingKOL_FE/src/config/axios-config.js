@@ -7,17 +7,40 @@ export const api = axios.create({
   baseURL: BASE_URL,
 });
 
+const normalizeMessage = (message) => {
+  if (Array.isArray(message)) {
+    return message.filter(Boolean).join(" ");
+  }
+  if (typeof message === "string") {
+    return message;
+  }
+  if (message === null || message === undefined) {
+    return undefined;
+  }
+  return String(message);
+};
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
     if (response.config.method === "get") {
       return response.data;
     }
-    toast.success(response.data.message);
+
+    if (!response.config?.skipSuccessToast) {
+      const toastMessage = normalizeMessage(response.data?.message);
+      if (toastMessage) {
+        toast.success(toastMessage);
+      }
+    }
+
     return response.data;
   },
   (error) => {
-    toast.error(error.response?.data?.message || "Có lỗi xảy ra!");
+    if (!error.config?.skipErrorToast) {
+      const toastMessage = normalizeMessage(error.response?.data?.message);
+      toast.error(toastMessage || "Có lỗi xảy ra, vui lòng thử lại.");
+    }
     return Promise.reject(error);
   }
 );

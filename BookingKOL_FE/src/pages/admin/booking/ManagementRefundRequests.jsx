@@ -9,6 +9,7 @@ import {
   Drawer,
   Empty,
   Pagination,
+  Popconfirm,
   Select,
   Space,
   Spin,
@@ -18,6 +19,7 @@ import {
 import { Eye, RefreshCcw } from "lucide-react";
 import { useGetRefundRequests } from "../../../hook/admin/booking/useGetRefundRequests";
 import { useGetRefundRequestDetail } from "../../../hook/admin/booking/useGetRefundRequestDetail";
+import { useConfirmRefundRequest } from "../../../hook/admin/booking/useConfirmRefundRequest";
 import {
   BOOKING_STATUS_LABEL,
   PAYMENT_STATUS_COLOR,
@@ -99,6 +101,8 @@ const DEFAULT_FILTERS = {
   status: undefined,
 };
 
+const CONFIRMABLE_REFUND_STATUSES = new Set(["PENDING"]);
+
 const ManagementRefundRequests = () => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [selectedRefundId, setSelectedRefundId] = useState(null);
@@ -117,6 +121,18 @@ const ManagementRefundRequests = () => {
     refetchRefundDetail,
     errorRefundDetail,
   } = useGetRefundRequestDetail(selectedRefundId);
+
+  const handleConfirmRefundSuccess = useCallback(() => {
+    refetchRefunds();
+    refetchRefundDetail();
+  }, [refetchRefundDetail, refetchRefunds]);
+
+  const {
+    isConfirmingRefundRequest,
+    handleConfirmRefundRequest: confirmRefundRequest,
+  } = useConfirmRefundRequest({
+    onSuccess: handleConfirmRefundSuccess,
+  });
 
   const detailVisible = Boolean(selectedRefundId);
 
@@ -149,6 +165,28 @@ const ManagementRefundRequests = () => {
   );
 
   const detailStatusMeta = resolveRefundStatusMeta(refundDetail?.status);
+  const normalizedRefundStatus = useMemo(() => {
+    if (!refundDetail?.status) return null;
+    return String(refundDetail.status).toUpperCase();
+  }, [refundDetail?.status]);
+
+  const hasRefundFinished = useMemo(
+    () =>
+      normalizedRefundStatus === "REFUNDED" ||
+      Boolean(refundDetail?.refundedAt),
+    [normalizedRefundStatus, refundDetail?.refundedAt]
+  );
+
+  const shouldShowConfirmButton = useMemo(
+    () =>
+      Boolean(
+        detailVisible &&
+          !hasRefundFinished &&
+          normalizedRefundStatus &&
+          CONFIRMABLE_REFUND_STATUSES.has(normalizedRefundStatus)
+      ),
+    [detailVisible, hasRefundFinished, normalizedRefundStatus]
+  );
 
   const isInitialDetailLoading =
     detailVisible && isLoadingRefundDetail && !refundDetail;
@@ -178,6 +216,15 @@ const ManagementRefundRequests = () => {
     if (!selectedRefundId) return;
     refetchRefundDetail();
   }, [refetchRefundDetail, selectedRefundId]);
+
+  const handleConfirmRefund = useCallback(async () => {
+    if (!selectedRefundId) return;
+    try {
+      await confirmRefundRequest({ refundId: selectedRefundId });
+    } catch (error) {
+      // Error handling is managed via global interceptors or hook callbacks.
+    }
+  }, [confirmRefundRequest, selectedRefundId]);
 
   const tableData = useMemo(() => {
     if (Array.isArray(refundsResponse?.content)) return refundsResponse.content;
@@ -353,15 +400,36 @@ const ManagementRefundRequests = () => {
         maskClosable={!isInitialDetailLoading}
         extra={
           detailVisible ? (
-            <Button
-              type="text"
-              icon={<RefreshCcw size={16} />}
-              onClick={handleRefetchDetail}
-              disabled={!selectedRefundId}
-              loading={detailRefreshLoading}
-            >
-              Tải lại
-            </Button>
+            <Space>
+              {shouldShowConfirmButton ? (
+                <Popconfirm
+                  title="Xác nhận hoàn tiền"
+                  description="Bạn có chắc chắn đã hoàn tiền cho người dùng?"
+                  okText="Xác nhận"
+                  cancelText="Huỷ"
+                  onConfirm={handleConfirmRefund}
+                  okButtonProps={{ loading: isConfirmingRefundRequest }}
+                  cancelButtonProps={{ disabled: isConfirmingRefundRequest }}
+                >
+                  <Button
+                    type="primary"
+                    loading={isConfirmingRefundRequest}
+                    disabled={isConfirmingRefundRequest || !selectedRefundId}
+                  >
+                    Xác nhận hoàn tiền
+                  </Button>
+                </Popconfirm>
+              ) : null}
+              <Button
+                type="text"
+                icon={<RefreshCcw size={16} />}
+                onClick={handleRefetchDetail}
+                disabled={!selectedRefundId}
+                loading={detailRefreshLoading}
+              >
+                Tải lại
+              </Button>
+            </Space>
           ) : null
         }
       >
