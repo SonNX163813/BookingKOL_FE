@@ -37,9 +37,17 @@ export const getMyWorktimeLivestreamMetrics = async (
     CLIENT_API_PATHS?.BOOKING?.worktimeLivestreamMetrics
   );
 
+  const requestConfig = {
+    skipErrorToast: true,
+  };
+
+  if (signal) {
+    requestConfig.signal = signal;
+  }
+
   return await get({
     url: pathBuilder(normalizedId),
-    config: signal ? { signal } : undefined,
+    config: requestConfig,
   });
 };
 

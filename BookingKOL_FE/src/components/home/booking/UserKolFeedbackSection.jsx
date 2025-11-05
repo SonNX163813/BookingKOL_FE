@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef } from "react";
 import dayjs from "dayjs";
 import {
   Button,
@@ -218,6 +219,19 @@ const UserKolFeedbackSection = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFetchingDetail, setIsFetchingDetail] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const feedbackRef = useRef(feedback);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    feedbackRef.current = feedback;
+  }, [feedback]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const contractId = useMemo(() => {
     if (!contract) return null;
@@ -239,38 +253,73 @@ const UserKolFeedbackSection = ({
   }, [contract, feedback]);
 
   useEffect(() => {
-    setFeedback(extractFeedbackFromContract(contract));
+    const extracted = extractFeedbackFromContract(contract);
+    setFeedback(extracted);
+    feedbackRef.current = extracted;
   }, [contract]);
 
-  const ensureFeedbackDetail = useCallback(async () => {
+  const fetchFeedbackDetail = useCallback(async ({ force = false, signal } = {}) => {
     if (!feedbackId) return null;
+
+    const cachedFeedback = feedbackRef.current;
+
     if (
-      feedback &&
-      (feedback.commentPublic ||
-        Number.isFinite(Number(feedback.professionalismRating)))
+      !force &&
+      cachedFeedback &&
+      (cachedFeedback.commentPublic ||
+        Number.isFinite(Number(cachedFeedback.professionalismRating)) ||
+        Number.isFinite(Number(cachedFeedback.communicationRating)) ||
+        Number.isFinite(Number(cachedFeedback.timelineRating)) ||
+        Number.isFinite(Number(cachedFeedback.contentQualityRating)))
     ) {
-      return feedback;
+      return cachedFeedback;
     }
 
-    setIsFetchingDetail(true);
+    if (isMountedRef.current) {
+      setIsFetchingDetail(true);
+    }
     try {
-      const response = await getKolFeedbackDetail({ feedbackId });
+      const response = await getKolFeedbackDetail({
+        feedbackId,
+        signal,
+      });
       const normalized = normalizeFeedback(response?.data ?? response);
-      setFeedback(normalized);
+      if (isMountedRef.current && normalized) {
+        setFeedback(normalized);
+        feedbackRef.current = normalized;
+      }
       return normalized;
     } catch (error) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+        return null;
+      }
       console.error("Không thể tải chi tiết đánh giá", error);
-      message.error(buildErrorMessage(error));
+      if (isMountedRef.current) {
+        message.error(buildErrorMessage(error));
+      }
       return null;
     } finally {
-      setIsFetchingDetail(false);
+      if (isMountedRef.current) {
+        setIsFetchingDetail(false);
+      }
     }
-  }, [feedback, feedbackId]);
+  }, [feedbackId]);
+
+  useEffect(() => {
+    if (!feedbackId) return;
+
+    const controller = new AbortController();
+    fetchFeedbackDetail({ force: true, signal: controller.signal }).catch(() => {});
+
+    return () => {
+      controller.abort();
+    };
+  }, [feedbackId, fetchFeedbackDetail]);
 
   const handleOpenModal = useCallback(async () => {
     if (!contractId || disabled) return;
 
-    const detail = await ensureFeedbackDetail();
+    const detail = await fetchFeedbackDetail({ force: true });
     const currentValues = detail ?? feedback ?? null;
 
     form.setFieldsValue({
@@ -297,7 +346,7 @@ const UserKolFeedbackSection = ({
       commentPrivate: currentValues?.commentPrivate ?? "",
     });
     setIsModalOpen(true);
-  }, [contractId, disabled, ensureFeedbackDetail, feedback, form]);
+  }, [contractId, disabled, fetchFeedbackDetail, feedback, form]);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
@@ -342,6 +391,7 @@ const UserKolFeedbackSection = ({
 
       const normalized = normalizeFeedback(result?.data ?? result);
       setFeedback(normalized);
+      feedbackRef.current = normalized;
       setIsModalOpen(false);
       form.resetFields();
 
@@ -363,6 +413,11 @@ const UserKolFeedbackSection = ({
       kol?.displayName ?? kol?.fullName ?? kol?.name ?? kol?.kolName ?? "KOL"
     );
   }, [kol]);
+
+  const hasFeedback = Boolean(feedbackId);
+  const isFeedbackUpdated = Boolean(feedback?.updatedAt);
+  const isUpdateActionAvailable = hasFeedback && !isFeedbackUpdated;
+  const shouldShowActionButton = !hasFeedback || isUpdateActionAvailable;
 
   const renderFeedbackSummary = () => {
     if (isFetchingDetail) {
@@ -476,15 +531,23 @@ const UserKolFeedbackSection = ({
 
       <div className="mt-3">{renderFeedbackSummary()}</div>
 
-      <Button
-        className="mt-4"
-        type={feedbackId ? "default" : "primary"}
-        icon={feedbackId ? <Pencil size={16} /> : <MessageCircle size={16} />}
-        onClick={handleOpenModal}
-        disabled={!contractId || disabled}
-      >
-        {feedbackId ? "Cập nhật đánh giá" : "Đánh giá ngay"}
-      </Button>
+      {shouldShowActionButton && (
+        <Button
+          className="mt-4"
+          type={isUpdateActionAvailable ? "default" : "primary"}
+          icon={
+            isUpdateActionAvailable ? (
+              <Pencil size={16} />
+            ) : (
+              <MessageCircle size={16} />
+            )
+          }
+          onClick={handleOpenModal}
+          disabled={!contractId || disabled}
+        >
+          {isUpdateActionAvailable ? "Cập nhật đánh giá" : "Đánh giá ngay"}
+        </Button>
+      )}
 
       <Modal
         centered

@@ -124,6 +124,50 @@ const formatLivestreamMetricValue = (key, value) => {
   return value;
 };
 
+const isMissingLivestreamMetricError = (error) => {
+  const response = error?.response;
+  if (!response) {
+    return false;
+  }
+
+  const { status, data } = response;
+  if (![400, 404].includes(status)) {
+    return false;
+  }
+
+  const rawMessage = data?.message;
+  const messages = Array.isArray(rawMessage)
+    ? rawMessage
+    : typeof rawMessage === "string"
+    ? [rawMessage]
+    : [];
+
+  const normalizedMessages = messages
+    .filter((message) => typeof message === "string")
+    .map((message) => message.toLowerCase());
+
+  const keywords = ["livestream metric", "không tìm thấy", "not found"];
+  const hasMissingMetricMessage = normalizedMessages.some((message) =>
+    keywords.some((keyword) => message.includes(keyword))
+  );
+
+  const hasDataProperty = Object.prototype.hasOwnProperty.call(
+    data ?? {},
+    "data"
+  );
+  const isEmptyPayload = hasDataProperty && data?.data === null;
+
+  if (hasMissingMetricMessage) {
+    return true;
+  }
+
+  if (isEmptyPayload && normalizedMessages.length === 0) {
+    return true;
+  }
+
+  return false;
+};
+
 const resolveWorktimeId = (worktime) =>
   worktime?.id ??
   worktime?.worktimeId ??
@@ -234,8 +278,16 @@ const MySingleBookingRequestDetail = () => {
     isLoadingWorktimeLivestreamMetrics,
     isFetchingWorktimeLivestreamMetrics,
   } = useGetWorktimeLivestreamMetrics(worktimeIds, {
-    enabled: worktimeIds.length > 0,
+    enabled:
+      !isLoadingMyBookingRequestDetail &&
+      !isFetchingMyBookingRequestDetail &&
+      worktimeIds.length > 0,
     retry: false,
+    staleTime: Infinity, // dữ liệu luôn “tươi”, React Query không refetch lại
+    cacheTime: Infinity, // giữ cache vĩnh viễn
+    refetchOnWindowFocus: false, // không refetch khi quay lại tab
+    refetchOnMount: false, // không refetch khi re-render lại trang
+    refetchOnReconnect: false, // không refetch khi reconnect mạng
   });
 
   const findQueryByWorktimeId = useCallback(
@@ -445,7 +497,19 @@ const MySingleBookingRequestDetail = () => {
         title: "Tên tệp",
         dataIndex: ["file", "fileName"],
         key: "fileName",
-        render: (_, r) => r?.file?.fileName ?? "--",
+        render: (_, r) => (
+          <Typography
+            sx={{
+              maxWidth: 200, // hoặc width: 240 nếu muốn cố định
+              wordBreak: "break-word",
+              overflowWrap: "break-word",
+              whiteSpace: "normal",
+              fontWeight: 500,
+            }}
+          >
+            {r?.file?.fileName ?? "--"}
+          </Typography>
+        ),
       },
       {
         title: "Loại",
@@ -651,9 +715,10 @@ const MySingleBookingRequestDetail = () => {
                         <p className="text-sm font-semibold text-slate-700">
                           Tệp đính kèm hiện có
                         </p>
-                        <p className="mb-3  text-slate-500">
+                        <p className="mb-3 text-slate-500">
                           Chọn các tệp bạn muốn xóa khi cập nhật.
                         </p>
+
                         {deletableAttachmentOptions.length > 0 ? (
                           <Checkbox.Group
                             value={fileIdsToDelete}
@@ -661,16 +726,27 @@ const MySingleBookingRequestDetail = () => {
                             className="flex flex-col gap-2"
                           >
                             {deletableAttachmentOptions.map((item) => (
-                              <Checkbox key={item.value} value={item.value}>
-                                <span
-                                  className={`text-sm transition-all duration-200 ${
+                              <Checkbox
+                                key={item.value}
+                                value={item.value}
+                                className="!w-full"
+                              >
+                                <div
+                                  className={`text-sm transition-all duration-200 break-words whitespace-normal block w-full ${
                                     fileIdsToDelete.includes(item.value)
                                       ? "line-through text-slate-700/60"
                                       : "text-slate-700"
                                   }`}
+                                  style={{
+                                    wordBreak: "break-word",
+                                    overflowWrap: "break-word",
+                                    whiteSpace: "normal",
+                                    width: "100%",
+                                    display: "block",
+                                  }}
                                 >
                                   {item.label}
-                                </span>
+                                </div>
                               </Checkbox>
                             ))}
                           </Checkbox.Group>
@@ -680,6 +756,7 @@ const MySingleBookingRequestDetail = () => {
                           </div>
                         )}
                       </div>
+
                       <div>
                         <p className="text-sm font-semibold text-slate-700">
                           Thêm tệp mới
@@ -747,6 +824,15 @@ const MySingleBookingRequestDetail = () => {
                       const errorMessage =
                         metricsError?.response?.data?.message ??
                         metricsError?.message;
+                      const isMetricsMissing =
+                        metricsError &&
+                        isMissingLivestreamMetricError(metricsError);
+                      const normalizedMetrics = isMetricsMissing
+                        ? null
+                        : metrics;
+                      const shouldShowMetricsError = Boolean(
+                        metricsError && !isMetricsMissing
+                      );
                       const worktimeStatus = normalizeStatus(worktime?.status);
                       const worktimeStatusLabel = worktimeStatus
                         ? BOOKING_STATUS_LABEL[worktimeStatus] ?? worktimeStatus
@@ -755,10 +841,10 @@ const MySingleBookingRequestDetail = () => {
                         confirmingWorktimeId === rawWorktimeId &&
                         isConfirmingWorktimeLivestreamMetrics;
                       const showConfirmTag =
-                        typeof metrics?.isConfirmed === "boolean";
+                        typeof normalizedMetrics?.isConfirmed === "boolean";
                       const isConfirmedValue = showConfirmTag
-                        ? metrics.isConfirmed
-                        : Boolean(metrics?.confirmedAt);
+                        ? normalizedMetrics.isConfirmed
+                        : Boolean(normalizedMetrics?.confirmedAt);
 
                       return (
                         <Card
@@ -823,10 +909,12 @@ const MySingleBookingRequestDetail = () => {
                                         : "Chưa xác nhận"}
                                     </Tag>
                                   ) : null}
-                                  {metrics?.confirmedAt ? (
+                                  {normalizedMetrics?.confirmedAt ? (
                                     <Text type="secondary">
                                       Xác nhận lúc:{" "}
-                                      {formatDateTime(metrics.confirmedAt)}
+                                      {formatDateTime(
+                                        normalizedMetrics.confirmedAt
+                                      )}
                                     </Text>
                                   ) : null}
                                 </Space>
@@ -834,7 +922,7 @@ const MySingleBookingRequestDetail = () => {
 
                               {isMetricsLoading ? (
                                 <Skeleton active paragraph={{ rows: 6 }} />
-                              ) : metricsError ? (
+                              ) : shouldShowMetricsError ? (
                                 <Alert
                                   type="error"
                                   showIcon
@@ -845,7 +933,7 @@ const MySingleBookingRequestDetail = () => {
                                       : undefined
                                   }
                                 />
-                              ) : metrics ? (
+                              ) : normalizedMetrics ? (
                                 <>
                                   <Descriptions
                                     bordered
@@ -861,7 +949,7 @@ const MySingleBookingRequestDetail = () => {
                                         >
                                           {formatLivestreamMetricValue(
                                             key,
-                                            metrics?.[key]
+                                            normalizedMetrics?.[key]
                                           )}
                                         </Descriptions.Item>
                                       )
@@ -870,16 +958,20 @@ const MySingleBookingRequestDetail = () => {
 
                                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <Space size="small" wrap>
-                                      {metrics?.createdAt ? (
+                                      {normalizedMetrics?.createdAt ? (
                                         <Text type="secondary">
                                           Cập nhật lúc:{" "}
-                                          {formatDateTime(metrics.createdAt)}
+                                          {formatDateTime(
+                                            normalizedMetrics.createdAt
+                                          )}
                                         </Text>
                                       ) : null}
-                                      {metrics?.confirmedAt ? (
+                                      {normalizedMetrics?.confirmedAt ? (
                                         <Text type="secondary">
                                           Xác nhận lúc:{" "}
-                                          {formatDateTime(metrics.confirmedAt)}
+                                          {formatDateTime(
+                                            normalizedMetrics.confirmedAt
+                                          )}
                                         </Text>
                                       ) : null}
                                     </Space>
@@ -896,7 +988,7 @@ const MySingleBookingRequestDetail = () => {
                                       disabled={
                                         isButtonLoading ||
                                         isMetricsLoading ||
-                                        !metrics ||
+                                        !normalizedMetrics ||
                                         rawWorktimeId === null ||
                                         rawWorktimeId === undefined
                                       }

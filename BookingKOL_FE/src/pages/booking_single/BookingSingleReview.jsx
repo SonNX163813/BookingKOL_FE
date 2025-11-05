@@ -658,7 +658,15 @@ const BookingSingleReview = () => {
                           alignItems={{ xs: "flex-start", sm: "center" }}
                         >
                           <Stack spacing={0.25}>
-                            <Typography sx={{ fontWeight: 600 }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 600,
+                                maxWidth: 400,
+                                wordBreak: "break-word",
+                                overflowWrap: "break-word",
+                              }}
+                            >
+                              {" "}
                               {file.name}
                             </Typography>
                             {file.size ? (

@@ -22,6 +22,13 @@ const BookingSinglePaymentSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const paymentInfo = location.state?.payment;
+  const stateContracts = Array.isArray(location.state?.contracts)
+    ? location.state.contracts
+    : [];
+  const stateContractNumber =
+    typeof location.state?.contractNumber === "string"
+      ? location.state.contractNumber.trim()
+      : null;
   const [countdown, setCountdown] = useState(15);
 
   useEffect(() => {
@@ -48,6 +55,52 @@ const BookingSinglePaymentSuccess = () => {
     return null;
   }
 
+  const contractsFromPayment = Array.isArray(paymentInfo?.contracts)
+    ? paymentInfo.contracts
+    : [];
+  const mergedContracts =
+    contractsFromPayment.length > 0 ? contractsFromPayment : stateContracts;
+
+  const primaryContract =
+    mergedContracts.find(
+      (contract) =>
+        contract &&
+        (contract.contractNumber || contract.contractCode || contract.code)
+    ) ?? mergedContracts[0];
+
+  const contractCandidates = [
+    stateContractNumber,
+    paymentInfo?.contractNumber,
+    paymentInfo?.contract?.contractNumber,
+    primaryContract?.contractNumber,
+    // paymentInfo?.contractCode,
+    // paymentInfo?.contract?.code,
+    // primaryContract?.contractCode,
+    // primaryContract?.code,
+    // paymentInfo?.contract?.number,
+    // paymentInfo?.contract?.id,
+    // primaryContract?.id,
+    // paymentInfo?.contractId,
+  ];
+
+  const contractNumber =
+    contractCandidates
+      .map((value) => {
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          return trimmed.length > 0 ? trimmed : null;
+        }
+        if (
+          value !== null &&
+          value !== undefined &&
+          (typeof value === "number" || typeof value === "bigint")
+        ) {
+          return String(value);
+        }
+        return null;
+      })
+      .find((value) => value !== null) ?? null;
+
   const detailRows = [
     {
       label: "Số tiền",
@@ -59,7 +112,7 @@ const BookingSinglePaymentSuccess = () => {
     },
     {
       label: "Mã hợp đồng",
-      value: paymentInfo.contractId,
+      value: contractNumber,
     },
   ].filter((row) => Boolean(row.value));
 

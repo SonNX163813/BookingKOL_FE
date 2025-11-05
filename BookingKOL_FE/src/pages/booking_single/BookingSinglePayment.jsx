@@ -184,9 +184,53 @@ const BookingSinglePayment = () => {
 
           sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
           toast.success("Thanh toán thành công 🎉");
+
+          const contractsFromPayment = Array.isArray(
+            thongTinThanhToan?.contracts
+          )
+            ? thongTinThanhToan.contracts
+            : [];
+          const contractsFromBooking = Array.isArray(yeuCauDatLich?.contracts)
+            ? yeuCauDatLich.contracts
+            : [];
+          const mergedContracts =
+            contractsFromPayment.length > 0
+              ? contractsFromPayment
+              : contractsFromBooking.length > 0
+              ? contractsFromBooking
+              : [];
+
+          const primaryContract =
+            mergedContracts.find(
+              (contract) =>
+                contract &&
+                (contract.contractNumber ||
+                  contract.contractCode ||
+                  contract.code)
+            ) ?? mergedContracts[0];
+
+          const contractNumberValue =
+            thongTinThanhToan?.contractNumber ??
+            primaryContract?.contractNumber ??
+            thongTinThanhToan?.contractId ??
+            primaryContract?.contractCode ??
+            primaryContract?.code ??
+            null;
+
+          const paymentState = {
+            ...thongTinThanhToan,
+            ...(contractNumberValue
+              ? { contractNumber: contractNumberValue }
+              : {}),
+            ...(mergedContracts.length > 0 ? { contracts: mergedContracts } : {}),
+          };
           navigate("/thanh-toan-kol-le/thanh-cong", {
             replace: true,
-            state: { payment: thongTinThanhToan },
+            state: {
+              payment: paymentState,
+              contracts: mergedContracts,
+              contractNumber: contractNumberValue,
+            },
           });
         }
       } catch (error) {
@@ -201,7 +245,7 @@ const BookingSinglePayment = () => {
       isActive = false;
       if (intervalId) clearInterval(intervalId);
     };
-  }, [navigate, thongTinThanhToan?.contractId]);
+  }, [navigate, thongTinThanhToan, yeuCauDatLich]);
 
   const thoiGianHetHanHienThi = useMemo(() => {
     const target = thongTinThanhToan?.expiresAt

@@ -260,7 +260,7 @@ const BookingFlow = ({
       };
 
       setHeldSlot(nextSlot);
-      toast.success("Đã giữ chỗ thành công!");
+      // toast.success("Đã giữ chỗ thành công!");
       setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
     } catch (err) {
       const errorMsg =
