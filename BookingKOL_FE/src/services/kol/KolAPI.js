@@ -670,14 +670,14 @@ export const resolveAvatarUrl = (kol) => {
 };
 
 /* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
-/* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
+// ================== MY SINGLE BOOKING REQUESTS (KOL) ==================
 const MY_SINGLE_REQUESTS_ALLOWED_PARAMS = new Set([
   "status",
+  "requestNumber",
   "startAt",
   "endAt",
   "createdAtFrom",
   "createdAtTo",
-  "requestNumber",
   "page",
   "size",
 ]);
@@ -685,13 +685,14 @@ const MY_SINGLE_REQUESTS_ALLOWED_PARAMS = new Set([
 const MY_SINGLE_REQUESTS_DEFAULT_PARAMS = { page: 0, size: 20 };
 
 const buildMySingleRequestsParams = (params = {}) => {
-  const merged = { ...MY_SINGLE_REQUESTS_DEFAULT_PARAMS, ...(params ?? {}) };
+  const merged = { ...MY_SINGLE_REQUESTS_DEFAULT_PARAMS, ...(params || {}) };
 
+  // Chuẩn hoá yyyy-MM-dd cho các trường ngày (nếu hợp lệ)
   const normalizeDate = (v) => {
-    if (!v) return v;
+    if (!v) return undefined;
     if (dayjs.isDayjs(v)) return v.format("YYYY-MM-DD");
     const d = dayjs(v);
-    return d.isValid() ? d.format("YYYY-MM-DD") : v;
+    return d.isValid() ? d.format("YYYY-MM-DD") : undefined;
   };
 
   const normalized = {
@@ -702,15 +703,32 @@ const buildMySingleRequestsParams = (params = {}) => {
     createdAtTo: normalizeDate(merged.createdAtTo),
   };
 
-  return Object.entries(normalized).reduce((acc, [key, value]) => {
-    if (!MY_SINGLE_REQUESTS_ALLOWED_PARAMS.has(key)) return acc;
-    const skip =
-      value === undefined ||
-      value === null ||
-      (typeof value === "string" && value.trim() === "");
-    if (!skip) acc[key] = value;
-    return acc;
-  }, {});
+  // status: cho phép truyền mảng hoặc string; Swagger là string → FE có thể gửi CSV
+  if (Array.isArray(merged.status)) {
+    const csv = merged.status
+      .filter(Boolean)
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(",");
+    normalized.status = csv || undefined;
+  } else if (typeof merged.status === "string") {
+    normalized.status = merged.status.trim() || undefined;
+  }
+
+  if (typeof merged.requestNumber === "string") {
+    normalized.requestNumber = merged.requestNumber.trim() || undefined;
+  }
+
+  // Loại bỏ key rỗng và chỉ giữ các key được phép
+  const out = {};
+  for (const [key, value] of Object.entries(normalized)) {
+    if (!MY_SINGLE_REQUESTS_ALLOWED_PARAMS.has(key)) continue;
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    out[key] = value;
+  }
+  return out;
 };
 
 export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
@@ -718,32 +736,11 @@ export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
 
   const payload = await get({
     url: CLIENT_API_PATHS.BOOKING.mySingleRequestsAll,
-    params: reqParams, // ví dụ: { page, size, status: ['IN_PROGRESS','REQUESTED',...] }
-    config: {
-      ...(signal ? { signal } : {}),
-      // ✅ serialize mảng theo dạng repeat, không cần qs
-      paramsSerializer: {
-        serialize: (p) => {
-          const u = new URLSearchParams();
-          Object.entries(p || {}).forEach(([k, v]) => {
-            if (v == null) return;
-            if (Array.isArray(v)) {
-              v.forEach((it) => {
-                if (it == null || String(it).trim() === "") return;
-                u.append(k, it);
-              });
-            } else {
-              if (typeof v === "string" && v.trim() === "") return;
-              u.append(k, v);
-            }
-          });
-          return u.toString();
-        },
-      },
-    },
+    params: reqParams, // ví dụ: { page:0, size:20, status:"IN_PROGRESS,REQUESTED" }
+    config: signal ? { signal } : undefined,
   });
 
-  // payload?.data có thể là envelope {status, message, data} hoặc page object hoặc array
+  // Hỗ trợ cả envelope { status, message, data } hoặc trả thẳng page object/array
   const raw = payload?.data;
   const data = raw?.data ?? raw;
 
@@ -786,20 +783,24 @@ export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
       ? data.size
       : MY_SINGLE_REQUESTS_DEFAULT_PARAMS.size;
 
-  const normalized = { content, totalElements: total, page, size };
+  const normalizedResult = { content, totalElements: total, page, size };
   const originalObject =
     data && typeof data === "object" && !Array.isArray(data) ? data : {};
 
+  // Trả về 2 dạng đồng nhất (để nơi dùng dễ đọc .data.content / .content đều OK)
   return {
     ...originalObject,
-    ...normalized,
+    ...normalizedResult,
     data: {
       ...originalObject,
-      ...normalized,
+      ...normalizedResult,
     },
   };
 };
 
+/** GET chi tiết booking single của KOL
+ *  Endpoint: /v1/kol/booking/single-requests/detail/{requestId}
+ */
 export const getKolMySingleRequestDetail = async (
   requestId,
   { signal } = {}

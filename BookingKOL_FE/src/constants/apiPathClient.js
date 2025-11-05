@@ -44,8 +44,11 @@ export const CLIENT_API_PATHS = {
     mySingleRequestsAll: "/v1/kol/booking/single-requests/all",
     mySingleRequestDetail: (requestId) =>
       `/v1/kol/booking/single-requests/detail/${requestId}`,
-    worktimeLivestreamMetrics: (worktimeId) =>
-      `/admin/requests/worktime/livestream-metrics/${worktimeId}`,
+    kolWorktimeLivestreamMetrics: (worktimeId) =>
+      `/v1/kol/requests/worktime/livestream-metrics/${encodeURIComponent(
+        worktimeId
+      )}`,
+
     kolCreateLivestreamMetric: (worktimeId) =>
       `/v1/kol/requests/worktime/create-livestream-metric/${encodeURIComponent(
         worktimeId

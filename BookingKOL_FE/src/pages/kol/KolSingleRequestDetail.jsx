@@ -1,5 +1,4 @@
-// src/pages/kol/KolSingleRequestDetail.jsx
-import { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   useNavigate,
   useParams,
@@ -37,28 +36,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
 import { getKolMySingleRequestDetail } from "../../services/kol/KolAPI";
 import { createKolLivestreamMetric } from "../../services/kol/LiveMetricAPI";
-import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
-
-/* ===== MUI ===== */
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Grid as MuiGrid,
-  InputAdornment,
-  MenuItem,
-  Box,
-  Button as MuiButton,
-  Divider as MuiDivider,
-  Typography as MuiTypography,
-} from "@mui/material";
+import { getKolLivestreamMetrics } from "../../services/kol/LiveMetricQueryAPI";
+import LivestreamMetricModal from "../../components/kol/kol-metric/LivestreamMetricModal";
 
 const { Title, Text, Link } = Typography;
 const { useBreakpoint } = Grid;
 
-/* ===== Việt hoá dayjs ===== */
 dayjs.extend(localeData);
 dayjs.extend(updateLocale);
 dayjs.locale("vi");
@@ -68,7 +51,7 @@ dayjs.updateLocale("vi", {
   weekdaysMin: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
 });
 
-/* ===== Trạng thái booking ===== */
+/* ===== Booking status ===== */
 const BOOKING_STATUS_OPTIONS = [
   { label: "Chờ Thanh Toán", value: "DRAFT" },
   { label: "Đã yêu cầu", value: "REQUESTED" },
@@ -78,7 +61,6 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hủy", value: "CANCELLED" },
   { label: "Đã thanh toán", value: "PAID" },
 ];
-
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
   REQUESTED: "processing",
@@ -88,12 +70,10 @@ const STATUS_TAG_COLOR = {
   CANCELLED: "error",
   PAID: "success",
 };
-
-const BOOKING_STATUS_MAP = BOOKING_STATUS_OPTIONS.reduce((acc, s) => {
-  acc[s.value] = s.label;
-  return acc;
-}, {});
-
+const BOOKING_STATUS_MAP = BOOKING_STATUS_OPTIONS.reduce(
+  (a, s) => ((a[s.value] = s.label), a),
+  {}
+);
 const formatDateTime = (v, p = "DD/MM/YYYY HH:mm") =>
   v ? dayjs(v).format(p) : "--";
 const normalizeStatus = (s) =>
@@ -101,7 +81,7 @@ const normalizeStatus = (s) =>
 const getBookingTypeLabel = (t) =>
   (t ?? "").toString().toUpperCase() === "SINGLE" ? "Book theo giờ" : t ?? "--";
 
-/* Xem trước tệp đính kèm */
+/* Preview file cell */
 const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
   if (!fileUrl) return "--";
   const t = (fileType || "").toString().toUpperCase();
@@ -128,7 +108,6 @@ const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
     </Link>
   );
 };
-
 const renderImageField = (url, label) =>
   !url ? (
     "--"
@@ -145,22 +124,46 @@ const renderImageField = (url, label) =>
     </Space>
   );
 
-/** 🔧 Bật fallback fetch để debug nếu cần (đặt true để test nhanh) */
-const BYPASS_AXIOS_WITH_FETCH = false;
-
-/** 🧠 Helper: lấy danh sách worktimes từ nhiều key khác nhau */
+/** Helper lấy worktimes */
 function extractWorktimes(detail) {
   if (!detail) return [];
-  const candidates = [
-    detail.kolWorkTimes, // ✅ API của bạn đang trả key này
-    detail.workTimes,
-    detail.worktimes,
-  ];
-  for (const c of candidates) {
-    if (Array.isArray(c) && c.length) return c;
-  }
+  const candidates = [detail.kolWorkTimes, detail.workTimes, detail.worktimes];
+  for (const c of candidates) if (Array.isArray(c) && c.length) return c;
   return [];
 }
+
+/* Format hiển thị metrics */
+const fmtInt = (v) =>
+  Number.isFinite(+v) ? Math.trunc(+v).toLocaleString("vi-VN") : "--";
+const fmtVnd = (v) =>
+  Number.isFinite(+v)
+    ? (+v).toLocaleString("vi-VN", {
+        style: "currency",
+        currency: "VND",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      })
+    : "--";
+const fmtPct = (v) =>
+  Number.isFinite(+v) ? `${(+v).toFixed(2).replace(/\.00$/, "")}%` : "--";
+
+const METRIC_FIELDS = [
+  { key: "revenue", label: "Tổng doanh thu", fmt: fmtVnd },
+  { key: "gpm", label: "GPM", fmt: fmtVnd },
+  { key: "avgOrderValue", label: "Giá trị TB mỗi đơn", fmt: fmtVnd },
+  { key: "totalOrders", label: "Tổng đơn hàng", fmt: fmtInt },
+  { key: "buyers", label: "Số người mua", fmt: fmtInt },
+  { key: "productsSold", label: "Các mặt hàng được bán", fmt: fmtInt },
+  { key: "totalViews", label: "Tổng lượt xem", fmt: fmtInt },
+  { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút", fmt: fmtInt },
+  { key: "viewsUnder1min", label: "Lượt xem < 1 phút", fmt: fmtInt },
+  { key: "pcu", label: "PCU (đồng xem cao nhất)", fmt: fmtInt },
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)", fmt: fmtInt }, // ⬅️ GIÂY
+  { key: "commentsIn1min", label: "BL trong 1 phút", fmt: fmtInt },
+  { key: "totalComments", label: "Tổng bình luận", fmt: fmtInt },
+  { key: "productClickRate", label: "Tỷ lệ click SP", fmt: fmtPct },
+  { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn", fmt: fmtPct },
+];
 
 export default function KolSingleRequestDetail() {
   const { requestId } = useParams();
@@ -192,13 +195,9 @@ export default function KolSingleRequestDetail() {
 
   const normalizedStatus = normalizeStatus(detail?.status);
   const canInputMetrics = normalizedStatus === "IN_PROGRESS";
-
   const requestNo = detail?.requestNumber ?? detail?.id ?? requestId ?? "--";
 
-  // ✅ FIX: dùng extractWorktimes
   const worktimes = extractWorktimes(detail);
-
-  /* Ưu tiên ca đã kết thúc (mà vẫn IN_PROGRESS) */
   const endedWorktime = worktimes.find(
     (w) =>
       normalizeStatus(w?.status) === "IN_PROGRESS" &&
@@ -206,29 +205,9 @@ export default function KolSingleRequestDetail() {
       dayjs().isAfter(dayjs(w.endAt))
   );
 
-  /* ===== Modal state ===== */
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [selectedWorktimeId, setSelectedWorktimeId] = useState("");
-  const [m, setM] = useState({
-    revenue: 0,
-    liveViewsOver1min: 0,
-    viewsUnder1min: 0,
-    commentsIn1min: 0,
-    totalComments: 0,
-    addToCartIn1min: 0,
-    totalViews: 0,
-    avgViewDuration: 0,
-    pcu: 0,
-    productClickRate: 0,
-    orderConversionRate: 0,
-    gpm: 0,
-    totalOrders: 0,
-    buyers: 0,
-    avgOrderValue: 0,
-    productsSold: 0,
-  });
 
-  /* Auto pick worktime */
   useEffect(() => {
     if (!worktimes?.length) return;
     setSelectedWorktimeId((prev) => {
@@ -239,20 +218,29 @@ export default function KolSingleRequestDetail() {
   }, [worktimes, endedWorktime?.id]);
 
   useEffect(() => {
-    if (searchParams.get("metrics") === "1" && canInputMetrics) {
+    if (searchParams.get("metrics") === "1" && canInputMetrics)
       setMetricsOpen(true);
-    }
   }, [searchParams, canInputMetrics]);
 
-  /* Keep mutation (dùng khi tắt BYPASS) */
+  /* GET metrics theo worktimeId */
+  const {
+    data: metrics,
+    isLoading: isMetricsLoading,
+    isFetching: isMetricsFetching,
+    error: metricsError,
+    refetch: refetchMetrics,
+  } = useQuery({
+    queryKey: ["kol-livestream-metrics", token, selectedWorktimeId],
+    queryFn: () => getKolLivestreamMetrics(selectedWorktimeId),
+    enabled: !!token && !!selectedWorktimeId,
+    retry: 1,
+  });
+
+  /* POST metrics */
   const { mutateAsync: submitMetricsAsync, isLoading: isSubmitting } =
     useMutation({
-      mutationFn: async ({ worktimeId, dto }) => {
-        console.debug("[METRIC] mutationFn start", { worktimeId, dto });
-        const res = await createKolLivestreamMetric(worktimeId, dto);
-        console.debug("[METRIC] mutationFn done", res);
-        return res;
-      },
+      mutationFn: async ({ worktimeId, dto }) =>
+        createKolLivestreamMetric(worktimeId, dto),
     });
 
   const handleOpenMetrics = () => {
@@ -265,87 +253,16 @@ export default function KolSingleRequestDetail() {
     setMetricsOpen(true);
   };
 
-  const handleSubmitMetricsCore = async () => {
-    const wid =
-      selectedWorktimeId || (worktimes.length ? worktimes[0]?.id : "");
-    const safeDto = Object.fromEntries(
-      Object.entries(m).map(([k, v]) => [
-        k,
-        v === "" || v == null ? 0 : Number(v),
-      ])
-    );
-
-    console.debug("[METRIC] SUBMIT CLICKED", {
-      canInputMetrics,
-      selectedWorktimeId,
-      resolvedWorktimeId: wid,
-      worktimesLen: worktimes.length,
-      BYPASS_AXIOS_WITH_FETCH,
-      payload: safeDto,
-    });
-
-    if (!wid) {
-      console.warn(
-        "[METRIC] No worktimeId resolved. worktimes = [] → Kiểm tra key kolWorkTimes/workTimes trong response detail."
-      );
-      message.error("Vui lòng chọn ca livestream (không tìm thấy worktime).");
-      return;
-    }
-
-    try {
-      if (BYPASS_AXIOS_WITH_FETCH) {
-        const builder =
-          CLIENT_API_PATHS?.BOOKING?.kolCreateLivestreamMetric ??
-          CLIENT_API_PATHS?.kolCreateLivestreamMetric;
-        if (typeof builder !== "function") {
-          throw new Error(
-            "Không tìm thấy CLIENT_API_PATHS.{BOOKING.}kolCreateLivestreamMetric"
-          );
-        }
-        const url = builder(wid);
-        const base = import.meta?.env?.VITE_API_BASE || "";
-        const fullUrl = `${base}${url}`;
-        console.debug("[METRIC] fetch URL =", fullUrl);
-
-        const res = await fetch(fullUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(safeDto),
-        });
-
-        console.debug("[METRIC] fetch status =", res.status);
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson?.message || `Request failed (${res.status})`);
-        }
-      } else {
-        await submitMetricsAsync({ worktimeId: wid, dto: safeDto });
-      }
-
-      message.success("Đã lưu số liệu livestream.");
-      setMetricsOpen(false);
-      refetch();
-    } catch (err) {
-      console.debug("[METRIC] submit error =", err);
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Không thể lưu số liệu.";
-      message.error(msg);
-    }
+  const handleSubmitMetrics = async (wid, dto) => {
+    await submitMetricsAsync({ worktimeId: wid, dto });
+    message.success("Đã lưu số liệu livestream.");
+    setMetricsOpen(false);
+    setSelectedWorktimeId(wid);
+    refetch();
+    refetchMetrics();
   };
 
-  /* ⬇️ Dùng form submit để chắc chắn event chạy (click hoặc Enter) */
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    handleSubmitMetricsCore();
-  };
-
-  /* ====== BACK BUTTON ====== */
+  /* Back button */
   const derivedListPath = useMemo(() => {
     const m = location.pathname.match(/^(.*)\/detail\/[^/]+$/);
     return m?.[1] || "/kol/booking/single-requests";
@@ -357,11 +274,8 @@ export default function KolSingleRequestDetail() {
       navigate(backTo, { replace: true });
       return;
     }
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate(derivedListPath, { replace: true });
-    }
+    if (window.history.length > 1) navigate(-1);
+    else navigate(derivedListPath, { replace: true });
   };
 
   const attachedFileColumns = useMemo(
@@ -393,6 +307,11 @@ export default function KolSingleRequestDetail() {
       },
     ],
     []
+  );
+
+  const selectedWorktime = useMemo(
+    () => worktimes.find((w) => w?.id === selectedWorktimeId),
+    [worktimes, selectedWorktimeId]
   );
 
   return (
@@ -450,7 +369,7 @@ export default function KolSingleRequestDetail() {
         </Card>
       ) : (
         <Skeleton loading={isLoading} active paragraph={{ rows: 6 }}>
-          {canInputMetrics && endedWorktime && (
+          {canInputMetrics && endedWorktime && !metrics && (
             <Alert
               type="error"
               showIcon
@@ -465,14 +384,13 @@ export default function KolSingleRequestDetail() {
             />
           )}
 
-          {/* ⚠️ Thông báo khi không tìm thấy worktime */}
           {!worktimes.length && (
             <Alert
               type="warning"
               showIcon
               className="mb-3"
               message="Không tìm thấy ca livestream trong chi tiết yêu cầu."
-              description="API có thể trả key 'kolWorkTimes' thay vì 'workTimes'. Đã sửa component để hỗ trợ cả hai. Nếu vẫn không thấy, kiểm tra payload detail."
+              description="API có thể trả key 'kolWorkTimes' thay vì 'workTimes'. Component đã hỗ trợ cả hai."
             />
           )}
 
@@ -611,176 +529,98 @@ export default function KolSingleRequestDetail() {
             )}
           </Card>
 
-          {/* ===== Modal nhập số liệu (Form submit) ===== */}
-          <Dialog
+          {/* ========= Card hiển thị Livestream Metrics ========= */}
+          <Card
+            className="shadow-sm"
+            bordered={false}
+            title={
+              <Space>
+                <BarChart3 size={18} />
+                <span>Chỉ số Livestream</span>
+              </Space>
+            }
+            extra={
+              <Space>
+                <Button
+                  onClick={() => refetchMetrics()}
+                  loading={isMetricsFetching}
+                  disabled={!selectedWorktimeId}
+                >
+                  Làm mới số liệu
+                </Button>
+                {canInputMetrics && (
+                  <Button type="primary" onClick={handleOpenMetrics}>
+                    Nhập số liệu
+                  </Button>
+                )}
+              </Space>
+            }
+          >
+            {!selectedWorktimeId ? (
+              <Alert
+                type="info"
+                showIcon
+                message="Chưa có ca livestream được chọn."
+                description="Hãy chọn 'ca livestream' trong hộp thoại nhập số liệu khi có nhiều worktime."
+              />
+            ) : metricsError ? (
+              <Alert
+                type="error"
+                showIcon
+                message="Không tải được số liệu livestream."
+                description={String(metricsError?.message || "")}
+              />
+            ) : (
+              <Skeleton
+                loading={isMetricsLoading}
+                active
+                paragraph={{ rows: 6 }}
+              >
+                {metrics ? (
+                  <>
+                    {selectedWorktime && (
+                      <div className="mb-3">
+                        <Text type="secondary">
+                          Ca:&nbsp;
+                          <Text strong>
+                            {dayjs(selectedWorktime.startAt).format("HH:mm")}–
+                            {dayjs(selectedWorktime.endAt).format("HH:mm")} •{" "}
+                            {dayjs(selectedWorktime.startAt).format(
+                              "DD/MM/YYYY"
+                            )}
+                          </Text>
+                        </Text>
+                      </div>
+                    )}
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 220 }}
+                    >
+                      {METRIC_FIELDS.map(({ key, label, fmt }) => (
+                        <Descriptions.Item key={key} label={label}>
+                          {fmt(metrics[key])}
+                        </Descriptions.Item>
+                      ))}
+                    </Descriptions>
+                  </>
+                ) : (
+                  <Empty description="Chưa có số liệu. Hãy nhấn 'Nhập số liệu' để lưu trước." />
+                )}
+              </Skeleton>
+            )}
+          </Card>
+
+          {/* ===== Modal nhập số liệu (reusable) ===== */}
+          <LivestreamMetricModal
             open={metricsOpen}
             onClose={() => setMetricsOpen(false)}
-            fullWidth
-            maxWidth="md"
-          >
-            <DialogTitle>Nhập số liệu Livestream</DialogTitle>
-
-            {/* Bọc form tại đây */}
-            <Box component="form" onSubmit={handleFormSubmit}>
-              <DialogContent dividers>
-                {worktimes.length > 1 && (
-                  <Box mb={2}>
-                    <TextField
-                      fullWidth
-                      select
-                      label="Chọn ca livestream"
-                      value={selectedWorktimeId}
-                      onChange={(e) => setSelectedWorktimeId(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      helperText=" "
-                    >
-                      {worktimes.map((w) => (
-                        <MenuItem key={w.id} value={w.id}>
-                          {`${dayjs(w.startAt).format("HH:mm")}–${dayjs(
-                            w.endAt
-                          ).format("HH:mm")}, ${dayjs(w.startAt).format(
-                            "DD/MM/YYYY"
-                          )}`}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Box>
-                )}
-
-                <MuiTypography variant="h6" gutterBottom>
-                  Số liệu trong 1 phút
-                </MuiTypography>
-                <MuiGrid container direction="column" spacing={2}>
-                  {[
-                    {
-                      key: "liveViewsOver1min",
-                      label: "Lượt xem live > 1 phút",
-                      step: 1,
-                    },
-                    {
-                      key: "commentsIn1min",
-                      label: "Bình luận trong 1 phút",
-                      step: 1,
-                    },
-                    {
-                      key: "addToCartIn1min",
-                      label: "Thêm vào giỏ trong 1 phút",
-                      step: 1,
-                    },
-                  ].map((f) => (
-                    <MuiGrid key={f.key} item xs={12}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label={f.label}
-                        value={m[f.key]}
-                        onChange={(e) =>
-                          setM((s) => ({ ...s, [f.key]: e.target.value }))
-                        }
-                        InputLabelProps={{ shrink: true }}
-                        helperText=" "
-                        inputProps={{ step: f.step ?? 1 }}
-                      />
-                    </MuiGrid>
-                  ))}
-                </MuiGrid>
-
-                <MuiDivider sx={{ my: 2 }} />
-
-                <MuiTypography variant="h6" gutterBottom>
-                  Tổng quan
-                </MuiTypography>
-                <MuiGrid container direction="column" spacing={2}>
-                  {[
-                    {
-                      key: "revenue",
-                      label: "Tổng doanh thu (VNĐ)",
-                      start: "₫",
-                      step: 1,
-                    },
-                    { key: "gpm", label: "GPM (VNĐ)", start: "₫", step: 1 },
-                    { key: "totalOrders", label: "Tổng số đơn hàng", step: 1 },
-                    {
-                      key: "avgOrderValue",
-                      label: "Giá trị TB mỗi đơn (VNĐ)",
-                      start: "₫",
-                      step: 1,
-                    },
-                    { key: "totalViews", label: "Tổng lượt xem", step: 1 },
-                    {
-                      key: "viewsUnder1min",
-                      label: "Lượt xem < 1 phút",
-                      step: 1,
-                    },
-                    { key: "pcu", label: "PCU (đồng xem cao nhất)", step: 1 },
-                    {
-                      key: "avgViewDuration",
-                      label: "Thời gian xem trung bình (giây)",
-                      end: "giây",
-                      step: 1,
-                    },
-                    { key: "totalComments", label: "Tổng bình luận", step: 1 },
-                    {
-                      key: "productClickRate",
-                      label: "Tỷ lệ click sản phẩm (%)",
-                      end: "%",
-                      step: 0.01,
-                    },
-                    {
-                      key: "orderConversionRate",
-                      label: "Tỷ lệ chuyển đổi đơn hàng (%)",
-                      end: "%",
-                      step: 0.01,
-                    },
-                    { key: "buyers", label: "Số người mua hàng", step: 1 },
-                    {
-                      key: "productsSold",
-                      label: "Tổng sản phẩm đã bán",
-                      step: 1,
-                    },
-                  ].map((f) => (
-                    <MuiGrid key={f.key} item xs={12}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label={f.label}
-                        value={m[f.key]}
-                        onChange={(e) =>
-                          setM((s) => ({ ...s, [f.key]: e.target.value }))
-                        }
-                        InputLabelProps={{ shrink: true }}
-                        helperText=" "
-                        InputProps={{
-                          startAdornment: f.start ? (
-                            <InputAdornment position="start">
-                              {f.start}
-                            </InputAdornment>
-                          ) : undefined,
-                          endAdornment: f.end ? (
-                            <InputAdornment position="end">
-                              {f.end}
-                            </InputAdornment>
-                          ) : undefined,
-                        }}
-                        inputProps={{ step: f.step ?? 1 }}
-                      />
-                    </MuiGrid>
-                  ))}
-                </MuiGrid>
-              </DialogContent>
-
-              <DialogActions>
-                <MuiButton onClick={() => setMetricsOpen(false)}>Huỷ</MuiButton>
-                <MuiButton
-                  variant="contained"
-                  type="submit"
-                  disabled={isSubmitting}
-                >
-                  Lưu số liệu
-                </MuiButton>
-              </DialogActions>
-            </Box>
-          </Dialog>
+            worktimes={worktimes}
+            defaultWorktimeId={selectedWorktimeId}
+            submitting={isSubmitting}
+            onSubmit={handleSubmitMetrics}
+          />
         </Skeleton>
       )}
     </div>
