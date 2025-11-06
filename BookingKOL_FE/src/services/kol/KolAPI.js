@@ -406,21 +406,29 @@ const normalizeSlot = (slot, { isBooking }) => {
 
 const isCancelled = (st) => String(st || "").toUpperCase() === "CANCELLED";
 
-/** Flatten workTimes -> segments, bỏ CANCELLED; nếu không có workTimes => bỏ luôn */
+/** Flatten workTimes -> segments, giữ meta để popup dùng */
 const expandWorkTimes = (item) => {
-  if (!Array.isArray(item?.workTimes) || item.workTimes.length === 0) {
-    return []; // không có workTimes thì không hiển thị
-  }
+  if (!Array.isArray(item?.workTimes) || item.workTimes.length === 0) return [];
+
+  const availabilityId = item?.id ?? item?.availabilityId ?? null; // id record timeline cha
+  const bookingRequestId = item?.requestId ?? item?.bookingId ?? null;
+  const requestNumber = item?.requestNumber ?? null;
+
   return item.workTimes
     .filter((w) => !isCancelled(w?.status))
     .map((w) => ({
-      parentId: item?.id ?? item?.requestId ?? item?.bookingId,
-      bookingId: item?.id ?? item?.requestId ?? item?.bookingId,
+      // ==== META để click popup gọi API chính xác ====
+      availabilityId, // ✅ cần cho /v1/availabilities/time-line/{availabilityId}
+      parentId: availabilityId, // alias
+      bookingRequestId, // fallback gọi detail đơn khi cần
+      requestNumber, // hiển thị mã đơn
+
+      // ==== DỮ LIỆU HIỂN THỊ ====
       ...w,
       startAt: w.startAt,
       endAt: w.endAt,
-      id: w.id || `${item?.id}_${w.startAt}_${w.endAt}`,
-      title: item?.title || item?.requestNumber || item?.note || "Booking",
+      id: w.id || `${availabilityId}_${w.startAt}_${w.endAt}`, // unique cho React key
+      title: item?.title || requestNumber || item?.note || "Booking",
       description: item?.note ?? w?.note ?? "Ca booking",
       status: w?.status,
     }));
@@ -594,27 +602,39 @@ export const fetchDayDuties = async ({
     subtractMany(f, bookedSegments)
   );
 
-  // 3) Chuẩn hoá thành desc cho UI
+  // 3) Chuẩn hoá FREE thành desc cho UI
   const freeDescs = freeAfterSubtract.map((iv) =>
     normalizeSlot(
       { startAt: iv.startISO, endAt: iv.endISO },
       { isBooking: false }
     )
   );
-  // LƯU Ý: Booking hiển thị **giờ gốc**, không hiển thị phần buffer
-  const bookedDisplayIntervals = (bookedSlots || [])
-    .flatMap(expandWorkTimes)
-    .map(toISOInterval)
-    .filter(Boolean)
-    .filter((seg) => overlaps(seg.startISO, seg.endISO, start, end))
-    .sort((a, b) => a.startISO.localeCompare(b.startISO));
 
-  const bookedDescs = bookedDisplayIntervals.map((iv) =>
-    normalizeSlot(
+  // 3b) Chuẩn hoá BOOKING (giờ gốc) + GIỮ META để popup dùng
+  const bookedSegmentsWithMeta = (bookedSlots || [])
+    .flatMap(expandWorkTimes)
+    .map((seg) => ({ ...seg, __iv: toISOInterval(seg) }))
+    .filter((x) => x.__iv)
+    .filter(({ __iv }) => overlaps(__iv.startISO, __iv.endISO, start, end))
+    .sort((a, b) => a.__iv.startISO.localeCompare(b.__iv.startISO));
+
+  const bookedDescs = bookedSegmentsWithMeta.map((seg) => {
+    const iv = seg.__iv;
+    const base = normalizeSlot(
       { startAt: iv.startISO, endAt: iv.endISO },
       { isBooking: true }
-    )
-  );
+    );
+    return {
+      ...base,
+      // ✅ META cho popup
+      availabilityId: seg.availabilityId ?? seg.parentId ?? null,
+      parentId: seg.availabilityId ?? seg.parentId ?? null,
+      bookingRequestId:
+        seg.bookingRequestId ?? seg.requestId ?? seg.bookingId ?? null,
+      requestNumber: seg.requestNumber ?? seg.title ?? null,
+      status: seg.status ?? base.status,
+    };
+  });
 
   // 4) Build day map (luôn render)
   const map = emptyDayMap(start, end);
@@ -670,14 +690,13 @@ export const resolveAvatarUrl = (kol) => {
 };
 
 /* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
-/* ================== MY SINGLE BOOKING REQUESTS (KOL) ================== */
 const MY_SINGLE_REQUESTS_ALLOWED_PARAMS = new Set([
   "status",
+  "requestNumber",
   "startAt",
   "endAt",
   "createdAtFrom",
   "createdAtTo",
-  "requestNumber",
   "page",
   "size",
 ]);
@@ -685,13 +704,14 @@ const MY_SINGLE_REQUESTS_ALLOWED_PARAMS = new Set([
 const MY_SINGLE_REQUESTS_DEFAULT_PARAMS = { page: 0, size: 20 };
 
 const buildMySingleRequestsParams = (params = {}) => {
-  const merged = { ...MY_SINGLE_REQUESTS_DEFAULT_PARAMS, ...(params ?? {}) };
+  const merged = { ...MY_SINGLE_REQUESTS_DEFAULT_PARAMS, ...(params || {}) };
 
+  // Chuẩn hoá yyyy-MM-dd cho các trường ngày (nếu hợp lệ)
   const normalizeDate = (v) => {
-    if (!v) return v;
+    if (!v) return undefined;
     if (dayjs.isDayjs(v)) return v.format("YYYY-MM-DD");
     const d = dayjs(v);
-    return d.isValid() ? d.format("YYYY-MM-DD") : v;
+    return d.isValid() ? d.format("YYYY-MM-DD") : undefined;
   };
 
   const normalized = {
@@ -702,15 +722,32 @@ const buildMySingleRequestsParams = (params = {}) => {
     createdAtTo: normalizeDate(merged.createdAtTo),
   };
 
-  return Object.entries(normalized).reduce((acc, [key, value]) => {
-    if (!MY_SINGLE_REQUESTS_ALLOWED_PARAMS.has(key)) return acc;
-    const skip =
-      value === undefined ||
-      value === null ||
-      (typeof value === "string" && value.trim() === "");
-    if (!skip) acc[key] = value;
-    return acc;
-  }, {});
+  // status: cho phép truyền mảng hoặc string; Swagger là string → FE có thể gửi CSV
+  if (Array.isArray(merged.status)) {
+    const csv = merged.status
+      .filter(Boolean)
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(",");
+    normalized.status = csv || undefined;
+  } else if (typeof merged.status === "string") {
+    normalized.status = merged.status.trim() || undefined;
+  }
+
+  if (typeof merged.requestNumber === "string") {
+    normalized.requestNumber = merged.requestNumber.trim() || undefined;
+  }
+
+  // Loại bỏ key rỗng và chỉ giữ các key được phép
+  const out = {};
+  for (const [key, value] of Object.entries(normalized)) {
+    if (!MY_SINGLE_REQUESTS_ALLOWED_PARAMS.has(key)) continue;
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    out[key] = value;
+  }
+  return out;
 };
 
 export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
@@ -718,32 +755,11 @@ export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
 
   const payload = await get({
     url: CLIENT_API_PATHS.BOOKING.mySingleRequestsAll,
-    params: reqParams, // ví dụ: { page, size, status: ['IN_PROGRESS','REQUESTED',...] }
-    config: {
-      ...(signal ? { signal } : {}),
-      // ✅ serialize mảng theo dạng repeat, không cần qs
-      paramsSerializer: {
-        serialize: (p) => {
-          const u = new URLSearchParams();
-          Object.entries(p || {}).forEach(([k, v]) => {
-            if (v == null) return;
-            if (Array.isArray(v)) {
-              v.forEach((it) => {
-                if (it == null || String(it).trim() === "") return;
-                u.append(k, it);
-              });
-            } else {
-              if (typeof v === "string" && v.trim() === "") return;
-              u.append(k, v);
-            }
-          });
-          return u.toString();
-        },
-      },
-    },
+    params: reqParams, // ví dụ: { page:0, size:20, status:"IN_PROGRESS,REQUESTED" }
+    config: signal ? { signal } : undefined,
   });
 
-  // payload?.data có thể là envelope {status, message, data} hoặc page object hoặc array
+  // Hỗ trợ cả envelope { status, message, data } hoặc trả thẳng page object/array
   const raw = payload?.data;
   const data = raw?.data ?? raw;
 
@@ -786,20 +802,24 @@ export const getMySingleBookingRequests = async ({ signal, params } = {}) => {
       ? data.size
       : MY_SINGLE_REQUESTS_DEFAULT_PARAMS.size;
 
-  const normalized = { content, totalElements: total, page, size };
+  const normalizedResult = { content, totalElements: total, page, size };
   const originalObject =
     data && typeof data === "object" && !Array.isArray(data) ? data : {};
 
+  // Trả về 2 dạng đồng nhất (để nơi dùng dễ đọc .data.content / .content đều OK)
   return {
     ...originalObject,
-    ...normalized,
+    ...normalizedResult,
     data: {
       ...originalObject,
-      ...normalized,
+      ...normalizedResult,
     },
   };
 };
 
+/** GET chi tiết booking single của KOL
+ *  Endpoint: /v1/kol/booking/single-requests/detail/{requestId}
+ */
 export const getKolMySingleRequestDetail = async (
   requestId,
   { signal } = {}
@@ -810,8 +830,6 @@ export const getKolMySingleRequestDetail = async (
     encodeURIComponent(requestId)
   );
 
-  // axios-config `get` thường trả về envelope { status, message, data }
-  // nhưng vẫn xử lý an toàn nếu nhận thẳng `data`
   const payload = await get({
     url,
     config: signal ? { signal } : undefined,
@@ -827,7 +845,6 @@ export const getKolMySingleRequestDetail = async (
     throw err;
   }
 
-  // Nếu là envelope → trả raw.data; nếu BE trả thẳng object → trả raw
   return raw?.data ?? raw ?? null;
 };
 
@@ -851,4 +868,22 @@ export const changeKolAvatarNew = async (file, opts = {}) => {
   });
 
   return payload?.data ?? null;
+};
+
+/** Ưu tiên dùng để xem chi tiết booking theo availabilityId (timeline id) */
+export const getAvailabilityTimelineById = async (
+  availabilityId,
+  { signal } = {}
+) => {
+  if (!availabilityId) throw new Error("availabilityId is required");
+  // Gọi trực tiếp endpoint timeline theo id
+  const url = `/v1/availabilities/time-line/${encodeURIComponent(
+    availabilityId
+  )}`;
+  const payload = await get({ url, config: signal ? { signal } : undefined });
+
+  const body = payload?.data ?? payload;
+  const data = body?.data ?? body;
+  // BE đôi khi trả mảng → lấy phần tử đầu
+  return Array.isArray(data) ? data[0] ?? null : data ?? null;
 };

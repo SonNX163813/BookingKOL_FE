@@ -1,4 +1,3 @@
-// src/components/kol/kol-schedule/DayGrid.jsx
 import React, { useMemo, useState } from "react";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -37,20 +36,18 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
     { length: 24 },
     (_, i) => `${String(i).padStart(2, "0")}:00`
   );
-
-  // phải là dayjs object
   const refDate = dayjs(fromDate);
 
   const weekDates = useMemo(() => {
     if (range === "week") {
-      const start = refDate.startOf("isoWeek"); // Monday
+      const start = refDate.startOf("isoWeek");
       return Array.from({ length: 7 }, (_, i) => {
         const d = start.add(i, "day");
         return {
           day: d.format("DD"),
           month: d.format("MM"),
           year: d.format("YYYY"),
-          weekday: d.isoWeekday(), // 1..7
+          weekday: d.isoWeekday(),
         };
       });
     }
@@ -67,7 +64,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
 
   const allLaidOutTasksByDay = useMemo(() => {
     const layouts = new Map();
-
     weekDates.forEach((weekDate) => {
       const tasksForThisDay =
         dayDuties?.goalList
@@ -93,7 +89,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
         })
         .sort((a, b) => a.startMinutes - b.startMinutes);
 
-      // tính overlap
       for (let i = 0; i < events.length; i++) {
         for (let j = i + 1; j < events.length; j++) {
           const a = events[i],
@@ -105,7 +100,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
         }
       }
 
-      // gán columnIndex
       for (const e of events) {
         const occupied = e.collisions
           .map((c) => c.columnIndex)
@@ -166,7 +160,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
     setPopupDayInfo(null);
   };
 
-  // GMT (tuỳ chọn)
   const timeZoneOffset = new Date().getTimezoneOffset();
   const offsetHours = -timeZoneOffset / 60;
   const gmtString = `GMT${offsetHours >= 0 ? " +" : ""}${String(
@@ -196,7 +189,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
               )}
               style={{ overflow: "visible" }}
             >
-              {/* Header thứ/ngày (tuần) */}
               {weekDates.length <= 1 ? null : (
                 <div className="flex flex-col justify-center items-center text-lg font-bold">
                   <p className="uppercase whitespace-nowrap">
@@ -206,7 +198,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                 </div>
               )}
 
-              {/* Grid nền theo giờ (không bắt click) */}
               <div
                 className={clsx(
                   "absolute left-0 right-0 pointer-events-none",
@@ -221,14 +212,12 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                 }}
               />
 
-              {/* Cột giờ + tasks */}
               <div
                 className={clsx(
                   "relative w-full",
                   range === "day" ? "mt-[118px]" : "mt-[63px]"
                 )}
               >
-                {/* Cột giờ bên trái */}
                 <div className="flex flex-col w-full items-center">
                   {hours.map((hour) => (
                     <div
@@ -252,7 +241,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                   ))}
                 </div>
 
-                {/* Layer chứa tasks (được click) */}
                 <div className="absolute top-0 left-0 right-0 bottom-0 z-10">
                   <div
                     className={clsx(
@@ -267,7 +255,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                           .toLowerCase()
                           .includes("book");
                       const hhmm = (t) => (t ? t.slice(0, 5) : "");
-
                       return (
                         <div
                           key={item.id}
@@ -292,11 +279,9 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                             className="h-full w-full rounded-xl p-2 text-white overflow-hidden border-2 border-white/60 shadow-sm"
                             style={{ backgroundColor: item.colorCode }}
                           >
-                            {/* Title */}
                             <p className="font-bold text-xs truncate text-white">
                               {isBooking ? item.description : "Lịch rảnh"}
                             </p>
-                            {/* Time line */}
                             {isBooking ? (
                               <p className="text-xs text-white truncate mt-0.5">
                                 {hhmm(item.startTime)} – {hhmm(item.endTime)}
@@ -319,7 +304,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
         })}
       </div>
 
-      {/* GMT header (optional) */}
       <div className="mt-3 w-full flex flex-col gap-8 absolute left-2 lg:left-[-22px] top-23 z-0">
         <div className="flex justify-center items-center gap-3 h-[56px] w-full !w-[calc(100%-40px)] absolute top-[-48px] lg:left-[30px]">
           <p className="text-[14px] !-mt-12">{gmtString}</p>
@@ -327,7 +311,6 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
         </div>
       </div>
 
-      {/* ======= POPUP TÁCH RIÊNG (portal qua antd) ======= */}
       <TaskPopup
         isDisplay={!!popupItem}
         goalDetails={popupItem}

@@ -66,6 +66,7 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
   { label: "Đã thanh toán", value: "PAID" }, // ✅ thêm PAID
+  { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 
 /* ------------------------- PAYMENT STATUS ------------------------- */
@@ -76,6 +77,7 @@ const PAYMENT_STATUS_OPTIONS = [
   { label: "Thanh toán thừa", value: "OVERPAID" },
   { label: "Đã hết hạn thanh toán", value: "EXPIRED" },
   { label: "Đã hủy thanh toán", value: "CANCELLED" },
+  { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 
 const PAYMENT_STATUS_COLOR = {
@@ -85,6 +87,7 @@ const PAYMENT_STATUS_COLOR = {
   OVERPAID: "purple",
   EXPIRED: "volcano",
   CANCELLED: "error",
+  REFUNDED: "purple",
 };
 
 /* ------------------------- TAG COLORS ------------------------- */
@@ -96,6 +99,7 @@ const STATUS_TAG_COLOR = {
   EXPIRED: "volcano",
   CANCELLED: "error",
   PAID: "success", // ✅ màu cho PAID
+  REFUNDED: "purple",
 };
 
 /* ------------------------- HELPERS ------------------------- */

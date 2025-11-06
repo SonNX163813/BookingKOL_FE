@@ -17,6 +17,7 @@ import {
   PersonOutline,
   CollectionsOutlined,
   EditCalendarOutlined,
+  ChangeCircleOutlined, // ✅ NEW
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 
@@ -65,6 +66,12 @@ export default function MainLayoutKOL() {
       {
         key: "kol-schedule-register",
         path: "/kol/schedule/register",
+        parentKey: "group-schedule",
+      },
+      // ✅ NEW: Schedule change
+      {
+        key: "kol-schedule-change",
+        path: "/kol/schedule/change",
         parentKey: "group-schedule",
       },
 
@@ -119,6 +126,12 @@ export default function MainLayoutKOL() {
           icon: <EditCalendarOutlined />,
           label: <Link to="schedule/register">Đăng ký lịch làm</Link>,
         },
+        // ✅ NEW: menu item “Thay đổi lịch làm”
+        {
+          key: "kol-schedule-change",
+          icon: <ChangeCircleOutlined />,
+          label: <Link to="schedule/change">Thay đổi lịch làm</Link>,
+        },
       ],
     },
     {
@@ -126,7 +139,6 @@ export default function MainLayoutKOL() {
       icon: <ShoppingBagOutlined />,
       label: "Đơn booking",
       children: [
-        // ✅ Link đúng
         {
           key: "kol-single-requests-all",
           icon: <ShoppingBagOutlined />,

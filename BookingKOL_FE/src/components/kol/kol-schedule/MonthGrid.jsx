@@ -1,4 +1,3 @@
-// src/components/scheduler/MonthGrid.jsx
 import React, { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -12,7 +11,6 @@ dayjs.extend(isoWeek);
 
 const BORDER = "#93cef6";
 const OUTER_BG = "#eef6ff";
-
 const WEEKDAYS_MON2SUN = [
   "THỨ HAI",
   "THỨ BA",
@@ -23,7 +21,6 @@ const WEEKDAYS_MON2SUN = [
   "CHỦ NHẬT",
 ];
 
-// Tạo grid tháng bắt đầu từ THỨ HAI (isoWeek)
 function buildMonthDaysMondayFirst(fromDate) {
   const m = dayjs(fromDate);
   const start = m.startOf("month").startOf("isoWeek");
@@ -40,7 +37,7 @@ function buildMonthDaysMondayFirst(fromDate) {
       month: d.format("MM"),
       year: d.format("YYYY"),
       isCurrentMonth: d.month() === m.month(),
-      isoWeekday: d.isoWeekday(), // 1..7 (Mon..Sun)
+      isoWeekday: d.isoWeekday(),
     });
   }
   return days;
@@ -52,7 +49,6 @@ export default function MonthGrid({
   fromDate,
 }) {
   const days = buildMonthDaysMondayFirst(fromDate);
-
   const { t } = useTranslation();
   const tWeekdays = t("calendar.weekdaysUpperMon2Sun", { returnObjects: true });
   const weekdays =
@@ -63,16 +59,14 @@ export default function MonthGrid({
   const [popupIndex, setPopupIndex] = useState("");
   const [viewedDay, setViewedDay] = useState(null);
 
-  // Chia theo tuần & bỏ hàng cuối nếu toàn ngày ngoài tháng
   const weeks = useMemo(() => {
     const chunks = [];
     for (let i = 0; i < days.length; i += 7) chunks.push(days.slice(i, i + 7));
     if (
       chunks.length &&
       chunks[chunks.length - 1].every((d) => !d.isCurrentMonth)
-    ) {
+    )
       chunks.pop();
-    }
     return chunks;
   }, [days]);
 
@@ -93,7 +87,6 @@ export default function MonthGrid({
             minHeight: 480,
           }}
         >
-          {/* Header thứ (Mon→Sun) */}
           <div className="grid grid-cols-7 gap-2 md:gap-3 px-1 pb-2">
             {weekdays.map((day) => (
               <div
@@ -105,7 +98,6 @@ export default function MonthGrid({
             ))}
           </div>
 
-          {/* Lưới theo tuần (Mon→Sun) */}
           <div className="flex flex-col gap-2 md:gap-3 h-[calc(100%-40px)]">
             {weeks.map((row, rowIdx) => (
               <div
@@ -124,7 +116,7 @@ export default function MonthGrid({
                   const hiddenCount = allDescriptions.length - 3;
 
                   const weekDate = {
-                    weekday: weekdays[colIdx], // Mon..Sun
+                    weekday: weekdays[colIdx],
                     day: day.day,
                     month: day.month,
                     year: day.year,
@@ -155,11 +147,13 @@ export default function MonthGrid({
                               .includes("book");
                           const hhmm = (t) => (t ? t.slice(0, 5) : "");
 
+                          const handleClick = () => setPopupIndex(item.id);
+
                           return (
                             <div
                               key={item.id}
                               className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-gray-50 cursor-pointer"
-                              onClick={() => setPopupIndex(item.id)}
+                              onClick={handleClick}
                               role="button"
                               tabIndex={0}
                             >
@@ -217,6 +211,7 @@ export default function MonthGrid({
         </div>
       </div>
 
+      {/* Popup danh sách trong ngày */}
       <DayTasksPopup details={viewedDay} onClose={() => setViewedDay(null)} />
     </>
   );

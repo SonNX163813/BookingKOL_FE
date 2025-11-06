@@ -67,6 +67,11 @@ const MainLayoutAdmin = () => {
       pattern: /^\/admin\/management-booking-requests(\/)?$/,
       key: "management-booking-requests",
     },
+    // NEW: highlight cho trang Campaign (kể cả các route con sau này)
+    {
+      pattern: /^\/admin\/management-booking-campaigns(\/|$)/,
+      key: "management-booking-campaigns",
+    },
     {
       pattern: /^\/admin\/management-refunds(\/)?$/,
       key: "management-refunds",
@@ -148,6 +153,16 @@ const MainLayoutAdmin = () => {
           icon: <CalendarMonthOutlined />,
           label: (
             <Link to="management-booking-requests">Quản lý booking lẻ</Link>
+          ),
+        },
+        // NEW: nút vào trang Campaign
+        {
+          key: "management-booking-campaigns",
+          icon: <BarChartOutlined />,
+          label: (
+            <Link to="management-booking-campaigns">
+              Quản lý booking Campaign
+            </Link>
           ),
         },
       ],

@@ -10,10 +10,10 @@ export default function DayTasksPopup({ details, onClose }) {
   const sorted = [...tasks].sort((a, b) =>
     a.startTime.localeCompare(b.startTime)
   );
+  const hhmm = (t) => (t ? t.slice(0, 5) : "");
 
   return (
     <div>
-      {/* Popup task chi tiết (nổi trên) */}
       <div className="fixed z-[9999] flex justify-center items-center right-[40%] top-[40%]">
         {selectedTask && (
           <TaskPopup
@@ -28,7 +28,6 @@ export default function DayTasksPopup({ details, onClose }) {
         )}
       </div>
 
-      {/* Overlay + card danh sách */}
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-sm flex justify-center items-center z-[9998]"
         onClick={onClose}
@@ -61,8 +60,6 @@ export default function DayTasksPopup({ details, onClose }) {
                 String(task?.status || "")
                   .toLowerCase()
                   .includes("book");
-              const hhmm = (t) => (t ? t.slice(0, 5) : "");
-
               return (
                 <div
                   key={task.id}
@@ -93,7 +90,6 @@ export default function DayTasksPopup({ details, onClose }) {
                 </div>
               );
             })}
-
             {!sorted.length && (
               <div className="text-center text-gray-500">
                 Không có lịch trong ngày

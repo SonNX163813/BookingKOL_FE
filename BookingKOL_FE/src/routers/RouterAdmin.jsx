@@ -1,3 +1,4 @@
+// src/router/routerAdmin.jsx
 import { Navigate } from "react-router-dom";
 import LoginPage from "../pages/authentication/LoginPage";
 import MainLayoutAdmin from "../layouts/MainLayoutAdmin";
@@ -19,8 +20,11 @@ import EditKOL from "../pages/admin/management-user/management-kol/EditKOL";
 import KolPortfolioPage from "../pages/admin/management-user/management-kol/KolPortfolioPage";
 import CreateKOL from "../pages/admin/management-user/management-kol/CreateKOL";
 import AdminKolBookingById from "../pages/admin/management-user/management-kol/AdminKolBookingById";
-// 👇 thêm import trang xem lịch KOL (đặt file ở đúng folder bạn dùng)
 import AdminViewKolSchedule from "../pages/admin/management-user/management-kol/AdminViewKolSchedule";
+
+// Campaign pages
+import ManagementBookingCampaigns from "../pages/admin/booking-campaign/ManagementBookingCampaigns";
+import EditBookingCampaign from "../pages/admin/booking-campaign/EditBookingCampain"; // 👈 mới
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -35,7 +39,6 @@ export const routerAdmin = [
       { path: "management-customer/:id", element: <UserDetailPage /> },
 
       { path: "management-kol", element: <ManagementKOL /> },
-      // 👇 route mới để Admin xem lịch của KOL
       { path: "kols/:kolId/schedule", element: <AdminViewKolSchedule /> },
 
       { path: "kols/create", element: <CreateKOL /> },
@@ -46,19 +49,25 @@ export const routerAdmin = [
         path: "management-booking-requests",
         element: <ManagementBookingRequests />,
       },
-      {
-        path: "management-refunds",
-        element: <ManagementRefundRequests />,
-      },
+      { path: "management-refunds", element: <ManagementRefundRequests /> },
       {
         path: "management-booking-requests/:requestId",
         element: <BookingRequestDetail />,
       },
+
       { path: "management-course", element: <ManagementCourse /> },
       { path: "edit-detail-course/:id", element: <ViewDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },
       { path: "create-course", element: <CreateCoursePage /> },
       { path: "kols/:kolId/bookings", element: <AdminKolBookingById /> },
+
+      // Campaign
+      {
+        path: "management-booking-campaigns",
+        element: <ManagementBookingCampaigns />,
+      },
+
+      { path: "bookings/create", element: <EditBookingCampaign /> }, // 👈 mới
     ],
   },
 

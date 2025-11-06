@@ -12,6 +12,7 @@ import KolWorkRegistration from "../pages/kol/KolWorkRegistration";
 // 👇 import ĐÚNG file + alias trùng với JSX bạn dùng
 import KolSingleRequest from "../pages/kol/KolSingleRequest";
 import KolSingleRequestDetail from "../pages/kol/KolSingleRequestDetail";
+import KolScheduleChange from "../pages/kol/KolScheduleChange";
 
 export const routerKOL = [
   {
@@ -33,7 +34,10 @@ export const routerKOL = [
         element: <KolWorkRegistration />,
       },
       { path: "settings", element: <KolSettings /> },
-
+      {
+        path: "schedule/change/:kolId?/:kolName?",
+        element: <KolScheduleChange />,
+      },
       // Detail
       {
         path: "booking/single-requests/detail/:requestId",

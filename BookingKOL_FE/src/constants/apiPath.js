@@ -38,6 +38,10 @@ export const API_PATHS = {
     createBookingPackage: "/v1/bookings/packages",
     getHistoryBookingPackage: "/v1/user/bookings",
   },
+  BOOKING_CAMPAIGN: {
+    list: "/v1/admin/bookings", // nếu Swagger của bạn KHÔNG có /v1 thì đổi thành "/admin/bookings"
+    create: "/v1/admin/bookings/create",
+  },
   BOOKING_REQUEST: {
     getAll: "/v1/admin/booking/single-requests/all",
     getDetail: "/v1/admin/booking/single-requests/detail",
