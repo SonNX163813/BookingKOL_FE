@@ -42,6 +42,10 @@ export const API_PATHS = {
     getAll: "/v1/admin/booking/single-requests/all",
     getDetail: "/v1/admin/booking/single-requests/detail",
     getAllByKol: "/v1/admin/booking/single-requests/all/by-kol",
+    getWorktimeLivestreamMetrics: (worktimeId) =>
+      `v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
+        worktimeId
+      )}`,
   },
   SCHEDULER_ADMIN: {
     // Admin xem free-time của KOL
@@ -51,5 +55,7 @@ export const API_PATHS = {
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",
+    getDetail: "/v1/admin/refunds/detail",
+    confirm: "/v1/admin/refunds/confirm",
   },
 };

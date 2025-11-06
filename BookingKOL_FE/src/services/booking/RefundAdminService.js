@@ -1,4 +1,4 @@
-import { get } from "../../config/axios-config";
+import { get, patch, post } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 
 const normalizeParam = (value) => {
@@ -25,6 +25,29 @@ export const getAllRefundRequests = async ({
       page,
       size,
       status: normalizeParam(status),
+    },
+  });
+};
+
+export const getRefundRequestDetail = async (refundId) => {
+  if (!refundId) {
+    throw new Error("refundId is required to fetch refund detail");
+  }
+
+  return await get({
+    url: `${API_PATHS.REFUND.getDetail}/${refundId}`,
+  });
+};
+
+export const confirmRefundRequest = async ({ refundId } = {}) => {
+  if (!refundId) {
+    throw new Error("refundId is required to confirm refund request");
+  }
+
+  return await patch({
+    url: `${API_PATHS.REFUND.confirm}/${refundId}`,
+    config: {
+      skipSuccessToast: true,
     },
   });
 };

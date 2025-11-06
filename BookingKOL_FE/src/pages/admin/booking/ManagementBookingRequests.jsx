@@ -21,63 +21,16 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useGetAllBookingRequests } from "../../../hook/admin/booking/useGetAllBookingRequests";
+import {
+  BOOKING_STATUS_LABEL,
+  BOOKING_STATUS_OPTIONS,
+  PAYMENT_STATUS_COLOR,
+  PAYMENT_STATUS_LABEL,
+  PAYMENT_STATUS_OPTIONS,
+  STATUS_TAG_COLOR,
+} from "../../../constants/mySingleBookingStatuses";
 
 const { RangePicker } = DatePicker;
-
-/* ------------------------- DANH SÁCH TRẠNG THÁI BOOKING ------------------------- */
-const BOOKING_STATUS_OPTIONS = [
-  { label: "Bản nháp", value: "DRAFT" },
-  { label: "Đã gửi yêu cầu", value: "REQUESTED" },
-  { label: "Đang thương lượng", value: "NEGOTIATING" },
-  { label: "Đã chấp nhận", value: "ACCEPTED" },
-  { label: "Từ chối", value: "REJECTED" },
-  { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã ký hợp đồng", value: "CONTRACT_SIGNED" },
-  { label: "Đang thực hiện", value: "IN_PROGRESS" },
-  { label: "Đã giao", value: "DELIVERED" },
-  { label: "Hoàn tất", value: "COMPLETED" },
-  { label: "Có tranh chấp", value: "DISPUTED" },
-  { label: "Hết hạn", value: "EXPIRED" },
-];
-
-/* ------------------------- DANH SÁCH TRẠNG THÁI THANH TOÁN ------------------------- */
-const PAYMENT_STATUS_OPTIONS = [
-  { label: "Đã thanh toán", value: "PAID" },
-  { label: "Chờ thanh toán", value: "PENDING" },
-  { label: "Đang xử lý", value: "PROCESSING" },
-  { label: "Hoàn tất", value: "COMPLETED" },
-  { label: "Thất bại", value: "FAILED" },
-  { label: "Hết hạn", value: "EXPIRED" },
-  { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã hoàn tiền", value: "REFUNDED" },
-];
-
-/* ------------------------- MÀU TAG ------------------------- */
-const STATUS_TAG_COLOR = {
-  DRAFT: "default",
-  REQUESTED: "processing",
-  NEGOTIATING: "cyan",
-  ACCEPTED: "success",
-  REJECTED: "error",
-  CANCELLED: "warning",
-  CONTRACT_SIGNED: "blue",
-  IN_PROGRESS: "processing",
-  DELIVERED: "gold",
-  COMPLETED: "success",
-  DISPUTED: "magenta",
-  EXPIRED: "volcano",
-};
-
-const PAYMENT_STATUS_COLOR = {
-  PAID: "success",
-  PENDING: "processing",
-  PROCESSING: "processing",
-  COMPLETED: "success",
-  FAILED: "error",
-  EXPIRED: "volcano",
-  CANCELLED: "warning",
-  REFUNDED: "purple",
-};
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
@@ -359,8 +312,9 @@ const ManagementBookingRequests = () => {
         render: (status) => {
           const normalized = status?.toUpperCase();
           const displayLabel =
-            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ||
-            normalized ||
+            BOOKING_STATUS_LABEL?.[normalized] ??
+            BOOKING_STATUS_OPTIONS.find((s) => s.value === normalized)?.label ??
+            normalized ??
             "--";
           return (
             <Tag color={STATUS_TAG_COLOR[normalized] ?? "default"}>
@@ -383,7 +337,8 @@ const ManagementBookingRequests = () => {
             return "--";
           }
           const displayLabel =
-            PAYMENT_STATUS_OPTIONS.find((p) => p.value === normalized)?.label ||
+            PAYMENT_STATUS_LABEL?.[normalized] ??
+            PAYMENT_STATUS_OPTIONS.find((p) => p.value === normalized)?.label ??
             normalized;
           return (
             <Tag color={PAYMENT_STATUS_COLOR[normalized] ?? "default"}>

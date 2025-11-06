@@ -10,12 +10,14 @@ import {
   Empty,
   Form,
   Input,
+  Select,
   Skeleton,
   Space,
   Table,
   Tag,
   Typography,
   Upload,
+  Grid,
 } from "antd";
 import {
   ArrowLeft,
@@ -29,6 +31,9 @@ import { useGetMySingleBookingRequestDetail } from "../../../hook/user/booking/u
 import { UploadOutlined } from "@ant-design/icons";
 import { useUpdateMySingleBookingRequest } from "../../../hook/user/booking/useUpdateMySingleBookingRequest";
 import UserKolFeedbackSection from "../../../components/home/booking/UserKolFeedbackSection";
+import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
+import { useGetWorktimeLivestreamMetrics } from "../../../hook/user/booking/useGetWorktimeLivestreamMetrics";
+import { useConfirmMyWorktimeLivestreamMetrics } from "../../../hook/user/booking/useConfirmMyWorktimeLivestreamMetrics";
 import {
   BOOKING_STATUS_LABEL,
   STATUS_TAG_COLOR,
@@ -37,6 +42,9 @@ import {
 } from "../../../constants/mySingleBookingStatuses";
 
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
+
+const OTHER_PLATFORM_VALUE = "__OTHER_PLATFORM__";
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
   value ? (dayjs(value).isValid() ? dayjs(value).format(pattern) : "--") : "--";
@@ -73,9 +81,104 @@ const formatArray = (v) => (Array.isArray(v) && v.length ? v.join(", ") : "--");
 const normalizeStatus = (s) =>
   s && typeof s === "string" ? s.toUpperCase() : s;
 
+const formatBoolean = (value) => {
+  if (value === null || value === undefined) return "--";
+  return value ? "Yes" : "No";
+};
+
+const LIVESTREAM_METRIC_LABELS = [
+  { key: "revenue", label: "Tổng doanh thu" },
+  { key: "gpm", label: "GPM" },
+  { key: "avgOrderValue", label: "Giá trị TB mỗi đơn" },
+  { key: "totalOrders", label: "Tổng đơn hàng" },
+  { key: "buyers", label: "Số người mua" },
+  { key: "productsSold", label: "Các mặt hàng được bán" },
+  { key: "totalViews", label: "Tổng lượt xem" },
+  { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút" },
+  { key: "viewsUnder1min", label: "Lượt xem < 1 phút" },
+  { key: "pcu", label: "PCU (đồng xem cao nhất)" },
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)" },
+  { key: "commentsIn1min", label: "BL trong 1 phút" },
+  { key: "totalComments", label: "Tổng bình luận" },
+  { key: "productClickRate", label: "Tỷ lệ click SP" },
+  { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn" },
+];
+
+const formatLivestreamMetricValue = (key, value) => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  if (key === "revenue" || key === "avgOrderValue") {
+    return formatCurrency(value);
+  }
+
+  if (key === "isConfirmed") {
+    return formatBoolean(value);
+  }
+
+  if (key === "createdAt" || key === "confirmedAt") {
+    return formatDateTime(value);
+  }
+
+  return value;
+};
+
+const isMissingLivestreamMetricError = (error) => {
+  const response = error?.response;
+  if (!response) {
+    return false;
+  }
+
+  const { status, data } = response;
+  if (![400, 404].includes(status)) {
+    return false;
+  }
+
+  const rawMessage = data?.message;
+  const messages = Array.isArray(rawMessage)
+    ? rawMessage
+    : typeof rawMessage === "string"
+    ? [rawMessage]
+    : [];
+
+  const normalizedMessages = messages
+    .filter((message) => typeof message === "string")
+    .map((message) => message.toLowerCase());
+
+  const keywords = ["livestream metric", "không tìm thấy", "not found"];
+  const hasMissingMetricMessage = normalizedMessages.some((message) =>
+    keywords.some((keyword) => message.includes(keyword))
+  );
+
+  const hasDataProperty = Object.prototype.hasOwnProperty.call(
+    data ?? {},
+    "data"
+  );
+  const isEmptyPayload = hasDataProperty && data?.data === null;
+
+  if (hasMissingMetricMessage) {
+    return true;
+  }
+
+  if (isEmptyPayload && normalizedMessages.length === 0) {
+    return true;
+  }
+
+  return false;
+};
+
+const resolveWorktimeId = (worktime) =>
+  worktime?.id ??
+  worktime?.worktimeId ??
+  worktime?.workTimeId ??
+  worktime?.work_time_id ??
+  null;
+
 const MySingleBookingRequestDetail = () => {
   const navigate = useNavigate();
   const { requestId } = useParams();
+  const screens = useBreakpoint();
 
   const {
     isLoadingMyBookingRequestDetail,
@@ -88,9 +191,63 @@ const MySingleBookingRequestDetail = () => {
     isUpdatingMySingleBookingRequest,
     handleUpdateMySingleBookingRequest,
   } = useUpdateMySingleBookingRequest();
+  const { platforms, isLoadingPlatforms } = useGetPlatforms();
   const [updateForm] = Form.useForm();
   const [newAttachments, setNewAttachments] = useState([]);
   const [fileIdsToDelete, setFileIdsToDelete] = useState([]);
+  const [confirmingWorktimeId, setConfirmingWorktimeId] = useState(null);
+
+  const platformOptions = useMemo(() => {
+    const unique = new Map();
+    (platforms ?? []).forEach((item) => {
+      const labelRaw =
+        typeof item?.name === "string" && item.name.trim().length > 0
+          ? item.name.trim()
+          : typeof item?.key === "string" && item.key.trim().length > 0
+          ? item.key.trim()
+          : "";
+      if (!labelRaw) return;
+      const normalizedKey = labelRaw.toLowerCase();
+      if (!unique.has(normalizedKey)) {
+        unique.set(normalizedKey, {
+          value: labelRaw,
+          label: labelRaw,
+        });
+      }
+    });
+    return Array.from(unique.values());
+  }, [platforms]);
+
+  const platformValueMap = useMemo(() => {
+    const map = new Map();
+    platformOptions.forEach((option) => {
+      map.set(option.value.toLowerCase(), option.value);
+    });
+    return map;
+  }, [platformOptions]);
+
+  const platformSelectOptions = useMemo(
+    () => [
+      ...platformOptions,
+      {
+        value: OTHER_PLATFORM_VALUE,
+        label: "Khác (nhập tay)",
+      },
+    ],
+    [platformOptions]
+  );
+
+  const selectedPlatform = Form.useWatch("platform", updateForm);
+  const showCustomPlatformInput = selectedPlatform === OTHER_PLATFORM_VALUE;
+
+  const handlePlatformChange = useCallback(
+    (value) => {
+      if (value !== OTHER_PLATFORM_VALUE) {
+        updateForm.setFieldsValue({ platformOther: "" });
+      }
+    },
+    [updateForm]
+  );
 
   const detail = myBookingRequestDetailResponse?.data ?? null;
   const contracts = Array.isArray(detail?.contracts)
@@ -99,6 +256,79 @@ const MySingleBookingRequestDetail = () => {
   const attachedFiles = Array.isArray(detail?.attachedFiles)
     ? detail.attachedFiles.filter(Boolean)
     : [];
+  const worktimes = useMemo(
+    () =>
+      Array.isArray(detail?.kolWorkTimes)
+        ? detail.kolWorkTimes.filter(Boolean)
+        : [],
+    [detail?.kolWorkTimes]
+  );
+  const worktimeIds = useMemo(
+    () =>
+      worktimes
+        .map((worktime) => resolveWorktimeId(worktime))
+        .filter((id) => id !== null && id !== undefined),
+    [worktimes]
+  );
+
+  const {
+    worktimeLivestreamMetricsMap,
+    worktimeLivestreamMetricQueries,
+    resolvedWorktimeIds,
+    isLoadingWorktimeLivestreamMetrics,
+    isFetchingWorktimeLivestreamMetrics,
+  } = useGetWorktimeLivestreamMetrics(worktimeIds, {
+    enabled:
+      !isLoadingMyBookingRequestDetail &&
+      !isFetchingMyBookingRequestDetail &&
+      worktimeIds.length > 0,
+    retry: false,
+    staleTime: Infinity, // dữ liệu luôn “tươi”, React Query không refetch lại
+    cacheTime: Infinity, // giữ cache vĩnh viễn
+    refetchOnWindowFocus: false, // không refetch khi quay lại tab
+    refetchOnMount: false, // không refetch khi re-render lại trang
+    refetchOnReconnect: false, // không refetch khi reconnect mạng
+  });
+
+  const findQueryByWorktimeId = useCallback(
+    (worktimeId) => {
+      if (worktimeId === null || worktimeId === undefined) {
+        return null;
+      }
+
+      const normalizedTarget = String(worktimeId);
+      const index = resolvedWorktimeIds.findIndex(
+        (id) => String(id) === normalizedTarget
+      );
+
+      return index >= 0 ? worktimeLivestreamMetricQueries[index] : null;
+    },
+    [resolvedWorktimeIds, worktimeLivestreamMetricQueries]
+  );
+
+  const {
+    isConfirmingWorktimeLivestreamMetrics,
+    handleConfirmWorktimeLivestreamMetrics,
+  } = useConfirmMyWorktimeLivestreamMetrics();
+
+  const handleConfirmMetrics = useCallback(
+    async (worktimeId, query) => {
+      if (worktimeId === null || worktimeId === undefined) return;
+      setConfirmingWorktimeId(worktimeId);
+      try {
+        await handleConfirmWorktimeLivestreamMetrics(worktimeId);
+        if (query?.refetch) {
+          await query.refetch();
+        }
+        await refetchMyBookingRequestDetail();
+      } catch (error) {
+        // handled by interceptors
+      } finally {
+        setConfirmingWorktimeId(null);
+      }
+    },
+    [handleConfirmWorktimeLivestreamMetrics, refetchMyBookingRequestDetail]
+  );
   const formattedAttachments = useMemo(
     () =>
       attachedFiles
@@ -141,8 +371,18 @@ const MySingleBookingRequestDetail = () => {
     navigate("/don-booking-kol");
   }, [navigate]);
 
-  const updateFormInitialValues = useMemo(
-    () => ({
+  const updateFormInitialValues = useMemo(() => {
+    const rawPlatform =
+      typeof detail?.platform === "string" && detail.platform.trim().length > 0
+        ? detail.platform.trim()
+        : typeof detail?.contact?.platform === "string" &&
+          detail.contact.platform.trim().length > 0
+        ? detail.contact.platform.trim()
+        : "";
+    const matchedPlatform =
+      rawPlatform && platformValueMap.get(rawPlatform.toLowerCase());
+
+    return {
       fullName:
         detail?.fullName ??
         detail?.contact?.fullName ??
@@ -154,9 +394,14 @@ const MySingleBookingRequestDetail = () => {
         detail?.email ?? detail?.contact?.email ?? detail?.user?.email ?? "",
       description: detail?.description ?? "",
       location: detail?.location ?? "",
-    }),
-    [detail]
-  );
+      platform: matchedPlatform
+        ? matchedPlatform
+        : rawPlatform
+        ? OTHER_PLATFORM_VALUE
+        : undefined,
+      platformOther: matchedPlatform ? "" : rawPlatform,
+    };
+  }, [detail, platformValueMap]);
 
   useEffect(() => {
     if (!detail) return;
@@ -190,18 +435,33 @@ const MySingleBookingRequestDetail = () => {
         .map((file) => file?.originFileObj)
         .filter(Boolean);
 
+      const resolvedPlatform =
+        values?.platform === OTHER_PLATFORM_VALUE
+          ? values?.platformOther
+          : values?.platform;
+
+      const valuesWithPlatform = {
+        ...values,
+        platform: resolvedPlatform,
+      };
+
       const payloadDto = {};
-      ["fullName", "phone", "email", "description", "location"].forEach(
-        (key) => {
-          const raw = values?.[key];
-          if (raw === undefined || raw === null) return;
-          if (typeof raw === "string") {
-            payloadDto[key] = raw.trim();
-          } else {
-            payloadDto[key] = raw;
-          }
+      [
+        "fullName",
+        "phone",
+        "email",
+        "description",
+        "location",
+        "platform",
+      ].forEach((key) => {
+        const raw = valuesWithPlatform?.[key];
+        if (raw === undefined || raw === null) return;
+        if (typeof raw === "string") {
+          payloadDto[key] = raw.trim();
+        } else {
+          payloadDto[key] = raw;
         }
-      );
+      });
 
       const sanitizedIds = fileIdsToDelete.filter(
         (id) => typeof id === "string" && id.trim().length > 0
@@ -237,7 +497,19 @@ const MySingleBookingRequestDetail = () => {
         title: "Tên tệp",
         dataIndex: ["file", "fileName"],
         key: "fileName",
-        render: (_, r) => r?.file?.fileName ?? "--",
+        render: (_, r) => (
+          <Typography
+            sx={{
+              maxWidth: 200, // hoặc width: 240 nếu muốn cố định
+              wordBreak: "break-word",
+              overflowWrap: "break-word",
+              whiteSpace: "normal",
+              fontWeight: 500,
+            }}
+          >
+            {r?.file?.fileName ?? "--"}
+          </Typography>
+        ),
       },
       {
         title: "Loại",
@@ -387,6 +659,48 @@ const MySingleBookingRequestDetail = () => {
                       <Form.Item label="Địa điểm" name="location">
                         <Input placeholder="Nhập địa điểm thực hiện" />
                       </Form.Item>
+
+                      <Form.Item
+                        label="Nền tảng"
+                        className="md:col-span-2"
+                        required
+                      >
+                        <Space direction="vertical" size={8} className="w-full">
+                          <Form.Item
+                            name="platform"
+                            noStyle
+                            rules={[
+                              {
+                                required: true,
+                                message: "Vui lòng chọn nền tảng",
+                              },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              placeholder="Chọn nền tảng"
+                              options={platformSelectOptions}
+                              optionFilterProp="label"
+                              loading={isLoadingPlatforms}
+                              onChange={handlePlatformChange}
+                            />
+                          </Form.Item>
+                          {showCustomPlatformInput ? (
+                            <Form.Item
+                              name="platformOther"
+                              noStyle
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Vui lòng nhập nền tảng",
+                                },
+                              ]}
+                            >
+                              <Input placeholder="Nhập nền tảng khác" />
+                            </Form.Item>
+                          ) : null}
+                        </Space>
+                      </Form.Item>
                     </div>
 
                     <Form.Item label="Ghi chú" name="description">
@@ -401,9 +715,10 @@ const MySingleBookingRequestDetail = () => {
                         <p className="text-sm font-semibold text-slate-700">
                           Tệp đính kèm hiện có
                         </p>
-                        <p className="mb-3  text-slate-500">
+                        <p className="mb-3 text-slate-500">
                           Chọn các tệp bạn muốn xóa khi cập nhật.
                         </p>
+
                         {deletableAttachmentOptions.length > 0 ? (
                           <Checkbox.Group
                             value={fileIdsToDelete}
@@ -411,16 +726,27 @@ const MySingleBookingRequestDetail = () => {
                             className="flex flex-col gap-2"
                           >
                             {deletableAttachmentOptions.map((item) => (
-                              <Checkbox key={item.value} value={item.value}>
-                                <span
-                                  className={`text-sm transition-all duration-200 ${
+                              <Checkbox
+                                key={item.value}
+                                value={item.value}
+                                className="!w-full"
+                              >
+                                <div
+                                  className={`text-sm transition-all duration-200 break-words whitespace-normal block w-full ${
                                     fileIdsToDelete.includes(item.value)
                                       ? "line-through text-slate-700/60"
                                       : "text-slate-700"
                                   }`}
+                                  style={{
+                                    wordBreak: "break-word",
+                                    overflowWrap: "break-word",
+                                    whiteSpace: "normal",
+                                    width: "100%",
+                                    display: "block",
+                                  }}
                                 >
                                   {item.label}
-                                </span>
+                                </div>
                               </Checkbox>
                             ))}
                           </Checkbox.Group>
@@ -430,6 +756,7 @@ const MySingleBookingRequestDetail = () => {
                           </div>
                         )}
                       </div>
+
                       <div>
                         <p className="text-sm font-semibold text-slate-700">
                           Thêm tệp mới
@@ -460,6 +787,228 @@ const MySingleBookingRequestDetail = () => {
                     </div>
                   </Form>
                 </Space>
+              </section>
+
+              {/* Worktimes & Metrics */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <CalendarRange size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Thống kê livestream theo phiên
+                  </span>
+                </Space>
+
+                {worktimes.length > 0 ? (
+                  <Space
+                    direction="vertical"
+                    size="large"
+                    className="w-full mt-4"
+                  >
+                    {worktimes.map((worktime, index) => {
+                      const rawWorktimeId = resolveWorktimeId(worktime);
+                      const worktimeKey =
+                        rawWorktimeId !== null && rawWorktimeId !== undefined
+                          ? rawWorktimeId
+                          : `worktime-${index}`;
+                      const metrics =
+                        rawWorktimeId !== null && rawWorktimeId !== undefined
+                          ? worktimeLivestreamMetricsMap.get(rawWorktimeId)
+                          : null;
+                      const queryState = findQueryByWorktimeId(rawWorktimeId);
+                      const isMetricsLoading =
+                        !!(queryState?.isPending || queryState?.isFetching) ||
+                        (!queryState &&
+                          (isLoadingWorktimeLivestreamMetrics ||
+                            isFetchingWorktimeLivestreamMetrics));
+                      const metricsError = queryState?.error;
+                      const errorMessage =
+                        metricsError?.response?.data?.message ??
+                        metricsError?.message;
+                      const isMetricsMissing =
+                        metricsError &&
+                        isMissingLivestreamMetricError(metricsError);
+                      const normalizedMetrics = isMetricsMissing
+                        ? null
+                        : metrics;
+                      const shouldShowMetricsError = Boolean(
+                        metricsError && !isMetricsMissing
+                      );
+                      const worktimeStatus = normalizeStatus(worktime?.status);
+                      const worktimeStatusLabel = worktimeStatus
+                        ? BOOKING_STATUS_LABEL[worktimeStatus] ?? worktimeStatus
+                        : null;
+                      const isButtonLoading =
+                        confirmingWorktimeId === rawWorktimeId &&
+                        isConfirmingWorktimeLivestreamMetrics;
+                      const showConfirmTag =
+                        typeof normalizedMetrics?.isConfirmed === "boolean";
+                      const isConfirmedValue = showConfirmTag
+                        ? normalizedMetrics.isConfirmed
+                        : Boolean(normalizedMetrics?.confirmedAt);
+
+                      return (
+                        <Card
+                          key={worktimeKey}
+                          type="inner"
+                          className="shadow-sm"
+                          title={`Phiên làm việc ${rawWorktimeId ?? ""}`}
+                        >
+                          <Descriptions bordered size="middle" column={1}>
+                            <Descriptions.Item label="Bắt đầu">
+                              {formatDateTime(
+                                worktime?.startAt ?? worktime?.startTime
+                              )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Kết thúc">
+                              {formatDateTime(
+                                worktime?.endAt ?? worktime?.endTime
+                              )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Trạng thái">
+                              {worktimeStatusLabel ? (
+                                <Tag
+                                  color={
+                                    STATUS_TAG_COLOR[worktimeStatus] ??
+                                    "default"
+                                  }
+                                >
+                                  {worktimeStatusLabel}
+                                </Tag>
+                              ) : (
+                                "--"
+                              )}
+                            </Descriptions.Item>
+                            {worktime?.note ? (
+                              <Descriptions.Item label="Ghi chú">
+                                <Text style={{ whiteSpace: "pre-wrap" }}>
+                                  {worktime.note}
+                                </Text>
+                              </Descriptions.Item>
+                            ) : null}
+                          </Descriptions>
+
+                          <div className="mt-4">
+                            <Space
+                              direction="vertical"
+                              size="middle"
+                              className="w-full"
+                            >
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <span className="text-base font-semibold text-slate-900">
+                                  Thống kê livestream
+                                </span>
+                                <Space size="small" wrap>
+                                  {showConfirmTag ? (
+                                    <Tag
+                                      color={
+                                        isConfirmedValue ? "green" : "orange"
+                                      }
+                                    >
+                                      {isConfirmedValue
+                                        ? "Đã xác nhận"
+                                        : "Chưa xác nhận"}
+                                    </Tag>
+                                  ) : null}
+                                  {normalizedMetrics?.confirmedAt ? (
+                                    <Text type="secondary">
+                                      Xác nhận lúc:{" "}
+                                      {formatDateTime(
+                                        normalizedMetrics.confirmedAt
+                                      )}
+                                    </Text>
+                                  ) : null}
+                                </Space>
+                              </div>
+
+                              {isMetricsLoading ? (
+                                <Skeleton active paragraph={{ rows: 6 }} />
+                              ) : shouldShowMetricsError ? (
+                                <Alert
+                                  type="error"
+                                  showIcon
+                                  message="Không thể tải thống kê livestream"
+                                  description={
+                                    errorMessage
+                                      ? String(errorMessage)
+                                      : undefined
+                                  }
+                                />
+                              ) : normalizedMetrics ? (
+                                <>
+                                  <Descriptions
+                                    bordered
+                                    size="middle"
+                                    column={screens.lg ? 3 : screens.md ? 2 : 1}
+                                    labelStyle={{ width: 220 }}
+                                  >
+                                    {LIVESTREAM_METRIC_LABELS.map(
+                                      ({ key, label }) => (
+                                        <Descriptions.Item
+                                          key={key}
+                                          label={label}
+                                        >
+                                          {formatLivestreamMetricValue(
+                                            key,
+                                            normalizedMetrics?.[key]
+                                          )}
+                                        </Descriptions.Item>
+                                      )
+                                    )}
+                                  </Descriptions>
+
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <Space size="small" wrap>
+                                      {normalizedMetrics?.createdAt ? (
+                                        <Text type="secondary">
+                                          Cập nhật lúc:{" "}
+                                          {formatDateTime(
+                                            normalizedMetrics.createdAt
+                                          )}
+                                        </Text>
+                                      ) : null}
+                                      {normalizedMetrics?.confirmedAt ? (
+                                        <Text type="secondary">
+                                          Xác nhận lúc:{" "}
+                                          {formatDateTime(
+                                            normalizedMetrics.confirmedAt
+                                          )}
+                                        </Text>
+                                      ) : null}
+                                    </Space>
+                                    <Button
+                                      type="primary"
+                                      ghost
+                                      onClick={() =>
+                                        handleConfirmMetrics(
+                                          rawWorktimeId,
+                                          queryState
+                                        )
+                                      }
+                                      loading={isButtonLoading}
+                                      disabled={
+                                        isButtonLoading ||
+                                        isMetricsLoading ||
+                                        !normalizedMetrics ||
+                                        rawWorktimeId === null ||
+                                        rawWorktimeId === undefined
+                                      }
+                                    >
+                                      Xác nhận thống kê
+                                    </Button>
+                                  </div>
+                                </>
+                              ) : (
+                                <Empty description="Chưa có thống kê livestream" />
+                              )}
+                            </Space>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </Space>
+                ) : (
+                  <Empty description="Chưa có phiên làm việc" />
+                )}
               </section>
 
               {/* User Info */}

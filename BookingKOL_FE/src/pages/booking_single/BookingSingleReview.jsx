@@ -206,6 +206,7 @@ const BookingSingleReview = () => {
       phone: bookingRequest.phone ?? bookingSingleReqDTO?.phone ?? "",
       email: bookingRequest.email ?? bookingSingleReqDTO?.email ?? "",
       location: bookingRequest.location ?? bookingSingleReqDTO?.location ?? "",
+      platform: bookingRequest.platform ?? bookingSingleReqDTO?.platform ?? "",
       description:
         bookingRequest.description ?? bookingSingleReqDTO?.description ?? "",
       status: getStatusLabel(bookingRequest.status),
@@ -605,6 +606,16 @@ const BookingSingleReview = () => {
                       <Typography
                         sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
                       >
+                        Nền tảng LIVE
+                      </Typography>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {contactInfo?.platform || FALLBACK_TEXT}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography
+                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                      >
                         Email
                       </Typography>
                       <Typography sx={{ fontWeight: 600 }}>
@@ -647,7 +658,15 @@ const BookingSingleReview = () => {
                           alignItems={{ xs: "flex-start", sm: "center" }}
                         >
                           <Stack spacing={0.25}>
-                            <Typography sx={{ fontWeight: 600 }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 600,
+                                maxWidth: 400,
+                                wordBreak: "break-word",
+                                overflowWrap: "break-word",
+                              }}
+                            >
+                              {" "}
                               {file.name}
                             </Typography>
                             {file.size ? (

@@ -45,7 +45,13 @@ export const CLIENT_API_PATHS = {
     mySingleRequestDetail: (requestId) =>
       `/v1/kol/booking/single-requests/detail/${requestId}`,
     worktimeLivestreamMetrics: (worktimeId) =>
-      `/admin/requests/worktime/livestream-metrics/${worktimeId}`,
+      `/v1/user/requests/worktime/livestream-metrics/${encodeURIComponent(
+        worktimeId
+      )}`,
+    worktimeLivestreamMetricsConfirm: (worktimeId) =>
+      `/v1/user/requests/worktime/livestream-metrics/confirm/${encodeURIComponent(
+        worktimeId
+      )}`,
     kolCreateLivestreamMetric: (worktimeId) =>
       `/v1/kol/requests/worktime/create-livestream-metric/${encodeURIComponent(
         worktimeId
@@ -60,6 +66,10 @@ export const CLIENT_API_PATHS = {
       `/v1/courses/purchase/confirm/${encodeURIComponent(purchaseId)}`,
     cancelPurchase: (purchaseId) =>
       `/v1/courses/purchase/cancel/${encodeURIComponent(purchaseId)}`,
+  },
+
+  PLATFORM: {
+    all: "/v1/platforms/all",
   },
 
   SCHEDULE_KOL_FREETIME: {

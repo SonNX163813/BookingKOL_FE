@@ -30,6 +30,7 @@ import {
 import { useCreateBooking as useCreateSingleBooking } from "../../../hook/booking_single/useCreateBooking";
 import { useHoldBookingSlot } from "../../../hook/booking_single/useHoldBookingSlot";
 import { BOOKING_SINGLE_REVIEW_STORAGE_KEY } from "../../../constants/storageKeys";
+import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
 
 /* ------------------------- HẰNG SỐ & HÀM HỖ TRỢ ------------------------- */
 
@@ -80,6 +81,8 @@ const BookingFlow = ({
     phone: "",
     note: "",
     location: "",
+    platform: "",
+    platformCustom: "",
   });
   const [attachments, setAttachments] = useState([]);
   const [errors, setErrors] = useState({});
@@ -92,6 +95,13 @@ const BookingFlow = ({
     });
   const { isHoldingBookingSlot: holdingSlot, handleHoldBookingSlot } =
     useHoldBookingSlot();
+  const {
+    platforms,
+    isLoadingPlatforms,
+    isFetchingPlatforms,
+    refetchPlatforms,
+    platformsError,
+  } = useGetPlatforms();
 
   /* ---------------------- Reset khi mở ---------------------- */
   useEffect(() => {
@@ -109,11 +119,57 @@ const BookingFlow = ({
       phone: userProfile?.phone ?? userProfile?.phoneNumber ?? "",
       note: "",
       location: "",
+      platform: "",
+      platformCustom: "",
     });
     setAttachments([]);
     setErrors({});
     setHeldSlot(null);
   }, [open, userProfile]);
+
+  const platformOptions = useMemo(() => {
+    if (!Array.isArray(platforms)) return [];
+    return platforms
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const name = typeof item.name === "string" ? item.name.trim() : "";
+        const key = typeof item.key === "string" ? item.key.trim() : "";
+        const id = typeof item.id === "string" ? item.id.trim() : "";
+        const label = name || key || id || "";
+        if (!label) return null;
+        const value = key || id || label;
+        const upperKey = key ? key.toUpperCase() : "";
+        return {
+          value,
+          label,
+          key,
+          id,
+          name: label,
+          isOther: upperKey === "OTHER",
+        };
+      })
+      .filter(Boolean);
+  }, [platforms]);
+
+  const platformLoading = isLoadingPlatforms || isFetchingPlatforms;
+
+  useEffect(() => {
+    if (!open) return;
+    if (!platformOptions.length) return;
+
+    setContact((prev) => {
+      const current = prev?.platform?.trim();
+      if (current) return prev;
+      const fallback =
+        platformOptions.find((option) => !option.isOther) ?? platformOptions[0];
+      if (!fallback) return prev;
+      return {
+        ...prev,
+        platform: fallback.value,
+        platformCustom: "",
+      };
+    });
+  }, [open, platformOptions]);
 
   /* ---------------------- Xác thực dữ liệu ---------------------- */
   const validateStep = (stepIndex = activeStep, touchErrors = false) => {
@@ -131,6 +187,12 @@ const BookingFlow = ({
       const phone = contact.phone?.trim() ?? "";
       const location = contact.location?.trim() ?? "";
       const note = contact.note?.trim() ?? "";
+      const platform = contact.platform?.trim() ?? "";
+      const platformCustom = contact.platformCustom?.trim() ?? "";
+      const selectedPlatformOption = platformOptions.find(
+        (option) => option.value === platform
+      );
+      const isOtherPlatform = selectedPlatformOption?.isOther === true;
 
       if (!fullName) {
         newErrors.fullName = "Vui lòng nhập họ và tên.";
@@ -152,6 +214,11 @@ const BookingFlow = ({
       // if (!note) {
       //   newErrors.note = "Vui lòng nhập ghi chú cho buổi làm việc.";
       // }
+      if (!platform) {
+        newErrors.platform = "Vui lòng chọn nền tảng.";
+      } else if (isOtherPlatform && !platformCustom) {
+        newErrors.platformCustom = "Vui lòng nhập nền tảng khác.";
+      }
       if (!attachments.length) {
         newErrors.attachments = "Vui lòng đính kèm ít nhất 1 tệp.";
       }
@@ -193,7 +260,7 @@ const BookingFlow = ({
       };
 
       setHeldSlot(nextSlot);
-      toast.success("Đã giữ chỗ thành công!");
+      // toast.success("Đã giữ chỗ thành công!");
       setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
     } catch (err) {
       const errorMsg =
@@ -279,6 +346,15 @@ const BookingFlow = ({
     const fullName = contact.fullName?.trim();
     const email = contact.email?.trim();
     const phone = contact.phone?.trim();
+    const platform = contact.platform?.trim();
+    const platformCustom = contact.platformCustom?.trim();
+    const matchedPlatformOption = platformOptions.find(
+      (option) => option.value === platform
+    );
+    const resolvedPlatform =
+      matchedPlatformOption?.isOther === true
+        ? platformCustom || ""
+        : matchedPlatformOption?.label ?? platform ?? "";
 
     try {
       const bookingSingleReqDTO = {
@@ -290,6 +366,7 @@ const BookingFlow = ({
         endAt: endIso,
         description: note || "",
         location: location || "",
+        platform: resolvedPlatform || "",
       };
 
       const payload = {
@@ -407,6 +484,10 @@ const BookingFlow = ({
         STYLE={STYLE}
         TEXT={TEXT}
         formatCurrency={formatCurrency}
+        platformOptions={platformOptions}
+        platformLoading={platformLoading}
+        platformError={platformsError}
+        onReloadPlatforms={refetchPlatforms}
       />
     );
 

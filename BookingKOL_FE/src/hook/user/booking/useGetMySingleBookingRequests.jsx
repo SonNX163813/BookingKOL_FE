@@ -43,7 +43,7 @@ export const useGetMySingleBookingRequests = (filters = {}) => {
     keepPreviousData: true,
     retry: false,
     enabled: hasToken && Boolean(userId),
-    refetchOnMount: false,
+    refetchOnMount: "always",
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   });

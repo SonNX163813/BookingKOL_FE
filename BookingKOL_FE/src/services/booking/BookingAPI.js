@@ -153,6 +153,7 @@ export const cancelSingleBookingRequest = async ({
   cancelReason,
   bankName,
   bankNumber,
+  bankShortName,
 } = {}) => {
   if (!requestId) {
     throw new Error("requestId is required to cancel single booking request");
@@ -169,8 +170,20 @@ export const cancelSingleBookingRequest = async ({
     ...(payload ?? {}),
   };
 
-  if (typeof bankName === "string" && bankName.trim().length > 0) {
-    data.bankName = bankName.trim();
+  const normalizedBankName =
+    typeof bankName === "string" && bankName.trim().length > 0
+      ? bankName.trim()
+      : "";
+
+  const normalizedBankShortName =
+    typeof bankShortName === "string" && bankShortName.trim().length > 0
+      ? bankShortName.trim()
+      : "";
+
+  if (normalizedBankName) {
+    data.bankName = normalizedBankShortName
+      ? `${normalizedBankShortName} - ${normalizedBankName}`
+      : normalizedBankName;
   }
 
   if (typeof bankNumber === "string" && bankNumber.trim().length > 0) {

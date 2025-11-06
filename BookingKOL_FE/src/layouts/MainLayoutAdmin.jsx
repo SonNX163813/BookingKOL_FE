@@ -154,7 +154,7 @@ const MainLayoutAdmin = () => {
     },
     {
       key: "management-refund",
-      icon: <EventNoteOutlined />,
+      icon: <MonetizationOnOutlined />,
       label: "Quản lý tiền",
       children: [
         {

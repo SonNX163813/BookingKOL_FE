@@ -514,7 +514,13 @@ const MySingleBookingRequests = () => {
         return;
       }
     }
-  }, [bankOptions, refundContext, refundForm, handleCancelRequest, resetRefundState]);
+  }, [
+    bankOptions,
+    refundContext,
+    refundForm,
+    handleCancelRequest,
+    resetRefundState,
+  ]);
 
   const renderBookingActions = useCallback(
     (record) => {
@@ -530,7 +536,14 @@ const MySingleBookingRequests = () => {
       const normalizedPaymentStatus = paymentStatusSource
         ? paymentStatusSource.toString().toUpperCase()
         : null;
-      const isRefundable = normalizedPaymentStatus === "PAID";
+      const contractStatusSource =
+        getPrimaryContract(record)?.status ?? record?.contractStatus ?? null;
+      const normalizedContractStatus = contractStatusSource
+        ? contractStatusSource.toString().toUpperCase()
+        : null;
+      const isRefundable =
+        normalizedPaymentStatus === "PAID" &&
+        normalizedContractStatus !== "WAIT_FOR_REFUND";
       const isPaymentPending = normalizedPaymentStatus === "PENDING";
       const isProcessingPaymentCancelThisRow =
         isCancellingMySingleBookingPayment &&
@@ -901,6 +914,9 @@ const MySingleBookingRequests = () => {
                   {dataSource.map((record) => {
                     const key = deriveRowKey(record);
                     const statusMeta = resolveBookingStatus(record?.status);
+                    // const statusMeta = resolveBookingStatus(
+                    //   record?.contracts?.[0]?.status
+                    // );
                     const payment = getPrimaryPayment(record);
                     const paymentMeta = resolvePaymentStatus(payment?.status);
                     const totalAmount =
@@ -935,12 +951,19 @@ const MySingleBookingRequests = () => {
                               Tạo lúc {createdAtLabel}
                             </p>
                           </div>
-                          <Tag
-                            color={statusMeta.color}
-                            className="rounded-full px-3 py-1 text-sm font-medium"
-                          >
-                            {statusMeta.label}
-                          </Tag>
+                          <div className="flex flex-col items-end text-right">
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                Trạng thái booking
+                              </p>
+                              <Tag
+                                color={statusMeta.color}
+                                className="rounded-full px-3 py-1 text-sm font-medium"
+                              >
+                                {statusMeta.label}
+                              </Tag>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="grid gap-3 text-sm text-slate-600">

@@ -1,11 +1,32 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Button, Card, Pagination, Select, Space, Table, Tag } from "antd";
-import { RefreshCcw } from "lucide-react";
-import { useGetRefundRequests } from "../../../hook/admin/booking/useGetRefundRequests";
 import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
+  Divider,
+  Drawer,
+  Empty,
+  Pagination,
+  Popconfirm,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Tag,
+} from "antd";
+import { Eye, RefreshCcw } from "lucide-react";
+import { useGetRefundRequests } from "../../../hook/admin/booking/useGetRefundRequests";
+import { useGetRefundRequestDetail } from "../../../hook/admin/booking/useGetRefundRequestDetail";
+import { useConfirmRefundRequest } from "../../../hook/admin/booking/useConfirmRefundRequest";
+import {
+  BOOKING_STATUS_LABEL,
+  PAYMENT_STATUS_COLOR,
+  PAYMENT_STATUS_LABEL,
   REFUND_REQUEST_STATUS_COLOR,
   REFUND_REQUEST_STATUS_OPTIONS,
+  STATUS_TAG_COLOR,
 } from "../../../constants/mySingleBookingStatuses";
 
 const resolveRefundStatusMeta = (status) => {
@@ -24,6 +45,32 @@ const resolveRefundStatusMeta = (status) => {
   };
 };
 
+const resolveBookingStatusMeta = (status) => {
+  if (!status) {
+    return { label: "--", color: "default" };
+  }
+
+  const normalized = status.toUpperCase();
+
+  return {
+    label: BOOKING_STATUS_LABEL[normalized] ?? normalized,
+    color: STATUS_TAG_COLOR[normalized] ?? "default",
+  };
+};
+
+const resolvePaymentStatusMeta = (status) => {
+  if (!status) {
+    return { label: "--", color: "default" };
+  }
+
+  const normalized = status.toUpperCase();
+
+  return {
+    label: PAYMENT_STATUS_LABEL[normalized] ?? normalized,
+    color: PAYMENT_STATUS_COLOR[normalized] ?? "default",
+  };
+};
+
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -36,6 +83,9 @@ const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format(pattern) : "--";
 };
+
+const formatCurrencyDisplay = (value) =>
+  value === undefined || value === null ? "--" : formatCurrency(value);
 
 const extractContractLabel = (contract) => {
   if (!contract || typeof contract !== "object") return "--";
@@ -51,8 +101,11 @@ const DEFAULT_FILTERS = {
   status: undefined,
 };
 
+const CONFIRMABLE_REFUND_STATUSES = new Set(["PENDING"]);
+
 const ManagementRefundRequests = () => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [selectedRefundId, setSelectedRefundId] = useState(null);
 
   const {
     refundsResponse,
@@ -60,6 +113,118 @@ const ManagementRefundRequests = () => {
     isFetchingRefunds,
     refetchRefunds,
   } = useGetRefundRequests(filters);
+
+  const {
+    refundDetailResponse,
+    isLoadingRefundDetail,
+    isFetchingRefundDetail,
+    refetchRefundDetail,
+    errorRefundDetail,
+  } = useGetRefundRequestDetail(selectedRefundId);
+
+  const handleConfirmRefundSuccess = useCallback(() => {
+    refetchRefunds();
+    refetchRefundDetail();
+  }, [refetchRefundDetail, refetchRefunds]);
+
+  const {
+    isConfirmingRefundRequest,
+    handleConfirmRefundRequest: confirmRefundRequest,
+  } = useConfirmRefundRequest({
+    onSuccess: handleConfirmRefundSuccess,
+  });
+
+  const detailVisible = Boolean(selectedRefundId);
+
+  const refundDetail = useMemo(() => {
+    if (!refundDetailResponse) return null;
+    if (refundDetailResponse?.data) return refundDetailResponse.data;
+    return refundDetailResponse;
+  }, [refundDetailResponse]);
+
+  const contractDetail =
+    refundDetail && typeof refundDetail.contract === "object"
+      ? refundDetail.contract
+      : null;
+
+  const paymentDetail =
+    contractDetail && typeof contractDetail.paymentDTO === "object"
+      ? contractDetail.paymentDTO
+      : refundDetail && typeof refundDetail.paymentDTO === "object"
+      ? refundDetail.paymentDTO
+      : null;
+
+  const contractStatusMeta = useMemo(
+    () => resolveBookingStatusMeta(contractDetail?.status),
+    [contractDetail?.status]
+  );
+
+  const paymentStatusMeta = useMemo(
+    () => resolvePaymentStatusMeta(paymentDetail?.status),
+    [paymentDetail?.status]
+  );
+
+  const detailStatusMeta = resolveRefundStatusMeta(refundDetail?.status);
+  const normalizedRefundStatus = useMemo(() => {
+    if (!refundDetail?.status) return null;
+    return String(refundDetail.status).toUpperCase();
+  }, [refundDetail?.status]);
+
+  const hasRefundFinished = useMemo(
+    () =>
+      normalizedRefundStatus === "REFUNDED" ||
+      Boolean(refundDetail?.refundedAt),
+    [normalizedRefundStatus, refundDetail?.refundedAt]
+  );
+
+  const shouldShowConfirmButton = useMemo(
+    () =>
+      Boolean(
+        detailVisible &&
+          !hasRefundFinished &&
+          normalizedRefundStatus &&
+          CONFIRMABLE_REFUND_STATUSES.has(normalizedRefundStatus)
+      ),
+    [detailVisible, hasRefundFinished, normalizedRefundStatus]
+  );
+
+  const isInitialDetailLoading =
+    detailVisible && isLoadingRefundDetail && !refundDetail;
+
+  const isRefreshingDetail =
+    detailVisible && isFetchingRefundDetail && Boolean(refundDetail);
+
+  const detailRefreshLoading =
+    detailVisible && isFetchingRefundDetail && !isInitialDetailLoading;
+
+  const detailErrorMessage =
+    errorRefundDetail?.response?.data?.message ??
+    errorRefundDetail?.message ??
+    null;
+
+  const handleViewDetail = useCallback((record) => {
+    const nextId = record?.id;
+    if (!nextId) return;
+    setSelectedRefundId(nextId);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedRefundId(null);
+  }, []);
+
+  const handleRefetchDetail = useCallback(() => {
+    if (!selectedRefundId) return;
+    refetchRefundDetail();
+  }, [refetchRefundDetail, selectedRefundId]);
+
+  const handleConfirmRefund = useCallback(async () => {
+    if (!selectedRefundId) return;
+    try {
+      await confirmRefundRequest({ refundId: selectedRefundId });
+    } catch (error) {
+      // Error handling is managed via global interceptors or hook callbacks.
+    }
+  }, [confirmRefundRequest, selectedRefundId]);
 
   const tableData = useMemo(() => {
     if (Array.isArray(refundsResponse?.content)) return refundsResponse.content;
@@ -74,14 +239,14 @@ const ManagementRefundRequests = () => {
         dataIndex: "id",
         key: "id",
         render: (value) => value ?? "--",
-        width: 220,
+        // width: 220,
       },
       {
         title: "Số tiền",
         dataIndex: "amount",
         key: "amount",
         render: (value) => formatCurrency(value),
-        width: 140,
+        // width: 140,
       },
       {
         title: "Trạng thái",
@@ -95,51 +260,67 @@ const ManagementRefundRequests = () => {
             <Tag color={meta.color}>{meta.label}</Tag>
           );
         },
-        width: 140,
+        // width: 140,
       },
       {
         title: "Mã hợp đồng",
         dataIndex: "contract",
         key: "contract",
         render: (contract) => extractContractLabel(contract),
-        width: 160,
-      },
-      {
-        title: "Ngân hàng",
-        dataIndex: "bankName",
-        key: "bankName",
-        render: (value) => value || "--",
-        width: 220,
+        // width: 160,
       },
       {
         title: "Số tài khoản",
         dataIndex: "bankNumber",
         key: "bankNumber",
         render: (value) => value || "--",
-        width: 160,
+        // width: 160,
+      },
+      {
+        title: "Ngân hàng",
+        dataIndex: "bankName",
+        key: "bankName",
+        render: (value) => value || "--",
+        width: 300,
       },
       {
         title: "Lý do",
         dataIndex: "reason",
         key: "reason",
         render: (value) => value || "--",
+        width: 300,
       },
       {
         title: "Ngày tạo yêu cầu",
         dataIndex: "createdAt",
         key: "createdAt",
         render: (value) => formatDateTime(value),
-        width: 180,
+        // width: 180,
       },
       {
         title: "Ngày hoàn tiền",
         dataIndex: "refundedAt",
         key: "refundedAt",
         render: (value) => formatDateTime(value),
-        width: 180,
+        // width: 180,
+      },
+      {
+        title: "Thao tác",
+        key: "actions",
+        fixed: "right",
+        // width: 110,
+        render: (_, record) => (
+          <Button
+            type="link"
+            onClick={() => handleViewDetail(record)}
+            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+          >
+            <Eye size={18} className="font-semibold" />
+          </Button>
+        ),
       },
     ],
-    []
+    [handleViewDetail]
   );
 
   const totalItems =
@@ -211,6 +392,177 @@ const ManagementRefundRequests = () => {
           />
         </div>
       </Card>
+      <Drawer
+        title="Chi tiết yêu cầu hoàn tiền"
+        width={640}
+        open={detailVisible}
+        onClose={handleCloseDetail}
+        maskClosable={!isInitialDetailLoading}
+        extra={
+          detailVisible ? (
+            <Space>
+              {shouldShowConfirmButton ? (
+                <Popconfirm
+                  title="Xác nhận hoàn tiền"
+                  description="Bạn có chắc chắn đã hoàn tiền cho người dùng?"
+                  okText="Xác nhận"
+                  cancelText="Huỷ"
+                  onConfirm={handleConfirmRefund}
+                  okButtonProps={{ loading: isConfirmingRefundRequest }}
+                  cancelButtonProps={{ disabled: isConfirmingRefundRequest }}
+                >
+                  <Button
+                    type="primary"
+                    loading={isConfirmingRefundRequest}
+                    disabled={isConfirmingRefundRequest || !selectedRefundId}
+                  >
+                    Xác nhận hoàn tiền
+                  </Button>
+                </Popconfirm>
+              ) : null}
+              <Button
+                type="text"
+                icon={<RefreshCcw size={16} />}
+                onClick={handleRefetchDetail}
+                disabled={!selectedRefundId}
+                loading={detailRefreshLoading}
+              >
+                Tải lại
+              </Button>
+            </Space>
+          ) : null
+        }
+      >
+        {isInitialDetailLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Spin />
+          </div>
+        ) : (
+          <Spin spinning={isRefreshingDetail} tip="Đang cập nhật...">
+            {errorRefundDetail ? (
+              <Alert
+                type="error"
+                showIcon
+                message="Không thể tải chi tiết hoàn tiền"
+                description={
+                  detailErrorMessage && detailErrorMessage.length > 0
+                    ? detailErrorMessage
+                    : undefined
+                }
+              />
+            ) : refundDetail ? (
+              <div className="space-y-4">
+                <Divider orientation="left">Thông tin chung</Divider>
+                <Descriptions column={1} size="small" bordered>
+                  <Descriptions.Item label="Mã hoàn tiền">
+                    {refundDetail.id ?? "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Số tiền">
+                    {formatCurrencyDisplay(refundDetail.amount)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Trạng thái">
+                    {detailStatusMeta.label === "--" ? (
+                      "--"
+                    ) : (
+                      <Tag color={detailStatusMeta.color}>
+                        {detailStatusMeta.label}
+                      </Tag>
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Lý do">
+                    {refundDetail.reason || "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngày tạo">
+                    {formatDateTime(refundDetail.createdAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngày hoàn tiền">
+                    {formatDateTime(refundDetail.refundedAt)}
+                  </Descriptions.Item>
+                </Descriptions>
+
+                <Divider orientation="left">Thông tin ngân hàng</Divider>
+                <Descriptions column={1} size="small" bordered>
+                  <Descriptions.Item label="Ngân hàng">
+                    {refundDetail.bankName || "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Số tài khoản">
+                    {refundDetail.bankNumber || "--"}
+                  </Descriptions.Item>
+                </Descriptions>
+
+                <Divider orientation="left">Thông tin hợp đồng</Divider>
+                {contractDetail ? (
+                  <Descriptions column={1} size="small" bordered>
+                    <Descriptions.Item label="Mã hợp đồng">
+                      {extractContractLabel(contractDetail)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="ID hợp đồng">
+                      {contractDetail.id || "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Trạng thái">
+                      {contractStatusMeta.label === "--" ? (
+                        "--"
+                      ) : (
+                        <Tag color={contractStatusMeta.color}>
+                          {contractStatusMeta.label}
+                        </Tag>
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Giá trị">
+                      {formatCurrencyDisplay(contractDetail.amount)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Ngày tạo">
+                      {formatDateTime(contractDetail.createdAt)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Cập nhật lúc">
+                      {formatDateTime(contractDetail.updatedAt)}
+                    </Descriptions.Item>
+                  </Descriptions>
+                ) : (
+                  <Empty description="Không có hợp đồng liên quan" />
+                )}
+
+                <Divider orientation="left">Thông tin thanh toán</Divider>
+                {paymentDetail ? (
+                  <Descriptions column={1} size="small" bordered>
+                    <Descriptions.Item label="Mã thanh toán">
+                      {paymentDetail.id || "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Tổng tiền">
+                      {formatCurrencyDisplay(paymentDetail.totalAmount)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Đã thanh toán">
+                      {formatCurrencyDisplay(paymentDetail.paidAmount)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Tiền tệ">
+                      {paymentDetail.currency || "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Trạng thái">
+                      {paymentStatusMeta.label === "--" ? (
+                        "--"
+                      ) : (
+                        <Tag color={paymentStatusMeta.color}>
+                          {paymentStatusMeta.label}
+                        </Tag>
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Ngày tạo">
+                      {formatDateTime(paymentDetail.createdAt)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Cập nhật lúc">
+                      {formatDateTime(paymentDetail.updatedAt)}
+                    </Descriptions.Item>
+                  </Descriptions>
+                ) : (
+                  <Empty description="Không có thông tin thanh toán" />
+                )}
+              </div>
+            ) : (
+              <Empty description="Không có dữ liệu hoàn tiền" />
+            )}
+          </Spin>
+        )}
+      </Drawer>
     </div>
   );
 };

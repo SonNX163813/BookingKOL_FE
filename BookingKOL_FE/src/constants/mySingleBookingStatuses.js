@@ -6,11 +6,12 @@ export const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
   { label: "Đã thanh toán", value: "PAID" },
+  { label: "Đợi hoàn tiền", value: "WAIT_FOR_REFUND" },
 ];
 
 export const BOOKING_STATUS_LABEL = {
   DRAFT: "Bản nháp",
-  REQUESTED: "Đang yêu cầu",
+  REQUESTED: "Đã yêu cầu",
   PENDING: "Chờ xử lý",
   NEGOTIATING: "Đang đàm phán",
   ACCEPTED: "Đã chấp nhận",
@@ -24,6 +25,9 @@ export const BOOKING_STATUS_LABEL = {
   CONTRACT_SIGNED: "Đã ký hợp đồng",
   EXPIRED: "Hết hạn",
   PAID: "Đã thanh toán",
+  WAIT_FOR_REFUND: "Đợi hoàn tiền",
+  REFUNDED: "Đã hoàn tiền",
+  OVERPAID: "Thanh toán thừa",
 };
 
 export const STATUS_TAG_COLOR = {
@@ -42,15 +46,19 @@ export const STATUS_TAG_COLOR = {
   CONTRACT_SIGNED: "purple",
   EXPIRED: "volcano",
   PAID: "success",
+  WAIT_FOR_REFUND: "cyan",
+  REFUNDED: "purple",
 };
 
 export const PAYMENT_STATUS_OPTIONS = [
+  { label: "Đợi hoàn tiền", value: "WAIT_FOR_REFUND" },
   { label: "Đợi thanh toán", value: "PENDING" },
   { label: "Thanh toán chưa đủ", value: "UNDERPAID" },
   { label: "Đã thanh toán", value: "PAID" },
   { label: "Thanh toán thừa", value: "OVERPAID" },
   { label: "Đã hết hạn thanh toán", value: "EXPIRED" },
   { label: "Đã hủy thanh toán", value: "CANCELLED" },
+  { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 
 export const PAYMENT_STATUS_LABEL = {
@@ -62,6 +70,8 @@ export const PAYMENT_STATUS_LABEL = {
   EXPIRED: "Hết hạn thanh toán",
   CANCELLED: "Đã huỷ thanh toán",
   REFUNDED: "Đã hoàn tiền",
+  WAIT_FOR_REFUND: "Đợi hoàn tiền",
+  OVERPAID: "Thanh toán thừa",
 };
 
 export const PAYMENT_STATUS_COLOR = {
@@ -71,6 +81,8 @@ export const PAYMENT_STATUS_COLOR = {
   OVERPAID: "purple",
   EXPIRED: "volcano",
   CANCELLED: "error",
+  WAIT_FOR_REFUND: "cyan",
+  REFUNDED: "purple",
 };
 
 export const REFUND_REQUEST_STATUS_OPTIONS = [
@@ -80,6 +92,7 @@ export const REFUND_REQUEST_STATUS_OPTIONS = [
   { label: "Đã hoàn tất", value: "COMPLETED" },
   { label: "Từ chối", value: "REJECTED" },
   { label: "Đã hủy", value: "CANCELLED" },
+  { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 
 export const REFUND_REQUEST_STATUS_COLOR = {
@@ -89,4 +102,5 @@ export const REFUND_REQUEST_STATUS_COLOR = {
   COMPLETED: "success",
   REJECTED: "error",
   CANCELLED: "warning",
+  REFUNDED: "purple",
 };

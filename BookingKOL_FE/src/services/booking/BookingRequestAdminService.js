@@ -48,3 +48,15 @@ export const getBookingRequestDetail = async (requestId) => {
     url: `${API_PATHS.BOOKING_REQUEST.getDetail}/${requestId}`,
   });
 };
+
+export const getWorktimeLivestreamMetrics = async (worktimeId) => {
+  if (!worktimeId) {
+    throw new Error(
+      "worktimeId is required to fetch worktime livestream metrics"
+    );
+  }
+
+  return await get({
+    url: API_PATHS.BOOKING_REQUEST.getWorktimeLivestreamMetrics(worktimeId),
+  });
+};
