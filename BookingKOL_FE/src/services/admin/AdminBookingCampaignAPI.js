@@ -1,0 +1,77 @@
+import dayjs from "dayjs";
+import { get } from "../../config/axios-config";
+import { API_PATHS } from "../../constants/apiPath";
+
+const PATH = API_PATHS.BOOKING_CAMPAIGN.list;
+
+// Chỉ 4 tham số theo Swagger: search, startDate, endDate, packageType (+ tuỳ chọn page/size nếu BE có)
+const ALLOWED = new Set([
+  "search",
+  "startDate",
+  "endDate",
+  "packageType",
+  "page",
+  "size",
+]);
+
+const toISO = (v) => {
+  if (!v) return undefined;
+  try {
+    if (typeof v === "string") {
+      const d0 = dayjs(v);
+      if (d0.isValid()) return d0.toISOString();
+
+      const cutAtZ = v.includes("Z") ? v.slice(0, v.indexOf("Z") + 1) : v;
+      const cleaned = cutAtZ.replace(/[^0-9T:.Z-]/g, "");
+      const d1 = dayjs(cleaned);
+      return d1.isValid() ? d1.toISOString() : undefined;
+    }
+
+    if (v && typeof v.toDate === "function") {
+      const d = v.toDate(); // dayjs instance
+      return d instanceof Date && !Number.isNaN(d.getTime())
+        ? d.toISOString()
+        : undefined;
+    }
+
+    if (v instanceof Date && !Number.isNaN(v.getTime())) {
+      return v.toISOString();
+    }
+  } catch (_err) {
+    // Bỏ qua lỗi parse/format, trả về undefined để hợp lệ với no-empty
+    return undefined;
+  }
+  return undefined;
+};
+const buildParams = (params = {}) =>
+  Object.entries(params || {}).reduce((acc, [k, v]) => {
+    if (
+      !ALLOWED.has(k) ||
+      v == null ||
+      (typeof v === "string" && v.trim() === "")
+    )
+      return acc;
+    if (k === "startDate" || k === "endDate") {
+      const iso = toISO(v);
+      if (iso) acc[k] = iso;
+      return acc;
+    }
+    acc[k] = v;
+    return acc;
+  }, {});
+
+// GET /admin/bookings
+export const adminGetCampaignBookings = async ({ signal, params } = {}) => {
+  const payload = await get({
+    url: PATH,
+    params: buildParams(params),
+    config: signal ? { signal } : undefined,
+  });
+  const data = payload?.data ?? payload;
+  const content = Array.isArray(data?.content)
+    ? data.content
+    : Array.isArray(data)
+    ? data
+    : [];
+  return { ...(typeof data === "object" ? data : {}), content };
+};

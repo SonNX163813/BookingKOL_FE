@@ -75,5 +75,17 @@ export const CLIENT_API_PATHS = {
     kolTimeline: (kolId) => `/v1/availabilities/time-line/kol/${kolId}`,
     // ✅ đổi sang dạng có kolId trên path
     kolSchedule: (kolId) => `/v1/availabilities/schedule/${kolId}`,
+    availabilityTimelineById: (availabilityId) =>
+      `/v1/availabilities/time-line/${encodeURIComponent(availabilityId)}`,
+  },
+  LEAVE_REQUESTS: {
+    // POST /leave-requests/{kolId}/{availabilityId}?reason=
+    create: (kolId, availabilityId, reason) =>
+      `/v1/leave-requests/${encodeURIComponent(kolId)}/${encodeURIComponent(
+        availabilityId
+      )}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`,
+
+    // GET /leave-requests/kol/my-leaves?page=&size=&keyword=
+    myLeaves: "/v1/leave-requests/kol/my-leaves",
   },
 };

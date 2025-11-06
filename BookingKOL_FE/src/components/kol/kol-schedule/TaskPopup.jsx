@@ -1,9 +1,11 @@
-// src/components/kol/kol-schedule/TaskPopup.jsx
-import React from "react";
-import { Modal } from "antd";
+import React, { useEffect, useState } from "react";
+import { Modal, Spin } from "antd";
 import { IoCloseOutline } from "react-icons/io5";
 import { CiClock2 } from "react-icons/ci";
 import { GoGoal } from "react-icons/go";
+import dayjs from "dayjs";
+import { getKolMySingleRequestDetail } from "../../../services/kol/KolAPI";
+import { getAvailabilityTimelineById } from "../../../services/kol/AvailabilityAPI"; // ✅
 
 export default function TaskPopup({
   isDisplay,
@@ -11,7 +13,10 @@ export default function TaskPopup({
   dayInfo,
   onClose,
 }) {
-  if (!isDisplay) return null;
+  // Hooks luôn ở top-level
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [err, setErr] = useState("");
 
   const hhmm = (t) => (t ? t.slice(0, 5) : "");
   const isBooking =
@@ -24,22 +29,107 @@ export default function TaskPopup({
     ? goalDetails?.description || "Booking"
     : "Lịch rảnh";
 
+  useEffect(() => {
+    let mounted = true;
+    setDetail(null);
+    setErr("");
+
+    if (!isDisplay || !isBooking) return;
+
+    const availabilityId =
+      goalDetails?.availabilityId ||
+      goalDetails?.parentId ||
+      goalDetails?.availabilityTimelineId ||
+      null;
+
+    const requestId =
+      goalDetails?.bookingRequestId || goalDetails?.requestId || null;
+
+    (async () => {
+      try {
+        setLoadingDetail(true);
+
+        if (availabilityId) {
+          // ✅ ƯU TIÊN gọi theo availability
+          const rec = await getAvailabilityTimelineById(availabilityId);
+          if (!mounted) return;
+
+          // Chuẩn hoá dữ liệu hiển thị
+          const firstWork = Array.isArray(rec?.workTimes)
+            ? rec.workTimes[0]
+            : null;
+          const normalized = {
+            source: "availability",
+            id: rec?.id,
+            status: firstWork?.status || rec?.status,
+            requestNumber: rec?.requestNumber || rec?.bookingCode || null,
+            customerName: rec?.customerName || rec?.brandName || null,
+            price: rec?.price ?? null,
+            note: rec?.note ?? null,
+            startAt: firstWork?.startAt || rec?.startAt || null,
+            endAt: firstWork?.endAt || rec?.endAt || null,
+          };
+          setDetail(normalized);
+          return;
+        }
+
+        if (requestId) {
+          // Fallback: gọi chi tiết đơn
+          const rec = await getKolMySingleRequestDetail(requestId);
+          if (!mounted) return;
+          setDetail({
+            source: "request",
+            id: rec?.id,
+            status: rec?.status,
+            requestNumber: rec?.requestNumber,
+            customerName: rec?.customerName || rec?.brandName || null,
+            price: rec?.price ?? null,
+            note: rec?.note ?? null,
+            startAt: rec?.startAt || null,
+            endAt: rec?.endAt || null,
+          });
+          return;
+        }
+
+        // Không có id nào → thôi
+      } catch (e) {
+        if (mounted) setErr(e?.message || "Không tải được chi tiết.");
+      } finally {
+        if (mounted) setLoadingDetail(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [
+    isDisplay,
+    isBooking,
+    goalDetails?.availabilityId,
+    goalDetails?.parentId,
+    goalDetails?.availabilityTimelineId,
+    goalDetails?.bookingRequestId,
+    goalDetails?.requestId,
+  ]);
+
+  if (!isDisplay) return null;
+
   return (
     <Modal
       open={isDisplay}
       onCancel={onClose}
-      title={null} // tự render header để canh lề đẹp
-      closable={false} // dùng nút X tự làm
+      title={null}
+      closable={false}
       maskClosable
       keyboard
       destroyOnClose
       centered
-      width={"min(92vw, 500px)"} // hẹp ngang, cao vừa nội dung
+      width={"min(92vw, 500px)"}
       styles={{
         content: {
-          background: "#ffffff",
+          background: "#fff",
           borderRadius: 24,
-          border: "1px solid #e5e7eb", // xám nhạt, nhẹ mắt
+          border: "1px solid #e5e7eb",
           overflow: "hidden",
         },
         body: { padding: 0 },
@@ -63,7 +153,7 @@ export default function TaskPopup({
 
       {/* Body */}
       <div className="px-5 pt-4 pb-5 text-gray-700">
-        {/* Thời gian */}
+        {/* Thời gian đã có từ slot */}
         <div className="flex items-start justify-between gap-3 text-[15px] flex-wrap">
           <div className="flex items-center gap-2">
             <CiClock2 className="text-xl text-gray-600" />
@@ -83,7 +173,6 @@ export default function TaskPopup({
           </div>
         </div>
 
-        {/* Mục tiêu */}
         <div className="mt-4 flex items-center gap-2 text-[15px]">
           <GoGoal className="text-xl text-gray-600" />
           <span className="font-medium">Mục tiêu:</span>
@@ -92,7 +181,70 @@ export default function TaskPopup({
           </span>
         </div>
 
-        {/* Footer */}
+        {/* Chi tiết booking lấy từ API */}
+        {isBooking && (
+          <div className="mt-5 rounded-xl border border-gray-200 p-4 bg-gray-50">
+            {loadingDetail ? (
+              <div className="flex items-center gap-2 text-gray-600">
+                <Spin size="small" />
+                <span>Đang tải chi tiết booking…</span>
+              </div>
+            ) : err ? (
+              <div className="text-red-500 text-sm">{err}</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 text-[14px]">
+                  <div>
+                    <div className="text-gray-500">Mã đơn</div>
+                    <div className="font-semibold">
+                      {detail?.requestNumber || "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Trạng thái</div>
+                    <div className="font-semibold">{detail?.status || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Bắt đầu</div>
+                    <div className="font-semibold">
+                      {detail?.startAt
+                        ? dayjs(detail.startAt).format("HH:mm DD/MM/YYYY")
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Kết thúc</div>
+                    <div className="font-semibold">
+                      {detail?.endAt
+                        ? dayjs(detail.endAt).format("HH:mm DD/MM/YYYY")
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Khách hàng</div>
+                    <div className="font-semibold">
+                      {detail?.customerName || "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Giá trị</div>
+                    <div className="font-semibold">
+                      {detail?.price != null ? `${detail.price}` : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {detail?.note && (
+                  <div className="mt-3">
+                    <div className="text-gray-500 text-[13px]">Ghi chú</div>
+                    <div className="text-[14px]">{detail.note}</div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}

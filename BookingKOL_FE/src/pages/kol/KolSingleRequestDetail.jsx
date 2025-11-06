@@ -1,3 +1,4 @@
+// src/pages/kol/KolSingleRequestDetail.jsx
 import React, { useMemo, useEffect, useState } from "react";
 import {
   useNavigate,
@@ -42,6 +43,7 @@ import LivestreamMetricModal from "../../components/kol/kol-metric/LivestreamMet
 const { Title, Text, Link } = Typography;
 const { useBreakpoint } = Grid;
 
+/* ===== dayjs (vi) ===== */
 dayjs.extend(localeData);
 dayjs.extend(updateLocale);
 dayjs.locale("vi");
@@ -124,7 +126,7 @@ const renderImageField = (url, label) =>
     </Space>
   );
 
-/** Helper lấy worktimes */
+/** Helper: lấy worktimes từ nhiều key */
 function extractWorktimes(detail) {
   if (!detail) return [];
   const candidates = [detail.kolWorkTimes, detail.workTimes, detail.worktimes];
@@ -147,6 +149,7 @@ const fmtVnd = (v) =>
 const fmtPct = (v) =>
   Number.isFinite(+v) ? `${(+v).toFixed(2).replace(/\.00$/, "")}%` : "--";
 
+/* Hiển thị avgViewDuration theo GIÂY */
 const METRIC_FIELDS = [
   { key: "revenue", label: "Tổng doanh thu", fmt: fmtVnd },
   { key: "gpm", label: "GPM", fmt: fmtVnd },
@@ -158,12 +161,17 @@ const METRIC_FIELDS = [
   { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút", fmt: fmtInt },
   { key: "viewsUnder1min", label: "Lượt xem < 1 phút", fmt: fmtInt },
   { key: "pcu", label: "PCU (đồng xem cao nhất)", fmt: fmtInt },
-  { key: "avgViewDuration", label: "Thời gian xem TB (giây)", fmt: fmtInt }, // ⬅️ GIÂY
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)", fmt: fmtInt },
   { key: "commentsIn1min", label: "BL trong 1 phút", fmt: fmtInt },
   { key: "totalComments", label: "Tổng bình luận", fmt: fmtInt },
   { key: "productClickRate", label: "Tỷ lệ click SP", fmt: fmtPct },
   { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn", fmt: fmtPct },
 ];
+
+/* ===== Helpers error ===== */
+const getHttpStatus = (e) =>
+  e?.appStatus || e?.response?.status || e?.status || 0;
+const isBadRequest = (e) => getHttpStatus(e) === 400;
 
 export default function KolSingleRequestDetail() {
   const { requestId } = useParams();
@@ -187,7 +195,7 @@ export default function KolSingleRequestDetail() {
     queryFn: () => getKolMySingleRequestDetail(requestId),
     enabled: !!requestId && !!token && !authLoading,
     retry: (count, err) => {
-      const code = err?.appStatus || err?.response?.status || 0;
+      const code = getHttpStatus(err);
       if (code === 404) return false;
       return count < 2;
     },
@@ -233,7 +241,8 @@ export default function KolSingleRequestDetail() {
     queryKey: ["kol-livestream-metrics", token, selectedWorktimeId],
     queryFn: () => getKolLivestreamMetrics(selectedWorktimeId),
     enabled: !!token && !!selectedWorktimeId,
-    retry: 1,
+    // ⬇ KHÔNG retry nếu 400 (coi như "chưa có số liệu")
+    retry: (count, err) => (isBadRequest(err) ? false : count < 1),
   });
 
   /* POST metrics */
@@ -563,6 +572,9 @@ export default function KolSingleRequestDetail() {
                 message="Chưa có ca livestream được chọn."
                 description="Hãy chọn 'ca livestream' trong hộp thoại nhập số liệu khi có nhiều worktime."
               />
+            ) : isBadRequest(metricsError) ? (
+              // ⬅️ Nếu 400 Bad Request → coi như chưa có metric → hiển thị Empty
+              <Empty description="Chưa có số liệu. Hãy nhấn 'Nhập số liệu' để lưu trước." />
             ) : metricsError ? (
               <Alert
                 type="error"
