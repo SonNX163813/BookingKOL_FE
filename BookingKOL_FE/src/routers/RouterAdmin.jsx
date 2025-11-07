@@ -25,6 +25,7 @@ import AdminViewKolSchedule from "../pages/admin/management-user/management-kol/
 // Campaign pages
 import ManagementBookingCampaigns from "../pages/admin/booking-campaign/ManagementBookingCampaigns";
 import EditBookingCampaign from "../pages/admin/booking-campaign/EditBookingCampain"; // 👈 mới
+import ManagementBlog from "../pages/admin/blog/ManagementBlog";
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -68,6 +69,7 @@ export const routerAdmin = [
       },
 
       { path: "bookings/create", element: <EditBookingCampaign /> }, // 👈 mới
+      { path: "management-blogs", element: <ManagementBlog /> },
     ],
   },
 

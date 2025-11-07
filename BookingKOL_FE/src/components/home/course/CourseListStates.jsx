@@ -14,7 +14,7 @@ export const LoadingState = () => (
   >
     <CircularProgress sx={{ color: "#4a74da" }} />
     <Typography sx={{ mt: 2, color: "rgba(15, 23, 42, 0.7)" }}>
-      Dang tai danh sach khoa hoc livestream...
+      Đang tải danh sách khóa học livestream...
     </Typography>
   </Stack>
 );
@@ -31,7 +31,7 @@ export const EmptyState = () => (
     }}
   >
     <Typography variant="h5" sx={{ fontWeight: 600, color: "#0f172a" }}>
-      Chua co goi khoa hoc nao san sang
+      Chưa có gói khóa học nào sẵn sàng
     </Typography>
     <Typography
       sx={{
@@ -40,8 +40,8 @@ export const EmptyState = () => (
         textAlign: "center",
       }}
     >
-      Vui long quay lai sau. Chung toi dang cap nhat cac giai phap dao tao
-      livestream moi nhat.
+      Vui lòng quay lại sau. Chúng tôi đang cập nhật các giải pháp đào tạo
+      livestream mới nhất.
     </Typography>
   </Stack>
 );

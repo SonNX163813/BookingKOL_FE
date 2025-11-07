@@ -54,7 +54,7 @@ const CourseCard = ({ course, onSelect }) => {
     >
       <Box
         sx={{
-          position: "relative",
+          //position: "relative",
           width: "100%",
           height: { xs: 220, sm: 220, md: 300 },
           aspectRatio: { xs: "16 / 11", sm: "16 / 10", md: "16 / 9" },
@@ -75,7 +75,7 @@ const CourseCard = ({ course, onSelect }) => {
             transition: "transform 320ms ease",
           }}
         />
-        <Box
+        {/* <Box
           sx={{
             position: "absolute",
             inset: 0,
@@ -83,7 +83,7 @@ const CourseCard = ({ course, onSelect }) => {
               "linear-gradient(180deg, rgba(15, 23, 42, 0) 60%, rgba(15, 23, 42, 0.18) 100%)",
             pointerEvents: "none",
           }}
-        />
+        /> */}
       </Box>
       <CardContent
         sx={{

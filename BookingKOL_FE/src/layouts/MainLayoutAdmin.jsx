@@ -18,6 +18,7 @@ import {
   CalendarMonthOutlined,
   EventNoteOutlined,
   MonetizationOnOutlined,
+  ArticleOutlined,
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 
@@ -66,6 +67,10 @@ const MainLayoutAdmin = () => {
     {
       pattern: /^\/admin\/management-booking-requests(\/)?$/,
       key: "management-booking-requests",
+    },
+    {
+      pattern: /^\/admin\/management-blogs(\/)?$/,
+      key: "management-blogs",
     },
     // NEW: highlight cho trang Campaign (kể cả các route con sau này)
     {
@@ -142,6 +147,11 @@ const MainLayoutAdmin = () => {
           label: <Link to="management-course">Khóa học</Link>,
         },
       ],
+    },
+    {
+      key: "management-blogs",
+      icon: <ArticleOutlined />,
+      label: <Link to="management-blogs">Quản lý blog</Link>,
     },
     {
       key: "management-booking",

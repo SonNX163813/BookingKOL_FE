@@ -975,26 +975,28 @@ const MySingleBookingRequestDetail = () => {
                                         </Text>
                                       ) : null}
                                     </Space>
-                                    <Button
-                                      type="primary"
-                                      ghost
-                                      onClick={() =>
-                                        handleConfirmMetrics(
-                                          rawWorktimeId,
-                                          queryState
-                                        )
-                                      }
-                                      loading={isButtonLoading}
-                                      disabled={
-                                        isButtonLoading ||
-                                        isMetricsLoading ||
-                                        !normalizedMetrics ||
-                                        rawWorktimeId === null ||
-                                        rawWorktimeId === undefined
-                                      }
-                                    >
-                                      Xác nhận thống kê
-                                    </Button>
+                                    {normalizedMetrics?.confirmedAt === null ? (
+                                      <Button
+                                        type="primary"
+                                        ghost
+                                        onClick={() =>
+                                          handleConfirmMetrics(
+                                            rawWorktimeId,
+                                            queryState
+                                          )
+                                        }
+                                        loading={isButtonLoading}
+                                        disabled={
+                                          isButtonLoading ||
+                                          isMetricsLoading ||
+                                          !normalizedMetrics ||
+                                          rawWorktimeId === null ||
+                                          rawWorktimeId === undefined
+                                        }
+                                      >
+                                        Xác nhận thống kê
+                                      </Button>
+                                    ) : null}
                                   </div>
                                 </>
                               ) : (

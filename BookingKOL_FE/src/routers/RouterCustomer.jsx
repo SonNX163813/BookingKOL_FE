@@ -9,6 +9,8 @@ import RankingPage from "../pages/rank/RankingPage";
 import ChatAIPage from "../pages/ai/ChatAIPage";
 import CourseLivesteam from "../pages/home/course-live/CourseLivesteam";
 import CourseLivesteamDetail from "../pages/home/course-live/CourseLivesteamDetail";
+import BlogListPage from "../pages/home/blog/BlogListPage";
+import BlogDetailPage from "../pages/home/blog/BlogDetailPage";
 
 // Pages (private)
 import UserProfile from "../pages/home/userProfileDetail/UserProfile";
@@ -68,6 +70,8 @@ export const routerCustomer = [
       { path: "/danh-sach-kol/:kolId?/:kolName?", element: <KOLDetail /> },
       { path: "/ranking", element: <RankingPage /> },
       { path: "/chat-AI", element: <ChatAIPage /> },
+      { path: "/blog", element: <BlogListPage /> },
+      { path: "/blog/:blogId", element: <BlogDetailPage /> },
       { path: "/goi-chien-dich", element: <ServicePackagePage /> },
       {
         path: "/xac-nhan-dat-lich-kol-le",

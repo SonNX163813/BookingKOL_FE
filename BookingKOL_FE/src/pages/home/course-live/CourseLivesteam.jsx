@@ -244,15 +244,37 @@ const CourseLivesteam = () => {
         }}
       />
       <Container
-        maxWidth="xl"
+        // maxWidth="xl"
+        maxWidth={false}
         sx={{
           position: "relative",
           zIndex: 1,
           color: "#0f172a",
+          maxWidth: "1400px",
         }}
       >
         <Stack spacing={6}>
-          {/* <CourseHeroSection
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "minmax(260px, 320px) minmax(0, 1fr)",
+                lg: "minmax(280px, 340px) minmax(0, 1fr)",
+              },
+              gap: { xs: 4, sm: 4.5, md: 6 },
+              alignItems: "start",
+            }}
+          >
+            <Box
+              sx={{
+                width: "100%",
+                maxWidth: { xs: "100%", md: 320, lg: 340 },
+                alignSelf: { xs: "stretch", md: "flex-start" },
+                mx: { xs: "auto", md: 0 },
+              }}
+            >
+              {/* <CourseHeroSection
             onExploreTopCourse={() =>
               handleNavigateDetail(topCourse?.id, topCourse?.slug)
             }
@@ -260,28 +282,30 @@ const CourseLivesteam = () => {
             loading={loading}
             onManualRefresh={handleRetry}
           /> */}
-
-          <CourseFilters
-            filters={formFilters}
-            onFilterInputChange={handleFilterInputChange}
-            onSortDirChange={handleSortDirChange}
-            onApply={handleApplyFilters}
-            onReset={handleResetFilters}
-            loading={loading}
-            hasActiveFilters={hasActiveFilters}
-            hasFilterChanges={hasFilterChanges}
-          />
-
-          {loading ? (
-            <LoadingState />
-          ) : decoratedCourses.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <CoursesGrid
-              courses={decoratedCourses}
-              onSelectCourse={handleNavigateDetail}
-            />
-          )}
+              <CourseFilters
+                filters={formFilters}
+                onFilterInputChange={handleFilterInputChange}
+                onSortDirChange={handleSortDirChange}
+                onApply={handleApplyFilters}
+                onReset={handleResetFilters}
+                loading={loading}
+                hasActiveFilters={hasActiveFilters}
+                hasFilterChanges={hasFilterChanges}
+              />
+            </Box>
+            <Box>
+              {loading ? (
+                <LoadingState />
+              ) : decoratedCourses.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <CoursesGrid
+                  courses={decoratedCourses}
+                  onSelectCourse={handleNavigateDetail}
+                />
+              )}
+            </Box>
+          </Box>
         </Stack>
       </Container>
 

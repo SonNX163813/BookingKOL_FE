@@ -62,4 +62,13 @@ export const API_PATHS = {
     getDetail: "/v1/admin/refunds/detail",
     confirm: "/v1/admin/refunds/confirm",
   },
+  BLOG: {
+    adminGetAll: "v1/admin/blogs/all",
+    adminGetDetail: (blogId) =>
+      `v1/admin/blogs/detail/${encodeURIComponent(blogId)}`,
+    adminUpdate: (blogId) =>
+      `v1/admin/blogs/detail/${encodeURIComponent(blogId)}`,
+    adminDelete: (blogId) =>
+      `v1/admin/blogs/delete/${encodeURIComponent(blogId)}`,
+  },
 };

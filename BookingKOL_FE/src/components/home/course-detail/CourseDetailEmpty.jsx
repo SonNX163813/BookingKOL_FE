@@ -13,11 +13,10 @@ const CourseDetailEmpty = () => (
     }}
   >
     <Typography variant="h5" sx={{ fontWeight: 600, color: "#0f172a" }}>
-      Khong tim thay khoa hoc phu hop
+      Không tìm thấy khóa học phù hợp
     </Typography>
-    <Typography sx={{ color: "rgba(15, 23, 42, 0.7)", maxWidth: 520 }}>
-      Vui long quay lai danh sach va chon lai goi dao tao livestream ma ban quan
-      tam.
+    <Typography sx={{ color: "rgba(15, 23, 42, 0.7)" }}>
+      Vui lòng thử lại với từ khóa khác hoặc kiểm tra lại kết nối mạng của bạn.
     </Typography>
   </Stack>
 );

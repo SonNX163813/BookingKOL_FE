@@ -258,58 +258,63 @@ const UserKolFeedbackSection = ({
     feedbackRef.current = extracted;
   }, [contract]);
 
-  const fetchFeedbackDetail = useCallback(async ({ force = false, signal } = {}) => {
-    if (!feedbackId) return null;
+  const fetchFeedbackDetail = useCallback(
+    async ({ force = false, signal } = {}) => {
+      if (!feedbackId) return null;
 
-    const cachedFeedback = feedbackRef.current;
+      const cachedFeedback = feedbackRef.current;
 
-    if (
-      !force &&
-      cachedFeedback &&
-      (cachedFeedback.commentPublic ||
-        Number.isFinite(Number(cachedFeedback.professionalismRating)) ||
-        Number.isFinite(Number(cachedFeedback.communicationRating)) ||
-        Number.isFinite(Number(cachedFeedback.timelineRating)) ||
-        Number.isFinite(Number(cachedFeedback.contentQualityRating)))
-    ) {
-      return cachedFeedback;
-    }
-
-    if (isMountedRef.current) {
-      setIsFetchingDetail(true);
-    }
-    try {
-      const response = await getKolFeedbackDetail({
-        feedbackId,
-        signal,
-      });
-      const normalized = normalizeFeedback(response?.data ?? response);
-      if (isMountedRef.current && normalized) {
-        setFeedback(normalized);
-        feedbackRef.current = normalized;
+      if (
+        !force &&
+        cachedFeedback &&
+        (cachedFeedback.commentPublic ||
+          Number.isFinite(Number(cachedFeedback.professionalismRating)) ||
+          Number.isFinite(Number(cachedFeedback.communicationRating)) ||
+          Number.isFinite(Number(cachedFeedback.timelineRating)) ||
+          Number.isFinite(Number(cachedFeedback.contentQualityRating)))
+      ) {
+        return cachedFeedback;
       }
-      return normalized;
-    } catch (error) {
-      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+
+      if (isMountedRef.current) {
+        setIsFetchingDetail(true);
+      }
+      try {
+        const response = await getKolFeedbackDetail({
+          feedbackId,
+          signal,
+        });
+        const normalized = normalizeFeedback(response?.data ?? response);
+        if (isMountedRef.current && normalized) {
+          setFeedback(normalized);
+          feedbackRef.current = normalized;
+        }
+        return normalized;
+      } catch (error) {
+        if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+          return null;
+        }
+        console.error("Không thể tải chi tiết đánh giá", error);
+        if (isMountedRef.current) {
+          message.error(buildErrorMessage(error));
+        }
         return null;
+      } finally {
+        if (isMountedRef.current) {
+          setIsFetchingDetail(false);
+        }
       }
-      console.error("Không thể tải chi tiết đánh giá", error);
-      if (isMountedRef.current) {
-        message.error(buildErrorMessage(error));
-      }
-      return null;
-    } finally {
-      if (isMountedRef.current) {
-        setIsFetchingDetail(false);
-      }
-    }
-  }, [feedbackId]);
+    },
+    [feedbackId]
+  );
 
   useEffect(() => {
     if (!feedbackId) return;
 
     const controller = new AbortController();
-    fetchFeedbackDetail({ force: true, signal: controller.signal }).catch(() => {});
+    fetchFeedbackDetail({ force: true, signal: controller.signal }).catch(
+      () => {}
+    );
 
     return () => {
       controller.abort();
@@ -717,5 +722,3 @@ const UserKolFeedbackSection = ({
 };
 
 export default UserKolFeedbackSection;
-
-

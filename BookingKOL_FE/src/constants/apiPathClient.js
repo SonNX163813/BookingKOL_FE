@@ -74,6 +74,10 @@ export const CLIENT_API_PATHS = {
     cancelPurchase: (purchaseId) =>
       `/v1/courses/purchase/cancel/${encodeURIComponent(purchaseId)}`,
   },
+  BLOG: {
+    getAll: "/v1/blogs/all",
+    getDetail: (blogId) => `/v1/blogs/detail/${encodeURIComponent(blogId)}`,
+  },
 
   PLATFORM: {
     all: "/v1/platforms/all",

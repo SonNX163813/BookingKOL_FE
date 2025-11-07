@@ -7,6 +7,7 @@ const CoursesGrid = ({ courses, onSelectCourse }) => (
     container
     spacing={{ xs: 2, md: 3 }}
     columns={{ xs: 12, sm: 12, md: 24, lg: 60 }}
+    justifyContent={"center"}
   >
     {courses.map((course) => (
       <Grid item xs={12} sm={6} md={8} lg={6} key={course.id ?? course.name}>

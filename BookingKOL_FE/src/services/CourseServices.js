@@ -32,21 +32,28 @@ export const getDetailCourse = async (id) => {
   });
 };
 
-export const createCourse = async (value) => {
+export const createCourse = async (value = {}) => {
   const formData = new FormData();
-  const requestPayload = {
-    name: value.name,
-    price: value.price,
-    discount: value.discount,
-    description: value.description,
-  };
+  const { courseMedias = [], coursePackageDTO, ...restFields } = value;
+
+  const payloadSource = coursePackageDTO ?? restFields;
+  const requestPayload = Object.fromEntries(
+    Object.entries(payloadSource).filter(([, fieldValue]) => fieldValue !== undefined)
+  );
 
   const blob = new Blob([JSON.stringify(requestPayload)], {
     type: "application/json",
   });
 
   formData.append("coursePackageDTO", blob);
-  formData.append("courseMedias", value.courseMedias);
+
+  const medias = Array.isArray(courseMedias)
+    ? courseMedias
+    : courseMedias
+    ? [courseMedias]
+    : [];
+
+  medias.forEach((media) => formData.append("courseMedias", media));
 
   return await post({
     url: API_PATHS.COURSE.createCourse,
