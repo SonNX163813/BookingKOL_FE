@@ -72,7 +72,7 @@ export const API_PATHS = {
     adminGetDetail: (blogId) =>
       `v1/admin/blogs/detail/${encodeURIComponent(blogId)}`,
     adminUpdate: (blogId) =>
-      `v1/admin/blogs/detail/${encodeURIComponent(blogId)}`,
+      `v1/admin/blogs/update/${encodeURIComponent(blogId)}`,
     adminDelete: (blogId) =>
       `v1/admin/blogs/delete/${encodeURIComponent(blogId)}`,
   },

@@ -146,6 +146,11 @@ const MainLayoutAdmin = () => {
           icon: <PlayCircleOutline />,
           label: <Link to="management-course">Khóa học</Link>,
         },
+        {
+          key: "management-his",
+          icon: <BarChartOutlined />,
+          label: "Quản lý lịch sử mua khóa học",
+        },
       ],
     },
     {
@@ -158,6 +163,11 @@ const MainLayoutAdmin = () => {
       icon: <EventNoteOutlined />,
       label: "Quản lý booking",
       children: [
+        {
+          key: "management-refunds",
+          icon: <MonetizationOnOutlined />,
+          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
+        },
         {
           key: "management-booking-requests",
           icon: <CalendarMonthOutlined />,
@@ -177,30 +187,18 @@ const MainLayoutAdmin = () => {
         },
       ],
     },
-    {
-      key: "management-refund",
-      icon: <MonetizationOnOutlined />,
-      label: "Quản lý tiền",
-      children: [
-        {
-          key: "management-refunds",
-          icon: <MonetizationOnOutlined />,
-          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
-        },
-      ],
-    },
-    {
-      key: "management-history",
-      icon: <FolderOutlined />,
-      label: "Quản lý lịch sử",
-      children: [
-        {
-          key: "management-his",
-          icon: <BarChartOutlined />,
-          label: "Quản lý lịch sử mua khóa học",
-        },
-      ],
-    },
+    // {
+    //   key: "management-refund",
+    //   icon: <MonetizationOnOutlined />,
+    //   label: "Quản lý tiền",
+    //   children: [],
+    // },
+    // {
+    //   key: "management-history",
+    //   icon: <FolderOutlined />,
+    //   label: "Quản lý lịch sử",
+    //   children: [],
+    // },
     {
       key: "management",
       icon: <FolderOutlined />,
@@ -214,12 +212,12 @@ const MainLayoutAdmin = () => {
       ],
     },
 
-    {
-      key: "settings",
-      icon: <SettingsOutlined />,
-      label: "Cài đặt",
-      children: [],
-    },
+    // {
+    //   key: "settings",
+    //   icon: <SettingsOutlined />,
+    //   label: "Cài đặt",
+    //   children: [],
+    // },
   ];
 
   return (

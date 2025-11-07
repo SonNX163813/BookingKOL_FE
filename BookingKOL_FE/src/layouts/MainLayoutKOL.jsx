@@ -146,18 +146,12 @@ export default function MainLayoutKOL() {
         },
       ],
     },
-    {
-      key: "group-portfolio",
-      icon: <CollectionsOutlined />,
-      label: "Portfolio",
-      children: [
-        {
-          key: "kol-portfolio",
-          icon: <CollectionsOutlined />,
-          label: <Link to="portfolio">Thư viện nội dung</Link>,
-        },
-      ],
-    },
+    // {
+    //   key: "group-portfolio",
+    //   icon: <CollectionsOutlined />,
+    //   label: "Portfolio",
+    //   children: [],
+    // },
     {
       key: "group-profile",
       icon: <PersonOutline />,
@@ -171,7 +165,12 @@ export default function MainLayoutKOL() {
         {
           key: "kol-settings",
           icon: <SettingsOutlined />,
-          label: <Link to="settings">Cài đặt hiển thị</Link>,
+          label: <Link to="settings">Cài đặt tài khoản</Link>,
+        },
+        {
+          key: "kol-portfolio",
+          icon: <CollectionsOutlined />,
+          label: <Link to="portfolio">Hồ sơ cá nhân</Link>,
         },
       ],
     },

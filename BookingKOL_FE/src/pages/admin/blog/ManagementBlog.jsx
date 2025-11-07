@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Button,
   Card,
-  Divider,
   Form,
   Input,
   Modal,
-  Space,
   Switch,
   Table,
   Tag,
@@ -16,9 +15,7 @@ import {
 } from "antd";
 import {
   DeleteOutlined,
-  EditOutlined,
   ExclamationCircleOutlined,
-  EyeOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
 import { Search, Trash2, Eye, Plus, Pencil } from "lucide-react";
@@ -28,8 +25,9 @@ import {
   adminFetchBlogList,
   adminUpdateBlog,
 } from "../../../services/admin/AdminBlogAPI";
+import RichTextEditor from "../../../components/admin/RichTextEditor";
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Text } = Typography;
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
@@ -37,7 +35,6 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 const formatDateTime = (value) =>
   value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "--";
 
-const emptyDetailState = { open: false, loading: false, data: null };
 const emptyEditState = {
   open: false,
   loading: false,
@@ -46,6 +43,7 @@ const emptyEditState = {
 };
 
 const ManagementBlog = () => {
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(DEFAULT_PAGE_SIZE);
   const [blogs, setBlogs] = useState([]);
@@ -55,7 +53,6 @@ const ManagementBlog = () => {
     totalPages: 0,
   });
 
-  const [detailModal, setDetailModal] = useState(emptyDetailState);
   const [editModal, setEditModal] = useState(emptyEditState);
   const [editForm] = Form.useForm();
 
@@ -92,19 +89,6 @@ const ManagementBlog = () => {
     setPage(nextPage);
     setSize(nextSize);
   };
-
-  const openDetailModal = async (blogId) => {
-    setDetailModal({ open: true, loading: true, data: null });
-    try {
-      const data = await adminFetchBlogDetail(blogId);
-      setDetailModal({ open: true, loading: false, data });
-    } catch (error) {
-      console.error("Failed to fetch blog detail", error);
-      setDetailModal({ open: false, loading: false, data: null });
-    }
-  };
-
-  const closeDetailModal = () => setDetailModal(emptyDetailState);
 
   const openEditModal = async (blogId) => {
     setEditModal({
@@ -210,13 +194,13 @@ const ManagementBlog = () => {
       width: 260,
       render: (_, record) => (
         <div className="flex justify-center gap-2">
-          <Button
-            onClick={() => openDetailModal(record.id)}
-            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-            title="Xem nhanh"
-          >
-            <Eye size={18} className="font-semibold" />
-          </Button>
+            <Button
+              onClick={() => navigate(`/admin/management-blogs/${record.id}`)}
+              className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+              title="Xem chi tiết"
+            >
+              <Eye size={18} className="font-semibold" />
+            </Button>
           <Button
             onClick={() => openEditModal(record.id)}
             className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
@@ -282,58 +266,6 @@ const ManagementBlog = () => {
       </Card>
 
       <Modal
-        open={detailModal.open}
-        onCancel={closeDetailModal}
-        footer={
-          <Button type="primary" onClick={closeDetailModal}>
-            Đóng
-          </Button>
-        }
-        title={
-          detailModal.data
-            ? `Chi tiết blog #${detailModal.data.id}`
-            : "Chi tiết blog"
-        }
-        width={720}
-      >
-        {detailModal.loading ? (
-          <div className="flex justify-center py-8">
-            <Spin />
-          </div>
-        ) : detailModal.data ? (
-          <div className="space-y-2">
-            <Paragraph>
-              <Text strong>Tiêu đề:</Text> {detailModal.data.title || "--"}
-            </Paragraph>
-            <Paragraph>
-              <Text strong>Tác giả:</Text> {detailModal.data.author || "--"}
-            </Paragraph>
-            <Paragraph>
-              <Text strong>Trạng thái:</Text>{" "}
-              {detailModal.data.isPublish ? "Đã xuất bản" : "Nháp"}
-            </Paragraph>
-            <Paragraph>
-              <Text strong>Ngày tạo:</Text>{" "}
-              {formatDateTime(detailModal.data.createdAt)}
-            </Paragraph>
-            <Paragraph>
-              <Text strong>Ngày cập nhật:</Text>{" "}
-              {formatDateTime(detailModal.data.updatedAt)}
-            </Paragraph>
-            <Divider />
-            <Paragraph>
-              <Text strong>Nội dung:</Text>
-            </Paragraph>
-            <Paragraph className="whitespace-pre-wrap">
-              {detailModal.data.content || "Chưa có nội dung"}
-            </Paragraph>
-          </div>
-        ) : (
-          <Paragraph>Không tìm thấy thông tin blog.</Paragraph>
-        )}
-      </Modal>
-
-      <Modal
         open={editModal.open}
         onCancel={closeEditModal}
         onOk={handleSubmitEdit}
@@ -343,7 +275,7 @@ const ManagementBlog = () => {
             ? `Chỉnh sửa blog #${editModal.blogId}`
             : "Chỉnh sửa blog"
         }
-        width={720}
+        width={900}
         okText="Luu"
         cancelText="Huy"
         okButtonProps={{ disabled: editModal.loading }}
@@ -371,7 +303,7 @@ const ManagementBlog = () => {
                 { required: true, message: "Vui lòng nhập nội dung bài viết" },
               ]}
             >
-              <Input.TextArea rows={6} placeholder="Nhập nội dung blog" />
+              <RichTextEditor placeholder="Nhập nội dung blog" />
             </Form.Item>
             <Form.Item
               label="Xuất bản"
