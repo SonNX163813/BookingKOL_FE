@@ -8,9 +8,9 @@ import {
   Button,
   Space,
   Table,
-  Tag,
   message,
   Empty,
+  DatePicker,
 } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
@@ -18,187 +18,177 @@ import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
 import {
-  createKolLeaveRequest,
-  getMyLeaveRequests,
-} from "../../services/kol/LeaveRequestAPI";
-import { getKolFreeTime } from "../../services/kol/KolAPI";
+  getKolFreeTime,
+  getKolProfileByUserId,
+  removeKolAvailabilityRange,
+} from "../../services/kol/KolAPI";
 
 dayjs.locale("vi");
 const { Title, Text } = Typography;
-
-const STATUS_COLOR = {
-  PENDING: "gold",
-  APPROVED: "green",
-  REJECTED: "red",
-  CANCELLED: "volcano",
-};
+const { RangePicker } = DatePicker;
 
 export default function KolScheduleChange() {
-  const { kolId: kolIdFromRoute } = useParams();
+  const { kolId: kolIdParam } = useParams();
   const auth = useAuth?.() || {};
-  const appUser = auth?.user || {};
+  const userId = auth?.user?.id;
   const queryClient = useQueryClient();
-
   const [form] = Form.useForm();
-  const [pagination, setPagination] = useState({ page: 0, size: 10 });
-  const [keyword, setKeyword] = useState("");
 
-  /** ===== LẤY DANH SÁCH YÊU CẦU NGHỈ (MY LEAVES) ===== */
-  const {
-    data: leavesRes,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ["kol-my-leaves", pagination.page, pagination.size, keyword],
-    queryFn: () =>
-      getMyLeaveRequests({
-        page: pagination.page,
-        size: pagination.size,
-        keyword,
-      }),
-    keepPreviousData: true,
+  // ===== 1. Resolve KOL ID giống KolSchedule.jsx =====
+  const [kolId, setKolId] = useState(
+    kolIdParam || auth?.user?.kolId || auth?.user?.kolProfileId || ""
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      // Nếu đã có kolId từ route / user thì thôi
+      if (kolId) return;
+      if (!userId) return;
+      try {
+        const me = await getKolProfileByUserId(userId);
+        if (mounted) setKolId(me?.id || "");
+      } catch (e) {
+        console.warn("[KolScheduleChange] getKolProfileByUserId fail:", e);
+        if (mounted) {
+          setKolId("");
+          message.error("Không lấy được KOL ID. Vui lòng kiểm tra tài khoản.");
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [kolId, userId]);
+
+  // ===== 2. Khoảng ngày filter free-time =====
+  const [dateRange, setDateRange] = useState(() => {
+    const start = dayjs().startOf("day");
+    const end = dayjs().add(14, "day").endOf("day");
+    return [start, end];
   });
 
-  // interceptor GET trả về response.data => leavesRes = { status, message, data, timestamp }
-  const leavesPage = leavesRes?.data || {};
-  const leavesContent = Array.isArray(leavesPage.content)
-    ? leavesPage.content
-    : [];
-  const totalElements = leavesPage.totalElements ?? 0;
-  const pageSize = leavesPage.size || pagination.size;
-
-  /** ===== SUY RA KOL ID TỰ ĐỘNG =====
-   * Ưu tiên:
-   * 1. kolId trên URL (nếu có)
-   * 2. kolId trong danh sách my-leaves (cột kolId)
-   * 3. kolId từ user context (nếu BE đã map)
-   */
-  const kolIdFromLeaves = useMemo(() => {
-    if (!leavesContent.length) return "";
-    // giả sử tất cả bản ghi thuộc cùng 1 KOL
-    return leavesContent[0]?.kolId || "";
-  }, [leavesContent]);
-
-  const resolvedKolId =
-    kolIdFromRoute ||
-    kolIdFromLeaves ||
-    appUser?.kolId ||
-    appUser?.kolProfileId ||
-    "";
-
-  /** ===== LẤY DANH SÁCH LỊCH RẢNH (FREE TIME) CHO KOL =====
-   * GET /v1/availabilities/free-time/{kolId}
-   */
+  // ===== 3. Load danh sách ca rảnh từ /availabilities/free-time/{kolId} =====
   const {
-    data: freeTimeRes,
+    data: freeSlots = [],
     isLoading: loadingFree,
-    isError: isErrorFree,
+    isError: freeError,
+    error: freeErrorObj,
   } = useQuery({
-    queryKey: ["kol-free-time-for-leave", resolvedKolId],
-    enabled: !!resolvedKolId,
+    queryKey: [
+      "kol-free-time-for-change",
+      kolId,
+      dateRange[0]?.toISOString(),
+      dateRange[1]?.toISOString(),
+    ],
+    enabled: !!kolId, // CHỈ chạy khi đã có kolId => trước đó bạn bị kẹt ở đây
     queryFn: () =>
       getKolFreeTime({
-        kolId: resolvedKolId,
-        // có thể truyền startDate/endDate nếu BE yêu cầu; để trống = full theo rule BE
+        kolId,
+        startDate: dateRange[0]?.toISOString(),
+        endDate: dateRange[1]?.toISOString(),
       }),
   });
 
-  // getKolFreeTime đã trả về array từ asArray()
-  const freeTimeList = Array.isArray(freeTimeRes) ? freeTimeRes : [];
+  const slots = useMemo(
+    () =>
+      (freeSlots || []).map((x, index) => ({
+        key: x.availabilityId || x.id || index,
+        availabilityId: x.availabilityId || x.id, // cần BE trả trường này
+        startAt: x.startAt,
+        endAt: x.endAt,
+      })),
+    [freeSlots]
+  );
 
-  /** ===== TẠO YÊU CẦU NGHỈ ===== */
-  const { mutateAsync, isLoading: creating } = useMutation({
-    mutationFn: createKolLeaveRequest,
+  // ===== 4. Gọi /availabilities/kol/remove-range =====
+  const { mutateAsync: doRemoveRange, isLoading: removing } = useMutation({
+    mutationFn: removeKolAvailabilityRange,
     onSuccess: () => {
-      message.success("Đã gửi yêu cầu xin nghỉ/đổi ca.");
-      form.resetFields(["availabilityId", "reason"]);
-      queryClient.invalidateQueries({ queryKey: ["kol-my-leaves"] });
+      message.success("Đã xóa khung giờ trong ca.");
+      queryClient.invalidateQueries({
+        queryKey: ["kol-free-time-for-change"],
+      });
+      form.resetFields(["removeRange"]);
     },
     onError: (e) => {
       const msg =
         e?.response?.data?.message?.[0] ||
         e?.response?.data?.message ||
         e?.message ||
-        "Gửi yêu cầu thất bại";
+        "Không thể cập nhật lịch.";
       message.error(msg);
     },
   });
 
-  const onSubmit = async (values) => {
-    const kolId = resolvedKolId;
+  const handleSubmit = async (values) => {
+    const { availabilityId, removeRange } = values;
+
     if (!kolId) {
-      message.warning(
-        "Không xác định được KOL ID. Vui lòng thử lại sau hoặc liên hệ hỗ trợ."
-      );
+      message.warning("Không xác định được KOL ID.");
       return;
     }
-    if (!values.availabilityId) {
-      message.warning("Vui lòng chọn Availability ID.");
+    if (!availabilityId) {
+      message.warning("Vui lòng chọn Availability ID từ bảng ca bên dưới.");
       return;
     }
-    await mutateAsync({
-      kolId,
-      availabilityId: values.availabilityId,
-      reason: values.reason || "",
+    if (!removeRange || removeRange.length !== 2) {
+      message.warning("Vui lòng chọn khoảng giờ cần xóa.");
+      return;
+    }
+
+    const [start, end] = removeRange;
+    if (!dayjs(end).isAfter(start)) {
+      message.warning("Thời gian kết thúc phải sau thời gian bắt đầu.");
+      return;
+    }
+
+    const slot = slots.find((s) => s.availabilityId === availabilityId);
+    if (slot && slot.startAt && slot.endAt) {
+      const sSlot = dayjs(slot.startAt);
+      const eSlot = dayjs(slot.endAt);
+
+      if (
+        !start.isBetween(sSlot, eSlot, null, "[)") ||
+        !end.isBetween(sSlot, eSlot, null, "(]")
+      ) {
+        message.warning(
+          "Khoảng giờ cần xóa phải nằm hoàn toàn trong ca đã chọn."
+        );
+        return;
+      }
+    }
+
+    await doRemoveRange({
+      availabilityId,
+      startRemove: start,
+      endRemove: end,
     });
   };
 
-  /** ===== CỘT BẢNG YÊU CẦU NGHỈ ===== */
-  const leaveColumns = [
-    {
-      title: "Thời gian tạo",
-      dataIndex: "createdAt",
-      key: "createdAt",
-      render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "-"),
-      width: 160,
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      render: (v) => <Tag color={STATUS_COLOR[v] || "blue"}>{v || "-"}</Tag>,
-      width: 120,
-    },
-    {
-      title: "Reason",
-      dataIndex: "reason",
-      key: "reason",
-      ellipsis: true,
-    },
-    {
-      title: "Admin note",
-      dataIndex: "adminNote",
-      key: "adminNote",
-      ellipsis: true,
-    },
+  // ===== 5. Bảng ca rảnh =====
+  const columns = [
     {
       title: "Availability ID",
       dataIndex: "availabilityId",
       key: "availabilityId",
-      render: (v) => <Text code>{v}</Text>,
       width: 260,
-    },
-  ];
-
-  /** ===== CỘT BẢNG LỊCH RẢNH (CHỌN AVAILABILITY) ===== */
-  const freeColumns = [
-    {
-      title: "Availability ID",
-      dataIndex: "id",
-      key: "id",
-      render: (v) => <Text code>{v}</Text>,
-      width: 260,
+      render: (v) =>
+        v ? (
+          <Text code>{v}</Text>
+        ) : (
+          <Text type="secondary">
+            Thiếu availabilityId (backend cần trả thêm trường này)
+          </Text>
+        ),
     },
     {
-      title: "Thời gian",
+      title: "Thời gian ca",
       key: "time",
       render: (record) => {
-        const start = record.startAt || record.startTime || record.start;
-        const end = record.endAt || record.endTime || record.end;
-        const s = start ? dayjs(start) : null;
-        const e = end ? dayjs(end) : null;
-        if (!s || !s.isValid() || !e || !e.isValid()) return "-";
+        const s = record.startAt ? dayjs(record.startAt) : null;
+        const e = record.endAt ? dayjs(record.endAt) : null;
+        if (!s?.isValid() || !e?.isValid()) return "-";
         return `${s.format("HH:mm")} - ${e.format("HH:mm")}, ${s.format(
           "DD/MM/YYYY"
         )}`;
@@ -207,49 +197,57 @@ export default function KolScheduleChange() {
     {
       title: "",
       key: "action",
-      render: (record) => (
-        <Button
-          size="small"
-          type="link"
-          onClick={() => form.setFieldsValue({ availabilityId: record.id })}
-        >
-          Chọn
-        </Button>
-      ),
-      width: 80,
+      width: 110,
+      render: (record) => {
+        const s = record.startAt ? dayjs(record.startAt) : null;
+        const e = record.endAt ? dayjs(record.endAt) : null;
+        return (
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              if (!record.availabilityId) {
+                message.warning(
+                  "Ca này không có availabilityId trong response. Liên hệ backend để bổ sung."
+                );
+                return;
+              }
+              if (!s?.isValid() || !e?.isValid()) {
+                message.warning("Thời gian ca không hợp lệ.");
+                return;
+              }
+              form.setFieldsValue({
+                availabilityId: record.availabilityId,
+                removeRange: [s, e],
+              });
+            }}
+          >
+            Chọn ca
+          </Button>
+        );
+      },
     },
   ];
 
   return (
     <Card style={{ margin: 16 }}>
-      <Space direction="vertical" size={12} style={{ width: "100%" }}>
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
         <Title level={4} style={{ marginBottom: 0 }}>
-          Thay đổi lịch làm / Xin nghỉ
+          Thay đổi lịch làm theo khung giờ
         </Title>
 
         <Text type="secondary">
-          1️⃣ Chọn <b>Availability</b> từ danh sách lịch rảnh bên dưới (bấm
-          “Chọn” để tự điền).
-          <br />
-          2️⃣ Nhập lý do (nếu có) và gửi yêu cầu. Hệ thống dùng endpoint:{" "}
-          <code>
-            /v1/leave-requests/{"{kolId}"}/{"{availabilityId}"}
-          </code>
-          .
+          Dùng <code>/v1/availabilities/free-time/{"{kolId}"}</code> để lấy ca
+          đã đăng ký và <code>/v1/availabilities/kol/remove-range</code> để xóa
+          1 phần ca.
         </Text>
 
-        {/* KOL ID hiển thị tự động, không cho sửa */}
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={onSubmit}
-          initialValues={{ availabilityId: "", reason: "" }}
-        >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item label="KOL ID">
             <Input
-              value={resolvedKolId || ""}
+              value={kolId || ""}
               disabled
-              placeholder="Đang lấy từ dữ liệu hệ thống..."
+              placeholder="Không xác định được KOL ID"
             />
           </Form.Item>
 
@@ -257,113 +255,77 @@ export default function KolScheduleChange() {
             label="Availability ID"
             name="availabilityId"
             rules={[
-              { required: true, message: "Vui lòng chọn Availability ID" },
+              {
+                required: true,
+                message: "Vui lòng chọn Availability ID từ bảng ca bên dưới.",
+              },
             ]}
           >
-            <Input placeholder="Chọn từ bảng lịch rảnh bên dưới hoặc dán ID ca làm đã đăng ký" />
+            <Input placeholder="Nhấn 'Chọn ca' bên dưới để tự điền." />
           </Form.Item>
 
-          <Form.Item label="Lý do (reason — optional)" name="reason">
-            <Input.TextArea rows={3} placeholder="Lý do xin nghỉ/đổi ca..." />
+          <Form.Item
+            label="Khoảng giờ cần xóa trong ca"
+            name="removeRange"
+            rules={[
+              { required: true, message: "Vui lòng chọn khoảng giờ cần xóa." },
+            ]}
+          >
+            <RangePicker
+              showTime
+              style={{ width: "100%" }}
+              format="DD/MM/YYYY HH:mm"
+            />
           </Form.Item>
 
-          <Space>
-            <Button
-              htmlType="submit"
-              type="primary"
-              loading={creating}
-              disabled={!resolvedKolId}
-            >
-              Gửi yêu cầu
-            </Button>
-          </Space>
-
-          {!resolvedKolId && (
-            <div className="mt-1 text-sm text-red-500">
-              Không xác định được KOL ID từ hệ thống. Kiểm tra lại đăng nhập
-              hoặc dữ liệu my-leaves.
-            </div>
-          )}
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={removing}
+            disabled={!kolId}
+          >
+            Xác nhận xóa khung giờ
+          </Button>
         </Form>
 
-        {/* DANH SÁCH LỊCH RẢNH */}
-        <div style={{ marginTop: 16 }}>
-          <Title level={5}>Lịch rảnh (để chọn Availability)</Title>
-          {isErrorFree ? (
-            <Empty
-              description="Không tải được danh sách lịch rảnh."
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
-          ) : (
+        <div>
+          <Space direction="vertical" style={{ width: "100%" }}>
+            <Title level={5}>Danh sách ca đã đăng ký</Title>
+
+            <Space style={{ marginBottom: 8 }}>
+              <RangePicker
+                format="DD/MM/YYYY"
+                value={dateRange}
+                onChange={(vals) => {
+                  if (!vals || vals.length !== 2) return;
+                  setDateRange([vals[0].startOf("day"), vals[1].endOf("day")]);
+                }}
+              />
+            </Space>
+
             <Table
               size="small"
-              rowKey={(r) => r.id || `${r.startAt}_${r.endAt}`}
+              rowKey="key"
               loading={loadingFree}
-              columns={freeColumns}
-              dataSource={freeTimeList}
+              columns={columns}
+              dataSource={slots}
               pagination={false}
               locale={{
-                emptyText: resolvedKolId
-                  ? "Không có lịch rảnh hoặc chưa đăng ký ca."
-                  : "Chưa xác định được KOL ID.",
+                emptyText: freeError ? (
+                  <Empty
+                    description={
+                      freeErrorObj?.response?.data?.message ||
+                      "Không tải được danh sách ca."
+                    }
+                  />
+                ) : kolId ? (
+                  "Không có ca nào trong khoảng ngày đã chọn."
+                ) : (
+                  "Chưa xác định được KOL ID."
+                ),
               }}
-            />
-          )}
-        </div>
-
-        {/* DANH SÁCH YÊU CẦU ĐÃ GỬI */}
-        <div style={{ marginTop: 24 }}>
-          <Title level={5}>Yêu cầu xin nghỉ/đổi ca của tôi</Title>
-
-          <Space style={{ marginBottom: 8 }}>
-            <Input.Search
-              placeholder="Tìm theo lý do / ghi chú"
-              allowClear
-              onSearch={(v) => {
-                setPagination((p) => ({ ...p, page: 0 }));
-                setKeyword(v || "");
-              }}
-              style={{ width: 280 }}
             />
           </Space>
-
-          <Table
-            bordered
-            rowKey={(r) => r.id}
-            loading={isLoading}
-            columns={leaveColumns}
-            dataSource={leavesContent}
-            locale={{
-              emptyText: isError ? (
-                <Empty
-                  description={
-                    <span>
-                      Không tải được dữ liệu.
-                      <br />
-                      {error?.response?.data?.message?.[0] ||
-                        error?.response?.data?.message ||
-                        error?.message ||
-                        "Vui lòng thử lại."}
-                    </span>
-                  }
-                />
-              ) : (
-                "Chưa có yêu cầu xin nghỉ nào."
-              ),
-            }}
-            pagination={{
-              current:
-                typeof leavesPage.number === "number"
-                  ? leavesPage.number + 1
-                  : pagination.page + 1,
-              total: totalElements,
-              pageSize: pageSize || pagination.size,
-              showSizeChanger: true,
-              onChange: (page, size) => {
-                setPagination({ page: page - 1, size });
-              },
-            }}
-          />
         </div>
       </Space>
     </Card>

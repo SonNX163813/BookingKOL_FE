@@ -46,9 +46,14 @@ export const API_PATHS = {
     getAll: "/v1/admin/booking/single-requests/all",
     getDetail: "/v1/admin/booking/single-requests/detail",
     getAllByKol: "/v1/admin/booking/single-requests/all/by-kol",
+    getAllByUser: "/v1/admin/booking/single-requests/all/by-user",
     getWorktimeLivestreamMetrics: (worktimeId) =>
       `v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
         worktimeId
+      )}`,
+    getLivestreamMetricsByKol: (kolId) =>
+      `v1/admin/requests/worktime/livestream-metrics/kol/${encodeURIComponent(
+        kolId
       )}`,
   },
   SCHEDULER_ADMIN: {

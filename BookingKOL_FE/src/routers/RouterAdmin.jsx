@@ -20,11 +20,14 @@ import EditKOL from "../pages/admin/management-user/management-kol/EditKOL";
 import KolPortfolioPage from "../pages/admin/management-user/management-kol/KolPortfolioPage";
 import CreateKOL from "../pages/admin/management-user/management-kol/CreateKOL";
 import AdminKolBookingById from "../pages/admin/management-user/management-kol/AdminKolBookingById";
+import AdminUserBookingById from "../pages/admin/management-user/management-customer/AdminUserBookingById";
 import AdminViewKolSchedule from "../pages/admin/management-user/management-kol/AdminViewKolSchedule";
 
 // Campaign pages
 import ManagementBookingCampaigns from "../pages/admin/booking-campaign/ManagementBookingCampaigns";
 import EditBookingCampaign from "../pages/admin/booking-campaign/EditBookingCampain"; // 👈 mới
+
+import AdminKolLivestreamMetrics from "../pages/admin/management-user/management-kol/AdminKolLivestreamMetrics";
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -44,7 +47,10 @@ export const routerAdmin = [
       { path: "kols/create", element: <CreateKOL /> },
       { path: "kols/:kolId/edit", element: <EditKOL /> },
       { path: "kols/:kolId/portfolio", element: <KolPortfolioPage /> },
-
+      {
+        path: "management-customer/:userId/bookings",
+        element: <AdminUserBookingById />,
+      },
       {
         path: "management-booking-requests",
         element: <ManagementBookingRequests />,
@@ -68,6 +74,10 @@ export const routerAdmin = [
       },
 
       { path: "bookings/create", element: <EditBookingCampaign /> }, // 👈 mới
+      {
+        path: "/admin/kols/:kolId/metrics",
+        element: <AdminKolLivestreamMetrics />,
+      },
     ],
   },
 

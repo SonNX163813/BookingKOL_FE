@@ -1,15 +1,14 @@
-import { Search, Trash2, Eye, Loader2, Check, X } from "lucide-react";
 import {
-  Button,
-  Card,
-  Form,
-  Input,
-  Modal,
-  Pagination,
-  Spin,
-  Table,
-  Popconfirm,
-} from "antd";
+  Search,
+  Trash2,
+  Eye,
+  Loader2,
+  Check,
+  X,
+  CalendarDays,
+  CheckCircle2,
+} from "lucide-react";
+import { Button, Form, Input, Pagination, Table, Popconfirm } from "antd";
 import { useState } from "react";
 import { useGetAllBrands } from "../../../../hook/admin/management-user/useGetAllBrands";
 import { AccountCircleOutlined } from "@mui/icons-material";
@@ -50,6 +49,7 @@ const ManagementCustomer = () => {
   const resetForm = () => {
     form.resetFields();
     setSearchValue(undefined);
+    setPage(0);
   };
 
   const handleActivate = (row) => {
@@ -101,6 +101,7 @@ const ManagementCustomer = () => {
       title: "Thao tác",
       key: "action",
       align: "center",
+      width: "26%",
       render: (record) => {
         const loadingThisRow =
           isLoadingAdminUpdateStatusAccount && userIdUpdate === record.userId;
@@ -108,12 +109,11 @@ const ManagementCustomer = () => {
         const isActive = record.status === "ACTIVE";
         const canActivate =
           record.status === "PENDING" || record.status === "SUSPENDED";
-        // Nếu muốn cho INACTIVE cũng hiện nút ✔ để kích hoạt, bật thêm điều kiện:
-        // const canActivate = ["PENDING", "SUSPENDED", "INACTIVE"].includes(record.status);
+        // Nếu muốn cho INACTIVE cũng kích hoạt được thì thêm vào mảng trên.
 
         return (
           <div className="w-full flex justify-center gap-3">
-            {/* Xem chi tiết */}
+            {/* Xem chi tiết hồ sơ */}
             <Button
               onClick={() =>
                 navigate(`/admin/management-customer/${record.userId}`)
@@ -123,7 +123,24 @@ const ManagementCustomer = () => {
               <Eye size={18} className="font-semibold" />
             </Button>
 
-            {/* Nếu ACTIVE → chỉ hiện nút X (tạm khóa) */}
+            {/* ✅ NEW: Xem lịch sử booking của user (giống bên KOL) */}
+            <Button
+              onClick={() =>
+                navigate(`/admin/management-customer/${record.userId}/bookings`)
+              }
+              className="!h-10 !bg-amber-600 !text-white !border-none hover:!bg-amber-700 transition-all"
+            >
+              <span className="relative inline-block">
+                <CalendarDays size={18} className="align-middle" />
+                <CheckCircle2
+                  size={12}
+                  strokeWidth={2}
+                  className="absolute -right-1 -bottom-1 rounded-full bg-amber-600"
+                />
+              </span>
+            </Button>
+
+            {/* Nếu ACTIVE → nút tạm khóa (X) */}
             {isActive && (
               <Popconfirm
                 title="Bạn có muốn tạm khóa tài khoản này không?"
@@ -142,7 +159,7 @@ const ManagementCustomer = () => {
               </Popconfirm>
             )}
 
-            {/* Nếu PENDING/SUSPENDED → chỉ hiện nút ✔ (kích hoạt) */}
+            {/* Nếu PENDING / SUSPENDED → nút kích hoạt (✔) */}
             {canActivate && (
               <Popconfirm
                 title="Bạn có muốn kích hoạt tài khoản này không?"
@@ -163,7 +180,6 @@ const ManagementCustomer = () => {
           </div>
         );
       },
-      width: "20%",
     },
   ];
 
@@ -206,15 +222,13 @@ const ManagementCustomer = () => {
         </Form>
       </div>
 
-      <div>
-        <Table
-          columns={columns}
-          dataSource={dataResponse}
-          loading={isLoadingGetAllBrands}
-          pagination={false}
-          rowKey="userId"
-        />
-      </div>
+      <Table
+        columns={columns}
+        dataSource={dataResponse}
+        loading={isLoadingGetAllBrands}
+        pagination={false}
+        rowKey="userId"
+      />
 
       <div className="!my-4 py-5">
         <Pagination

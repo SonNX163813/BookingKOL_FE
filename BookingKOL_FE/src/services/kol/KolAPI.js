@@ -887,3 +887,31 @@ export const getAvailabilityTimelineById = async (
   // BE đôi khi trả mảng → lấy phần tử đầu
   return Array.isArray(data) ? data[0] ?? null : data ?? null;
 };
+export const removeKolAvailabilityRange = async ({
+  availabilityId,
+  startRemove,
+  endRemove,
+  signal,
+} = {}) => {
+  if (!availabilityId) throw new Error("availabilityId is required");
+  if (!startRemove || !endRemove) {
+    throw new Error("startRemove và endRemove là bắt buộc");
+  }
+
+  const body = {
+    availabilityId,
+    startRemove: dayjs.isDayjs(startRemove)
+      ? startRemove.toISOString()
+      : startRemove,
+    endRemove: dayjs.isDayjs(endRemove) ? endRemove.toISOString() : endRemove,
+  };
+
+  const res = await post({
+    url: CLIENT_API_PATHS.SCHEDULER.kolRemoveRange,
+    data: body,
+    config: signal ? { signal } : undefined,
+  });
+
+  // axios-config interceptor đã toast & trả res.data
+  return res;
+};
