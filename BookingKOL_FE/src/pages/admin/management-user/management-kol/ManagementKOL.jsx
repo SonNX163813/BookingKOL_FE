@@ -7,6 +7,7 @@ import {
   CalendarRange,
   CalendarDays,
   CheckCircle2,
+  BarChart3, // ✅ Icon thống kê
 } from "lucide-react";
 
 // src/pages/admin/management-user/management-kol/ManagementKOL.jsx
@@ -26,7 +27,6 @@ import {
 } from "antd";
 
 import { useEffect, useMemo, useState } from "react";
-
 import { useNavigate } from "react-router-dom";
 import { useGetAllKol } from "../../../../hook/admin/management-user/useGetAllKol";
 import { adminGetKolsByCategory } from "../../../../services/admin/AdminAPI";
@@ -48,7 +48,7 @@ const ManagementKOL = () => {
   const [size, setSize] = useState(20);
   const [form] = Form.useForm();
 
-  const [searchValue, setSearchValue] = useState(); // tên (displayName)
+  const [searchValue, setSearchValue] = useState();
   const [searchMinBookingPrice, setSearchMinBookingPrice] = useState();
   const [minRating, setMinRating] = useState(null);
 
@@ -123,13 +123,13 @@ const ManagementKOL = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, page, size]);
 
-  // Nguồn dữ liệu thô (tùy theo có category hay không)
+  // Nguồn dữ liệu thô
   const rawList = useMemo(() => {
     if (categoryId) return listByCategory ?? [];
     return ResponseGetAllKol?.data?.content ?? [];
   }, [categoryId, listByCategory, ResponseGetAllKol]);
 
-  // Lọc FE (contains + bỏ dấu) để đồng bộ UX ở cả 2 luồng
+  // Lọc FE (contains + bỏ dấu)
   const filteredData = useMemo(() => {
     const needle = viNormalize(searchValue);
     const minPrice = Number(searchMinBookingPrice || 0);
@@ -164,14 +164,18 @@ const ManagementKOL = () => {
     navigate(`/admin/kols/${record?.id}/schedule?view=month`);
   };
 
-  // 👉 Nút mới: Lịch sử booking của KOL
+  // 👉 Nút lịch sử booking của KOL
   const handleOpenBookingHistory = (record) => {
     navigate(`/admin/kols/${record?.id}/bookings`);
   };
 
+  // 👉 Nút xem metric / thống kê hiệu suất KOL
+  const handleOpenMetrics = (record) => {
+    navigate(`/admin/kols/${record?.id}/metrics`);
+  };
+
   const handleSearch = (values) => {
     const vSearch = values?.search?.trim() || undefined;
-    // InputNumber dùng parser -> values.minBookingPrice là chuỗi số (stringMode)
     const raw = values?.minBookingPrice;
     const num = raw ? Number(String(raw)) : undefined;
 
@@ -191,21 +195,13 @@ const ManagementKOL = () => {
 
   const handlePaginationChange = (pageNumber, pageSizeNumber) => {
     const nextPage = pageNumber - 1;
-    if (nextPage !== page) {
-      setPage(nextPage);
-    }
-    if (pageSizeNumber !== size) {
-      setSize(pageSizeNumber);
-    }
+    if (nextPage !== page) setPage(nextPage);
+    if (pageSizeNumber !== size) setSize(pageSizeNumber);
   };
 
   const handlePageSizeChange = (_currentPage, pageSizeNumber) => {
-    if (page !== 0) {
-      setPage(0);
-    }
-    if (pageSizeNumber !== size) {
-      setSize(pageSizeNumber);
-    }
+    if (page !== 0) setPage(0);
+    if (pageSizeNumber !== size) setSize(pageSizeNumber);
   };
 
   const columns = [
@@ -284,9 +280,10 @@ const ManagementKOL = () => {
       title: "Thao tác",
       key: "action",
       align: "center",
-      width: 320,
+      width: 400,
       render: (record) => (
         <div className="w-full flex justify-center gap-2">
+          {/* Xem portfolio */}
           <Tooltip title="Xem portfolio">
             <Button
               onClick={() => handleViewDetail(record)}
@@ -296,6 +293,7 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
+          {/* Sửa thông tin */}
           <Tooltip title="Sửa thông tin">
             <Button
               onClick={() => handleEdit(record)}
@@ -305,7 +303,7 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* ✅ Nút lịch sử booking (icon lịch + tick giống ảnh mẫu) */}
+          {/* Lịch sử booking */}
           <Tooltip title="Lịch sử booking">
             <Button
               onClick={() => handleOpenBookingHistory(record)}
@@ -322,7 +320,17 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* ✅ Nút lịch (mặc định theo Tháng) */}
+          {/* Thống kê / Metric */}
+          <Tooltip title="Thống kê hiệu suất KOL">
+            <Button
+              onClick={() => handleOpenMetrics(record)}
+              className="!h-10 !bg-cyan-600 !text-white !border-none hover:!bg-cyan-700 transition-all"
+            >
+              <BarChart3 size={18} className="font-semibold" />
+            </Button>
+          </Tooltip>
+
+          {/* Xem lịch làm việc (mặc định tháng) */}
           <Tooltip title="Xem lịch làm việc">
             <Button
               onClick={() => handleOpenSchedule(record)}
@@ -358,7 +366,6 @@ const ManagementKOL = () => {
           className="flex gap-3 flex-wrap"
           onFinish={handleSearch}
         >
-          {/* Tên KOL (contains, bỏ dấu) */}
           <Form.Item name="search">
             <Input
               className="h-12!"
@@ -368,7 +375,6 @@ const ManagementKOL = () => {
             />
           </Form.Item>
 
-          {/* Giá booking tối thiểu */}
           <Form.Item
             name="minBookingPrice"
             rules={[
@@ -403,7 +409,6 @@ const ManagementKOL = () => {
             />
           </Form.Item>
 
-          {/* Đánh giá tối thiểu */}
           <Select
             placeholder="Đánh giá tối thiểu"
             value={minRating}
@@ -423,7 +428,6 @@ const ManagementKOL = () => {
             ]}
           />
 
-          {/* Lọc theo Category */}
           <Select
             showSearch
             placeholder="Lọc theo chuyên mục"
@@ -449,6 +453,7 @@ const ManagementKOL = () => {
               <Search size={16} /> Tìm kiếm
             </Button>
           </Form.Item>
+
           <Form.Item>
             <Button
               onClick={resetForm}
@@ -457,6 +462,7 @@ const ManagementKOL = () => {
               <Trash2 size={16} /> Xóa tìm kiếm
             </Button>
           </Form.Item>
+
           <Form.Item>
             <Button
               onClick={handleCreateKol}

@@ -1,7 +1,7 @@
 import { get } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 
-/* helpers giống phong cách AdminAPI */
+/* ===== Helpers chung ===== */
 const normalizeParam = (v) => {
   if (v === undefined || v === null) return undefined;
   if (typeof v === "string") {
@@ -33,7 +33,7 @@ const buildParams = (params = {}) => {
   return out;
 };
 
-/** ✅ Lấy danh sách booking theo KOL ID (path param) */
+/** ✅ Booking theo KOL ID (đã có) */
 export const adminGetBookingRequestsByKol = async (
   kolId,
   {
@@ -67,5 +67,44 @@ export const adminGetBookingRequestsByKol = async (
     params,
     config: signal ? { signal } : undefined,
   });
+
+  return payload?.data ?? payload ?? null;
+};
+
+/** ✅ Booking theo USER ID (NEW) */
+export const adminGetBookingRequestsByUser = async (
+  userId,
+  {
+    page = 0,
+    size = 20,
+    status,
+    startAt,
+    endAt,
+    createdAtFrom,
+    createdAtTo,
+    requestNumber,
+    signal,
+  } = {}
+) => {
+  if (!userId) throw new Error("userId is required");
+  const params = buildParams({
+    page,
+    size,
+    status,
+    startAt,
+    endAt,
+    createdAtFrom,
+    createdAtTo,
+    requestNumber,
+  });
+
+  const payload = await get({
+    url: `${API_PATHS.BOOKING_REQUEST.getAllByUser}/${encodeURIComponent(
+      userId
+    )}`,
+    params,
+    config: signal ? { signal } : undefined,
+  });
+
   return payload?.data ?? payload ?? null;
 };

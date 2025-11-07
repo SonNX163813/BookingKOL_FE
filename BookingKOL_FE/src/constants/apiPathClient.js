@@ -95,6 +95,7 @@ export const CLIENT_API_PATHS = {
     kolSchedule: (kolId) => `/v1/availabilities/schedule/${kolId}`,
     availabilityTimelineById: (availabilityId) =>
       `/v1/availabilities/time-line/${encodeURIComponent(availabilityId)}`,
+    kolRemoveRange: "/v1/availabilities/kol/remove-range",
   },
   LEAVE_REQUESTS: {
     // POST /leave-requests/{kolId}/{availabilityId}?reason=
