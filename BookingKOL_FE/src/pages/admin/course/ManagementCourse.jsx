@@ -13,11 +13,13 @@ import {
   Typography,
   Divider,
   Select, // <== THÊM
+  message,
 } from "antd";
 import { useMemo, useState } from "react";
 import { useGetAllCourse } from "../../../hook/admin/course/useGetAllCourse";
 import { SchoolOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { adminCourseDelete } from "../../../services/admin/AdminAPI";
 
 const { Title, Text } = Typography;
 
@@ -35,6 +37,7 @@ const calcFinal = (price, discount) => {
 };
 
 const ManagementCourse = () => {
+  const [modal, contextHolder] = Modal.useModal();
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const [form] = Form.useForm();
@@ -46,32 +49,35 @@ const ManagementCourse = () => {
 
   const navigate = useNavigate();
 
-  const { isLoadingGetAllCourse, ResponseGetAllCourse } = useGetAllCourse(
-    page,
-    size,
-    searchMinPrice,
-    searchMaxPrice,
-    searchIsAvailable, // <== TRUYỀN
-    searchValue // <== TRUYỀN
-  );
+  const { isLoadingGetAllCourse, ResponseGetAllCourse, refetchGetAllCourse } =
+    useGetAllCourse(
+      page,
+      size,
+      searchMinPrice,
+      searchMaxPrice,
+      searchIsAvailable,
+      searchValue
+    );
 
   const dataResponse = ResponseGetAllCourse?.data?.content || [];
 
   // ===== Modal state =====
   const [openView, setOpenView] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [deletingCourseId, setDeletingCourseId] = useState(null);
 
   const handleSearch = (value) => {
     setSearchValue(value.search);
     setSearchMinPrice(value.minPrice);
     setSearchMaxPrice(value.maxPrice);
 
-    // map "all" -> undefined (không gửi), "true"/"false" -> boolean
-    const status = value.status;
-    const mapped =
-      status === "true" ? true : status === "false" ? false : undefined;
-    setSearchIsAvailable(mapped);
+    // Chuyển giá trị từ Select sang đúng kiểu boolean hoặc undefined
+    let mapped;
+    if (value.status === "true") mapped = true;
+    else if (value.status === "false") mapped = false;
+    else mapped = undefined;
 
+    setSearchIsAvailable(mapped);
     setPage(0);
   };
 
@@ -100,6 +106,40 @@ const ManagementCourse = () => {
 
   const handleEdit = (record) => {
     navigate(`/admin/edit-detail-course/${record.id}`);
+  };
+
+  const handleDeleteCourse = (record) => {
+    if (!record?.id) {
+      message.warning("Không tìm thấy mã khoá học để xoá.");
+      return;
+    }
+
+    modal.confirm({
+      title: "Xoá khoá học",
+      centered: true,
+      okText: "Xoá",
+      okButtonProps: { danger: true },
+      cancelText: "Huỷ",
+      content: `Bạn chắc chắn muốn xoá khoá học "${record?.name || ""}"?`,
+      onOk: async () => {
+        try {
+          setDeletingCourseId(record.id);
+          await adminCourseDelete(record.id);
+          message.success("Xoá khoá học thành công");
+          if (typeof refetchGetAllCourse === "function") {
+            await refetchGetAllCourse();
+          }
+        } catch (error) {
+          const errMsg =
+            error?.response?.data?.message ||
+            error?.message ||
+            "Không thể xoá khoá học. Vui lòng thử lại.";
+          message.error(errMsg);
+        } finally {
+          setDeletingCourseId(null);
+        }
+      },
+    });
   };
 
   // ====== derive media ======
@@ -234,6 +274,14 @@ const ManagementCourse = () => {
           >
             <Pencil size={18} className="font-semibold" />
           </Button>
+          <Button
+            onClick={() => handleDeleteCourse(record)}
+            loading={deletingCourseId === record.id}
+            className="!h-10 !bg-red-600 !text-white !border-none hover:!bg-red-700 transition-all"
+            title="Xoá khóa học"
+          >
+            <Trash2 size={18} className="font-semibold" />
+          </Button>
         </div>
       ),
       width: "10%",
@@ -242,6 +290,7 @@ const ManagementCourse = () => {
 
   return (
     <div className="relative h-full">
+      {contextHolder}
       <div className="flex gap-2 items-center">
         <div className="border-2 p-2 border-gray-300">
           <SchoolOutlined className="text-gray-400" />

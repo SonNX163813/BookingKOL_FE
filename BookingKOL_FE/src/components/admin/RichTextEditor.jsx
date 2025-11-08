@@ -1,9 +1,6 @@
-﻿import { useMemo, useRef } from "react";
-import { CKEditor } from "ckeditor4-react";
+﻿import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Editor } from "@tinymce/tinymce-react";
 import { BASE_URL } from "../../utils/config";
-
-const DEFAULT_EDITOR_URL =
-  "https://cdn.ckeditor.com/4.22.1/full-all/ckeditor.js";
 
 const BLOG_UPLOAD_PATH = "/v1/admin/blogs/file/upload";
 
@@ -84,148 +81,275 @@ const resolveUploadedFileUrl = (payload) => {
   return undefined;
 };
 
-const setupEditorUploadHandlers = (editor) => {
-  if (!editor || !BLOG_UPLOAD_URL) return;
+const uploadImage = async (blobInfo) => {
+  if (!BLOG_UPLOAD_URL) {
+    throw new Error("Không tìm thấy URL tải lên.");
+  }
 
-  const handleUploadRequest = (evt) => {
-    const fileLoader = evt?.data?.fileLoader;
-    const file = fileLoader?.file;
-    if (!fileLoader || !file) return;
+  const file = blobInfo?.blob();
+  if (!file) {
+    throw new Error("Không thể đọc dữ liệu tệp.");
+  }
 
-    const xhr = fileLoader.xhr;
-    const formData = new FormData();
-    formData.append("file", file, file.name || fileLoader.fileName || "image");
+  const formData = new FormData();
+  formData.append("file", file, blobInfo.filename() || "image");
 
-    xhr.open("POST", BLOG_UPLOAD_URL, true);
-    xhr.setRequestHeader("Accept", "application/json");
+  const headers = { Accept: "application/json" };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
-    const token = getAuthToken();
-    if (token) {
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+  const response = await fetch(BLOG_UPLOAD_URL, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  const text = await response.text();
+  const payload = safeJsonParse(text) ?? text;
+
+  if (!response.ok) {
+    const errorMessage =
+      (typeof payload === "object" && payload?.message) ||
+      `Tải ảnh thất bại (${response.status}).`;
+    throw new Error(errorMessage);
+  }
+
+  const imageUrl = resolveUploadedFileUrl(payload);
+  if (!imageUrl) {
+    const fallbackMessage =
+      (typeof payload === "object" && payload?.message) ||
+      "Không lấy được URL ảnh từ phản hồi máy chủ.";
+    throw new Error(fallbackMessage);
+  }
+
+  return imageUrl;
+};
+
+const createImageUploadHandler = () => {
+  if (!BLOG_UPLOAD_URL) return undefined;
+
+  return async (blobInfo) => {
+    try {
+      const url = await uploadImage(blobInfo);
+      return url;
+    } catch (error) {
+      const message =
+        error?.message || "Không thể tải ảnh lên. Vui lòng thử lại.";
+      throw new Error(message);
     }
-
-    xhr.send(formData);
-    evt.stop();
   };
+};
 
-  const handleUploadResponse = (evt) => {
-    const fileLoader = evt?.data?.fileLoader;
-    const responseText = fileLoader?.xhr?.responseText;
-    const parsed = responseText
-      ? safeJsonParse(responseText) ?? responseText
-      : null;
+const createFilePickerHandler = () => {
+  if (typeof window === "undefined" || !BLOG_UPLOAD_URL) return undefined;
 
-    const imageUrl = resolveUploadedFileUrl(parsed);
-    if (!imageUrl) {
-      evt.cancel();
-      evt.data.message =
-        (parsed && typeof parsed === "object" && parsed.message) ||
-        "Khong lay duoc URL anh tu phan hoi may chu.";
+  return async (callback, value, meta) => {
+    if (!meta || meta.filetype !== "image") {
+      callback(value);
       return;
     }
 
-    evt.data.url = imageUrl;
-    evt.stop();
+    const input = window.document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const pseudoBlobInfo = {
+        blob: () => file,
+        filename: () => file.name || "image",
+      };
+
+      try {
+        const url = await uploadImage(pseudoBlobInfo);
+        callback(url, { title: file.name });
+      } catch (error) {
+        const message =
+          error?.message || "Không thể tải ảnh lên. Vui lòng thử lại.";
+        window.alert?.(message);
+        console.error("Image upload failed:", error);
+      } finally {
+        input.value = "";
+      }
+    };
+
+    input.click();
   };
-
-  editor.on("fileUploadRequest", handleUploadRequest);
-  editor.on("fileUploadResponse", handleUploadResponse);
-
-  editor.on("destroy", () => {
-    editor.removeListener("fileUploadRequest", handleUploadRequest);
-    editor.removeListener("fileUploadResponse", handleUploadResponse);
-  });
 };
 
-const TOOLBAR_CONFIG = [
-  {
-    name: "document",
-    items: ["Source", "-", "Preview", "Print", "-", "Templates"],
-  },
-  { name: "clipboard", items: ["Cut", "Copy", "Paste", "-", "Undo", "Redo"] },
-  {
-    name: "basicstyles",
-    items: ["Bold", "Italic", "Underline", "Strike", "-", "RemoveFormat"],
-  },
-  {
-    name: "paragraph",
-    items: [
-      "NumberedList",
-      "BulletedList",
-      "-",
-      "Outdent",
-      "Indent",
-      "-",
-      "Blockquote",
-      "-",
-      "JustifyLeft",
-      "JustifyCenter",
-      "JustifyRight",
-      "JustifyBlock",
-    ],
-  },
-  { name: "links", items: ["Link", "Unlink", "Anchor"] },
-  {
-    name: "insert",
-    items: ["Image", "Table", "HorizontalRule", "SpecialChar", "Iframe"],
-  },
-  { name: "styles", items: ["Styles", "Format", "Font", "FontSize"] },
-  { name: "colors", items: ["TextColor", "BGColor"] },
-  { name: "tools", items: ["Maximize", "ShowBlocks"] },
+import "tinymce/tinymce";
+import "tinymce/icons/default";
+import "tinymce/themes/silver";
+import "tinymce/models/dom";
+import "tinymce/skins/ui/oxide/skin.min.css";
+import "tinymce/skins/content/default/content.min.css";
+import "tinymce/plugins/advlist";
+import "tinymce/plugins/anchor";
+import "tinymce/plugins/autolink";
+import "tinymce/plugins/autoresize";
+import "tinymce/plugins/autosave";
+import "tinymce/plugins/charmap";
+import "tinymce/plugins/code";
+import "tinymce/plugins/codesample";
+import "tinymce/plugins/directionality";
+import "tinymce/plugins/emoticons";
+import "tinymce/plugins/fullscreen";
+import "tinymce/plugins/help";
+import "tinymce/plugins/image";
+import "tinymce/plugins/importcss";
+import "tinymce/plugins/insertdatetime";
+import "tinymce/plugins/link";
+import "tinymce/plugins/lists";
+import "tinymce/plugins/media";
+import "tinymce/plugins/preview";
+import "tinymce/plugins/quickbars";
+import "tinymce/plugins/searchreplace";
+import "tinymce/plugins/table";
+import "tinymce/plugins/visualblocks";
+import "tinymce/plugins/visualchars";
+import "tinymce/plugins/wordcount";
+
+const TINYMCE_LANGUAGE = {
+  code: "vi",
+  url: (() => {
+    const assetPath = "/tinymce/langs/vi.js";
+    const base = stripTrailingSlash(import.meta.env?.BASE_URL ?? "");
+    if (!base) return assetPath;
+    return assetPath.startsWith("/")
+      ? `${base}${assetPath}`
+      : `${base}/${assetPath}`;
+  })(),
+};
+
+const PLUGINS = [
+  "advlist",
+  "anchor",
+  "autolink",
+  "autoresize",
+  "autosave",
+  "charmap",
+  "code",
+  "codesample",
+  "directionality",
+  "emoticons",
+  "fullscreen",
+  "help",
+  "image",
+  "importcss",
+  "insertdatetime",
+  "link",
+  "lists",
+  "media",
+  "preview",
+  "quickbars",
+  "searchreplace",
+  "table",
+  "visualblocks",
+  "visualchars",
+  "wordcount",
 ];
+
+const TOOLBAR =
+  "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough removeformat | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | emoticons charmap codesample | fullscreen preview code";
+
+const normalizeValue = (value) =>
+  typeof value === "string" ? value : value?.toString() || "";
 
 const RichTextEditor = ({
   value = "",
   onChange,
   disabled = false,
-  placeholder = "Nh?p n?i dung...",
+  placeholder = "Nhập nội dung...",
 }) => {
+  const safeValue = normalizeValue(value);
   const editorRef = useRef(null);
+  const lastValueRef = useRef(safeValue);
+  const imageUploadHandler = useMemo(createImageUploadHandler, []);
+  const filePickerHandler = useMemo(createFilePickerHandler, []);
 
-  const editorConfig = useMemo(
-    () => ({
-      toolbar: TOOLBAR_CONFIG,
-      extraPlugins:
-        "uploadimage,uploadfile,colorbutton,colordialog,font,justify,autogrow",
-      removePlugins: "elementspath,easyimage",
-      autoGrow_minHeight: 260,
-      autoGrow_maxHeight: 600,
-      allowedContent: true,
-      resize_enabled: true,
-      readOnly: disabled,
+  const initConfig = useMemo(() => {
+    const baseConfig = {
+      min_height: 500,
+      menubar: true,
+      plugins: PLUGINS.join(" "),
+      toolbar: TOOLBAR,
+      toolbar_mode: "sliding",
       placeholder,
-      filebrowserUploadUrl: BLOG_UPLOAD_URL,
-      filebrowserImageUploadUrl: BLOG_UPLOAD_URL,
-      filebrowserUploadMethod: "form",
-    }),
-    [disabled, placeholder]
+      language: TINYMCE_LANGUAGE.code,
+      language_url: TINYMCE_LANGUAGE.url,
+      branding: false,
+      promotion: false,
+      automatic_uploads: Boolean(imageUploadHandler),
+      file_picker_types: "file image media",
+      quickbars_selection_toolbar:
+        "bold italic underline | quicklink | alignleft aligncenter alignright | h2 h3 blockquote",
+      image_advtab: true,
+      image_caption: true,
+      table_default_attributes: { border: "1" },
+      content_style:
+        "body { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }",
+    };
+
+    if (imageUploadHandler) {
+      baseConfig.images_upload_handler = imageUploadHandler;
+    }
+    if (filePickerHandler) {
+      baseConfig.file_picker_callback = filePickerHandler;
+    }
+
+    return baseConfig;
+  }, [filePickerHandler, imageUploadHandler, placeholder]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (safeValue === lastValueRef.current) return;
+
+    editor.setContent(safeValue);
+    lastValueRef.current = safeValue;
+  }, [safeValue]);
+
+  const handleInit = useCallback(
+    (_, editor) => {
+      editorRef.current = editor;
+      editor.setContent(safeValue);
+      lastValueRef.current = safeValue;
+    },
+    [safeValue]
+  );
+
+  const handleChange = useCallback(
+    (content) => {
+      lastValueRef.current = content;
+      onChange?.(content);
+    },
+    [onChange]
+  );
+
+  useEffect(
+    () => () => {
+      if (editorRef.current) {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
+    },
+    []
   );
 
   return (
     <div className="rich-text-editor border border-gray-200 rounded-lg overflow-hidden">
-      <style>{`
-        .cke_notification,
-        .cke_notification_message,
-        .cke_notifications_area {
-          display: none !important;
-        }
-      `}</style>
-
-      <CKEditor
-        editorUrl={DEFAULT_EDITOR_URL}
-        initData={value}
-        config={editorConfig}
-        readOnly={disabled}
-        onInstanceReady={({ editor }) => {
-          editorRef.current = editor;
-          setupEditorUploadHandlers(editor);
-          if (!value) editor.setData("");
-        }}
-        onChange={({ editor }) => onChange?.(editor.getData())}
+      <Editor
+        value={safeValue}
+        disabled={disabled}
+        init={initConfig}
+        onInit={handleInit}
+        onEditorChange={handleChange}
       />
     </div>
   );
 };
 
 export default RichTextEditor;
-

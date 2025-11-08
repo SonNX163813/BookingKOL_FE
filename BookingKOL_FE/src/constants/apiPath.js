@@ -19,10 +19,11 @@ export const API_PATHS = {
     adminKolCreate: "/v1/admin/kol/create-new-kol",
   },
   COURSE: {
-    getAllCourse: "/v1/courses/all",
-    adminViewDetailCourse: "/v1/courses",
+    getAllCourse: "/v1/admin/course/all",
+    adminViewDetailCourse: "/v1/admin/course/detail",
     createCourse: "/v1/admin/course/create",
     adminCourseUpdate: "/v1/admin/course/update", // + /{courseId}
+    adminCourseDelete: "/v1/admin/course/delete", // + /{courseId}
     adminCourseMediasRemove: "/v1/admin/course/medias/remove", // + /{courseId}
     adminCourseCoverImageSet: "/v1/admin/course/cover-image/set", // + /{courseId}?fileId=...
     adminCourseMediasUpload: "/v1/admin/course/medias/upload", // + /{courseId}
@@ -69,6 +70,7 @@ export const API_PATHS = {
   },
   BLOG: {
     adminGetAll: "v1/admin/blogs/all",
+    adminCreate: "v1/admin/blogs/create",
     adminGetDetail: (blogId) =>
       `v1/admin/blogs/detail/${encodeURIComponent(blogId)}`,
     adminUpdate: (blogId) =>

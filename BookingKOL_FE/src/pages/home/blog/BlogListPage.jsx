@@ -106,7 +106,10 @@ const BlogCard = ({ blog, onSelectBlog }) => {
     <Card
       elevation={0}
       sx={{
-        height: "100%",
+        maxWidth: 420, // 👈 thêm giới hạn để tất cả card đồng bộ
+        height: "100%", // 👈 giúp card cao bằng nhau
+        display: "flex",
+        flexDirection: "column",
         borderRadius: "24px",
         background:
           "radial-gradient(circle at 30% 10%, rgba(147,206,246,0.15) 0%, rgba(255,255,255,0.85) 70%)",
@@ -124,7 +127,11 @@ const BlogCard = ({ blog, onSelectBlog }) => {
       }}
     >
       <CardContent
-        sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+        sx={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
         <Stack spacing={2} sx={{ flexGrow: 1 }}>
           {/* Tác giả + Tiêu đề */}
@@ -317,10 +324,10 @@ const BlogListPage = () => {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                lg: "minmax(280px, 340px) minmax(0, 1fr)",
-              },
+              // gridTemplateColumns: {
+              //   xs: "1fr",
+              //   lg: "minmax(280px, 340px) minmax(0, 1fr)",
+              // },
               gap: { xs: 4, sm: 4.5, md: 6 },
               alignItems: "start",
             }}
@@ -514,13 +521,29 @@ const BlogListPage = () => {
                 </Stack>
               ) : hasBlogs ? (
                 <>
-                  <Grid container spacing={3}>
+                  <Grid
+                    container
+                    spacing={3}
+                    justifyContent="center"
+                    alignItems="stretch"
+                    sx={{ width: "100%" }}
+                  >
                     {displayedBlogs.map((blog, index) => {
                       const key =
                         blog?.id ??
                         (blog?.title ? `${blog.title}-${index}` : index);
                       return (
-                        <Grid item xs={12} sm={6} md={4} key={key}>
+                        <Grid
+                          item
+                          xs={12}
+                          sm={6}
+                          md={4}
+                          key={key}
+                          sx={{
+                            display: "flex", // giúp card cùng chiều cao
+                            justifyContent: "center",
+                          }}
+                        >
                           <BlogCard
                             blog={blog}
                             onSelectBlog={handleSelectBlog}
@@ -529,6 +552,7 @@ const BlogListPage = () => {
                       );
                     })}
                   </Grid>
+
                   {totalPages > 1 && (
                     <Stack alignItems="center" sx={{ mt: 4 }}>
                       <Pagination
