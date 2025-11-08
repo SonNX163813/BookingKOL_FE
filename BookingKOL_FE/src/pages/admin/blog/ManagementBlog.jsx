@@ -194,13 +194,13 @@ const ManagementBlog = () => {
       width: 260,
       render: (_, record) => (
         <div className="flex justify-center gap-2">
-            <Button
-              onClick={() => navigate(`/admin/management-blogs/${record.id}`)}
-              className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-              title="Xem chi tiết"
-            >
-              <Eye size={18} className="font-semibold" />
-            </Button>
+          <Button
+            onClick={() => navigate(`/admin/management-blogs/${record.id}`)}
+            className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+            title="Xem chi tiết"
+          >
+            <Eye size={18} className="font-semibold" />
+          </Button>
           <Button
             onClick={() => openEditModal(record.id)}
             className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
@@ -266,6 +266,7 @@ const ManagementBlog = () => {
       </Card>
 
       <Modal
+        destroyOnHidden
         open={editModal.open}
         onCancel={closeEditModal}
         onOk={handleSubmitEdit}
