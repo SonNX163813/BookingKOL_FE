@@ -21,15 +21,15 @@ export const useCreateBooking = (
         onErrorCallBack(error);
         return;
       }
-      if (errorToastMessage) {
-        toast.error(errorToastMessage);
-      }
+      // if (errorToastMessage) {
+      //   toast.error(errorToastMessage);
+      // }
     },
     onSuccess: (data) => {
       onSuccessCallBack?.(data);
-      if (successToastMessage) {
-        toast.success(successToastMessage);
-      }
+      // if (successToastMessage) {
+      //   toast.success(successToastMessage);
+      // }
     },
   });
 

@@ -14,7 +14,6 @@ export const useCreateBooking = (onSuccessCallBack) => {
     },
     onSuccess: () => {
       onSuccessCallBack?.();
-      toast.success("Thanh cong");
     },
   });
 

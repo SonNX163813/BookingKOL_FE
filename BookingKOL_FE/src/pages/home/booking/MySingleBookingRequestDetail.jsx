@@ -86,6 +86,63 @@ const formatBoolean = (value) => {
   return value ? "Yes" : "No";
 };
 
+const normalizeIdValue = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  try {
+    return String(value);
+  } catch {
+    return null;
+  }
+};
+
+const resolveContractIdentifier = (contract) =>
+  normalizeIdValue(
+    contract?.id ??
+      contract?.contractId ??
+      contract?.contract?.id ??
+      contract?.contractDTO?.id
+  );
+
+const resolveFeedbackContractIdentifier = (feedback) =>
+  normalizeIdValue(
+    feedback?.contractId ??
+      feedback?.bookingContractId ??
+      feedback?.kolContractId ??
+      feedback?.contract?.id ??
+      feedback?.contractDTO?.id
+  );
+
+const resolveContractKolIdentifier = (contract) =>
+  normalizeIdValue(
+    contract?.kolId ??
+      contract?.kol?.id ??
+      contract?.kolDTO?.id ??
+      contract?.kolProfile?.id ??
+      contract?.kolProfileId
+  );
+
+const resolveFeedbackKolIdentifier = (feedback) =>
+  normalizeIdValue(
+    feedback?.kolId ??
+      feedback?.kol?.id ??
+      feedback?.kolDTO?.id ??
+      feedback?.kolProfileId
+  );
+
+const resolveKolIdentifier = (kol) =>
+  normalizeIdValue(
+    kol?.id ??
+      kol?.kolId ??
+      kol?.kolProfileId ??
+      kol?.userId ??
+      kol?.profileId ??
+      kol?.kolProfile?.id
+  );
+
 const LIVESTREAM_METRIC_LABELS = [
   { key: "revenue", label: "Tổng doanh thu" },
   { key: "gpm", label: "GPM" },
@@ -253,6 +310,14 @@ const MySingleBookingRequestDetail = () => {
   const contracts = Array.isArray(detail?.contracts)
     ? detail.contracts.filter(Boolean)
     : [];
+  const feedbackSummaries = useMemo(
+    () =>
+      Array.isArray(detail?.feedbackDTOS)
+        ? detail.feedbackDTOS.filter(Boolean)
+        : [],
+    [detail?.feedbackDTOS]
+  );
+  const kolInfo = detail?.kol ?? null;
   const attachedFiles = Array.isArray(detail?.attachedFiles)
     ? detail.attachedFiles.filter(Boolean)
     : [];
@@ -270,6 +335,50 @@ const MySingleBookingRequestDetail = () => {
         .filter((id) => id !== null && id !== undefined),
     [worktimes]
   );
+  const contractsWithFeedback = useMemo(() => {
+    if (!contracts.length) {
+      return [];
+    }
+
+    const remaining = [...feedbackSummaries];
+
+    return contracts.map((currentContract) => {
+      const contractId = resolveContractIdentifier(currentContract);
+      const kolId =
+        resolveContractKolIdentifier(currentContract) ?? resolveKolIdentifier(kolInfo);
+
+      let matchIndex = -1;
+
+      if (contractId) {
+        matchIndex = remaining.findIndex((candidate) => {
+          const candidateContractId =
+            resolveFeedbackContractIdentifier(candidate);
+          return (
+            candidateContractId && candidateContractId === contractId
+          );
+        });
+      }
+
+      if (matchIndex < 0 && kolId) {
+        matchIndex = remaining.findIndex((candidate) => {
+          const candidateKolId = resolveFeedbackKolIdentifier(candidate);
+          return candidateKolId && candidateKolId === kolId;
+        });
+      }
+
+      if (matchIndex < 0 && remaining.length === 1) {
+        matchIndex = 0;
+      }
+
+      const matchedFeedback =
+        matchIndex >= 0 ? remaining.splice(matchIndex, 1)[0] : null;
+
+      return {
+        contract: currentContract,
+        feedbackSummary: matchedFeedback,
+      };
+    });
+  }, [contracts, feedbackSummaries, kolInfo]);
 
   const {
     worktimeLivestreamMetricsMap,
@@ -1105,7 +1214,7 @@ const MySingleBookingRequestDetail = () => {
                     size="large"
                     className="w-full mt-4"
                   >
-                    {contracts.map((c) => {
+                    {contractsWithFeedback.map(({ contract: c, feedbackSummary }) => {
                       const paymentStatus = normalizeStatus(
                         c?.paymentDTO?.status
                       );
@@ -1164,6 +1273,7 @@ const MySingleBookingRequestDetail = () => {
                             <UserKolFeedbackSection
                               contract={c}
                               kol={detail?.kol}
+                              initialFeedback={feedbackSummary}
                               onFeedbackUpdated={() =>
                                 refetchMyBookingRequestDetail()
                               }
