@@ -15,6 +15,7 @@ import AppSnackbar from "../../components/UI/AppSnackbar";
 import ProfileHeader from "../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../components/home/kol-detail/Introduction";
 import ReviewsSection from "../../components/home/kol-detail/ReviewsSection";
+import { buildKolReviewsData } from "../../utils/kolFeedback";
 
 import {
   getKolProfileById,
@@ -171,26 +172,6 @@ const buildIntroductionData = (kol) => {
   };
 };
 
-const buildReviewsData = (kol) => {
-  const reviewCount = Number.isFinite(Number(kol?.feedbackCount))
-    ? Number(kol.feedbackCount)
-    : 0;
-  const rating = Number.isFinite(Number(kol?.overallRating))
-    ? Number(kol.overallRating)
-    : 0;
-  const ratingDistribution = [5, 4, 3, 2, 1].map((stars) => ({
-    stars,
-    count: 0,
-    percentage: 0,
-  }));
-  return {
-    reviews: [],
-    overallRating: rating,
-    ratingDistribution,
-    reviewCount,
-  };
-};
-
 /* ================= Component ================= */
 export default function KolPortfolio() {
   const { kolId } = useParams();
@@ -269,7 +250,7 @@ export default function KolPortfolio() {
     () => buildIntroductionData(kolData),
     [kolData]
   );
-  const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const reviewsData = useMemo(() => buildKolReviewsData(kolData), [kolData]);
 
   const shouldShowContent = !isLoading && !error && headerData;
 
@@ -344,6 +325,7 @@ export default function KolPortfolio() {
               reviews={reviewsData.reviews}
               overallRating={reviewsData.overallRating}
               ratingDistribution={reviewsData.ratingDistribution}
+              reviewCount={reviewsData.reviewCount}
             />
           </Box>
         )}

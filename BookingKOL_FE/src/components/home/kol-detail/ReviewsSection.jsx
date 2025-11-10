@@ -19,7 +19,32 @@ const overlayGradient =
 const cardGradient =
   "linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(147, 206, 246, 0.25) 55%, rgba(255, 161, 218, 0.22) 100%)";
 
-const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
+const fallbackDistribution = [5, 4, 3, 2, 1].map((stars) => ({
+  stars,
+  count: 0,
+  percentage: 0,
+}));
+
+const ReviewsSection = ({
+  reviews = [],
+  overallRating = 0,
+  ratingDistribution = fallbackDistribution,
+  reviewCount,
+}) => {
+  const normalizedReviews = Array.isArray(reviews) ? reviews : [];
+  const totalReviews =
+    typeof reviewCount === "number" && reviewCount > 0
+      ? reviewCount
+      : normalizedReviews.length;
+  const hasReviews = normalizedReviews.length > 0;
+  const safeOverallRating = Number.isFinite(Number(overallRating))
+    ? Math.round(Number(overallRating) * 10) / 10
+    : 0;
+  const safeDistribution =
+    Array.isArray(ratingDistribution) && ratingDistribution.length > 0
+      ? ratingDistribution
+      : fallbackDistribution;
+
   const renderStars = (rating) => {
     const fullStars = Math.round(Math.max(0, Math.min(5, rating)));
 
@@ -89,63 +114,89 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
           >
             <Box sx={{ flex: { xs: "1 1 100%", md: "1 1 66.67%" } }}>
               <Stack spacing={2.5}>
-                {reviews.map((review) => (
+                {!hasReviews && (
                   <Box
-                    key={review.id}
                     sx={{
                       borderRadius: "18px",
-                      background: cardGradient,
-                      border: "1px solid rgba(74, 116, 218, 0.16)",
-                      px: { xs: 2, sm: 2.5 },
-                      py: { xs: 2, sm: 2.25 },
+                      border: "1px dashed rgba(74, 116, 218, 0.35)",
+                      backgroundColor: "rgba(255, 255, 255, 0.92)",
+                      textAlign: "center",
+                      py: 4,
+                      px: 3,
                     }}
                   >
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={1.5}
-                      justifyContent="space-between"
-                      alignItems={{ xs: "flex-start", sm: "center" }}
-                    >
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            background:
-                              "linear-gradient(135deg, rgba(141, 226, 237, 0.45), rgba(88, 43, 175, 0.3))",
-                            color: textPrimary,
-                            fontWeight: 700,
-                          }}
-                          alt={`Ảnh đại diện của ${review.name}`}
-                        >
-                          {review.name?.charAt(0)}
-                        </Avatar>
-                        <Box>
-                          <Typography
-                            sx={{ color: textPrimary, fontWeight: 600 }}
-                          >
-                            {review.name}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: textSecondary }}
-                          >
-                            {review.time}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      <Stack direction="row" spacing={0.5}>
-                        {renderStars(review.rating)}
-                      </Stack>
-                    </Stack>
                     <Typography
-                      variant="body2"
-                      sx={{ color: textSecondary, mt: 1.75, lineHeight: 1.7 }}
+                      variant="subtitle1"
+                      sx={{ color: textPrimary, fontWeight: 600 }}
                     >
-                      {review.content}
+                      Chưa có đánh giá
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: textSecondary }}>
+                      Khách hàng sẽ để lại nhận xét sau khi hợp tác với KOL.
                     </Typography>
                   </Box>
-                ))}
+                )}
+
+                {hasReviews &&
+                  normalizedReviews.map((review) => (
+                    <Box
+                      key={review.id}
+                      sx={{
+                        borderRadius: "18px",
+                        background: cardGradient,
+                        border: "1px solid rgba(74, 116, 218, 0.16)",
+                        px: { xs: 2, sm: 2.5 },
+                        py: { xs: 2, sm: 2.25 },
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1.5}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                      >
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar
+                            src={review.avatarUrl || undefined}
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              background:
+                                "linear-gradient(135deg, rgba(141, 226, 237, 0.45), rgba(88, 43, 175, 0.3))",
+                              color: textPrimary,
+                              fontWeight: 700,
+                            }}
+                            alt={`Ảnh đại diện của ${review.name}`}
+                          >
+                            {!review.avatarUrl &&
+                              (review.name?.charAt(0)?.toUpperCase() ?? "?")}
+                          </Avatar>
+                          <Box>
+                            <Typography
+                              sx={{ color: textPrimary, fontWeight: 600 }}
+                            >
+                              {review.name}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ color: textSecondary }}
+                            >
+                              {review.time || "Đang cập nhật"}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                        <Stack direction="row" spacing={0.5}>
+                          {renderStars(review.rating)}
+                        </Stack>
+                      </Stack>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: textSecondary, mt: 1.75, lineHeight: 1.7 }}
+                      >
+                        {review.content}
+                      </Typography>
+                    </Box>
+                  ))}
 
                 <Button
                   endIcon={<ChevronRightRoundedIcon />}
@@ -158,6 +209,7 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
                     "&:hover": { color: "#582baf", background: "transparent" },
                   }}
                   aria-label="Xem thêm đánh giá"
+                  disabled={!hasReviews}
                 >
                   Xem thêm đánh giá
                 </Button>
@@ -184,18 +236,18 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
                     variant="h2"
                     sx={{ color: textPrimary, fontWeight: 700 }}
                   >
-                    {overallRating}
+                    {safeOverallRating.toFixed(1)}
                   </Typography>
                   <Stack direction="row" spacing={0.5}>
-                    {renderStars(overallRating)}
+                    {renderStars(safeOverallRating)}
                   </Stack>
                   <Typography variant="body2" sx={{ color: textSecondary }}>
-                    Dựa trên {reviews.length} đánh giá
+                    Dựa trên {totalReviews} đánh giá
                   </Typography>
                 </Stack>
 
                 <Stack spacing={1.2}>
-                  {ratingDistribution.map((item) => (
+                  {safeDistribution.map((item) => (
                     <Stack
                       key={item.stars}
                       direction="row"
@@ -211,7 +263,10 @@ const ReviewsSection = ({ reviews, overallRating, ratingDistribution }) => {
                       </Typography>
                       <LinearProgress
                         variant="determinate"
-                        value={item.percentage}
+                        value={Math.max(
+                          0,
+                          Math.min(100, item.percentage ?? 0)
+                        )}
                         sx={{
                           flex: 1,
                           height: 8,

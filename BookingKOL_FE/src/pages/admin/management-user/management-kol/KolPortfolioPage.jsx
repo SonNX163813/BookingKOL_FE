@@ -12,6 +12,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import ProfileHeader from "../../../../components/home/kol-detail/ProfileHeader";
 import Introduction from "../../../../components/home/kol-detail/Introduction";
 import ReviewsSection from "../../../../components/home/kol-detail/ReviewsSection";
+import { buildKolReviewsData } from "../../../../utils/kolFeedback";
 
 import { getKolProfileById } from "../../../../services/kol/KolAPI";
 import hotkolimg from "../../../../assets/hotkol.png";
@@ -194,26 +195,6 @@ const buildIntroductionData = (kol) => {
   };
 };
 
-const buildReviewsData = (kol) => {
-  const reviewCount = Number.isFinite(Number(kol?.feedbackCount))
-    ? Number(kol.feedbackCount)
-    : 0;
-  const rating = Number.isFinite(Number(kol?.overallRating))
-    ? Number(kol.overallRating)
-    : 0;
-  const ratingDistribution = [5, 4, 3, 2, 1].map((stars) => ({
-    stars,
-    count: 0,
-    percentage: 0,
-  }));
-  return {
-    reviews: [],
-    overallRating: rating,
-    ratingDistribution,
-    reviewCount,
-  };
-};
-
 /* ================= Page Component ================= */
 export default function KolPortfolioPage() {
   const { kolId } = useParams();
@@ -250,7 +231,7 @@ export default function KolPortfolioPage() {
     () => buildIntroductionData(kolData),
     [kolData]
   );
-  const feedback = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const feedback = useMemo(() => buildKolReviewsData(kolData), [kolData]);
   const livestreamVideos = useMemo(
     () => buildLivestreamVideos(kolData),
     [kolData]
@@ -368,6 +349,7 @@ export default function KolPortfolioPage() {
               reviews={feedback.reviews}
               overallRating={feedback.overallRating}
               ratingDistribution={feedback.ratingDistribution}
+              reviewCount={feedback.reviewCount}
             />
           </Box>
         )}
