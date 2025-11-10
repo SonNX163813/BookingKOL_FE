@@ -23,8 +23,8 @@ export const createBookingPackage = async (value) => {
   formData.append("objective", value.objective);
   formData.append("budgetMin", value.budgetMin);
   formData.append("budgetMax", value.budgetMax);
-  formData.append("startDate", value.startDate);
-  formData.append("endDate", value.endDate);
+  formData.append("startDate", new Date(value.startDate).toISOString());
+  formData.append("endDate", new Date(value.endDate).toISOString());
   formData.append("recurrencePattern", value.recurrencePattern ? "WEEKLY" : "");
   if (value?.liveIds) {
     formData.append("liveIds", value.liveIds);

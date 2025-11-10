@@ -79,6 +79,10 @@ export const CLIENT_API_PATHS = {
     getDetail: (blogId) => `/v1/blogs/detail/${encodeURIComponent(blogId)}`,
   },
 
+  SERVICE_PACKAGES: {
+    list: "v1/servicepackages",
+  },
+
   PLATFORM: {
     all: "/v1/platforms/all",
   },

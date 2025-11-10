@@ -6,6 +6,8 @@ export const getAllCourse = async (
   size,
   minPrice,
   maxPrice,
+  isAvailable,
+  searchValue,
   minDiscount,
   maxDiscount,
   sortBy,
@@ -18,6 +20,8 @@ export const getAllCourse = async (
       size: size,
       minPrice: minPrice ?? null,
       maxPrice: maxPrice ?? null,
+      isAvailable: typeof isAvailable === "boolean" ? isAvailable : null,
+      search: searchValue ?? null,
       minDiscount: minDiscount ?? null,
       maxDiscount: maxDiscount ?? null,
       sortBy: sortBy ?? "price",
@@ -38,7 +42,9 @@ export const createCourse = async (value = {}) => {
 
   const payloadSource = coursePackageDTO ?? restFields;
   const requestPayload = Object.fromEntries(
-    Object.entries(payloadSource).filter(([, fieldValue]) => fieldValue !== undefined)
+    Object.entries(payloadSource).filter(
+      ([, fieldValue]) => fieldValue !== undefined
+    )
   );
 
   const blob = new Blob([JSON.stringify(requestPayload)], {

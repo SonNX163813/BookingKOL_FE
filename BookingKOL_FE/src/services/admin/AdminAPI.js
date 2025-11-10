@@ -316,6 +316,18 @@ export const adminCourseUpdate = async (courseId, body, { signal } = {}) => {
   return payload?.data ?? payload ?? null;
 };
 
+// DELETE /v1/admin/course/delete/{courseId}
+export const adminCourseDelete = async (courseId, { signal } = {}) => {
+  if (!courseId) throw new Error("courseId is required");
+  const payload = await remove2({
+    url: `${API_PATHS.COURSE.adminCourseDelete}/${encodeURIComponent(
+      courseId
+    )}`,
+    config: signal ? { signal } : undefined,
+  });
+  return payload?.data ?? payload ?? null;
+};
+
 // POST /v1/admin/course/medias/upload/{courseId}
 export const adminCourseMediasUpload = async (courseId, files, opts = {}) => {
   if (!courseId) throw new Error("courseId is required");

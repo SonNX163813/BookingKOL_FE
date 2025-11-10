@@ -29,6 +29,7 @@ import NotFound from "../pages/NotFound.jsx";
 import ListKOL from "../pages/home/kol/ListKOL.jsx";
 
 import ServicePackagePage from "../pages/booking_package/ServicePackagePage.jsx";
+import ServicePackageBookingFormPage from "../pages/booking_package/ServicePackageBookingFormPage.jsx";
 import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPackagePage.jsx";
 import BookingSinglePayment from "../pages/booking_single/BookingSinglePayment.jsx";
 import BookingSinglePaymentSuccess from "../pages/booking_single/BookingSinglePaymentSuccess.jsx";
@@ -73,6 +74,10 @@ export const routerCustomer = [
       { path: "/blog", element: <BlogListPage /> },
       { path: "/blog/:blogId", element: <BlogDetailPage /> },
       { path: "/goi-chien-dich", element: <ServicePackagePage /> },
+      {
+        path: "/goi-chien-dich/dat-goi",
+        element: <ServicePackageBookingFormPage />,
+      },
       {
         path: "/xac-nhan-dat-lich-kol-le",
         element: <BookingSingleReview />,

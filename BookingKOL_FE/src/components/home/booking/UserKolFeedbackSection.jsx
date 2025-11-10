@@ -188,15 +188,21 @@ const extractFeedbackFromContract = (contract) => {
   return null;
 };
 
+const extractFeedbackFromSources = (contract, fallback) => {
+  const fromContract = extractFeedbackFromContract(contract);
+  if (fromContract) return fromContract;
+  return normalizeFeedback(fallback);
+};
+
 const buildErrorMessage = (error) => {
-  if (!error) return "Có lỗi xảy ra. Vui lòng thử lại sau.";
-  const responseMessage =
-    error?.response?.data?.message ??
-    error?.response?.data?.error ??
-    error?.response?.data?.errors?.[0] ??
-    null;
-  if (responseMessage) return responseMessage;
-  return error?.message ?? "Có lỗi xảy ra. Vui lòng thử lại sau.";
+  // if (!error) return "Có lỗi xảy ra. Vui lòng thử lại sau.";
+  // const responseMessage =
+  //   error?.response?.data?.message ??
+  //   error?.response?.data?.error ??
+  //   error?.response?.data?.errors?.[0] ??
+  //   null;
+  // if (responseMessage) return responseMessage;
+  // return error?.message ?? "Có lỗi xảy ra. Vui lòng thử lại sau.";
 };
 
 const formatDateTime = (value) => {
@@ -211,10 +217,16 @@ const UserKolFeedbackSection = ({
   kol,
   onFeedbackUpdated,
   disabled = false,
+  initialFeedback = null,
 }) => {
   const [form] = Form.useForm();
+  const normalizedInitialFeedback = useMemo(
+    () => normalizeFeedback(initialFeedback),
+    [initialFeedback]
+  );
+  const fallbackFeedback = normalizedInitialFeedback ?? initialFeedback ?? null;
   const [feedback, setFeedback] = useState(() =>
-    extractFeedbackFromContract(contract)
+    extractFeedbackFromSources(contract, fallbackFeedback)
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFetchingDetail, setIsFetchingDetail] = useState(false);
@@ -240,6 +252,7 @@ const UserKolFeedbackSection = ({
 
   const feedbackId = useMemo(() => {
     if (feedback?.id) return feedback.id;
+    if (normalizedInitialFeedback?.id) return normalizedInitialFeedback.id;
     if (!contract) return null;
     return (
       contract?.feedbackId ??
@@ -250,13 +263,13 @@ const UserKolFeedbackSection = ({
       contract?.kolFeedbackDTO?.id ??
       null
     );
-  }, [contract, feedback]);
+  }, [contract, feedback, normalizedInitialFeedback]);
 
   useEffect(() => {
-    const extracted = extractFeedbackFromContract(contract);
+    const extracted = extractFeedbackFromSources(contract, fallbackFeedback);
     setFeedback(extracted);
     feedbackRef.current = extracted;
-  }, [contract]);
+  }, [contract, fallbackFeedback]);
 
   const fetchFeedbackDetail = useCallback(
     async ({ force = false, signal } = {}) => {
@@ -477,7 +490,7 @@ const UserKolFeedbackSection = ({
           <Space size={8} align="center">
             <Text strong>Điểm trung bình:</Text>
             <Rate disabled value={Number(feedback.rating)} />
-            <Text>({Number(feedback.rating).toFixed(1)}/5)</Text>
+            <Text>{Number(feedback.rating).toFixed(1)}/5</Text>
           </Space>
         )}
         <Space direction="vertical" size={4}>
@@ -515,10 +528,12 @@ const UserKolFeedbackSection = ({
           <Text strong>Chế độ hiển thị:</Text>
           <Text>{feedback.isPublic ? "Công khai" : "Riêng tư"}</Text>
         </Space>
+        <Text type="secondary">
+          Ngày tạo: {formatDateTime(feedback.createdAt) ?? "--"}
+        </Text>
         {(feedback.updatedAt || feedback.createdAt) && (
           <Text type="secondary">
-            Cập nhật:{" "}
-            {formatDateTime(feedback.updatedAt ?? feedback.createdAt) ?? "--"}
+            Ngày cập nhật: {formatDateTime(feedback.updatedAt) ?? "--"}
           </Text>
         )}
       </Space>

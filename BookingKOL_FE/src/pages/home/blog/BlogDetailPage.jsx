@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Chip,
+  Button,
   Container,
   Skeleton,
   Stack,
   Typography,
 } from "@mui/material";
+import { Empty, Spin } from "antd";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchBlogDetail } from "../../../services/blog/BlogAPI";
-
+import { ArrowLeft } from "lucide-react";
 const PAGE_BACKGROUND = `
   radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.24) 0%, rgba(147, 206, 246, 0.06) 60%, rgba(147, 206, 246, 0) 90%),
   radial-gradient(90% 90% at 85% 20%, rgba(255, 161, 218, 0.18) 0%, rgba(255, 161, 218, 0) 65%)
@@ -207,66 +208,88 @@ const BlogDetailPage = () => {
   };
 
   // Phần nội dung chính của blog
+  // const renderBodyContent = () => {
+  //   if (loading) {
+  //     return (
+  //       <Stack spacing={2}>
+  //         <Skeleton
+  //           variant="text"
+  //           height={32}
+  //           sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
+  //         />
+  //         <Skeleton
+  //           variant="text"
+  //           height={24}
+  //           width="70%"
+  //           sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
+  //         />
+  //         <Skeleton
+  //           variant="rectangular"
+  //           height={300}
+  //           sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
+  //         />
+  //       </Stack>
+  //     );
+  //   }
+
+  //   if (errorMessage) {
+  //     return (
+  //       <Stack spacing={2} alignItems="center">
+  //         <Typography variant="body1" color="error">
+  //           {errorMessage}
+  //         </Typography>
+  //         <Button
+  //           variant="contained"
+  //           onClick={loadBlogDetail}
+  //           sx={PRIMARY_BUTTON_SX}
+  //         >
+  //           Thử lại
+  //         </Button>
+  //       </Stack>
+  //     );
+  //   }
+
+  //   if (!blog) {
+  //     return (
+  //       <Typography variant="body1" color="text.secondary" align="center">
+  //         Blog không tồn tại hoặc đã bị xóa.
+  //       </Typography>
+  //     );
+  //   }
+
+  //   return (
+  //     <Typography
+  //       component="div"
+  //       variant="body1"
+  //       sx={{ whiteSpace: "pre-line", color: "#0f172a", lineHeight: 1.8 }}
+  //     >
+  //       {blog?.content || "Bài viết chưa có nội dung."}
+  //     </Typography>
+  //   );
+  // };
   const renderBodyContent = () => {
     if (loading) {
       return (
-        <Stack spacing={2}>
-          <Skeleton
-            variant="text"
-            height={32}
-            sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-          />
-          <Skeleton
-            variant="text"
-            height={24}
-            width="70%"
-            sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-          />
-          <Skeleton
-            variant="rectangular"
-            height={300}
-            sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-          />
-        </Stack>
+        <div className="flex justify-center py-10">
+          <Spin />
+        </div>
       );
     }
-
-    if (errorMessage) {
+    if (!blog?.content) {
       return (
-        <Stack spacing={2} alignItems="center">
-          <Typography variant="body1" color="error">
-            {errorMessage}
-          </Typography>
-          <Button
-            variant="contained"
-            onClick={loadBlogDetail}
-            sx={PRIMARY_BUTTON_SX}
-          >
-            Thử lại
-          </Button>
-        </Stack>
+        <Empty
+          description="Chưa có nội dung bài viết"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
       );
     }
-
-    if (!blog) {
-      return (
-        <Typography variant="body1" color="text.secondary" align="center">
-          Blog không tồn tại hoặc đã bị xóa.
-        </Typography>
-      );
-    }
-
     return (
-      <Typography
-        component="div"
-        variant="body1"
-        sx={{ whiteSpace: "pre-line", color: "#0f172a", lineHeight: 1.8 }}
-      >
-        {blog?.content || "Bài viết chưa có nội dung."}
-      </Typography>
+      <div
+        className="min-h-[220px] leading-relaxed text-base text-gray-800 blog-detail-content"
+        dangerouslySetInnerHTML={{ __html: blog.content }}
+      />
     );
   };
-
   return (
     <Box
       sx={{
@@ -291,31 +314,35 @@ const BlogDetailPage = () => {
         sx={{
           position: "relative",
           zIndex: 1,
-          maxWidth: "1100px",
+          maxWidth: "1500px",
           color: "#0f172a",
         }}
       >
         <Stack spacing={4}>
           <Button
-            startIcon={<ArrowBackRoundedIcon />}
             onClick={handleBack}
+            startIcon={<ArrowBackRoundedIcon />}
             sx={{
-              borderRadius: 999,
-              textTransform: "none",
-              px: 3,
-              py: 1.1,
-              fontWeight: 600,
               alignSelf: "flex-start",
-              color: "#1d3ab6",
-              backgroundColor: "rgba(74,116,218,0.12)",
-              boxShadow: "0 12px 30px rgba(74,116,218,0.18)",
+              textTransform: "none",
+              borderRadius: 2.5, // ~rounded-xl
+              border: "1px solid",
+              borderColor: "rgb(226 232 240)", // slate-200
+              backgroundColor: "#ffffff",
+              color: "#4f46e5", // indigo-600
+              fontWeight: 600,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              transition: "all 0.3s ease",
               "&:hover": {
-                backgroundColor: "rgba(74,116,218,0.2)",
-                boxShadow: "0 18px 35px rgba(74,116,218,0.25)",
+                borderColor: "rgba(99, 102, 241, 0.6)", // indigo-500/60
+                color: "#3730a3", // indigo-700
+                backgroundColor: "#eef2ff", // indigo-50
               },
+              px: 2.5,
+              py: 1,
             }}
           >
-            Quay lại
+            Trở về Blog
           </Button>
 
           <Box

@@ -1,4 +1,4 @@
-import { get, patch, remove2 } from "../../config/axios-config";
+import { get, patch, post, remove2 } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 
 const BLOG_PATHS = API_PATHS.BLOG;
@@ -64,14 +64,79 @@ export const adminFetchBlogDetail = async (blogId, { signal } = {}) => {
   return payload?.data ?? payload ?? null;
 };
 
+const sanitizeString = (value) =>
+  typeof value === "string" ? value.trim() : value;
+
+const buildCreatePayload = (body = {}) => {
+  const payload = {
+    title: sanitizeString(body.title),
+    author: sanitizeString(body.author),
+    content: body.content,
+    isPublish: Boolean(body.isPublish),
+  };
+
+  if (!payload.title) {
+    throw new Error("title is required");
+  }
+  if (!payload.author) {
+    throw new Error("author is required");
+  }
+  if (
+    payload.content === undefined ||
+    payload.content === null ||
+    payload.content === ""
+  ) {
+    throw new Error("content is required");
+  }
+
+  return payload;
+};
+
+const buildUpdatePayload = (body = {}) => {
+  const payload = {};
+
+  if (body.title !== undefined) {
+    payload.title = sanitizeString(body.title);
+  }
+  if (body.author !== undefined) {
+    payload.author = sanitizeString(body.author);
+  }
+  if (body.content !== undefined) {
+    payload.content = body.content;
+  }
+  if (body.isPublish !== undefined) {
+    payload.isPublish = Boolean(body.isPublish);
+  }
+
+  if (!Object.keys(payload).length) {
+    throw new Error("At least one editable field is required");
+  }
+
+  return payload;
+};
+
 export const adminUpdateBlog = async (blogId, body, { signal } = {}) => {
   const id = ensureBlogId(blogId);
   if (!body || typeof body !== "object") {
     throw new Error("body is required");
   }
+  const data = buildUpdatePayload(body);
   const payload = await patch({
     url: BLOG_PATHS.adminUpdate(id),
-    data: body,
+    data,
+    config: signal ? { signal } : undefined,
+  });
+  return payload?.data ?? payload ?? null;
+};
+
+export const adminCreateBlog = async (body, { signal } = {}) => {
+  if (!body || typeof body !== "object") {
+    throw new Error("body is required");
+  }
+  const data = buildCreatePayload(body);
+  const payload = await post({
+    url: BLOG_PATHS.adminCreate,
+    data,
     config: signal ? { signal } : undefined,
   });
   return payload?.data ?? payload ?? null;
@@ -90,5 +155,6 @@ export default {
   adminFetchBlogList,
   adminFetchBlogDetail,
   adminUpdateBlog,
+  adminCreateBlog,
   adminDeleteBlog,
 };

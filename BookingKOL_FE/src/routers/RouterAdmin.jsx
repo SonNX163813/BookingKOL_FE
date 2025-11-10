@@ -28,6 +28,7 @@ import ManagementBookingCampaigns from "../pages/admin/booking-campaign/Manageme
 import EditBookingCampaign from "../pages/admin/booking-campaign/EditBookingCampain"; // 👈 mới
 import ManagementBlog from "../pages/admin/blog/ManagementBlog";
 import AdminBlogDetail from "../pages/admin/blog/AdminBlogDetail";
+import CreateBlog from "../pages/admin/blog/CreateBlog";
 
 import AdminKolLivestreamMetrics from "../pages/admin/management-user/management-kol/AdminKolLivestreamMetrics";
 
@@ -78,6 +79,7 @@ export const routerAdmin = [
       { path: "bookings/create", element: <EditBookingCampaign /> }, // 👈 mới
 
       { path: "management-blogs", element: <ManagementBlog /> },
+      { path: "management-blogs/create", element: <CreateBlog /> },
       { path: "management-blogs/:blogId", element: <AdminBlogDetail /> },
 
       {
