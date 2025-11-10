@@ -12,7 +12,7 @@ import dayjs from "dayjs";
 
 /** ======= CẤU HÌNH BUSINESS RULE ======= */
 // Buffer tối thiểu giữa các ca (phút). Ví dụ 60 = ±1h quanh booking.
-const BOOKING_BUFFER_MINUTES = 60;
+const BOOKING_BUFFER_MINUTES = 0;
 
 /* ================== KOL LIST (CLIENT) ================== */
 const KOL_LIST_ALLOWED_PARAMS = new Set([
@@ -906,7 +906,7 @@ export const removeKolAvailabilityRange = async ({
     endRemove: dayjs.isDayjs(endRemove) ? endRemove.toISOString() : endRemove,
   };
 
-  const res = await post({
+  const res = await update({
     url: CLIENT_API_PATHS.SCHEDULER.kolRemoveRange,
     data: body,
     config: signal ? { signal } : undefined,

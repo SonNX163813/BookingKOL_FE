@@ -107,11 +107,14 @@ const RichTextEditor = ({
     lastValueRef.current = safeValue;
   }, [safeValue]);
 
-  const handleInit = useCallback((_, editor) => {
-    editorRef.current = editor;
-    editor.setContent(safeValue);
-    lastValueRef.current = safeValue;
-  }, [safeValue]);
+  const handleInit = useCallback(
+    (_, editor) => {
+      editorRef.current = editor;
+      editor.setContent(safeValue);
+      lastValueRef.current = safeValue;
+    },
+    [safeValue]
+  );
 
   const handleChange = useCallback(
     (content) => {

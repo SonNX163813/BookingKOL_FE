@@ -1,332 +1,452 @@
 // src/pages/kol/KolScheduleChange.jsx
-import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  Typography,
-  Form,
-  Input,
-  Button,
-  Space,
-  Table,
-  message,
-  Empty,
-  DatePicker,
-} from "antd";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
+import { Card, Typography, Space, Button, message, TimePicker } from "antd";
+import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
 import { useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { useAuth } from "../../context/AuthContext";
 import {
-  getKolFreeTime,
   getKolProfileByUserId,
+  getKolFreeTime,
   removeKolAvailabilityRange,
 } from "../../services/kol/KolAPI";
 
 dayjs.locale("vi");
 const { Title, Text } = Typography;
-const { RangePicker } = DatePicker;
+
+/** Chỉ cho phép đúng 1 phút, khóa toàn bộ phút khác */
+const buildDisabledMinutes = (allowedMinute) => () =>
+  Array.from({ length: 60 }, (_, i) => i).filter((m) => m !== allowedMinute);
 
 export default function KolScheduleChange() {
   const { kolId: kolIdParam } = useParams();
   const auth = useAuth?.() || {};
   const userId = auth?.user?.id;
-  const queryClient = useQueryClient();
-  const [form] = Form.useForm();
 
-  // ===== 1. Resolve KOL ID giống KolSchedule.jsx =====
-  const [kolId, setKolId] = useState(
-    kolIdParam || auth?.user?.kolId || auth?.user?.kolProfileId || ""
-  );
+  const [kolId, setKolId] = useState(kolIdParam || null);
+  const [resolvingKolId, setResolvingKolId] = useState(!kolIdParam);
 
+  // Tháng đang xem lịch rảnh
+  const [monthAnchor, setMonthAnchor] = useState(dayjs());
+  const [freeList, setFreeList] = useState([]);
+  const [loadingFree, setLoadingFree] = useState(false);
+
+  // Slot đang chọn để cắt giờ
+  const [selectedSlotKey, setSelectedSlotKey] = useState(null);
+  const [startRemove, setStartRemove] = useState(null);
+  const [endRemove, setEndRemove] = useState(null);
+  const [removing, setRemoving] = useState(false);
+
+  /** ==== Resolve kolId giống KolSchedule ==== */
   useEffect(() => {
     let mounted = true;
     (async () => {
-      // Nếu đã có kolId từ route / user thì thôi
-      if (kolId) return;
-      if (!userId) return;
+      if (kolIdParam) {
+        setKolId(kolIdParam);
+        setResolvingKolId(false);
+        return;
+      }
+      if (!userId) {
+        setResolvingKolId(false);
+        return;
+      }
       try {
         const me = await getKolProfileByUserId(userId);
-        if (mounted) setKolId(me?.id || "");
+        if (mounted) setKolId(me?.id || null);
       } catch (e) {
-        console.warn("[KolScheduleChange] getKolProfileByUserId fail:", e);
-        if (mounted) {
-          setKolId("");
-          message.error("Không lấy được KOL ID. Vui lòng kiểm tra tài khoản.");
-        }
+        console.warn("[KolScheduleChange] getKolProfileByUserId error:", e);
+        if (mounted) setKolId(null);
+      } finally {
+        if (mounted) setResolvingKolId(false);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [kolId, userId]);
+  }, [kolIdParam, userId]);
 
-  // ===== 2. Khoảng ngày filter free-time =====
-  const [dateRange, setDateRange] = useState(() => {
-    const start = dayjs().startOf("day");
-    const end = dayjs().add(14, "day").endOf("day");
-    return [start, end];
-  });
-
-  // ===== 3. Load danh sách ca rảnh từ /availabilities/free-time/{kolId} =====
-  const {
-    data: freeSlots = [],
-    isLoading: loadingFree,
-    isError: freeError,
-    error: freeErrorObj,
-  } = useQuery({
-    queryKey: [
-      "kol-free-time-for-change",
-      kolId,
-      dateRange[0]?.toISOString(),
-      dateRange[1]?.toISOString(),
-    ],
-    enabled: !!kolId, // CHỈ chạy khi đã có kolId => trước đó bạn bị kẹt ở đây
-    queryFn: () =>
-      getKolFreeTime({
-        kolId,
-        startDate: dateRange[0]?.toISOString(),
-        endDate: dateRange[1]?.toISOString(),
-      }),
-  });
-
-  const slots = useMemo(
-    () =>
-      (freeSlots || []).map((x, index) => ({
-        key: x.availabilityId || x.id || index,
-        availabilityId: x.availabilityId || x.id, // cần BE trả trường này
-        startAt: x.startAt,
-        endAt: x.endAt,
-      })),
-    [freeSlots]
+  /** ==== Header tháng ==== */
+  const { headerLabel } = useMemo(
+    () => ({
+      headerLabel: monthAnchor.format("MMMM, YYYY"),
+    }),
+    [monthAnchor]
   );
 
-  // ===== 4. Gọi /availabilities/kol/remove-range =====
-  const { mutateAsync: doRemoveRange, isLoading: removing } = useMutation({
-    mutationFn: removeKolAvailabilityRange,
-    onSuccess: () => {
-      message.success("Đã xóa khung giờ trong ca.");
-      queryClient.invalidateQueries({
-        queryKey: ["kol-free-time-for-change"],
+  /** ==== Load free-time theo tháng ==== */
+  const loadFreeTime = useCallback(async (currentKolId, baseDate) => {
+    if (!currentKolId || !baseDate) return;
+    setLoadingFree(true);
+    try {
+      const startISO = baseDate
+        .startOf("month")
+        .startOf("day")
+        .toDate()
+        .toISOString();
+      const endISO = baseDate
+        .endOf("month")
+        .endOf("day")
+        .toDate()
+        .toISOString();
+
+      const data =
+        (await getKolFreeTime({
+          kolId: currentKolId,
+          startDate: startISO,
+          endDate: endISO,
+        })) || [];
+
+      const sorted = [...data].sort((a, b) =>
+        String(a.startAt).localeCompare(String(b.startAt))
+      );
+      setFreeList(sorted);
+    } catch (e) {
+      console.warn("[KolScheduleChange] loadFreeTime error:", e);
+      setFreeList([]);
+    } finally {
+      setLoadingFree(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (kolId) {
+      loadFreeTime(kolId, monthAnchor);
+    }
+  }, [kolId, monthAnchor, loadFreeTime]);
+
+  /** ==== Điều hướng tháng ==== */
+  const handlePrevMonth = () =>
+    setMonthAnchor((d) => d.subtract(1, "month").startOf("month"));
+  const handleNextMonth = () =>
+    setMonthAnchor((d) => d.add(1, "month").startOf("month"));
+
+  /** ==== Chọn 1 ca để cắt giờ ==== */
+  const onSelectSlot = (slot) => {
+    const key = `${slot.availabilityId || ""}_${slot.startAt}`;
+    setSelectedSlotKey(key);
+
+    const slotStart = dayjs(slot.startAt);
+    const slotEnd = dayjs(slot.endAt);
+
+    if (slotStart.isValid() && slotEnd.isValid()) {
+      // mặc định chọn full ca
+      setStartRemove(slotStart);
+      setEndRemove(slotEnd);
+    } else {
+      setStartRemove(null);
+      setEndRemove(null);
+    }
+  };
+
+  /** ==== Gọi remove-range ==== */
+  const handleRemoveRange = async () => {
+    if (!selectedSlotKey) {
+      message.warning("Vui lòng chọn ca muốn thay đổi.");
+      return;
+    }
+
+    const slot = freeList.find(
+      (s) => `${s.availabilityId || ""}_${s.startAt}` === selectedSlotKey
+    );
+    if (!slot) {
+      message.error("Không tìm thấy ca đã chọn. Vui lòng tải lại trang.");
+      return;
+    }
+
+    const slotStart = dayjs(slot.startAt);
+    const slotEnd = dayjs(slot.endAt);
+    if (!slotStart.isValid() || !slotEnd.isValid()) {
+      message.warning("Dữ liệu ca làm không hợp lệ.");
+      return;
+    }
+
+    const finalStart =
+      startRemove && startRemove.isValid() ? startRemove : slotStart;
+    const finalEnd = endRemove && endRemove.isValid() ? endRemove : slotEnd;
+
+    // 1) Bắt buộc start < end
+    if (!finalStart.isBefore(finalEnd)) {
+      message.warning("Giờ bắt đầu phải trước giờ kết thúc.");
+      return;
+    }
+
+    // 2) Chỉ trong khung ca rảnh
+    if (finalStart.isBefore(slotStart) || finalEnd.isAfter(slotEnd)) {
+      message.warning("Khung giờ hủy phải nằm trong khoảng của ca đã chọn.");
+      return;
+    }
+
+    try {
+      setRemoving(true);
+
+      await removeKolAvailabilityRange({
+        availabilityId: slot.availabilityId,
+        startRemove: finalStart.toDate().toISOString(),
+        endRemove: finalEnd.toDate().toISOString(),
       });
-      form.resetFields(["removeRange"]);
-    },
-    onError: (e) => {
+
+      message.success("Đã cập nhật lịch làm việc.");
+      if (kolId) {
+        loadFreeTime(kolId, monthAnchor);
+      }
+      setSelectedSlotKey(null);
+      setStartRemove(null);
+      setEndRemove(null);
+    } catch (e) {
+      console.warn("[KolScheduleChange] remove-range error:", e);
       const msg =
         e?.response?.data?.message?.[0] ||
         e?.response?.data?.message ||
         e?.message ||
-        "Không thể cập nhật lịch.";
+        "Không thể cập nhật lịch. Vui lòng thử lại.";
       message.error(msg);
-    },
-  });
-
-  const handleSubmit = async (values) => {
-    const { availabilityId, removeRange } = values;
-
-    if (!kolId) {
-      message.warning("Không xác định được KOL ID.");
-      return;
+    } finally {
+      setRemoving(false);
     }
-    if (!availabilityId) {
-      message.warning("Vui lòng chọn Availability ID từ bảng ca bên dưới.");
-      return;
-    }
-    if (!removeRange || removeRange.length !== 2) {
-      message.warning("Vui lòng chọn khoảng giờ cần xóa.");
-      return;
-    }
-
-    const [start, end] = removeRange;
-    if (!dayjs(end).isAfter(start)) {
-      message.warning("Thời gian kết thúc phải sau thời gian bắt đầu.");
-      return;
-    }
-
-    const slot = slots.find((s) => s.availabilityId === availabilityId);
-    if (slot && slot.startAt && slot.endAt) {
-      const sSlot = dayjs(slot.startAt);
-      const eSlot = dayjs(slot.endAt);
-
-      if (
-        !start.isBetween(sSlot, eSlot, null, "[)") ||
-        !end.isBetween(sSlot, eSlot, null, "(]")
-      ) {
-        message.warning(
-          "Khoảng giờ cần xóa phải nằm hoàn toàn trong ca đã chọn."
-        );
-        return;
-      }
-    }
-
-    await doRemoveRange({
-      availabilityId,
-      startRemove: start,
-      endRemove: end,
-    });
   };
-
-  // ===== 5. Bảng ca rảnh =====
-  const columns = [
-    {
-      title: "Availability ID",
-      dataIndex: "availabilityId",
-      key: "availabilityId",
-      width: 260,
-      render: (v) =>
-        v ? (
-          <Text code>{v}</Text>
-        ) : (
-          <Text type="secondary">
-            Thiếu availabilityId (backend cần trả thêm trường này)
-          </Text>
-        ),
-    },
-    {
-      title: "Thời gian ca",
-      key: "time",
-      render: (record) => {
-        const s = record.startAt ? dayjs(record.startAt) : null;
-        const e = record.endAt ? dayjs(record.endAt) : null;
-        if (!s?.isValid() || !e?.isValid()) return "-";
-        return `${s.format("HH:mm")} - ${e.format("HH:mm")}, ${s.format(
-          "DD/MM/YYYY"
-        )}`;
-      },
-    },
-    {
-      title: "",
-      key: "action",
-      width: 110,
-      render: (record) => {
-        const s = record.startAt ? dayjs(record.startAt) : null;
-        const e = record.endAt ? dayjs(record.endAt) : null;
-        return (
-          <Button
-            type="link"
-            size="small"
-            onClick={() => {
-              if (!record.availabilityId) {
-                message.warning(
-                  "Ca này không có availabilityId trong response. Liên hệ backend để bổ sung."
-                );
-                return;
-              }
-              if (!s?.isValid() || !e?.isValid()) {
-                message.warning("Thời gian ca không hợp lệ.");
-                return;
-              }
-              form.setFieldsValue({
-                availabilityId: record.availabilityId,
-                removeRange: [s, e],
-              });
-            }}
-          >
-            Chọn ca
-          </Button>
-        );
-      },
-    },
-  ];
 
   return (
     <Card style={{ margin: 16 }}>
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Space direction="vertical" size={12} style={{ width: "100%" }}>
         <Title level={4} style={{ marginBottom: 0 }}>
-          Thay đổi lịch làm theo khung giờ
+          Hủy Lịch Làm
         </Title>
 
-        <Text type="secondary">
-          Dùng <code>/v1/availabilities/free-time/{"{kolId}"}</code> để lấy ca
-          đã đăng ký và <code>/v1/availabilities/kol/remove-range</code> để xóa
-          1 phần ca.
-        </Text>
+        {resolvingKolId ? (
+          <Text>Đang xác định KOL ID...</Text>
+        ) : !kolId ? (
+          <Text type="danger">
+            Không tìm thấy KOL ID. Vui lòng đăng nhập bằng tài khoản KOL.
+          </Text>
+        ) : (
+          <>
+            {/* ==== HEADER THÁNG & ĐIỀU HƯỚNG ==== */}
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <IoIosArrowBack className="text-[#7bb4fb]" />
+                </button>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <IoIosArrowForward className="text-[#7bb4fb]" />
+                </button>
 
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item label="KOL ID">
-            <Input
-              value={kolId || ""}
-              disabled
-              placeholder="Không xác định được KOL ID"
-            />
-          </Form.Item>
+                <Text strong>Lịch rảnh trong tháng {headerLabel}</Text>
+              </div>
 
-          <Form.Item
-            label="Availability ID"
-            name="availabilityId"
-            rules={[
-              {
-                required: true,
-                message: "Vui lòng chọn Availability ID từ bảng ca bên dưới.",
-              },
-            ]}
-          >
-            <Input placeholder="Nhấn 'Chọn ca' bên dưới để tự điền." />
-          </Form.Item>
+              {loadingFree && (
+                <Text type="secondary">Đang tải lịch rảnh...</Text>
+              )}
+            </div>
 
-          <Form.Item
-            label="Khoảng giờ cần xóa trong ca"
-            name="removeRange"
-            rules={[
-              { required: true, message: "Vui lòng chọn khoảng giờ cần xóa." },
-            ]}
-          >
-            <RangePicker
-              showTime
-              style={{ width: "100%" }}
-              format="DD/MM/YYYY HH:mm"
-            />
-          </Form.Item>
+            {/* ==== LIST CA RẢNH ==== */}
+            {freeList.length === 0 ? (
+              <Text type="secondary">Chưa có ca rảnh nào trong tháng này.</Text>
+            ) : (
+              <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                {freeList.map((slot) => {
+                  const slotStart = dayjs(slot.startAt);
+                  const slotEnd = dayjs(slot.endAt);
+                  if (!slotStart.isValid() || !slotEnd.isValid()) return null;
 
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={removing}
-            disabled={!kolId}
-          >
-            Xác nhận xóa khung giờ
-          </Button>
-        </Form>
+                  const key = `${slot.availabilityId || ""}_${slot.startAt}`;
+                  const isSelected = key === selectedSlotKey;
 
-        <div>
-          <Space direction="vertical" style={{ width: "100%" }}>
-            <Title level={5}>Danh sách ca đã đăng ký</Title>
+                  // phút gốc để khóa (chỉ cho đổi giờ)
+                  const slotStartMinute = slotStart.minute();
+                  const slotEndMinute = slotEnd.minute();
 
-            <Space style={{ marginBottom: 8 }}>
-              <RangePicker
-                format="DD/MM/YYYY"
-                value={dateRange}
-                onChange={(vals) => {
-                  if (!vals || vals.length !== 2) return;
-                  setDateRange([vals[0].startOf("day"), vals[1].endOf("day")]);
-                }}
-              />
-            </Space>
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        border: isSelected
+                          ? "2px solid #0050ab"
+                          : "1px solid #e0efff",
+                        borderRadius: 6,
+                        padding: 8,
+                        backgroundColor: isSelected ? "#f0f6ff" : "#f8fbff",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 16,
+                        }}
+                      >
+                        <Text
+                          strong
+                          style={{ minWidth: 110, color: "#0050ab" }}
+                        >
+                          {slotStart.format("DD/MM/YYYY")}
+                        </Text>
+                        <Text style={{ minWidth: 120 }}>
+                          {`${slotStart.format("HH:mm")} - ${slotEnd.format(
+                            "HH:mm"
+                          )}`}
+                        </Text>
 
-            <Table
-              size="small"
-              rowKey="key"
-              loading={loadingFree}
-              columns={columns}
-              dataSource={slots}
-              pagination={false}
-              locale={{
-                emptyText: freeError ? (
-                  <Empty
-                    description={
-                      freeErrorObj?.response?.data?.message ||
-                      "Không tải được danh sách ca."
-                    }
-                  />
-                ) : kolId ? (
-                  "Không có ca nào trong khoảng ngày đã chọn."
-                ) : (
-                  "Chưa xác định được KOL ID."
-                ),
-              }}
-            />
-          </Space>
-        </div>
+                        <Button
+                          size="small"
+                          type={isSelected ? "default" : "primary"}
+                          onClick={() => onSelectSlot(slot)}
+                        >
+                          {isSelected ? "Đang chọn" : "Chọn ca này"}
+                        </Button>
+                      </div>
+
+                      {isSelected && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            paddingTop: 8,
+                            borderTop: "1px dashed #c4d9ff",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <Text>Chọn khung giờ muốn hủy trong ca này:</Text>
+
+                          {/* START TIME */}
+                          <TimePicker
+                            format="HH:mm"
+                            value={startRemove || slotStart}
+                            disabledMinutes={buildDisabledMinutes(
+                              slotStartMinute
+                            )}
+                            disabledHours={() => {
+                              // không cho chọn trước giờ bắt đầu ca
+                              // và không cho lùi giờ nhỏ hơn lần chọn trước
+                              const prev =
+                                startRemove && startRemove.isValid()
+                                  ? startRemove
+                                  : slotStart;
+                              let minHour = Math.max(
+                                slotStart.hour(),
+                                prev.hour()
+                              );
+                              // nếu đã có endRemove thì start không vượt quá end
+                              let maxHour = endRemove
+                                ? Math.min(slotEnd.hour(), endRemove.hour())
+                                : slotEnd.hour();
+                              if (maxHour < minHour) maxHour = minHour;
+                              const disabled = [];
+                              for (let h = 0; h < 24; h++) {
+                                if (h < minHour || h > maxHour)
+                                  disabled.push(h);
+                              }
+                              return disabled;
+                            }}
+                            onChange={(val) => {
+                              if (!val) {
+                                setStartRemove(null);
+                                return;
+                              }
+                              const prev =
+                                startRemove && startRemove.isValid()
+                                  ? startRemove
+                                  : slotStart;
+                              let newHour = val.hour();
+
+                              let minHour = Math.max(
+                                slotStart.hour(),
+                                prev.hour()
+                              );
+                              let maxHour = endRemove
+                                ? Math.min(slotEnd.hour(), endRemove.hour())
+                                : slotEnd.hour();
+
+                              if (newHour < minHour) newHour = minHour;
+                              if (newHour > maxHour) newHour = maxHour;
+
+                              const next = slotStart
+                                .hour(newHour)
+                                .minute(slotStartMinute)
+                                .second(0)
+                                .millisecond(0);
+
+                              setStartRemove(next);
+                            }}
+                          />
+
+                          <span>-</span>
+
+                          {/* END TIME */}
+                          <TimePicker
+                            format="HH:mm"
+                            value={endRemove || slotEnd}
+                            disabledMinutes={buildDisabledMinutes(
+                              slotEndMinute
+                            )}
+                            disabledHours={() => {
+                              const baseStart =
+                                startRemove && startRemove.isValid()
+                                  ? startRemove
+                                  : slotStart;
+                              let minHour = baseStart.hour(); // luôn >= start
+                              let maxHour = slotEnd.hour();
+                              if (maxHour < minHour) maxHour = minHour;
+                              const disabled = [];
+                              for (let h = 0; h < 24; h++) {
+                                if (h < minHour || h > maxHour)
+                                  disabled.push(h);
+                              }
+                              return disabled;
+                            }}
+                            onChange={(val) => {
+                              if (!val) {
+                                setEndRemove(null);
+                                return;
+                              }
+                              const baseStart =
+                                startRemove && startRemove.isValid()
+                                  ? startRemove
+                                  : slotStart;
+                              let newHour = val.hour();
+
+                              let minHour = baseStart.hour();
+                              let maxHour = slotEnd.hour();
+
+                              if (newHour < minHour) newHour = minHour;
+                              if (newHour > maxHour) newHour = maxHour;
+
+                              const next = slotEnd
+                                .hour(newHour)
+                                .minute(slotEndMinute)
+                                .second(0)
+                                .millisecond(0);
+
+                              setEndRemove(next);
+                            }}
+                          />
+
+                          <Button
+                            danger
+                            type="primary"
+                            loading={removing}
+                            onClick={handleRemoveRange}
+                          >
+                            Xóa khung giờ này
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </Space>
+            )}
+          </>
+        )}
       </Space>
     </Card>
   );

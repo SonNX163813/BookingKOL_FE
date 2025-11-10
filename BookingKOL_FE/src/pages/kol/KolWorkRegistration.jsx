@@ -22,14 +22,17 @@ import {
   getKolProfileByUserId,
   getKolProfileById,
   registerKolAvailabilities,
-  getKolTimeline, // ⬅️ thêm import để lấy booking đã có
+  getKolTimeline,
+  getKolFreeTime,
 } from "../../services/kol/KolAPI";
 
-const MIN_GAP_MINUTES = 60; // Khoảng cách tối thiểu giữa các ca
-const MIN_DURATION_MINUTES = 60; // Thời lượng tối thiểu 1 ca
+dayjs.locale("vi");
+
+const MIN_GAP_MINUTES = 60;
+const MIN_DURATION_MINUTES = 60;
 const MIN_DATE = dayjs().add(14, "day").startOf("day");
 
-// ===== Helpers: đọc user auth từ storage (local -> session) =====
+// ===== Helpers auth =====
 function readJSON(raw) {
   try {
     return JSON.parse(raw);
@@ -37,8 +40,9 @@ function readJSON(raw) {
     return null;
   }
 }
+
 function getAuthUserFromStorage() {
-  const KEY = "auth_user"; // đổi nếu dự án dùng key khác
+  const KEY = "auth_user";
   const rawLocal =
     typeof window !== "undefined" ? localStorage.getItem(KEY) : null;
   const rawSession =
@@ -46,30 +50,43 @@ function getAuthUserFromStorage() {
   return readJSON(rawLocal) || readJSON(rawSession) || null;
 }
 
-/** Cố gắng bóc ra **KOL primary id** từ object user trong auth. */
-function extractKolPrimaryId(user) {
-  if (!user || typeof user !== "object") return null;
-
-  const candidates = [
-    user?.kolProfile?.id,
-    user?.kol?.id,
-    user?.kolProfileId,
-    user?.kol_primary_id,
-    user?.kolIdPrimary,
-    // user?.kolId, // thường là "kolid" (KHÔNG dùng nếu BE cần "id")
-    user?.id, // fallback cuối
-  ];
-  return candidates.find(Boolean) || null;
+/** Lấy userId từ auth_user */
+function extractUserId(auth) {
+  if (!auth || typeof auth !== "object") return null;
+  return auth.userId || auth.id || auth.user?.id || auth.user?.userId || null;
 }
 
-// Hiển thị nhãn thứ (T2..CN). dayjs: 0=CN, 1=T2, ... 6=T7
+/** Lấy kolId (id profile KOL) nếu có sẵn trong auth_user */
+function extractKolIdFromAuth(auth) {
+  if (!auth || typeof auth !== "object") return null;
+
+  if (auth.kolProfile?.id) return auth.kolProfile.id;
+  if (auth.kol?.id) return auth.kol.id;
+  if (auth.kolProfileId) return auth.kolProfileId;
+  if (auth.kol_primary_id) return auth.kol_primary_id;
+  if (auth.kolIdPrimary) return auth.kolIdPrimary;
+  if (auth.kolId) return auth.kolId;
+
+  const nested = auth.user || auth.account || null;
+  if (nested) {
+    if (nested.kolProfile?.id) return nested.kolProfile.id;
+    if (nested.kol?.id) return nested.kol.id;
+    if (nested.kolProfileId) return nested.kolProfileId;
+    if (nested.kol_primary_id) return nested.kol_primary_id;
+    if (nested.kolIdPrimary) return nested.kolIdPrimary;
+    if (nested.kolId) return nested.kolId;
+  }
+
+  return null;
+}
+
+// dayjs: 0=CN,1=T2..6=T7
 const dayOfWeekLabel = (d) => {
   const w = d.day();
   if (w === 0) return "CN";
   return `T${w + 1}`;
 };
 
-// Lấy message từ lỗi axios (BE hay trả { message: string | string[] })
 function extractApiMessage(err) {
   const data = err?.response?.data;
   if (!data) return "";
@@ -80,13 +97,12 @@ function extractApiMessage(err) {
   return "";
 }
 
-// Tạo label khung giờ đẹp
 const labelOf = (date, start, end) =>
   `${start?.format("HH:mm")}–${end?.format("HH:mm")}, ${date?.format(
     "DD/MM/YYYY"
   )}`;
 
-/* ===== Helpers cho “khoảng đệm 1 giờ quanh booking” (chỉ dùng cục bộ file này) ===== */
+/* ===== Helpers cho blocked ranges (từ timeline) ===== */
 const isCancelled = (st) => String(st || "").toUpperCase() === "CANCELLED";
 
 const toISOInterval = (slot) => {
@@ -141,49 +157,93 @@ const mergeSortedIntervals = (arr) => {
 export default function KolWorkRegistrationMui() {
   const { kolId: kolIdParam } = useParams();
 
-  // ===== Resolve primary id: ưu tiên auth storage (local -> session) =====
-  const [resolvedId, setResolvedId] = React.useState(null);
-  const [resolving, setResolving] = React.useState(false);
+  const [resolvedUserId, setResolvedUserId] = React.useState(null);
+  const [resolvedKolId, setResolvedKolId] = React.useState(null);
+  const [resolving, setResolving] = React.useState(true);
 
-  // Loading khi gọi API Lưu
   const [saving, setSaving] = React.useState(false);
 
-  // ===== Blocked ranges theo booking + buffer cho ngày đang chọn =====
-  const [blocked, setBlocked] = React.useState([]); // [{startISO, endISO}]
+  const [blocked, setBlocked] = React.useState([]);
   const [loadingBlocked, setLoadingBlocked] = React.useState(false);
 
+  const [monthAnchor, setMonthAnchor] = React.useState(MIN_DATE);
+  const [monthSchedule, setMonthSchedule] = React.useState([]);
+  const [loadingMonthSchedule, setLoadingMonthSchedule] = React.useState(false);
+
+  const [pickedDate, setPickedDate] = React.useState(null);
+  const [shifts, setShifts] = React.useState([]);
+
+  const [snack, setSnack] = React.useState({
+    open: false,
+    type: "success",
+    message: "",
+  });
+
+  /* -------- Resolve userId + kolId -------- */
   React.useEffect(() => {
     let mounted = true;
 
     (async () => {
       try {
         setResolving(true);
-
-        // 1) Từ auth_user trong storage
         const authUser = getAuthUserFromStorage();
-        const idFromAuth = extractKolPrimaryId(authUser);
-        if (mounted && idFromAuth) {
-          setResolvedId(idFromAuth);
-          return;
-        }
 
-        // 2) Có kolId trên URL → map sang primary id
+        // 1. Nếu URL có kolIdParam
         if (kolIdParam) {
-          const prof = await getKolProfileById(kolIdParam);
-          if (mounted) setResolvedId(prof?.id || null);
+          try {
+            const prof = await getKolProfileById(kolIdParam);
+            if (!mounted) return;
+            if (prof?.id) setResolvedKolId(prof.id);
+            else setResolvedKolId(kolIdParam);
+            if (prof?.userId) {
+              setResolvedUserId(prof.userId);
+            } else if (authUser) {
+              const uId = extractUserId(authUser);
+              if (uId) setResolvedUserId(uId);
+            }
+          } catch (e) {
+            console.warn("[Register] getKolProfileById failed:", e);
+            if (!mounted) return;
+            setResolvedKolId(kolIdParam);
+            if (authUser) {
+              const uId = extractUserId(authUser);
+              if (uId) setResolvedUserId(uId);
+            }
+          }
           return;
         }
 
-        // 3) Fallback: lấy theo userId trong auth_user
-        const userIdFromAuth =
-          authUser?.userId || authUser?.id || authUser?.user?.id || null;
-        if (userIdFromAuth) {
-          const me = await getKolProfileByUserId(userIdFromAuth);
-          if (mounted) setResolvedId(me?.id || null);
+        // 2. Không có kolIdParam -> lấy từ auth_user
+        if (!authUser) {
+          if (mounted) {
+            setResolvedUserId(null);
+            setResolvedKolId(null);
+          }
+          return;
+        }
+
+        const uIdFromAuth = extractUserId(authUser);
+        const kolIdFromAuth = extractKolIdFromAuth(authUser);
+
+        if (uIdFromAuth && mounted) setResolvedUserId(uIdFromAuth);
+        if (kolIdFromAuth && mounted) {
+          setResolvedKolId(kolIdFromAuth);
+          return;
+        }
+
+        // 3. Có userId nhưng chưa có kolId -> hỏi BE
+        if (uIdFromAuth) {
+          const me = await getKolProfileByUserId(uIdFromAuth);
+          if (!mounted) return;
+          if (me?.id) setResolvedKolId(me.id);
+          if (!resolvedUserId && me?.userId) setResolvedUserId(me.userId);
         }
       } catch (e) {
-        console.warn("[Register] Resolve id failed:", e);
-        if (mounted) setResolvedId(null);
+        console.warn("[Register] Resolve ids failed:", e);
+        if (mounted) {
+          setResolvedUserId(null);
+          setResolvedKolId(null);
+        }
       } finally {
         if (mounted) setResolving(false);
       }
@@ -194,30 +254,19 @@ export default function KolWorkRegistrationMui() {
     };
   }, [kolIdParam]);
 
-  // ===== UI đăng ký =====
-  const [pickedDate, setPickedDate] = React.useState(null);
-  const [shifts, setShifts] = React.useState([]); // [{start: dayjs, end: dayjs}]
-  const [history, setHistory] = React.useState([]);
-
-  // Snackbar
-  const [snack, setSnack] = React.useState({
-    open: false,
-    type: "success", // "success" | "error"
-    message: "",
-  });
-
-  // Load blocked ranges (booking + buffer) mỗi khi đổi ngày hoặc đổi KOL
+  /* -------- Blocked (từ timeline) -------- */
   React.useEffect(() => {
     let active = true;
     const load = async () => {
       setBlocked([]);
-      if (!resolvedId || !pickedDate) return;
+      if (!resolvedKolId || !pickedDate) return;
       setLoadingBlocked(true);
       try {
         const start = pickedDate.startOf("day");
         const end = pickedDate.endOf("day");
+
         const booked = await getKolTimeline({
-          kolId: resolvedId,
+          kolId: resolvedKolId,
           startDate: start.toISOString(),
           endDate: end.toISOString(),
           page: 0,
@@ -228,12 +277,11 @@ export default function KolWorkRegistrationMui() {
           .flatMap(expandWorkTimesLocal)
           .map(toISOInterval)
           .filter(Boolean)
-          .map((iv) => expandIntervalByMinutes(iv, MIN_GAP_MINUTES)) // mở rộng ±1h
+          .map((iv) => expandIntervalByMinutes(iv, MIN_GAP_MINUTES))
           .filter((iv) => overlaps(iv.startISO, iv.endISO, start, end))
           .sort((a, b) => a.startISO.localeCompare(b.startISO));
 
-        const merged = mergeSortedIntervals(intervals);
-        if (active) setBlocked(merged);
+        if (active) setBlocked(mergeSortedIntervals(intervals));
       } catch (e) {
         console.warn("[Register] load blocked failed:", e);
         if (active) setBlocked([]);
@@ -245,20 +293,104 @@ export default function KolWorkRegistrationMui() {
     return () => {
       active = false;
     };
-  }, [resolvedId, pickedDate]);
+  }, [resolvedKolId, pickedDate]);
 
+  /* -------- Lịch RẢNH trong tháng -------- */
+  const reloadMonthSchedule = React.useCallback(async () => {
+    if (!resolvedKolId || !monthAnchor) {
+      setMonthSchedule([]);
+      return;
+    }
+    setLoadingMonthSchedule(true);
+    try {
+      const start = monthAnchor.startOf("month");
+      const end = monthAnchor.endOf("month");
+
+      const freeTimes = await getKolFreeTime({
+        kolId: resolvedKolId,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        page: 0,
+        size: 1000,
+      });
+
+      const events = [];
+
+      (freeTimes || []).forEach((item) => {
+        if (Array.isArray(item.workTimes) && item.workTimes.length) {
+          item.workTimes.forEach((w) => {
+            if (!w.startAt || !w.endAt) return;
+            events.push({
+              id: w.id || `${w.startAt}_${w.endAt}`,
+              startAt: w.startAt,
+              endAt: w.endAt,
+            });
+          });
+        } else if (item.startAt && item.endAt) {
+          events.push({
+            id: item.id || `${item.startAt}_${item.endAt}`,
+            startAt: item.startAt,
+            endAt: item.endAt,
+          });
+        }
+      });
+
+      events.sort(
+        (a, b) => dayjs(a.startAt).valueOf() - dayjs(b.startAt).valueOf()
+      );
+      setMonthSchedule(events);
+    } catch (e) {
+      console.warn("[Register] load free-time failed:", e);
+      setMonthSchedule([]);
+    } finally {
+      setLoadingMonthSchedule(false);
+    }
+  }, [resolvedKolId, monthAnchor]);
+
+  React.useEffect(() => {
+    reloadMonthSchedule();
+  }, [reloadMonthSchedule]);
+
+  /* -------- Group lịch rảnh theo ngày -------- */
+  const monthScheduleByDay = React.useMemo(() => {
+    if (!monthSchedule.length) return [];
+    const map = new Map();
+    monthSchedule.forEach((ev) => {
+      const key = dayjs(ev.startAt).format("YYYY-MM-DD");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(ev);
+    });
+
+    return Array.from(map.entries())
+      .sort(([d1], [d2]) => dayjs(d1).valueOf() - dayjs(d2).valueOf())
+      .map(([date, list]) => ({
+        date,
+        items: list
+          .slice()
+          .sort(
+            (a, b) => dayjs(a.startAt).valueOf() - dayjs(b.startAt).valueOf()
+          ),
+      }));
+  }, [monthSchedule]);
+
+  /* -------- Quản lý ca đăng ký -------- */
   const addShift = () => {
     if (!pickedDate) return;
-    let start = pickedDate.hour(9).minute(0).second(0);
-    let end = pickedDate.hour(11).minute(0).second(0);
+
+    let start = pickedDate.hour(9).minute(0).second(0).millisecond(0);
+    let end = pickedDate.hour(10).minute(0).second(0).millisecond(0);
+
     if (shifts.length) {
       const last = shifts[shifts.length - 1];
-      start = last.end.add(MIN_GAP_MINUTES, "minute");
-      end = start.add(2, "hour");
+      // đảm bảo cộng theo block giờ
+      start = last.end.add(MIN_GAP_MINUTES, "minute").minute(0).second(0);
+      end = start.add(1, "hour").minute(0).second(0);
     }
+
     setShifts((s) => [...s, { start, end }]);
   };
 
+  // ✅ Chỉ giữ đúng giờ, không phút
   const updateShift = (idx, field, val) => {
     setShifts((arr) =>
       arr.map((s, i) =>
@@ -266,7 +398,7 @@ export default function KolWorkRegistrationMui() {
           ? {
               ...s,
               [field]: val
-                ? pickedDate.hour(val.hour()).minute(val.minute()).second(0)
+                ? pickedDate.hour(val.hour()).minute(0).second(0).millisecond(0)
                 : null,
             }
           : s
@@ -277,15 +409,19 @@ export default function KolWorkRegistrationMui() {
   const removeShift = (idx) =>
     setShifts((arr) => arr.filter((_, i) => i !== idx));
 
-  // Kiểm tra ca hợp lệ (sort theo giờ bắt đầu để tránh pass nhầm do thứ tự)
+  /* -------- Validate -------- */
   const validate = () => {
     if (!pickedDate) return "Vui lòng chọn ngày đăng ký (≥ 14 ngày).";
     if (!shifts.length) return "Vui lòng thêm ít nhất 1 ca.";
 
-    const sorted = [...shifts].sort((a, b) => a.start.diff(b.start));
+    const sorted = [...shifts].sort((a, b) =>
+      a.start && b.start ? a.start.diff(b.start) : 0
+    );
+
     for (let i = 0; i < sorted.length; i++) {
       const s = sorted[i];
       if (!s.start || !s.end) return "Thiếu thời gian cho một ca.";
+
       const duration = s.end.diff(s.start, "minute");
       if (duration < MIN_DURATION_MINUTES)
         return `Mỗi ca phải tối thiểu ${MIN_DURATION_MINUTES} phút.`;
@@ -297,7 +433,6 @@ export default function KolWorkRegistrationMui() {
           return `Khoảng cách giữa các ca phải ≥ ${MIN_GAP_MINUTES} phút.`;
       }
 
-      // ❗NEW: chặn ca đè vào khoảng bị block (booking ± buffer 60')
       const sIv = {
         startISO: s.start.toISOString(),
         endISO: s.end.toISOString(),
@@ -306,27 +441,27 @@ export default function KolWorkRegistrationMui() {
         overlaps(sIv.startISO, sIv.endISO, b.startISO, b.endISO)
       );
       if (hit) {
-        const msg =
+        return (
           `Ca ${i + 1} (${labelOf(pickedDate, s.start, s.end)}) ` +
-          `nằm trong khoảng không khả dụng do lịch đã đặt (bao gồm đệm ±${MIN_GAP_MINUTES}’). ` +
-          `Vui lòng chọn khung khác.`;
-        return msg;
+          `nằm trong khoảng không khả dụng do lịch đã đặt (bao gồm đệm ±${MIN_GAP_MINUTES}’).`
+        );
       }
     }
     return null;
   };
 
+  /* -------- Submit -------- */
   const handleSave = async () => {
     const err = validate();
     if (err) {
       setSnack({ open: true, type: "error", message: err });
       return;
     }
-    if (!resolvedId) {
+    if (!resolvedUserId) {
       setSnack({
         open: true,
         type: "error",
-        message: "Không xác định được KOL ID.",
+        message: "Không xác định được User ID của KOL.",
       });
       return;
     }
@@ -334,12 +469,11 @@ export default function KolWorkRegistrationMui() {
     try {
       setSaving(true);
       const result = await registerKolAvailabilities({
-        kolId: resolvedId, // primary id từ storage/fallback
-        date: pickedDate, // dayjs
-        shifts, // [{start, end}]
+        kolId: resolvedUserId, // backend: /schedule/{userId}
+        date: pickedDate,
+        shifts,
       });
 
-      // Phòng hờ: nếu service chưa được sửa để throw khi app-status != 200
       if (Array.isArray(result)) {
         const bad = result.find(
           (x) => typeof x?.status === "number" && x.status !== 200
@@ -353,23 +487,19 @@ export default function KolWorkRegistrationMui() {
         }
       }
 
-      const rec = {
-        date: pickedDate.format("YYYY-MM-DD"),
-        shifts: shifts.map((s) => ({
-          start: s.start.format("HH:mm"),
-          end: s.end.format("HH:mm"),
-        })),
-      };
-      setHistory((list) => {
-        const rest = list.filter((x) => x.date !== rec.date);
-        return [rec, ...rest].sort((a, b) => (a.date < b.date ? 1 : -1));
+      setSnack({
+        open: true,
+        type: "success",
+        message: "Đăng ký ca làm thành công!",
       });
+      setShifts([]);
 
-      setSnack({ open: true, type: "success", message: "Đăng ký thành công!" });
+      if (resolvedKolId) {
+        await reloadMonthSchedule();
+      }
     } catch (e) {
-      // ====== HIỂN THỊ THÔNG BÁO TRÙNG LỊCH DỄ HIỂU ======
       const httpStatus = e?.response?.status;
-      const appStatus = e?.appStatus; // nếu service có gắn
+      const appStatus = e?.appStatus;
       const isConflict =
         httpStatus === 400 ||
         httpStatus === 409 ||
@@ -395,238 +525,253 @@ export default function KolWorkRegistrationMui() {
       }
     } finally {
       setSaving(false);
-      // Reload lại blocked để phản ánh ca mới vừa đăng ký (nếu BE trả kịp)
-      if (resolvedId && pickedDate) {
-        const start = pickedDate.startOf("day");
-        const end = pickedDate.endOf("day");
-        try {
-          setLoadingBlocked(true);
-          const booked = await getKolTimeline({
-            kolId: resolvedId,
-            startDate: start.toISOString(),
-            endDate: end.toISOString(),
-            page: 0,
-            size: 1000,
-          });
-          const intervals = (booked || [])
-            .flatMap(expandWorkTimesLocal)
-            .map(toISOInterval)
-            .filter(Boolean)
-            .map((iv) => expandIntervalByMinutes(iv, MIN_GAP_MINUTES))
-            .filter((iv) => overlaps(iv.startISO, iv.endISO, start, end))
-            .sort((a, b) => a.startISO.localeCompare(b.startISO));
-          setBlocked(mergeSortedIntervals(intervals));
-        } catch {
-          /* ignore */
-        } finally {
-          setLoadingBlocked(false);
-        }
-      }
     }
   };
 
-  const loadingUI = resolving || !resolvedId;
+  const loadingUI = resolving || !resolvedUserId;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
-      <Box sx={{ p: 2, maxWidth: 1100, mx: "auto" }}>
+      <Box sx={{ p: 2, maxWidth: 1200, mx: "auto" }}>
         <Typography variant="h5" fontWeight={700} color="#0050ab" mb={1}>
           Đăng ký lịch làm việc
         </Typography>
 
         {loadingUI ? (
-          <Typography>Đang tải KOL ID...</Typography>
-        ) : (
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            alignItems="flex-start"
-          >
-            {/* Calendar landscape, bắt đầu từ ngày khả dụng (>= +14 ngày) */}
-            <Card sx={{ p: 1, border: "2px solid #93cef6", borderRadius: 2 }}>
-              <StaticDatePicker
-                orientation="landscape"
-                defaultCalendarMonth={MIN_DATE}
-                minDate={MIN_DATE}
-                value={pickedDate}
-                onChange={(val) => {
-                  setPickedDate(val?.startOf("day") || null);
-                  setShifts([]); // đổi ngày → reset ca
-                }}
-                dayOfWeekFormatter={dayOfWeekLabel}
-                localeText={{ toolbarTitle: "Chọn ngày" }}
-                slotProps={{ actionBar: { actions: [] } }}
-              />
-            </Card>
-
-            {/* Khung ca trong ngày được chọn */}
-            <Card sx={{ p: 2, flex: 1, border: "2px solid #93cef6" }}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-              >
-                <Typography fontWeight={600}>
-                  {pickedDate
-                    ? `Ngày: ${pickedDate.format("dddd, DD/MM/YYYY")}`
-                    : "Chọn ngày (≥ 14 ngày từ hôm nay)"}
-                </Typography>
-                <Button
-                  variant="contained"
-                  onClick={addShift}
-                  disabled={!pickedDate || saving}
-                >
-                  Thêm ca
-                </Button>
-              </Stack>
-
-              <Divider sx={{ my: 1.5 }} />
-
-              {/* Thông tin block để user biết (tuỳ chọn, có thể xoá nếu không muốn hiện) */}
-              {pickedDate && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 1 }}
-                >
-                  {loadingBlocked
-                    ? "Đang kiểm tra lịch đã đặt..."
-                    : blocked.length
-                    ? `Khoảng KHÔNG khả dụng (đã gồm đệm ±${MIN_GAP_MINUTES}’): ` +
-                      blocked
-                        .map(
-                          (b) =>
-                            `${dayjs(b.startISO).format("HH:mm")}–${dayjs(
-                              b.endISO
-                            ).format("HH:mm")}`
-                        )
-                        .join("  •  ")
-                    : "Toàn ngày chưa có đặt trước (hoặc ngoài khung hiển thị)."}
-                </Typography>
-              )}
-
-              <Stack spacing={1.5}>
-                {shifts.map((sh, idx) => {
-                  const minEndTime =
-                    sh.start?.add(MIN_DURATION_MINUTES, "minute") || null;
-                  const maxStartTime =
-                    sh.end?.add(-MIN_DURATION_MINUTES, "minute") || null;
-
-                  return (
-                    <Stack
-                      key={idx}
-                      direction="row"
-                      alignItems="center"
-                      spacing={1.5}
-                      sx={{
-                        p: 1,
-                        border: "1px solid #93cef6",
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography sx={{ width: 56, textAlign: "right" }}>
-                        Ca {idx + 1}
-                      </Typography>
-
-                      <Typography>Từ</Typography>
-                      <TimePicker
-                        value={sh.start}
-                        onChange={(v) => updateShift(idx, "start", v)}
-                        ampm={false}
-                        minutesStep={5}
-                        maxTime={maxStartTime || undefined}
-                        disabled={saving}
-                      />
-
-                      <Typography>đến</Typography>
-                      <TimePicker
-                        value={sh.end}
-                        onChange={(v) => updateShift(idx, "end", v)}
-                        ampm={false}
-                        minutesStep={5}
-                        minTime={minEndTime || undefined}
-                        disabled={saving}
-                      />
-
-                      <Box flex={1} />
-                      <Button
-                        color="error"
-                        onClick={() => removeShift(idx)}
-                        disabled={saving}
-                      >
-                        Xoá
-                      </Button>
-                    </Stack>
-                  );
-                })}
-
-                {!pickedDate && (
-                  <Typography color="text.secondary">
-                    Hãy chọn ngày rồi bấm <b>Thêm ca</b>.
-                  </Typography>
-                )}
-                {pickedDate && !shifts.length && (
-                  <Typography color="text.secondary">
-                    Ngày này chưa có ca. Bấm <b>Thêm ca</b> để bắt đầu.
-                  </Typography>
-                )}
-              </Stack>
-
-              <Stack direction="row" justifyContent="flex-end" mt={2}>
-                <Button
-                  variant="contained"
-                  onClick={handleSave}
-                  disabled={!pickedDate || !shifts.length || saving}
-                  startIcon={saving ? <CircularProgress size={18} /> : null}
-                >
-                  {saving ? (
-                    "Đang đăng ký..."
-                  ) : (
-                    <>
-                      Lưu đăng ký ngày{" "}
-                      {pickedDate ? pickedDate.format("DD/MM") : ""}
-                    </>
-                  )}
-                </Button>
-              </Stack>
-            </Card>
-          </Stack>
-        )}
-
-        {/* Lịch sử (chỉ ngày đã lưu) */}
-        <Card
-          sx={{ mt: 2, p: 2, border: "2px solid #93cef6", borderRadius: 2 }}
-        >
-          <Typography fontWeight={700} mb={1}>
-            Lịch sử đăng ký
+          <Typography>Đang tải thông tin KOL...</Typography>
+        ) : !resolvedUserId ? (
+          <Typography color="error">
+            Không tìm thấy User ID. Vui lòng đăng nhập bằng tài khoản KOL.
           </Typography>
-          {history.length === 0 ? (
-            <Typography color="text.secondary">Chưa có bản ghi.</Typography>
-          ) : (
-            <Stack spacing={1}>
-              {history.map((h) => (
-                <Box
-                  key={h.date}
-                  sx={{
-                    p: 1,
-                    border: "1px solid #e3f0ff",
-                    borderRadius: 1,
-                    background: "#f8fbff",
+        ) : (
+          <>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              alignItems="flex-start"
+            >
+              {/* Calendar chọn ngày */}
+              <Card
+                sx={{
+                  p: 1,
+                  border: "2px solid #93cef6",
+                  borderRadius: 2,
+                  minWidth: 360,
+                }}
+              >
+                <StaticDatePicker
+                  orientation="landscape"
+                  defaultCalendarMonth={MIN_DATE}
+                  minDate={MIN_DATE}
+                  value={pickedDate}
+                  onChange={(val) => {
+                    const d = val && val.isValid() ? val.startOf("day") : null;
+                    setPickedDate(d);
+                    setShifts([]);
+                    if (d) setMonthAnchor(d.startOf("month"));
                   }}
+                  onMonthChange={(month) => {
+                    if (month) setMonthAnchor(month.startOf("month"));
+                  }}
+                  dayOfWeekFormatter={dayOfWeekLabel}
+                  localeText={{ toolbarTitle: "Chọn ngày" }}
+                  slotProps={{ actionBar: { actions: [] } }}
+                />
+              </Card>
+
+              {/* Form ca */}
+              <Card
+                sx={{
+                  p: 2,
+                  flex: 1,
+                  border: "2px solid #93cef6",
+                  borderRadius: 2,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
                 >
                   <Typography fontWeight={600}>
-                    {dayjs(h.date).format("dddd, DD/MM/YYYY")}
+                    {pickedDate
+                      ? `Ngày: ${pickedDate.format("dddd, DD/MM/YYYY")}`
+                      : "Chọn ngày (≥ 14 ngày từ hôm nay) để đăng ký ca"}
                   </Typography>
-                  <Typography variant="body2">
-                    {h.shifts.map((s) => `${s.start}–${s.end}`).join("  •  ")}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </Card>
+                  <Button
+                    variant="contained"
+                    onClick={addShift}
+                    disabled={!pickedDate || saving}
+                  >
+                    Thêm ca
+                  </Button>
+                </Stack>
 
-        {/* Snackbar thông báo success/fail */}
+                <Divider sx={{ my: 1.5 }} />
+
+                {pickedDate && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 1 }}
+                  >
+                    {loadingBlocked
+                      ? "Đang kiểm tra lịch đã đặt..."
+                      : blocked.length
+                      ? `Khoảng KHÔNG khả dụng (đã gồm đệm ±${MIN_GAP_MINUTES}’): ` +
+                        blocked
+                          .map(
+                            (b) =>
+                              `${dayjs(b.startISO).format("HH:mm")}–${dayjs(
+                                b.endISO
+                              ).format("HH:mm")}`
+                          )
+                          .join("  •  ")
+                      : "Không có khoảng chặn nào trong ngày này."}
+                  </Typography>
+                )}
+
+                <Stack spacing={1.5}>
+                  {shifts.map((sh, idx) => {
+                    const minEndTime =
+                      sh.start?.add(MIN_DURATION_MINUTES, "minute") || null;
+                    const maxStartTime =
+                      sh.end?.add(-MIN_DURATION_MINUTES, "minute") || null;
+
+                    return (
+                      <Stack
+                        key={idx}
+                        direction="row"
+                        alignItems="center"
+                        spacing={1.5}
+                        sx={{
+                          p: 1,
+                          border: "1px solid #93cef6",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography sx={{ width: 56, textAlign: "right" }}>
+                          Ca {idx + 1}
+                        </Typography>
+
+                        <Typography>Từ</Typography>
+                        <TimePicker
+                          value={sh.start}
+                          onChange={(v) => updateShift(idx, "start", v)}
+                          ampm={false}
+                          views={["hours"]} // ✅ chỉ chọn giờ
+                          format="HH" // hiển thị giờ, phút = 00 ngầm định
+                          maxTime={maxStartTime || undefined}
+                          disabled={saving}
+                        />
+
+                        <Typography>đến</Typography>
+                        <TimePicker
+                          value={sh.end}
+                          onChange={(v) => updateShift(idx, "end", v)}
+                          ampm={false}
+                          views={["hours"]} // ✅ chỉ chọn giờ
+                          format="HH"
+                          minTime={minEndTime || undefined}
+                          // ✅ phải chọn start trước rồi mới cho chọn end
+                          disabled={saving || !sh.start}
+                        />
+
+                        <Box flex={1} />
+                        <Button
+                          color="error"
+                          onClick={() => removeShift(idx)}
+                          disabled={saving}
+                        >
+                          Xoá
+                        </Button>
+                      </Stack>
+                    );
+                  })}
+
+                  {!pickedDate && (
+                    <Typography color="text.secondary">
+                      Hãy chọn ngày bên trái rồi bấm <b>Thêm ca</b>.
+                    </Typography>
+                  )}
+                  {pickedDate && !shifts.length && (
+                    <Typography color="text.secondary">
+                      Ngày này chưa có ca mới. Bấm <b>Thêm ca</b> để đăng ký.
+                    </Typography>
+                  )}
+                </Stack>
+
+                <Stack direction="row" justifyContent="flex-end" mt={2}>
+                  <Button
+                    variant="contained"
+                    onClick={handleSave}
+                    disabled={!pickedDate || !shifts.length || saving}
+                    startIcon={saving ? <CircularProgress size={18} /> : null}
+                  >
+                    {saving
+                      ? "Đang đăng ký..."
+                      : `Lưu đăng ký ngày ${
+                          pickedDate ? pickedDate.format("DD/MM") : ""
+                        }`}
+                  </Button>
+                </Stack>
+              </Card>
+            </Stack>
+
+            {/* Lịch RẢNH trong tháng */}
+            <Card
+              sx={{
+                mt: 2,
+                p: 2,
+                border: "2px solid #93cef6",
+                borderRadius: 2,
+              }}
+            >
+              <Typography fontWeight={700} mb={1}>
+                Lịch rảnh trong tháng {monthAnchor.format("MM/YYYY")}
+              </Typography>
+
+              {loadingMonthSchedule ? (
+                <Typography color="text.secondary">
+                  Đang tải lịch rảnh...
+                </Typography>
+              ) : !monthScheduleByDay.length ? (
+                <Typography color="text.secondary">
+                  Chưa có khoảng rảnh nào trong tháng này.
+                </Typography>
+              ) : (
+                <Stack spacing={0.75}>
+                  {monthScheduleByDay.map((d) => (
+                    <Box
+                      key={d.date}
+                      sx={{
+                        p: 0.75,
+                        borderRadius: 1,
+                        border: "1px solid #e3f0ff",
+                        backgroundColor: "#f8fbff",
+                      }}
+                    >
+                      <Typography fontWeight={600} variant="body2">
+                        {dayjs(d.date).format("dddd, DD/MM/YYYY")}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {d.items
+                          .map(
+                            (ev) =>
+                              `${dayjs(ev.startAt).format("HH:mm")}–${dayjs(
+                                ev.endAt
+                              ).format("HH:mm")}`
+                          )
+                          .join("  •  ")}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Card>
+          </>
+        )}
+
         <Snackbar
           open={snack.open}
           autoHideDuration={snack.type === "error" ? 6000 : 3000}

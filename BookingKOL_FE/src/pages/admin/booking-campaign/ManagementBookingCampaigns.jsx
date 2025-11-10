@@ -57,16 +57,14 @@ const rowKey = (r) =>
   r?.code ||
   `campaign-${Math.random().toString(36).slice(2, 10)}`;
 
-// kiểm tra hai đoạn thời gian [aStart, aEnd] và [bStart, bEnd] có giao nhau không
 const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
-  if (!aStart && !aEnd) return false; // record không có mốc thời gian
+  if (!aStart && !aEnd) return false;
   const startA = dayjs(aStart || aEnd);
   const endA = dayjs(aEnd || aStart);
   if (!startA.isValid() || !endA.isValid()) return false;
   const startB = dayjs(bStart);
   const endB = dayjs(bEnd);
-  if (!startB.isValid() || !endB.isValid()) return true; // không có range filter hợp lệ thì cho qua
-  // overlap nếu startA <= endB && endA >= startB
+  if (!startB.isValid() || !endB.isValid()) return true;
   return (
     startA.valueOf() <= endB.valueOf() && endA.valueOf() >= startB.valueOf()
   );
@@ -83,10 +81,9 @@ export default function ManagementBookingCampaigns() {
     search: undefined,
     status: undefined,
     packageType: undefined,
-    executionRange: undefined, // [start, end]
+    executionRange: undefined,
   });
 
-  // Chỉ gửi page & size lên server như bạn yêu cầu
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["admin-campaign-bookings", { page, size }],
     queryFn: () => adminGetCampaignBookings({ params: { page, size } }),
@@ -180,7 +177,6 @@ export default function ManagementBookingCampaigns() {
   };
 
   const goCreate = useCallback(() => {
-    // ✅ trỏ đúng màn hình tạo/sửa bạn đã khai báo: /admin/bookings/create
     navigate(`/admin/bookings/create`);
   }, [navigate]);
 
@@ -194,15 +190,24 @@ export default function ManagementBookingCampaigns() {
 
   const goEdit = useCallback(
     (r) => {
-      const id = r?.id || r?.requestNumber || r?.code;
-      if (id) {
-        navigate(
-          `/admin/bookings/create?campaignId=${encodeURIComponent(id)}`,
-          {
-            state: { ...r, campaignId: id },
-          }
-        );
+      // ✅ PHẢI DÙNG campaignId từ API, KHÔNG dùng id
+      const campaignId = r?.campaignId;
+      if (!campaignId) {
+        // Nếu không có campaignId thì không điều hướng (hoặc log ra để debug)
+        // console.error("Row không có campaignId:", r);
+        return;
       }
+
+      navigate(
+        `/admin/bookings/create?campaignId=${encodeURIComponent(campaignId)}`,
+        {
+          // truyền đầy đủ row + campaignId chuẩn
+          state: {
+            ...r,
+            campaignId,
+          },
+        }
+      );
     },
     [navigate]
   );
@@ -274,7 +279,6 @@ export default function ManagementBookingCampaigns() {
         width: 150,
         render: (_, r) => (
           <Space>
-            {/* Xem */}
             <Button
               type="link"
               onClick={() => goDetail(r)}
@@ -283,13 +287,12 @@ export default function ManagementBookingCampaigns() {
             >
               <Eye size={18} />
             </Button>
-            {/* Sửa */}
             <Button
               type="link"
               onClick={() => goEdit(r)}
               className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
               style={{ backgroundColor: "#10B981" }}
-              title="Sửa"
+              title="Tạo booking từ campaign"
             >
               <Pencil size={18} />
             </Button>
@@ -319,7 +322,6 @@ export default function ManagementBookingCampaigns() {
             </div>
           </div>
 
-          {/* Thêm */}
           <Button
             type="link"
             onClick={goCreate}

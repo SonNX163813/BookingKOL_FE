@@ -56,6 +56,10 @@ export const API_PATHS = {
         kolId
       )}`,
   },
+
+  CONTRACT_PAYMENT: {
+    create: "/v1/admin/contracts/payments/create",
+  },
   SCHEDULER_ADMIN: {
     // Admin xem free-time của KOL
     kolFreeTime: "/v1/availabilities/free-time", // + /{kolId}

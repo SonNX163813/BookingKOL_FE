@@ -122,10 +122,10 @@ function Footer() {
             <li className="flex items-center gap-3">
               <img src={email} alt="email" className="!w-[20px]" />
               <a
-                href="mailto:info.planier@gmail.com"
+                href="mailto:nexusagency@gmail.com"
                 className="text-sm hover:text-blue-800"
               >
-                Email: info.planier@gmail.com
+                Email: nexusagency@gmail.com
               </a>
             </li>
             <li className="flex items-center gap-3">
