@@ -22,7 +22,7 @@ import {
 } from "@mui/icons-material";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 
-const MainLayoutAdmin = () => {
+const MainLayoutSuperAdmin = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -153,11 +153,11 @@ const MainLayoutAdmin = () => {
         },
       ],
     },
-    {
-      key: "management-blogs",
-      icon: <ArticleOutlined />,
-      label: <Link to="management-blogs">Quản lý blog</Link>,
-    },
+    // {
+    //   key: "management-blogs",
+    //   icon: <ArticleOutlined />,
+    //   label: <Link to="management-blogs">Quản lý blog</Link>,
+    // },
     {
       key: "management-booking",
       icon: <EventNoteOutlined />,
@@ -256,4 +256,4 @@ const MainLayoutAdmin = () => {
   );
 };
 
-export default MainLayoutAdmin;
+export default MainLayoutSuperAdmin;

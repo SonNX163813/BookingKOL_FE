@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
-const AdminHeader = () => {
+const SuperAdminHeader = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const navigate = useNavigate();
@@ -27,7 +27,9 @@ const AdminHeader = () => {
     <header className="w-full bg-gray-900 text-white px-6 py-3 flex justify-between items-center shadow-md h-20">
       <div className="flex items-center space-x-3">
         <h1 className="text-xl font-semibold overflow-hidden whitespace-nowrap relative">
-          <span className="animate-marquee inline-block">Admin Dashboard</span>
+          <span className="animate-marquee inline-block">
+            Super Admin Dashboard
+          </span>
         </h1>
       </div>
 
@@ -64,4 +66,4 @@ const AdminHeader = () => {
   );
 };
 
-export default AdminHeader;
+export default SuperAdminHeader;
