@@ -81,5 +81,9 @@ export const API_PATHS = {
       `v1/admin/blogs/update/${encodeURIComponent(blogId)}`,
     adminDelete: (blogId) =>
       `v1/admin/blogs/delete/${encodeURIComponent(blogId)}`,
+    adminThumbnailUpload: (blogId) =>
+      `v1/admin/blogs/thumbnail/upload/${encodeURIComponent(blogId)}`,
+    adminThumbnailDelete: (blogId) =>
+      `v1/admin/blogs/thumbnail/delete/${encodeURIComponent(blogId)}`,
   },
 };

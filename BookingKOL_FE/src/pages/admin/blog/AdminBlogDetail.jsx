@@ -113,9 +113,9 @@ const AdminBlogDetail = () => {
   const statusTag = useMemo(() => {
     if (!data) return <Tag color="default">Đang cập nhật</Tag>;
     return data.isPublish ? (
-      <Tag color="green">Đã xuất bản</Tag>
+      <Tag color="green">Công khai</Tag>
     ) : (
-      <Tag color="default">Bản nháp</Tag>
+      <Tag color="default">Ẩn</Tag>
     );
   }, [data]);
 
@@ -139,7 +139,7 @@ const AdminBlogDetail = () => {
         value: stripHtml(editablePreview.content).slice(0, 160) || "--",
       },
       {
-        label: "Xuất bản",
+        label: "Công khai",
         value: editablePreview.isPublish ? "Bật" : "Tắt",
       },
     ],
@@ -226,7 +226,7 @@ const AdminBlogDetail = () => {
         <Form.Item label="Tác giả" name="author">
           <Input placeholder="Nhập tên tác giả" />
         </Form.Item>
-        <Form.Item label="Xuất bản" name="isPublish" valuePropName="checked">
+        <Form.Item label="Công khai" name="isPublish" valuePropName="checked">
           <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
         </Form.Item>
       </div>

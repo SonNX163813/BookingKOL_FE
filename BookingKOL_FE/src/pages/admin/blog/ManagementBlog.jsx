@@ -1,7 +1,17 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import { Button, Card, Modal, Table, Tag, Typography, message } from "antd";
+import {
+  Button,
+  Card,
+  Modal,
+  Table,
+  Tag,
+  Typography,
+  Upload,
+  message,
+  Image,
+} from "antd";
 import {
   DeleteOutlined,
   ExclamationCircleOutlined,
@@ -10,7 +20,9 @@ import {
 import { Eye, Pencil } from "lucide-react";
 import {
   adminDeleteBlog,
+  adminDeleteBlogThumbnail,
   adminFetchBlogList,
+  adminUploadBlogThumbnail,
 } from "../../../services/admin/AdminBlogAPI";
 
 const { Title, Text } = Typography;
@@ -49,6 +61,8 @@ const ManagementBlog = () => {
     totalPages: 0,
   });
   const [deletingId, setDeletingId] = useState(null);
+  const [thumbnailUploadingId, setThumbnailUploadingId] = useState(null);
+  const [thumbnailRemovingId, setThumbnailRemovingId] = useState(null);
 
   const fetchBlogs = useCallback(async (targetPage, targetSize) => {
     setLoading(true);
@@ -82,6 +96,72 @@ const ManagementBlog = () => {
     const nextSize = pagination?.pageSize ?? DEFAULT_PAGE_SIZE;
     setPage(nextPage);
     setSize(nextSize);
+  };
+
+  const handleUploadThumbnail = async (blogId, file) => {
+    if (!blogId) {
+      message.warning("Khong tim thay blog id.");
+      return;
+    }
+    if (!file) {
+      message.warning("Vui long chon file anh.");
+      return;
+    }
+
+    try {
+      setThumbnailUploadingId(blogId);
+      await adminUploadBlogThumbnail(blogId, file);
+      message.success("Cap nhat thumbnail thanh cong.");
+      fetchBlogs(page, size);
+    } catch (error) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Khong the cap nhat thumbnail. Vui long thu lai.";
+      message.error(errorMsg);
+    } finally {
+      setThumbnailUploadingId(null);
+    }
+  };
+
+  const handleRemoveThumbnail = async (blogId) => {
+    if (!blogId) {
+      message.warning("Khong tim thay blog id.");
+      return;
+    }
+
+    try {
+      setThumbnailRemovingId(blogId);
+      await adminDeleteBlogThumbnail(blogId);
+      message.success("Da xoa thumbnail cua blog.");
+      fetchBlogs(page, size);
+    } catch (error) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Khong the xoa thumbnail. Vui long thu lai.";
+      message.error(errorMsg);
+    } finally {
+      setThumbnailRemovingId(null);
+    }
+  };
+
+  const handleConfirmRemoveThumbnail = (blogId) => {
+    if (!blogId) {
+      message.warning("Không tìm thấy mã blog để xóa thumbnail.");
+      return;
+    }
+
+    modal.confirm({
+      title: "Xoá thumbnail",
+      icon: <ExclamationCircleOutlined />,
+      centered: true,
+      okText: "Xoá",
+      okButtonProps: { danger: true },
+      cancelText: "Huỷ",
+      content: "Hành động này không thể hoàn tác.",
+      onOk: () => handleRemoveThumbnail(blogId),
+    });
   };
 
   const handleDeleteBlog = (blogId) => {
@@ -126,6 +206,77 @@ const ManagementBlog = () => {
       render: (id) => id || "Chưa cập nhật",
     },
     {
+      title: "Thumbnail",
+      dataIndex: "thumbnail",
+      key: "thumbnail",
+      width: 240,
+      render: (_, record) => {
+        const blogId = resolveBlogId(record);
+        const isMissingBlogId =
+          blogId === null || blogId === undefined || blogId === "";
+        const isUploading = !isMissingBlogId && thumbnailUploadingId === blogId;
+        const isRemoving = !isMissingBlogId && thumbnailRemovingId === blogId;
+        const thumbnailUrl =
+          typeof record?.thumbnail === "string" &&
+          record.thumbnail.trim().length > 0
+            ? record.thumbnail.trim()
+            : null;
+
+        return (
+          <div className="flex flex-col items-center gap-2">
+            {thumbnailUrl ? (
+              <Image
+                src={thumbnailUrl}
+                alt="Thumbnail"
+                preview={{ mask: "Xem ảnh" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <Text type="secondary" className="text-xs">
+                Chưa có thumbnail
+              </Text>
+            )}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                maxCount={1}
+                disabled={isMissingBlogId || isUploading || isRemoving}
+                beforeUpload={(file) => {
+                  handleUploadThumbnail(blogId, file);
+                  return false;
+                }}
+              >
+                <Button
+                  size="small"
+                  type="primary"
+                  disabled={isMissingBlogId || isUploading || isRemoving}
+                  loading={isUploading}
+                >
+                  Cập nhật
+                </Button>
+              </Upload>
+              <Button
+                size="small"
+                danger
+                disabled={
+                  isMissingBlogId || !thumbnailUrl || isRemoving || isUploading
+                }
+                loading={isRemoving}
+                onClick={() => handleConfirmRemoveThumbnail(blogId)}
+              >
+                Xoá
+              </Button>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
       title: "Tiêu đề",
       dataIndex: "title",
       key: "title",
@@ -146,9 +297,9 @@ const ManagementBlog = () => {
       width: 150,
       render: (value) =>
         value ? (
-          <Tag color="green">Xuất bản</Tag>
+          <Tag color="green">Công khai</Tag>
         ) : (
-          <Tag color="default">Bản nháp</Tag>
+          <Tag color="default">Ẩn</Tag>
         ),
     },
     {
@@ -158,6 +309,7 @@ const ManagementBlog = () => {
       width: 200,
       render: (value) => formatDateTime(value),
     },
+
     {
       title: "Thao tác",
       key: "actions",

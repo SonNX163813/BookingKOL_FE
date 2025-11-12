@@ -15,7 +15,7 @@ import { Crown, Megaphone, CheckCircle } from "lucide-react";
 import { useCreateBooking } from "../../hook/booking_package/useCreateBooking";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getKolProfiles } from "../../services/kol/KolAPI";
+import { getKolProfiles, resolveAvatarUrl } from "../../services/kol/KolAPI";
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
 
 const normalizePackageType = (type) => {
@@ -50,13 +50,38 @@ const HERO_STATS = [
   { value: "24/7", label: "Hỗ trợ vận hành" },
 ];
 
-const ASSISTANT_OPTIONS = [
-  { value: "Ngoc Anh", label: "Ngọc Anh" },
-  { value: "Bao Tram", label: "Bảo Trâm" },
-  { value: "Quang Minh", label: "Quang Minh" },
-];
-
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+
+/** Tag render: avatar nhỏ + tên, không hiện id */
+const createTagRender = (options) => (tagProps) => {
+  const { value, closable, onClose } = tagProps;
+  const opt = options.find((o) => o.value === value);
+  if (!opt) return null;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-[2px] bg-gray-100 rounded-full mr-1 mb-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {opt.avatar && (
+        <img
+          src={opt.avatar}
+          alt={opt.name || "KOL"}
+          className="w-4 h-4 rounded-full object-cover"
+        />
+      )}
+      <span className="text-xs">{opt.name || "KOL"}</span>
+      {closable && (
+        <span
+          onClick={onClose}
+          className="cursor-pointer ml-1 text-gray-400 hover:text-red-400"
+        >
+          ×
+        </span>
+      )}
+    </span>
+  );
+};
 
 const PricingCard = ({
   title,
@@ -158,7 +183,6 @@ const ServicePackageBookingFormPage = () => {
     initialPackageType || null
   );
   const [form] = Form.useForm();
-  const [vipForm] = Form.useForm();
   const [campaignData, setCampaignData] = useState({});
   const [vipExtraData, setVipExtraData] = useState({});
   const [attachmentFile, setAttachmentFile] = useState(null);
@@ -167,9 +191,7 @@ const ServicePackageBookingFormPage = () => {
   const hasExternalPackageSelection = Boolean(initialPackageType);
   const shouldShowSelectionStep = !hasExternalPackageSelection;
   const campaignStepIndex = shouldShowSelectionStep ? 1 : 0;
-  const vipStepIndex = selectedPackage === "vip" ? campaignStepIndex + 1 : -1;
-  const confirmStepIndex =
-    selectedPackage === "vip" ? campaignStepIndex + 2 : campaignStepIndex + 1;
+  const confirmStepIndex = campaignStepIndex + 1;
 
   const handleScrollToForm = () => {
     stepsWrapperRef.current?.scrollIntoView({
@@ -189,10 +211,15 @@ const ServicePackageBookingFormPage = () => {
       return;
     }
     setSelectedPackage(initialPackageType);
-    vipForm.resetFields();
+    form.setFieldsValue({ kol: [], assistant: [] });
     setVipExtraData({});
     setCurrent(campaignStepIndex);
-  }, [initialPackageType, campaignStepIndex, vipForm]);
+  }, [initialPackageType, campaignStepIndex, form]);
+
+  useEffect(() => {
+    if (selectedPackage === "vip") return;
+    form.setFieldsValue({ kol: [], assistant: [] });
+  }, [selectedPackage, form]);
 
   const {
     data: servicePackages,
@@ -222,7 +249,7 @@ const ServicePackageBookingFormPage = () => {
   useEffect(() => {
     if (!isPackageFetchError) return;
     const fallbackMessage =
-      "Khong the tai danh sach goi dich vu. Vui long thu lai sau.";
+      "Không thể tải danh sách gói dịch vụ. Vui lòng thử lại sau.";
     message.error(packageFetchError?.message || fallbackMessage);
   }, [isPackageFetchError, packageFetchError]);
 
@@ -239,96 +266,133 @@ const ServicePackageBookingFormPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const kolOptions = useMemo(() => {
+  const { hostOptions, liveOptions } = useMemo(() => {
     const list = Array.isArray(kolResponse?.content) ? kolResponse.content : [];
+
+    const buildOption = (item) => {
+      const name =
+        item.displayName ||
+        item.fullName ||
+        item.name ||
+        item.username ||
+        item.email ||
+        item.phone ||
+        item.id;
+      const avatar = resolveAvatarUrl(item) || item.avatarUrl || "";
+
+      return {
+        label: (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {avatar && (
+                <img
+                  src={avatar}
+                  alt={name}
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              )}
+              <span>{name}</span>
+            </div>
+            {item.role && (
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                {item.role}
+              </span>
+            )}
+          </div>
+        ),
+        value: item.id,
+        name,
+        avatar,
+        role: item.role,
+        searchText: `${name ?? ""} ${item.id ?? ""} ${item.role ?? ""}`,
+      };
+    };
+
     return list
-      .filter((kol) => kol?.id)
-      .map((kol) => ({
-        value: kol.id,
-        label:
-          kol.displayName ||
-          kol.name ||
-          kol.fullName ||
-          `KOL ${String(kol.id).slice(0, 6)}`,
-      }));
+      .filter((i) => i?.id)
+      .reduce(
+        (acc, item) => {
+          const option = buildOption(item);
+          if (item.role === "LIVE") {
+            acc.liveOptions.push(option);
+          } else {
+            acc.hostOptions.push(option);
+          }
+          return acc;
+        },
+        { hostOptions: [], liveOptions: [] }
+      );
   }, [kolResponse]);
 
   useEffect(() => {
     if (!isKolFetchError) return;
     const fallbackMessage =
-      "Khong the tai danh sach KOL. Vui long thu lai sau.";
+      "Không thể tải danh sách KOL. Vui lòng thử lại sau.";
     message.error(kolFetchError?.message || fallbackMessage);
   }, [isKolFetchError, kolFetchError]);
 
   useEffect(() => {
     if (selectedPackage !== "vip") return;
-    if (!kolOptions.length) return;
-    const currentKol = vipForm.getFieldValue("kol");
-    if (!currentKol) {
-      vipForm.setFieldsValue({ kol: kolOptions[0].value });
+    if (!hostOptions.length) return;
+    const currentKol = form.getFieldValue("kol");
+    if (!Array.isArray(currentKol) || currentKol.length === 0) {
+      form.setFieldsValue({ kol: [hostOptions[0].value] });
     }
-  }, [selectedPackage, kolOptions, vipForm]);
+  }, [selectedPackage, hostOptions, form]);
 
   useEffect(() => {
     if (selectedPackage !== "vip") return;
-    if (!vipExtraData.kol && !vipExtraData.assistant) return;
-    if (
-      vipExtraData.kol &&
-      !kolOptions.some((option) => option.value === vipExtraData.kol)
-    )
-      return;
-    vipForm.setFieldsValue({
-      kol: vipExtraData.kol ?? vipForm.getFieldValue("kol"),
-      assistant:
-        vipExtraData.assistant ??
-        vipForm.getFieldValue("assistant") ??
-        "Ngoc Anh",
-    });
-  }, [selectedPackage, vipExtraData, kolOptions, vipForm]);
+    if (!liveOptions.length) return;
+    const currentAssistant = form.getFieldValue("assistant");
+    if (!Array.isArray(currentAssistant) || currentAssistant.length === 0) {
+      form.setFieldsValue({ assistant: [liveOptions[0].value] });
+    }
+  }, [selectedPackage, liveOptions, form]);
 
   const handleSelectPackage = (pkg) => {
     setSelectedPackage(pkg);
     if (pkg !== "vip") {
-      vipForm.resetFields();
+      form.setFieldsValue({ kol: [], assistant: [] });
       setVipExtraData({});
     }
     setCurrent(campaignStepIndex);
   };
 
   const handleCampaignFormFinish = (values) => {
+    const { kol, assistant, startDate, endDate, ...rest } = values;
     const formatted = {
-      ...values,
-      startDate: values.startDate.format("YYYY-MM-DD"),
-      endDate: values.endDate.format("YYYY-MM-DD"),
+      ...rest,
+      startDate: startDate.format("YYYY-MM-DD"),
+      endDate: endDate.format("YYYY-MM-DD"),
     };
     setCampaignData(formatted);
 
     if (selectedPackage === "vip") {
-      setCurrent(vipStepIndex);
+      const selectedHostIds = Array.isArray(kol) ? kol : [];
+      const selectedAssistantIds = Array.isArray(assistant) ? assistant : [];
+      const selectedKols = hostOptions.filter((o) =>
+        selectedHostIds.includes(o.value)
+      );
+      const selectedAssistants = liveOptions.filter((o) =>
+        selectedAssistantIds.includes(o.value)
+      );
+      setVipExtraData({
+        kol: selectedHostIds,
+        assistant: selectedAssistantIds,
+        kolNames: selectedKols.map((k) => k.name).join(", "),
+        assistantNames: selectedAssistants.map((a) => a.name).join(", "),
+      });
     } else {
-      setCurrent(confirmStepIndex);
+      setVipExtraData({});
     }
-  };
 
-  const handleVipFormFinish = (values) => {
-    const selectedKols = kolOptions.filter((option) =>
-      values.kol.includes(option.value)
-    );
-    const selectedAssistants = ASSISTANT_OPTIONS.filter((option) =>
-      values.assistant.includes(option.value)
-    );
-
-    setVipExtraData({
-      ...values,
-      kolNames: selectedKols.map((k) => k.label).join(", "),
-      assistantNames: selectedAssistants.map((a) => a.label).join(", "),
-    });
     setCurrent(confirmStepIndex);
   };
 
   const onSuccess = () => {
     form.resetFields();
     setAttachmentFile(null);
+    setVipExtraData({});
     navigate("/");
   };
 
@@ -348,7 +412,7 @@ const ServicePackageBookingFormPage = () => {
 
   const handleConfirm = () => {
     if (!selectedPackage) {
-      message.error("Vui long chon goi dich vu truoc khi tiep tuc.");
+      message.error("Vui lòng chọn gói dịch vụ trước khi tiếp tục.");
       return;
     }
 
@@ -356,7 +420,7 @@ const ServicePackageBookingFormPage = () => {
       routePackageId || packageTypeIdMap[selectedPackage];
 
     if (!resolvedPackageId) {
-      message.error("Khong tim thay thong tin goi dich vu.");
+      message.error("Không tìm thấy thông tin gói dịch vụ.");
       return;
     }
 
@@ -364,14 +428,18 @@ const ServicePackageBookingFormPage = () => {
       packageId: resolvedPackageId,
       campaignName: campaignData.campaignName,
       objective: campaignData.objective,
-      budgetMin: campaignData.budgetMin,
-      budgetMax: campaignData.budgetMax,
+      targetPrice: campaignData.targetPrice,
       startDate: campaignData.startDate,
       endDate: campaignData.endDate,
       recurrencePattern: campaignData.recurrencePattern,
-      // liveIds:
-      //   selectedPackage === "vip" ? vipExtraData.assistant ?? [] : [],
-      kolIds: selectedPackage === "vip" ? vipExtraData.kol ?? [] : [],
+      liveIds:
+        selectedPackage === "vip" && Array.isArray(vipExtraData.assistant)
+          ? vipExtraData.assistant
+          : undefined,
+      kolIds:
+        selectedPackage === "vip" && Array.isArray(vipExtraData.kol)
+          ? vipExtraData.kol
+          : undefined,
       attachment: attachmentFile || undefined,
     };
 
@@ -384,15 +452,15 @@ const ServicePackageBookingFormPage = () => {
       <div className="space-y-8">
         {/* <div className="rounded-3xl border border-white/50 bg-gradient-to-r from-[#3117ff] via-[#6d37ff] to-[#a125ff] p-6 text-white shadow-2xl shadow-indigo-500/40">
           <p className="text-[11px] uppercase tracking-[0.4em] text-white/80">
-            Buoc 1
+            Bước 1
           </p>
           <h3 className="mt-3 text-2xl font-semibold tracking-tight">
-            Chon cach dong hanh
+            Chọn cách đồng hành
           </h3>
           <p className="mt-3 text-sm text-white/85">
-            Hay cung chung toi xay dung mot chien dich livestream an tuong voi
-            doi ngu KOL va tro ly da kinh nghiem. Moi goi duoc chuan hoa nhu
-            giao dien CourseLivestream: sang trong, cap nhat ro rang, thao tac
+            Hãy cùng chúng tôi xây dựng một chiến dịch livestream ấn tượng với
+            đội ngũ KOL và trợ lý giàu kinh nghiệm. Mỗi gói được chuẩn hoá như
+            giao diện CourseLivestream: sang trọng, cập nhật rõ ràng, thao tác
             nhanh.
           </p>
         </div> */}
@@ -430,14 +498,14 @@ const ServicePackageBookingFormPage = () => {
       <div className="space-y-8">
         {/* <div className="rounded-3xl border border-slate-200/60 bg-white/70 p-6 shadow-lg shadow-slate-200/60 backdrop-blur">
           <p className="text-[11px] uppercase tracking-[0.4em] text-blue-600">
-            Buoc 2
+            Bước 2
           </p>
           <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            Mo ta chien dich
+            Mô tả chiến dịch
           </h3>
           <p className="mt-2 text-sm text-slate-600">
-            Dien cac thong tin tuong tu bo cuc CourseLivestream: ro rang, tinh
-            gon va tao cam hung.
+            Điền các thông tin tương tự bố cục CourseLivestream: rõ ràng, tinh
+            gọn và tạo cảm hứng.
           </p>
         </div> */}
         <Form
@@ -446,10 +514,11 @@ const ServicePackageBookingFormPage = () => {
           initialValues={{
             campaignName: "",
             objective: "",
-            budgetMin: 1000000,
-            budgetMax: 5000000,
+            targetPrice: 3000000,
             startDate: dayjs(),
             endDate: dayjs().add(7, "day"),
+            kol: [],
+            assistant: [],
           }}
           onFinish={handleCampaignFormFinish}
         >
@@ -475,48 +544,29 @@ const ServicePackageBookingFormPage = () => {
           >
             <Input
               className="!h-12"
-              placeholder="VD: Tăng nhận diện thương hiệu và thúc đẩy doanh số bán hàng"
+              placeholder="VD: Tăng nhận diện thương hiệu và thúc đẩy doanh số"
             />
           </Form.Item>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Form.Item
-              label="Ngân sách (VND)"
-              name="budgetMin"
-              rules={[
-                {
-                  required: true,
-                  message: "Vui long nhap ngan sach toi thieu!",
-                },
-              ]}
-              className="w-full"
-            >
-              <InputNumber
-                className="!w-full !h-12"
-                formatter={(value) =>
-                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                }
-                parser={(value) => value.replace(/\\$\\s?|(,*)/g, "")}
-                min={0}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Ngan sach toi da (VND)"
-              name="budgetMax"
-              rules={[
-                { required: true, message: "Vui long nhap ngan sach toi da!" },
-              ]}
-            >
-              <InputNumber
-                className="!w-full !h-12"
-                formatter={(value) =>
-                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                }
-                parser={(value) => value.replace(/\\$\\s?|(,*)/g, "")}
-                min={0}
-              />
-            </Form.Item>
-          </div>
+          <Form.Item
+            label="Ngân sách mục tiêu (VND)"
+            name="targetPrice"
+            rules={[
+              {
+                required: true,
+                message: "Vui lòng nhập ngân sách mục tiêu!",
+              },
+            ]}
+          >
+            <InputNumber
+              className="!w-full !h-12"
+              formatter={(value) =>
+                value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
+              }
+              parser={(value) => (value ? value.replace(/,/g, "") : "")}
+              min={0}
+            />
+          </Form.Item>
 
           <div className="grid gap-6 md:grid-cols-2">
             <Form.Item
@@ -542,7 +592,7 @@ const ServicePackageBookingFormPage = () => {
           <Form.Item label="Tần suất triển khai" name="recurrencePattern">
             <Input
               className="!h-12"
-              placeholder="VD: Hàng tuần, Hàng tháng, Không lặp lại"
+              placeholder="VD: Hàng tuần, Hàng tháng, hoặc Không lặp lại"
             />
           </Form.Item>
 
@@ -565,13 +615,95 @@ const ServicePackageBookingFormPage = () => {
             </div>
           </Form.Item>
 
-          <div className="flex flex-wrap justify-end gap-4">
+          {selectedPackage === "vip" && (
+            <div className="rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Chọn Host chính & Trợ lý LIVE
+              </h3>
+              <p className="mb-4 text-sm text-slate-600">
+                Lựa chọn đội ngũ đồng hành phù hợp cho gói VIP của bạn.
+              </p>
+              <Form.Item
+                label="Host chính"
+                name="kol"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn ít nhất một Host chính!",
+                  },
+                ]}
+              >
+                <Select
+                  mode="multiple"
+                  loading={isFetchingKols}
+                  options={hostOptions}
+                  placeholder="Chọn KOL phù hợp"
+                  allowClear
+                  showSearch
+                  optionFilterProp="searchText"
+                  filterOption={(input, option) =>
+                    (option?.searchText || "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  tagRender={createTagRender(hostOptions)}
+                  notFoundContent={
+                    isFetchingKols
+                      ? "Đang tải danh sách..."
+                      : "Không tìm thấy Host chính phù hợp."
+                  }
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Trợ lý LIVE"
+                name="assistant"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn ít nhất một Trợ lý LIVE!",
+                  },
+                ]}
+              >
+                <Select
+                  mode="multiple"
+                  loading={isFetchingKols}
+                  options={liveOptions}
+                  placeholder="Chọn Trợ lý LIVE hỗ trợ"
+                  allowClear
+                  showSearch
+                  optionFilterProp="searchText"
+                  filterOption={(input, option) =>
+                    (option?.searchText || "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  tagRender={createTagRender(liveOptions)}
+                  notFoundContent={
+                    isFetchingKols
+                      ? "Đang tải danh sách..."
+                      : "Không tìm thấy Trợ lý LIVE phù hợp."
+                  }
+                />
+              </Form.Item>
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-4 pt-4">
             {shouldShowSelectionStep && (
               <Button className="!h-12" onClick={() => setCurrent(0)}>
                 Quay lại
               </Button>
             )}
-            <Button className="!h-12 !px-10" type="primary" htmlType="submit">
+            <Button
+              className="!h-12 !px-10"
+              type="primary"
+              htmlType="submit"
+              disabled={
+                selectedPackage === "vip" &&
+                (!hostOptions.length || !liveOptions.length)
+              }
+            >
               Lưu và tiếp tục
             </Button>
           </div>
@@ -580,95 +712,19 @@ const ServicePackageBookingFormPage = () => {
     ),
   };
 
-  const vipStep =
-    selectedPackage === "vip"
-      ? {
-          title: "Chọn Host Chính và Trợ LIVE",
-          content: (
-            <Form
-              form={vipForm}
-              layout="vertical"
-              onFinish={handleVipFormFinish}
-              initialValues={{ assistant: "Ngoc Anh" }}
-              className="p-4"
-            >
-              <Form.Item
-                label="Chọn Host Chính"
-                name="kol"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn ít nhất một Host Chính!",
-                  },
-                ]}
-              >
-                <Select
-                  mode="multiple"
-                  loading={isFetchingKols}
-                  options={kolOptions}
-                  placeholder="Chọn KOL phù hợp"
-                  optionFilterProp="label"
-                  showSearch
-                  notFoundContent={
-                    isFetchingKols
-                      ? "Đang tải danh sách..."
-                      : "Không tìm thấy Host Chính phù hợp."
-                  }
-                />
-              </Form.Item>
-
-              <Form.Item
-                label="Trợ LIVE"
-                name="assistant"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn ít nhất một Trợ LIVE!",
-                  },
-                ]}
-              >
-                <Select
-                  mode="multiple"
-                  options={ASSISTANT_OPTIONS}
-                  placeholder="Chọn Trợ LIVE hỗ trợ"
-                />
-              </Form.Item>
-
-              <div className="flex flex-wrap justify-end gap-4 pt-4">
-                <Button
-                  className="!h-12"
-                  onClick={() => setCurrent(campaignStepIndex)}
-                >
-                  Quay lại
-                </Button>
-                <Button
-                  className="!h-12"
-                  type="primary"
-                  htmlType="submit"
-                  disabled={!kolOptions.length}
-                >
-                  Tiếp tục
-                </Button>
-              </div>
-            </Form>
-          ),
-        }
-      : null;
-
   const confirmStep = {
     title: "Xác nhận",
     content: (
       <div className="space-y-8">
         {/* <div className="rounded-3xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 via-white to-white p-6 shadow-lg shadow-emerald-100/70">
           <p className="text-[11px] uppercase tracking-[0.4em] text-emerald-500">
-            Buoc 4
+            Bước 3
           </p>
           <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            Kiem tra lan cuoi truoc khi gui
+            Kiểm tra lần cuối trước khi gửi
           </h3>
           <p className="mt-2 text-sm text-slate-600">
-            Tong ket thong tin chien dich giong cach CourseLivestream hien thi
-            chi tiet khoa hoc: ro rang, sang trong va de doi chieu.
+            Tổng kết thông tin chiến dịch rõ ràng, sang trọng và dễ đối chiếu.
           </p>
         </div> */}
 
@@ -686,11 +742,13 @@ const ServicePackageBookingFormPage = () => {
               <Descriptions.Item label="Mục tiêu chiến dịch">
                 {campaignData.objective}
               </Descriptions.Item>
-              <Descriptions.Item label="Ngân sách tối thiểu">
-                {campaignData.budgetMin?.toLocaleString()} VND
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngân sách tối đa">
-                {campaignData.budgetMax?.toLocaleString()} VND
+              <Descriptions.Item label="Ngân sách mục tiêu">
+                {campaignData.targetPrice !== undefined &&
+                campaignData.targetPrice !== null &&
+                campaignData.targetPrice !== "" &&
+                !Number.isNaN(Number(campaignData.targetPrice))
+                  ? `${Number(campaignData.targetPrice).toLocaleString()} VND`
+                  : "--"}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày bắt đầu">
                 {campaignData.startDate}
@@ -718,10 +776,10 @@ const ServicePackageBookingFormPage = () => {
                   column={1}
                   labelStyle={{ fontWeight: "bold" }}
                 >
-                  <Descriptions.Item label="Host Chính">
+                  <Descriptions.Item label="Host chính">
                     {vipExtraData.kolNames || vipExtraData.kol?.join(", ")}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Trợ LIVE">
+                  <Descriptions.Item label="Trợ lý LIVE">
                     {vipExtraData.assistantNames ||
                       vipExtraData.assistant?.join(", ")}
                   </Descriptions.Item>
@@ -734,11 +792,7 @@ const ServicePackageBookingFormPage = () => {
           <Button
             className="!h-12"
             onClick={() => {
-              if (selectedPackage === "vip") {
-                setCurrent(vipStepIndex);
-              } else {
-                setCurrent(campaignStepIndex);
-              }
+              setCurrent(campaignStepIndex);
             }}
           >
             Quay lại
@@ -756,7 +810,6 @@ const ServicePackageBookingFormPage = () => {
   const steps = [
     ...(shouldShowSelectionStep ? [selectionStep] : []),
     campaignStep,
-    ...(vipStep ? [vipStep] : []),
     confirmStep,
   ];
 
@@ -780,10 +833,12 @@ const ServicePackageBookingFormPage = () => {
               Booking Package
             </span>
             <h1 className="mt-6 text-4xl font-extrabold leading-tight text-slate-900 sm:text-5xl">
-              Hay cung chung toi xay dung mot chien dich Livestream dinh cao
+              Hãy cùng chúng tôi xây dựng một chiến dịch Livestream đỉnh cao
             </h1>
             <p className="mt-4 text-lg text-slate-600">
-              Lay tinh than thiet ke cua trang CourseLivestream va mang vao quy trinh dat goi: giao dien trong tre, thong tin minh bach, trai nghiem cap nhat lien tuc.
+              Lấy tinh thần thiết kế của trang CourseLivestream và mang vào quy
+              trình đặt gói: giao diện trong trẻo, thông tin minh bạch, trải
+              nghiệm cập nhật liên tục.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <button
@@ -791,14 +846,14 @@ const ServicePackageBookingFormPage = () => {
                 onClick={handleScrollToForm}
                 className="rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/40 transition hover:-translate-y-0.5"
               >
-                Bat dau dat goi
+                Bắt đầu đặt gói
               </button>
               <button
                 type="button"
                 onClick={handleScrollToForm}
                 className="rounded-full border border-slate-300/80 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5"
               >
-                Xem quy trinh
+                Xem quy trình
               </button>
             </div>
           </div>

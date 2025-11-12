@@ -41,6 +41,7 @@ import CoursePurchaseReview from "../pages/home/course-live/CoursePurchaseReview
 import CoursePurchasePayment from "../pages/home/course-live/CoursePurchasePayment.jsx";
 import CoursePurchaseSuccess from "../pages/home/course-live/CoursePurchaseSuccess.jsx";
 import CoursePurchaseFail from "../pages/home/course-live/CoursePurchaseFail.jsx";
+import CourseBookingHistory from "../pages/home/course-live/CourseBookingHistory.jsx";
 
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
@@ -103,11 +104,18 @@ export const routerCustomer = [
         element: <MainLayout />,
         children: [
           { path: "/userprofile", element: <UserProfile /> },
-          { path: "/don-mua", element: <HistoryBookingPackagePage /> },
+          {
+            path: "/don-booking-chien-dich",
+            element: <HistoryBookingPackagePage />,
+          },
           { path: "/don-booking-kol", element: <MySingleBookingRequests /> },
           {
             path: "/don-booking-kol/:requestId",
             element: <MySingleBookingRequestDetail />,
+          },
+          {
+            path: "/don-dat-khoa-hoc",
+            element: <CourseBookingHistory />,
           },
           {
             path: "/khoa-hoc/review/:coursePackageId",

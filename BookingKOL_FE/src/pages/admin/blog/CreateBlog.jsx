@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowLeftOutlined,
-  SaveOutlined,
-} from "@ant-design/icons";
+import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons";
 import {
   Button,
   Card,
@@ -56,7 +53,7 @@ const CreateBlog = () => {
             Tạo blog mới
           </Title>
           <Text type="secondary">
-            Nhập thông tin chi tiết và nội dung bài viết trước khi xuất bản.
+            Nhập thông tin chi tiết và nội dung bài viết trước khi công khai.
           </Text>
         </div>
         <Space wrap>
@@ -100,9 +97,7 @@ const CreateBlog = () => {
             <Form.Item
               name="author"
               label="Tác giả"
-              rules={[
-                { required: true, message: "Vui lòng nhập tên tác giả" },
-              ]}
+              rules={[{ required: true, message: "Vui lòng nhập tên tác giả" }]}
             >
               <Input placeholder="Nhập tên tác giả" />
             </Form.Item>
@@ -111,7 +106,7 @@ const CreateBlog = () => {
               label="Trạng thái"
               valuePropName="checked"
             >
-              <Switch checkedChildren="Xuất bản" unCheckedChildren="Bản nháp" />
+              <Switch checkedChildren="Công khai" unCheckedChildren="Ẩn" />
             </Form.Item>
           </div>
           <Form.Item
@@ -130,4 +125,3 @@ const CreateBlog = () => {
 };
 
 export default CreateBlog;
-

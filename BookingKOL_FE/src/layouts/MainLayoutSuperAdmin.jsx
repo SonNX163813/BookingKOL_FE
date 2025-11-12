@@ -128,12 +128,12 @@ const MainLayoutSuperAdmin = () => {
           icon: <CategoryOutlined />,
           label: <Link to="management-category">Quản lý lĩnh vực</Link>,
         },
-        {
-          key: "management-abc",
-          icon: <AppsOutlined />,
-          // label: <Link to="/management-category">Quản lý nền tảng</Link>,
-          label: "Quản lý nền tảng",
-        },
+        // {
+        //   key: "management-abc",
+        //   icon: <AppsOutlined />,
+        //   // label: <Link to="/management-category">Quản lý nền tảng</Link>,
+        //   label: "Quản lý nền tảng",
+        // },
       ],
     },
     {

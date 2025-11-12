@@ -530,7 +530,15 @@ const Navbar = () => {
         </MenuItem>
         <MenuItem
           component={Link}
-          to="/don-mua"
+          to="/don-dat-khoa-hoc"
+          onClick={closeAccount}
+          sx={{ fontWeight: 700, py: 1.25 }}
+        >
+          Đơn đặt khóa học
+        </MenuItem>
+        <MenuItem
+          component={Link}
+          to="/don-booking-chien-dich"
           onClick={closeAccount}
           sx={{ fontWeight: 700, py: 1.25 }}
         >

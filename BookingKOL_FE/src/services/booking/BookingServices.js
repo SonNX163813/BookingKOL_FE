@@ -6,8 +6,7 @@ export const createBookingPackage = async (value) => {
     packageId: value.packageId,
     campaignName: value.campaignName,
     objective: value.objective,
-    budgetMin: value.budgetMin,
-    budgetMax: value.budgetMax,
+    targetPrice: value.targetPrice,
     startDate: value.startDate,
     endDate: value.endDate,
     recurrencePattern: value.recurrencePattern,
@@ -21,8 +20,7 @@ export const createBookingPackage = async (value) => {
   formData.append("packageId", value.packageId);
   formData.append("campaignName", value.campaignName);
   formData.append("objective", value.objective);
-  formData.append("budgetMin", value.budgetMin);
-  formData.append("budgetMax", value.budgetMax);
+  formData.append("targetPrice", value.targetPrice);
   formData.append("startDate", new Date(value.startDate).toISOString());
   formData.append("endDate", new Date(value.endDate).toISOString());
   formData.append("recurrencePattern", value.recurrencePattern ? "WEEKLY" : "");
