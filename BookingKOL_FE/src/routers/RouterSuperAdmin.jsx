@@ -30,6 +30,9 @@ import ManagementBlog from "../pages/admin/blog/ManagementBlog";
 import AdminBlogDetail from "../pages/admin/blog/AdminBlogDetail";
 import CreateBlog from "../pages/admin/blog/CreateBlog";
 
+import ManagementAllUser from "../pages/superAdmin/ManagementAllUser";
+import ManagementMerchant from "../pages/superAdmin/ManagementMerchant";
+
 export const routerSuperAdmin = [
   { path: "/login", element: <LoginPage /> },
 
@@ -39,6 +42,8 @@ export const routerSuperAdmin = [
     children: [
       { index: true, element: <SuperAdminDashBoard /> },
       { path: "management-log-chat-ai", element: <ManagementLogAI /> },
+      { path: "management-all-user", element: <ManagementAllUser /> },
+      { path: "management-merchants", element: <ManagementMerchant /> },
       { path: "management-customer", element: <ManagementCustomer /> },
       { path: "management-customer/:id", element: <UserDetailPage /> },
 

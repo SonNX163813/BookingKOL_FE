@@ -51,7 +51,7 @@ const SuperAdminHeader = () => {
           transformOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <MenuItem onClick={handleLogout}>
-            <LogoutOutlined className="mr-2" /> Logout
+            <LogoutOutlined className="mr-2" /> Đăng xuất
           </MenuItem>
         </Menu>
       </div>

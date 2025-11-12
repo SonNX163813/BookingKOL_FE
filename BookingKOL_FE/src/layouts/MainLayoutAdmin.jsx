@@ -147,9 +147,13 @@ const MainLayoutAdmin = () => {
           label: <Link to="management-course">Khóa học</Link>,
         },
         {
-          key: "management-his",
+          key: "management-course-history",
           icon: <BarChartOutlined />,
-          label: "Quản lý lịch sử mua khóa học",
+          label: (
+            <Link to="management-course-history">
+              Quản lý lịch sử mua khóa học
+            </Link>
+          ),
         },
       ],
     },

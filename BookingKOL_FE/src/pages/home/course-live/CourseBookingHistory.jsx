@@ -15,11 +15,8 @@ import { useGetCoursePurchaseHistory } from "../../../hook/course/useGetCoursePu
 const { RangePicker } = DatePicker;
 
 const COURSE_STATUS_META = {
-  COURSEASSIGNED: { label: "Đã ghi danh", color: "blue" },
-  PENDING: { label: "Đang xử lý", color: "gold" },
-  PROCESSING: { label: "Đang xử lý", color: "gold" },
-  COMPLETED: { label: "Hoàn tất", color: "green" },
-  CANCELLED: { label: "Đã hủy", color: "red" },
+  COURSEASSIGNED: { label: "Khóa học đã được gửi", color: "success" },
+  NOTASSIGNED: { label: "Khóa học chưa được gửi", color: "blue" },
 };
 
 const PAYMENT_STATUS_META = {
@@ -404,6 +401,7 @@ const CourseBookingHistory = () => {
                       ? formatDateTime(booking.endDate, "DD/MM/YYYY HH:mm")
                       : "Chưa cập nhật";
                     const orderCode =
+                      booking?.purchasedCourseNumber ??
                       booking?.orderCode ??
                       booking?.code ??
                       booking?.id ??
@@ -420,6 +418,17 @@ const CourseBookingHistory = () => {
                       booking?.mentorName ??
                       booking?.kolName ??
                       booking?.instructorName ??
+                      "--";
+                    const customerEmail =
+                      booking?.email ??
+                      booking?.user?.email ??
+                      booking?.user?.emailAddress ??
+                      "--";
+                    const customerPhone =
+                      booking?.phoneNumber ??
+                      booking?.phone ??
+                      booking?.user?.phone ??
+                      booking?.user?.phoneNumber ??
                       "--";
                     const note =
                       typeof booking?.note === "string"
@@ -492,20 +501,34 @@ const CourseBookingHistory = () => {
                               {periodLabel}
                             </span>
                           </div>
-                          <div className="flex items-start justify-between gap-3">
+                          {/* <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Giảng viên</span>
                             <span className="text-right font-medium text-slate-900">
                               {mentorLabel}
                             </span>
+                          </div> */}
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Email</span>
+                            <span className="text-right font-medium text-slate-900 break-all">
+                              {customerEmail}
+                            </span>
                           </div>
                           <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số điện thoại
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {customerPhone}
+                            </span>
+                          </div>
+                          {/* <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Ghi chú</span>
                           </div>
                           {note ? (
                             <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                               {note}
                             </div>
-                          ) : null}
+                          ) : null} */}
                         </div>
 
                         <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">

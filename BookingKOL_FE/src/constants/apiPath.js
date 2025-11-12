@@ -27,6 +27,8 @@ export const API_PATHS = {
     adminCourseMediasRemove: "/v1/admin/course/medias/remove", // + /{courseId}
     adminCourseCoverImageSet: "/v1/admin/course/cover-image/set", // + /{courseId}?fileId=...
     adminCourseMediasUpload: "/v1/admin/course/medias/upload", // + /{courseId}
+    adminCourseHistory: "/v1/admin/course/history/all",
+    adminCourseConfirm: "/v1/admin/course/confirm", // + /{purchasedCourseId}
   },
   CATEGORY: {
     getAllCategory: "/v1/categories",

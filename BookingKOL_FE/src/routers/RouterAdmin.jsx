@@ -11,6 +11,7 @@ import ManagementCourse from "../pages/admin/course/ManagementCourse";
 import ViewDetailCourse from "../pages/admin/course/EditDetailCourse";
 import ManagementCategory from "../pages/admin/category/ManagementCategory";
 import CreateCoursePage from "../pages/admin/course/CreateCoursePage";
+import ManagementCourseHistory from "../pages/admin/course/ManagementCourseHistory";
 
 import ManagementBookingRequests from "../pages/admin/booking/ManagementBookingRequests";
 import ManagementRefundRequests from "../pages/admin/booking/ManagementRefundRequests";
@@ -65,6 +66,10 @@ export const routerAdmin = [
       },
 
       { path: "management-course", element: <ManagementCourse /> },
+      {
+        path: "management-course-history",
+        element: <ManagementCourseHistory />,
+      },
       { path: "edit-detail-course/:id", element: <ViewDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },
       { path: "create-course", element: <CreateCoursePage /> },
