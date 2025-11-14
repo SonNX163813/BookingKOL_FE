@@ -155,9 +155,13 @@ const ReviewsSection = ({
                         justifyContent="space-between"
                         alignItems={{ xs: "flex-start", sm: "center" }}
                       >
-                        <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          alignItems="center"
+                        >
                           <Avatar
-                            src={review.avatarUrl || undefined}
+                            // src={review.avatarUrl || undefined}
                             sx={{
                               width: 40,
                               height: 40,
@@ -263,10 +267,7 @@ const ReviewsSection = ({
                       </Typography>
                       <LinearProgress
                         variant="determinate"
-                        value={Math.max(
-                          0,
-                          Math.min(100, item.percentage ?? 0)
-                        )}
+                        value={Math.max(0, Math.min(100, item.percentage ?? 0))}
                         sx={{
                           flex: 1,
                           height: 8,

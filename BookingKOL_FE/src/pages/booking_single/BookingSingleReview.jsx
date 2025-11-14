@@ -722,7 +722,7 @@ const BookingSingleReview = () => {
                       color: BOOKING_FLOW_STYLE.textPrimary,
                     }}
                   >
-                    Lịch trình dự kiến
+                    Lịch làm việc
                   </Typography>
                   <Stack spacing={1.5}>
                     <Stack direction="row" justifyContent="space-between">

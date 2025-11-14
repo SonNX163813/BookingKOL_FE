@@ -88,4 +88,7 @@ export const API_PATHS = {
     adminThumbnailDelete: (blogId) =>
       `v1/admin/blogs/thumbnail/delete/${encodeURIComponent(blogId)}`,
   },
+  DASHBOARD: {
+    adminSummary: "/v1/admin/dashboard/summary",
+  },
 };

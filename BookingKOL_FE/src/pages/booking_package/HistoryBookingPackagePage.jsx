@@ -33,11 +33,11 @@ const formatCurrency = (value) => {
   return `${new Intl.NumberFormat("vi-VN").format(numeric)} ₫`;
 };
 
-const composeBudgetRange = (min, max) => {
-  if (min === null || min === undefined || max === null || max === undefined) {
+const composeBudgetRange = (targetPrice) => {
+  if (targetPrice === null || targetPrice === undefined) {
     return "--";
   }
-  return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+  return `${formatCurrency(targetPrice)}`;
 };
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
@@ -300,6 +300,11 @@ const HistoryBookingPackagePage = () => {
                           .map((kol) => kol?.displayName)
                           .filter(Boolean)
                       : [];
+                    const liveNames = Array.isArray(record?.lives)
+                      ? record.lives
+                          .map((live) => live?.displayName)
+                          .filter(Boolean)
+                      : [];
                     return (
                       <article
                         key={key}
@@ -330,13 +335,10 @@ const HistoryBookingPackagePage = () => {
                             color="purple"
                             className="rounded-full px-3 py-1 text-sm font-medium"
                           >
-                            Gói: {record?.packageName ?? "--"}
+                            Gói {record?.packageName ?? "--"}
                           </Tag>
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-                            {composeBudgetRange(
-                              record?.budgetMin,
-                              record?.budgetMax
-                            )}
+                            {composeBudgetRange(record?.targetPrice)}
                           </span>
                         </div>
 
@@ -352,10 +354,18 @@ const HistoryBookingPackagePage = () => {
                           </div>
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">
-                              Số KOL tham gia
+                              Số Host Chính tham gia
                             </span>
                             <span className="text-right font-semibold text-indigo-600">
                               {kolNames.length}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số Trợ LIVE tham gia
+                            </span>
+                            <span className="text-right font-semibold text-indigo-600">
+                              {liveNames.length}
                             </span>
                           </div>
                         </div>
@@ -363,9 +373,17 @@ const HistoryBookingPackagePage = () => {
                         {kolNames.length ? (
                           <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                             <span className="font-semibold text-slate-700">
-                              Danh sách KOL:
+                              Danh sách Host Chính:
                             </span>{" "}
                             {kolNames.join(", ")}
+                          </div>
+                        ) : null}
+                        {liveNames.length ? (
+                          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <span className="font-semibold text-slate-700">
+                              Danh sách Trợ LIVE:
+                            </span>{" "}
+                            {liveNames.join(", ")}
                           </div>
                         ) : null}
                       </article>
