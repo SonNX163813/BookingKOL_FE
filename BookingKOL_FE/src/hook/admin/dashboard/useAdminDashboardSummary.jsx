@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getAdminDashboardSummary } from "../../../services/superadmin/SuperAdminDashboardAPI";
+import { getAdminDashboardSummary } from "../../../services/admin/AdminDashboardAPI";
 
 const DASHBOARD_QUERY_KEY = ["admin-dashboard-summary"];
 
@@ -7,7 +7,7 @@ const DASHBOARD_QUERY_KEY = ["admin-dashboard-summary"];
  * Shared React Query hook for the admin dashboard summary endpoint.
  * Accepts the same options as useQuery so callers can override defaults.
  */
-const useSuperAdminDashboardSummary = (options = {}) => {
+const useAdminDashboardSummary = (options = {}) => {
   return useQuery({
     queryKey: DASHBOARD_QUERY_KEY,
     queryFn: ({ signal }) => getAdminDashboardSummary({ signal }),
@@ -17,4 +17,4 @@ const useSuperAdminDashboardSummary = (options = {}) => {
   });
 };
 
-export default useSuperAdminDashboardSummary;
+export default useAdminDashboardSummary;

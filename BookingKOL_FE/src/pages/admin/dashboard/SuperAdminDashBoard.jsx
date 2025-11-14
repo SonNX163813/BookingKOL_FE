@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import dayjs from "dayjs";
 import { ReloadOutlined } from "@ant-design/icons";
 import ReactECharts from "echarts-for-react";
-import useSuperAdminDashboardSummary from "../../../hook/superadmin/dashboard/useAdminDashboardSummary";
+import { useSuperAdminDashboardSummary } from "../../../hook/superadmin/dashboard/useSuperAdminDashboardSummary";
 import { BOOKING_STATUS_LABEL } from "../../../constants/mySingleBookingStatuses";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {

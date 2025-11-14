@@ -102,9 +102,9 @@ const normalizeSummary = (rawData) => {
   };
 };
 
-export const getAdminDashboardSummary = async ({ signal } = {}) => {
+export const getSuperAdminDashboardSummary = async ({ signal } = {}) => {
   const payload = await get({
-    url: API_PATHS_SUPERADMIN.DASHBOARD.adminSummary,
+    url: API_PATHS_SUPERADMIN.DASHBOARD.superAdminSummary,
     config: signal ? { signal } : undefined,
   });
 
