@@ -44,6 +44,10 @@ export const API_PATHS = {
   BOOKING_CAMPAIGN: {
     list: "/v1/admin/bookings", // nếu Swagger của bạn KHÔNG có /v1 thì đổi thành "/admin/bookings"
     create: "/v1/admin/bookings/create",
+    detail: "/v1/admin/bookings/admin", // + /{campaignId}
+  },
+  CAMPAIGN: {
+    detail: "/v1/campaigns", // + /{campaignId}
   },
   BOOKING_REQUEST: {
     getAll: "/v1/admin/booking/single-requests/all",

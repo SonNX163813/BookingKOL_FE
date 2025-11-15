@@ -182,8 +182,12 @@ export default function ManagementBookingCampaigns() {
 
   const goDetail = useCallback(
     (r) => {
-      const id = r?.id || r?.requestNumber || r?.code;
-      if (id) navigate(`/admin/management-booking-campaigns/${id}`);
+      const campaignId = r?.campaignId || r?.id || r?.code;
+      if (!campaignId) return;
+
+      navigate(
+        `/admin/management-booking-campaigns/${encodeURIComponent(campaignId)}`
+      );
     },
     [navigate]
   );
