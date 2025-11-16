@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
   Alert,
@@ -6,14 +6,21 @@ import {
   Box,
   Button,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  IconButton,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-
+import { renderAsync } from "docx-preview";
+// import "docx-preview/dist/docx-preview.css";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   confirmSingleBookingRequest,
   cancelSingleBookingRequestById,
@@ -139,6 +146,106 @@ const safeText = (value) => {
   return value;
 };
 
+const extractUrlsFromText = (text) => {
+  if (typeof text !== "string" || !text.length) return [];
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = text.match(urlRegex);
+  if (!matches) return [];
+  const normalized = matches.map((url) => url.replace(/[),.]+$/, ""));
+  return [...new Set(normalized)];
+};
+
+const ContractDocPreview = ({ url }) => {
+  const previewRef = useRef(null);
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!url) {
+      setStatus("idle");
+      setError("");
+      if (previewRef.current) {
+        previewRef.current.innerHTML = "";
+      }
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadDocument = async () => {
+      setStatus("loading");
+      setError("");
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error("Không thể tải file hợp đồng.");
+        }
+        const buffer = await response.arrayBuffer();
+        if (!previewRef.current || !isMounted) return;
+        previewRef.current.innerHTML = "";
+        await renderAsync(buffer, previewRef.current, undefined, {
+          className: "docx-preview-content",
+          inWrapper: true,
+          ignoreWidth: true,
+          ignoreHeight: true,
+          breakPages: false,
+        });
+        if (isMounted) {
+          setStatus("ready");
+        }
+      } catch (loadError) {
+        if (!isMounted) return;
+        setStatus("error");
+        setError(
+          loadError?.message ||
+            "Không thể hiển thị file hợp đồng. Vui lòng thử lại."
+        );
+      }
+    };
+
+    loadDocument();
+
+    return () => {
+      isMounted = false;
+      if (previewRef.current) {
+        previewRef.current.innerHTML = "";
+      }
+    };
+  }, [url]);
+
+  if (!url) {
+    return (
+      <Typography sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}>
+        Không tìm thấy file hợp đồng.
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ minHeight: 260 }}>
+      {status === "loading" ? (
+        <Typography sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}>
+          Đang tải file hợp đồng...
+        </Typography>
+      ) : null}
+      {status === "error" ? (
+        <Typography sx={{ color: "#d32f2f" }}>{error}</Typography>
+      ) : null}
+      <Box
+        ref={previewRef}
+        sx={{
+          "& .docx-wrapper": { backgroundColor: "transparent" },
+          "& .docx": {
+            backgroundColor: "transparent",
+            color: BOOKING_FLOW_STYLE.textPrimary,
+          },
+          "& .docx p": { color: BOOKING_FLOW_STYLE.textPrimary },
+        }}
+      />
+    </Box>
+  );
+};
+
 const BookingSingleReview = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,6 +254,8 @@ const BookingSingleReview = () => {
   const [bookingSingleReqDTO, setBookingSingleReqDTO] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [readTermsIds, setReadTermsIds] = useState([]);
+  const [openContractTerms, setOpenContractTerms] = useState(null);
 
   useEffect(() => {
     const stateRequest = location.state?.bookingRequest;
@@ -259,6 +368,7 @@ const BookingSingleReview = () => {
 
     return fromDto;
   }, [bookingRequest, bookingSingleReqDTO]);
+
   const kolDetails = useMemo(() => {
     if (!kolInfo) return [];
 
@@ -291,15 +401,56 @@ const BookingSingleReview = () => {
       const requestNumber = safeText(
         contract.requestNumber ?? bookingRequest.requestNumber
       );
+      const terms = typeof contract.terms === "string" ? contract.terms : "";
       return {
         id: contract.id ?? contract.contractNumber ?? requestNumber,
         contractNumber,
         requestNumber,
         status: getContractStatusLabel(contract.status),
         createdAt: contract.createdAt ?? null,
+        terms,
       };
     });
   }, [bookingRequest]);
+
+  const contractsWithTerms = useMemo(() => {
+    return contractInfo
+      .map((contract) => {
+        const termsText =
+          typeof contract.terms === "string" ? contract.terms : "";
+        return {
+          ...contract,
+          terms: termsText,
+          termLinks: extractUrlsFromText(termsText),
+        };
+      })
+      .filter((contract) => contract.terms.trim().length > 0);
+  }, [contractInfo]);
+
+  const contractTermsById = useMemo(() => {
+    const map = new Map();
+    contractsWithTerms.forEach((contract) => {
+      map.set(contract.id, contract);
+    });
+    return map;
+  }, [contractsWithTerms]);
+
+  const hasReadAllContractTerms = useMemo(() => {
+    if (contractsWithTerms.length === 0) {
+      return true;
+    }
+    return contractsWithTerms.every((contract) =>
+      readTermsIds.includes(contract.id)
+    );
+  }, [contractsWithTerms, readTermsIds]);
+
+  const actionButtonsDisabled =
+    confirming || cancelling || !hasReadAllContractTerms;
+
+  useEffect(() => {
+    setReadTermsIds([]);
+    setOpenContractTerms(null);
+  }, [bookingRequest?.id]);
 
   const errorMessageFromResponse = (error) => {
     const serverMessage =
@@ -377,537 +528,811 @@ const BookingSingleReview = () => {
     }
   };
 
+  const handleOpenContractTerms = (contract) => {
+    if (!contract) return;
+    setOpenContractTerms(contract);
+  };
+
+  const handleCloseContractTerms = () => {
+    setOpenContractTerms(null);
+  };
+
+  const handleContractTermsScroll = (contractId) => (event) => {
+    const target = event.currentTarget;
+    if (!target) return;
+
+    const reachedBottom =
+      target.scrollTop + target.clientHeight >= target.scrollHeight - 4;
+
+    if (reachedBottom) {
+      setReadTermsIds((prev) =>
+        prev.includes(contractId) ? prev : [...prev, contractId]
+      );
+    }
+  };
+
   if (!bookingRequest) {
     return null;
   }
 
   return (
-    <Box
-      sx={{
-        position: "relative",
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        py: { xs: 8, md: 12 },
-        px: { xs: 2, md: 4 },
-        bgcolor: "#f5f7ff",
-      }}
-    >
+    <>
       <Box
-        aria-hidden
         sx={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "#ffffff",
+          position: "relative",
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          py: { xs: 8, md: 12 },
+          px: { xs: 2, md: 4 },
+          bgcolor: "#f5f7ff",
         }}
-      />
-
-      <Container maxWidth="md" sx={{ position: "relative", zIndex: 1 }}>
-        <Paper
-          elevation={0}
+      >
+        <Box
+          aria-hidden
           sx={{
-            p: { xs: 4, md: 5 },
-            borderRadius: "28px",
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(147,206,246,0.18) 45%, rgba(255,255,255,0.92) 100%)",
-            border: `1px solid ${BOOKING_FLOW_STYLE.border}`,
-            boxShadow: BOOKING_FLOW_STYLE.shadow,
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "#ffffff",
           }}
-        >
-          <Stack spacing={4}>
-            <Stack spacing={1}>
-              <Typography
-                variant="h5"
-                sx={{ fontWeight: 700, color: BOOKING_FLOW_STYLE.textPrimary }}
-              >
-                Xác nhận yêu cầu đặt lịch
-              </Typography>
-              <Typography
+        />
+
+        <Container maxWidth="md" sx={{ position: "relative", zIndex: 1 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 4, md: 5 },
+              borderRadius: "28px",
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(147,206,246,0.18) 45%, rgba(255,255,255,0.92) 100%)",
+              border: `1px solid ${BOOKING_FLOW_STYLE.border}`,
+              boxShadow: BOOKING_FLOW_STYLE.shadow,
+            }}
+          >
+            <Stack spacing={4}>
+              <Stack spacing={1}>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 700,
+                    color: BOOKING_FLOW_STYLE.textPrimary,
+                  }}
+                >
+                  Xác nhận yêu cầu đặt lịch
+                </Typography>
+                <Typography
+                  sx={{
+                    color: BOOKING_FLOW_STYLE.textSecondary,
+                    maxWidth: 520,
+                  }}
+                >
+                  Vui lòng kiểm tra lại thông tin đặt lịch trước khi xác nhận.
+                  Bạn có thể hủy nếu cần chỉnh sửa thêm.
+                </Typography>
+              </Stack>
+
+              <Paper
+                variant="outlined"
                 sx={{
-                  color: BOOKING_FLOW_STYLE.textSecondary,
-                  maxWidth: 520,
+                  borderRadius: "22px",
+                  borderColor: BOOKING_FLOW_STYLE.border,
+                  backgroundColor: BOOKING_FLOW_STYLE.subtleSurface,
+                  px: { xs: 3, md: 4 },
+                  py: { xs: 3, md: 3.5 },
                 }}
               >
-                Vui lòng kiểm tra lại thông tin đặt lịch trước khi xác nhận. Bạn
-                có thể hủy nếu cần chỉnh sửa thêm.
-              </Typography>
-            </Stack>
-
-            <Paper
-              variant="outlined"
-              sx={{
-                borderRadius: "22px",
-                borderColor: BOOKING_FLOW_STYLE.border,
-                backgroundColor: BOOKING_FLOW_STYLE.subtleSurface,
-                px: { xs: 3, md: 4 },
-                py: { xs: 3, md: 3.5 },
-              }}
-            >
-              <Stack spacing={3}>
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={{ xs: 3, md: 4 }}
-                  alignItems={{ xs: "flex-start", md: "center" }}
-                >
+                <Stack spacing={3}>
                   <Stack
-                    direction="row"
-                    spacing={2}
-                    alignItems="center"
-                    flex={1}
+                    direction={{ xs: "column", md: "row" }}
+                    spacing={{ xs: 3, md: 4 }}
+                    alignItems={{ xs: "flex-start", md: "center" }}
                   >
-                    <Avatar
-                      src={kolInfo?.avatarUrl ?? ""}
-                      alt={kolInfo?.displayName ?? kolInfo?.fullName ?? "KOL"}
-                      sx={{ width: 64, height: 64 }}
-                    />
-                    <Stack spacing={0.5}>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 700,
-                          color: BOOKING_FLOW_STYLE.textPrimary,
-                        }}
-                      >
-                        {kolInfo?.displayName ??
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      alignItems="center"
+                      flex={1}
+                    >
+                      <Avatar
+                        src={kolInfo?.avatarUrl ?? ""}
+                        alt={
+                          kolInfo?.displayName ??
                           kolInfo?.fullName ??
-                          "KOL đang cập nhật"}
-                      </Typography>
-                      {kolInfo?.bio ? (
+                          "KOL đang cập nhật"
+                        }
+                        sx={{ width: 64, height: 64 }}
+                      />
+                      <Stack spacing={0.5}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 700,
+                            color: BOOKING_FLOW_STYLE.textPrimary,
+                          }}
+                        >
+                          {kolInfo?.displayName ??
+                            kolInfo?.fullName ??
+                            "KOL đang cập nhật"}
+                        </Typography>
+                        {kolInfo?.bio ? (
+                          <Typography
+                            variant="body2"
+                            sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                          >
+                            {kolInfo.bio}
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    </Stack>
+                    <Stack
+                      spacing={1}
+                      alignItems={{ xs: "flex-start", md: "flex-end" }}
+                      sx={{ minWidth: { md: 220 } }}
+                    >
+                      <Stack
+                        spacing={0.25}
+                        alignItems={{ xs: "flex-start", md: "flex-end" }}
+                      >
                         <Typography
                           variant="body2"
                           sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
                         >
-                          {kolInfo.bio}
-                        </Typography>
-                      ) : null}
-                    </Stack>
-                  </Stack>
-                  <Stack
-                    spacing={1}
-                    alignItems={{ xs: "flex-start", md: "flex-end" }}
-                    sx={{ minWidth: { md: 220 } }}
-                  >
-                    <Stack
-                      spacing={0.25}
-                      alignItems={{ xs: "flex-start", md: "flex-end" }}
-                    >
-                      <Typography
-                        variant="body2"
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Mã yêu cầu
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontWeight: 600,
-                          color: BOOKING_FLOW_STYLE.textPrimary,
-                        }}
-                      >
-                        {contactInfo?.requestNumber ?? FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                    <Stack
-                      spacing={0.25}
-                      alignItems={{ xs: "flex-start", md: "flex-end" }}
-                    >
-                      <Typography
-                        variant="body2"
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Trạng thái
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontWeight: 600,
-                          color: BOOKING_FLOW_STYLE.accent,
-                        }}
-                      >
-                        {contactInfo?.status ?? FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Stack>
-
-                <Divider />
-
-                <Stack spacing={2}>
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: 600,
-                      color: BOOKING_FLOW_STYLE.textPrimary,
-                    }}
-                  >
-                    Thông tin KOL
-                  </Typography>
-                  <Stack spacing={1.5}>
-                    {kolDetails.map((detail) => (
-                      <Stack
-                        key={detail.label}
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="flex-start"
-                      >
-                        <Typography
-                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                        >
-                          {detail.label}
+                          Mã yêu cầu
                         </Typography>
                         <Typography
                           sx={{
                             fontWeight: 600,
-                            maxWidth: { xs: "60%", md: "55%" },
-                            textAlign: "right",
+                            color: BOOKING_FLOW_STYLE.textPrimary,
                           }}
                         >
-                          {detail.value}
+                          {contactInfo?.requestNumber ?? FALLBACK_TEXT}
                         </Typography>
                       </Stack>
-                    ))}
-                  </Stack>
-                </Stack>
-
-                <Divider />
-
-                <Stack spacing={2}>
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: 600,
-                      color: BOOKING_FLOW_STYLE.textPrimary,
-                    }}
-                  >
-                    Thông tin liên hệ
-                  </Typography>
-                  <Stack spacing={1.5}>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                      <Stack
+                        spacing={0.25}
+                        alignItems={{ xs: "flex-start", md: "flex-end" }}
                       >
-                        Họ tên
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {contactInfo?.fullName || FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Số điện thoại
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {contactInfo?.phone || FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Nền tảng LIVE
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {contactInfo?.platform || FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Email
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {contactInfo?.email || FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Địa điểm
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {contactInfo?.location || FALLBACK_TEXT}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Stack>
-
-                <Divider />
-
-                <Stack spacing={2}>
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: 600,
-                      color: BOOKING_FLOW_STYLE.textPrimary,
-                    }}
-                  >
-                    Tệp đính kèm
-                  </Typography>
-                  {attachments.length > 0 ? (
-                    <Stack spacing={1.5}>
-                      {attachments.map((file) => (
-                        <Stack
-                          key={file.id ?? file.url ?? file.name}
-                          direction={{ xs: "column", sm: "row" }}
-                          spacing={{ xs: 1, sm: 2 }}
-                          justifyContent="space-between"
-                          alignItems={{ xs: "flex-start", sm: "center" }}
+                        <Typography
+                          variant="body2"
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
                         >
-                          <Stack spacing={0.25}>
-                            <Typography
-                              sx={{
-                                fontWeight: 600,
-                                maxWidth: 400,
-                                wordBreak: "break-word",
-                                overflowWrap: "break-word",
-                              }}
-                            >
-                              {" "}
-                              {file.name}
-                            </Typography>
-                            {file.size ? (
-                              <Typography
-                                variant="caption"
-                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                              >
-                                {formatFileSize(file.size)}
-                              </Typography>
-                            ) : null}
-                          </Stack>
-                          {file.url ? (
-                            <Button
-                              component="a"
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              size="small"
-                              variant="outlined"
-                              sx={{
-                                textTransform: "none",
-                                borderRadius: "12px",
-                              }}
-                            >
-                              Xem tệp
-                            </Button>
-                          ) : (
-                            <Typography
-                              sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                            >
-                              Không có liên kết tệp
-                            </Typography>
-                          )}
+                          Trạng thái
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontWeight: 600,
+                            color: BOOKING_FLOW_STYLE.accent,
+                          }}
+                        >
+                          {contactInfo?.status ?? FALLBACK_TEXT}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                  </Stack>
+
+                  <Divider />
+
+                  <Stack spacing={2}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        color: BOOKING_FLOW_STYLE.textPrimary,
+                      }}
+                    >
+                      Thông tin KOL
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      {kolDetails.map((detail) => (
+                        <Stack
+                          key={detail.label}
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="flex-start"
+                        >
+                          <Typography
+                            sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                          >
+                            {detail.label}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontWeight: 600,
+                              maxWidth: { xs: "60%", md: "55%" },
+                              textAlign: "right",
+                            }}
+                          >
+                            {detail.value}
+                          </Typography>
                         </Stack>
                       ))}
                     </Stack>
+                  </Stack>
+
+                  <Divider />
+
+                  <Stack spacing={2}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        color: BOOKING_FLOW_STYLE.textPrimary,
+                      }}
+                    >
+                      Thông tin liên hệ
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Họ tên
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {contactInfo?.fullName || FALLBACK_TEXT}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Số điện thoại
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {contactInfo?.phone || FALLBACK_TEXT}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Nền tảng LIVE
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {contactInfo?.platform || FALLBACK_TEXT}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Email
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {contactInfo?.email || FALLBACK_TEXT}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Địa điểm
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {contactInfo?.location || FALLBACK_TEXT}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                  </Stack>
+
+                  <Divider />
+
+                  <Stack spacing={2}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        color: BOOKING_FLOW_STYLE.textPrimary,
+                      }}
+                    >
+                      Tệp đính kèm
+                    </Typography>
+                    {attachments.length > 0 ? (
+                      <Stack spacing={1.5}>
+                        {attachments.map((file) => (
+                          <Stack
+                            key={file.id ?? file.url ?? file.name}
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={{ xs: 1, sm: 2 }}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "flex-start", sm: "center" }}
+                          >
+                            <Stack spacing={0.25}>
+                              <Typography
+                                sx={{
+                                  fontWeight: 600,
+                                  maxWidth: 400,
+                                  wordBreak: "break-word",
+                                  overflowWrap: "break-word",
+                                }}
+                              >
+                                {file.name}
+                              </Typography>
+                              {file.size ? (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: BOOKING_FLOW_STYLE.textSecondary,
+                                  }}
+                                >
+                                  {formatFileSize(file.size)}
+                                </Typography>
+                              ) : null}
+                            </Stack>
+                            {file.url ? (
+                              <Button
+                                component="a"
+                                href={file.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                  textTransform: "none",
+                                  borderRadius: "12px",
+                                }}
+                              >
+                                Xem tệp
+                              </Button>
+                            ) : (
+                              <Typography
+                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                              >
+                                Không có liên kết tệp
+                              </Typography>
+                            )}
+                          </Stack>
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Typography
+                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                      >
+                        Không có tệp đính kèm
+                      </Typography>
+                    )}
+                  </Stack>
+
+                  <Divider />
+
+                  <Stack spacing={2}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        color: BOOKING_FLOW_STYLE.textPrimary,
+                      }}
+                    >
+                      Lịch làm việc
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Bắt đầu
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {formatDateTime(scheduleInfo?.startAt)}
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography
+                          sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                        >
+                          Kết thúc
+                        </Typography>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {formatDateTime(scheduleInfo?.endAt)}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+                  </Stack>
+
+                  {contractInfo.length > 0 ? (
+                    <>
+                      <Divider />
+                      <Stack spacing={2}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 600,
+                            color: BOOKING_FLOW_STYLE.textPrimary,
+                          }}
+                        >
+                          Hợp đồng
+                        </Typography>
+
+                        <Stack spacing={1.5}>
+                          {contractInfo.map((contract) => {
+                            const contractTerms = contractTermsById.get(
+                              contract.id
+                            );
+                            const hasReadTerms = readTermsIds.includes(
+                              contract.id
+                            );
+                            return (
+                              <Stack key={contract.id} spacing={1}>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      color: BOOKING_FLOW_STYLE.textSecondary,
+                                    }}
+                                  >
+                                    Số hợp đồng
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: 600 }}>
+                                    {contract.contractNumber}
+                                  </Typography>
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      color: BOOKING_FLOW_STYLE.textSecondary,
+                                    }}
+                                  >
+                                    Mã yêu cầu
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: 600 }}>
+                                    {contract.requestNumber}
+                                  </Typography>
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      color: BOOKING_FLOW_STYLE.textSecondary,
+                                    }}
+                                  >
+                                    Trạng thái
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: 600 }}>
+                                    {contract.status}
+                                  </Typography>
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      color: BOOKING_FLOW_STYLE.textSecondary,
+                                    }}
+                                  >
+                                    Ngày tạo
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: 600 }}>
+                                    {formatDateTime(contract.createdAt)}
+                                  </Typography>
+                                </Stack>
+                                {/* {contractTerms ? (
+                                  <Stack spacing={0.75}>
+                                    <Stack
+                                      direction={{ xs: "column", sm: "row" }}
+                                      justifyContent="space-between"
+                                      alignItems={{
+                                        xs: "flex-start",
+                                        sm: "center",
+                                      }}
+                                    >
+                                      <Typography
+                                        sx={{
+                                          color:
+                                            BOOKING_FLOW_STYLE.textSecondary,
+                                        }}
+                                      >
+                                        Điều khoản
+                                      </Typography>
+                                      <Stack direction="row" spacing={1}>
+                                        <Button
+                                          variant="outlined"
+                                          size="small"
+                                          onClick={() =>
+                                            handleOpenContractTerms(
+                                              contractTerms
+                                            )
+                                          }
+                                          sx={{
+                                            textTransform: "none",
+                                            borderRadius: "12px",
+                                            fontWeight: 600,
+                                          }}
+                                        >
+                                          Xem điều khoản
+                                        </Button>
+                                      </Stack>
+                                    </Stack>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: hasReadTerms
+                                          ? BOOKING_FLOW_STYLE.textSecondary
+                                          : "#d32f2f",
+                                      }}
+                                    >
+                                      {hasReadTerms
+                                        ? "Bạn đã xem hết điều khoản hợp đồng."
+                                        : "Mở popup và đọc hết điều khoản trước khi tiếp tục."}
+                                    </Typography>
+                                  </Stack>
+                                ) : null} */}
+                              </Stack>
+                            );
+                          })}
+                        </Stack>
+                      </Stack>
+                    </>
+                  ) : null}
+
+                  <Divider />
+
+                  <Stack spacing={1}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        color: BOOKING_FLOW_STYLE.textPrimary,
+                      }}
+                    >
+                      Ghi chú
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: contactInfo?.description
+                          ? BOOKING_FLOW_STYLE.textPrimary
+                          : BOOKING_FLOW_STYLE.textSecondary,
+                      }}
+                    >
+                      {contactInfo?.description || "Không có ghi chú bổ sung"}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </Paper>
+              {contractInfo.length > 0 ? (
+                <>
+                  <Divider />
+                  <Stack spacing={1.5}>
+                    {contractInfo.map((contract) => {
+                      const contractTerms = contractTermsById.get(contract.id);
+                      const hasReadTerms = readTermsIds.includes(contract.id);
+                      return (
+                        <Stack key={contract.id} spacing={1}>
+                          {contractTerms ? (
+                            <Stack spacing={0.75}>
+                              <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                justifyContent="space-between"
+                                alignItems={{
+                                  xs: "flex-start",
+                                  sm: "center",
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    color: BOOKING_FLOW_STYLE.textSecondary,
+                                  }}
+                                >
+                                  Điều khoản
+                                </Typography>
+                                <Stack direction="row" spacing={1}>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() =>
+                                      handleOpenContractTerms(contractTerms)
+                                    }
+                                    sx={{
+                                      textTransform: "none",
+                                      borderRadius: "12px",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Xem điều khoản
+                                  </Button>
+                                </Stack>
+                              </Stack>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: hasReadTerms
+                                    ? BOOKING_FLOW_STYLE.textSecondary
+                                    : "#d32f2f",
+                                }}
+                              >
+                                {hasReadTerms
+                                  ? "Bạn đã xem hết điều khoản hợp đồng."
+                                  : "Mở popup và đọc hết điều khoản trước khi tiếp tục."}
+                              </Typography>
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </>
+              ) : null}
+              <Alert
+                severity="warning"
+                sx={{
+                  borderRadius: "18px",
+                  backgroundColor: "#fff8e1",
+                  fontSize: 16,
+                }}
+              >
+                Lưu ý: Vui lòng không thoát khỏi trình duyệt hoặc tắt tab trong
+                quá trình thanh toán để tránh gián đoạn. Nếu có vấn đề xảy ra,
+                bạn có thể hủy yêu cầu và tạo lại yêu cầu mới.
+              </Alert>
+
+              {contractsWithTerms.length > 0 && !hasReadAllContractTerms ? (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "#d32f2f",
+                    textAlign: "right",
+                    fontWeight: 500,
+                  }}
+                >
+                  Vui lòng đọc hết điều khoản hợp đồng trước khi tiếp tục.
+                </Typography>
+              ) : null}
+
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                justifyContent="flex-end"
+              >
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={handleCancel}
+                  disabled={actionButtonsDisabled}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: "16px",
+                  }}
+                >
+                  {cancelling ? "Đang hủy..." : "Hủy yêu cầu"}
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleConfirm}
+                  disabled={actionButtonsDisabled}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: "16px",
+                    backgroundColor: BOOKING_FLOW_STYLE.accent,
+                    "&:hover": { backgroundColor: "#3a5ec4" },
+                  }}
+                >
+                  {confirming ? "Đang xác nhận..." : "Xác nhận & Thanh toán"}
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
+        </Container>
+      </Box>
+      <Dialog
+        open={Boolean(openContractTerms)}
+        onClose={handleCloseContractTerms}
+        fullWidth
+        maxWidth="md"
+        aria-labelledby="contract-terms-dialog-title"
+      >
+        {openContractTerms ? (
+          <>
+            <DialogTitle
+              id="contract-terms-dialog-title"
+              sx={{ pr: 6, fontWeight: 700 }}
+            >
+              Điều khoản hợp đồng
+            </DialogTitle>
+            <IconButton
+              onClick={handleCloseContractTerms}
+              aria-label="Đóng"
+              sx={{
+                position: "absolute",
+                right: 12,
+                top: 10,
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+            <DialogContent dividers sx={{ p: 0 }}>
+              <Box
+                sx={{
+                  maxHeight: 520,
+                  overflowY: "auto",
+                }}
+                onScroll={handleContractTermsScroll(openContractTerms.id)}
+              >
+                <Stack spacing={2.5} sx={{ p: 3 }}>
+                  <Stack spacing={0.5}>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      Số hợp đồng: {openContractTerms.contractNumber}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                    >
+                      Mã yêu cầu: {openContractTerms.requestNumber}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                    >
+                      Trạng thái: {openContractTerms.status}
+                    </Typography>
+                  </Stack>
+                  {openContractTerms.termLinks?.[0] ? (
+                    <ContractDocPreview url={openContractTerms.termLinks[0]} />
                   ) : (
                     <Typography
                       sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
                     >
-                      Không có tệp đính kèm
+                      Không tìm thấy file hợp đồng để hiển thị.
                     </Typography>
                   )}
-                </Stack>
-
-                <Divider />
-
-                <Stack spacing={2}>
-                  <Typography
-                    variant="subtitle1"
+                  {/* <Typography
+                    component="div"
                     sx={{
-                      fontWeight: 600,
                       color: BOOKING_FLOW_STYLE.textPrimary,
+                      whiteSpace: "pre-line",
+                      wordBreak: "break-word",
                     }}
                   >
-                    Lịch làm việc
-                  </Typography>
-                  <Stack spacing={1.5}>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Bắt đầu
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {formatDateTime(scheduleInfo?.startAt)}
-                      </Typography>
+                    {openContractTerms.terms}
+                  </Typography> */}
+                  {openContractTerms.termLinks?.length > 0 ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {openContractTerms.termLinks.map((url, index) => (
+                        <Button
+                          key={`${openContractTerms.id}-dialog-link-${index}`}
+                          component="a"
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="small"
+                          variant="outlined"
+                          sx={{
+                            textTransform: "none",
+                            borderRadius: "12px",
+                          }}
+                        >
+                          {openContractTerms.termLinks.length > 1
+                            ? `Tải file #${index + 1}`
+                            : "Tải file hợp đồng"}
+                        </Button>
+                      ))}
                     </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography
-                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                      >
-                        Kết thúc
-                      </Typography>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {formatDateTime(scheduleInfo?.endAt)}
-                      </Typography>
-                    </Stack>
-                  </Stack>
+                  ) : null}
                 </Stack>
-
-                {contractInfo.length > 0 ? (
-                  <>
-                    <Divider />
-                    <Stack spacing={2}>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 600,
-                          color: BOOKING_FLOW_STYLE.textPrimary,
-                        }}
-                      >
-                        Hợp đồng
-                      </Typography>
-
-                      <Stack spacing={1.5}>
-                        {contractInfo.map((contract) => (
-                          <Stack
-                            key={contract.id}
-                            spacing={1}
-                            // sx={{
-                            //   p: 2,
-                            //   borderRadius: "16px",
-                            //   border: `1px solid ${BOOKING_FLOW_STYLE.border}`,
-                            //   backgroundColor: "#ffffff",
-                            // }}
-                          >
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                            >
-                              <Typography
-                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                              >
-                                Số hợp đồng
-                              </Typography>
-                              <Typography sx={{ fontWeight: 600 }}>
-                                {contract.contractNumber}
-                              </Typography>
-                            </Stack>
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                            >
-                              <Typography
-                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                              >
-                                Mã yêu cầu
-                              </Typography>
-                              <Typography sx={{ fontWeight: 600 }}>
-                                {contract.requestNumber}
-                              </Typography>
-                            </Stack>
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                            >
-                              <Typography
-                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                              >
-                                Trạng thái
-                              </Typography>
-                              <Typography sx={{ fontWeight: 600 }}>
-                                {contract.status}
-                              </Typography>
-                            </Stack>
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                            >
-                              <Typography
-                                sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                              >
-                                Ngày tạo
-                              </Typography>
-                              <Typography sx={{ fontWeight: 600 }}>
-                                {formatDateTime(contract.createdAt)}
-                              </Typography>
-                            </Stack>
-                          </Stack>
-                        ))}
-                      </Stack>
-                    </Stack>
-                  </>
-                ) : null}
-
-                <Divider />
-
-                <Stack spacing={1}>
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: 600,
-                      color: BOOKING_FLOW_STYLE.textPrimary,
-                    }}
-                  >
-                    Ghi chú
-                  </Typography>
-                  <Typography
-                    sx={{
-                      color: contactInfo?.description
-                        ? BOOKING_FLOW_STYLE.textPrimary
-                        : BOOKING_FLOW_STYLE.textSecondary,
-                    }}
-                  >
-                    {contactInfo?.description || "Không có ghi chú bổ sung"}
-                  </Typography>
-                </Stack>
-              </Stack>
-            </Paper>
-
-            <Alert
-              severity="warning"
-              sx={{
-                borderRadius: "18px",
-                backgroundColor: "#fff8e1",
-                fontSize: 16,
-              }}
-            >
-              Lưu ý: Vui lòng không thoát khỏi trình duyệt hoặc tắt tab trong
-              quá trình thanh toán để tránh gián đoạn. Nếu có vấn đề xảy ra, bạn
-              có thể hủy yêu cầu và tạo lại yêu cầu mới.
-            </Alert>
-
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              justifyContent="flex-end"
-            >
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, py: 2 }}>
               <Button
-                variant="outlined"
-                color="error"
-                onClick={handleCancel}
-                disabled={confirming || cancelling}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  borderRadius: "16px",
-                }}
+                onClick={handleCloseContractTerms}
+                sx={{ textTransform: "none", fontWeight: 600 }}
               >
-                {cancelling ? "Đang hủy..." : "Hủy yêu cầu"}
+                Đóng
               </Button>
-              <Button
-                variant="contained"
-                onClick={handleConfirm}
-                disabled={confirming || cancelling}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  borderRadius: "16px",
-                  backgroundColor: BOOKING_FLOW_STYLE.accent,
-                  "&:hover": { backgroundColor: "#3a5ec4" },
-                }}
-              >
-                {confirming ? "Đang xác nhận..." : "Xác nhận & Thanh toán"}
-              </Button>
-            </Stack>
-          </Stack>
-        </Paper>
-      </Container>
-    </Box>
+            </DialogActions>
+          </>
+        ) : null}
+      </Dialog>
+    </>
   );
 };
 
