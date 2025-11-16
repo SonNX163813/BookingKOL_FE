@@ -154,6 +154,8 @@ export const cancelSingleBookingRequest = async ({
   bankName,
   bankNumber,
   bankShortName,
+  ownerName,
+  reason,
 } = {}) => {
   if (!requestId) {
     throw new Error("requestId is required to cancel single booking request");
@@ -169,6 +171,44 @@ export const cancelSingleBookingRequest = async ({
   const data = {
     ...(payload ?? {}),
   };
+
+  const normalizedOwnerName =
+    typeof ownerName === "string" && ownerName.trim().length > 0
+      ? ownerName.trim()
+      : typeof data.ownerName === "string" && data.ownerName.trim().length > 0
+      ? data.ownerName.trim()
+      : "";
+
+  if (!normalizedOwnerName) {
+    throw new Error("ownerName is required to cancel single booking request");
+  }
+
+  if (normalizedOwnerName.length > 255) {
+    throw new Error("ownerName must not exceed 255 characters");
+  }
+
+  data.ownerName = normalizedOwnerName;
+
+  const normalizedReasonCandidate =
+    typeof reason === "string" && reason.trim().length > 0
+      ? reason.trim()
+      : typeof data.reason === "string" && data.reason.trim().length > 0
+      ? data.reason.trim()
+      : typeof data.cancelReason === "string" &&
+        data.cancelReason.trim().length > 0
+      ? data.cancelReason.trim()
+      : "";
+
+  if (!normalizedReasonCandidate) {
+    throw new Error("reason is required to cancel single booking request");
+  }
+
+  if (normalizedReasonCandidate.length > 1000) {
+    throw new Error("reason must not exceed 1000 characters");
+  }
+
+  data.reason = normalizedReasonCandidate;
+  delete data.cancelReason;
 
   const normalizedBankName =
     typeof bankName === "string" && bankName.trim().length > 0

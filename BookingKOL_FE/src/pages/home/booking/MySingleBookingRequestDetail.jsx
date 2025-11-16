@@ -307,6 +307,8 @@ const MySingleBookingRequestDetail = () => {
   );
 
   const detail = myBookingRequestDetailResponse?.data ?? null;
+  const refund = detail?.refundDTO ?? null;
+  const refundStatus = normalizeStatus(refund?.status);
   const contracts = Array.isArray(detail?.contracts)
     ? detail.contracts.filter(Boolean)
     : [];
@@ -321,13 +323,14 @@ const MySingleBookingRequestDetail = () => {
   const attachedFiles = Array.isArray(detail?.attachedFiles)
     ? detail.attachedFiles.filter(Boolean)
     : [];
-  const worktimes = useMemo(
-    () =>
-      Array.isArray(detail?.kolWorkTimes)
-        ? detail.kolWorkTimes.filter(Boolean)
-        : [],
-    [detail?.kolWorkTimes]
-  );
+  const worktimes = useMemo(() => {
+    if (Array.isArray(detail?.kolWorkTimes)) {
+      return detail.kolWorkTimes.filter(Boolean);
+    }
+    return detail?.kolWorkTimes ? [detail.kolWorkTimes] : [];
+  }, [detail?.kolWorkTimes]);
+  const latestKolWorktime = worktimes[0] ?? null;
+  const kolWorkTimesStatusLabel = normalizeStatus(latestKolWorktime?.status);
   const worktimeIds = useMemo(
     () =>
       worktimes
@@ -345,7 +348,8 @@ const MySingleBookingRequestDetail = () => {
     return contracts.map((currentContract) => {
       const contractId = resolveContractIdentifier(currentContract);
       const kolId =
-        resolveContractKolIdentifier(currentContract) ?? resolveKolIdentifier(kolInfo);
+        resolveContractKolIdentifier(currentContract) ??
+        resolveKolIdentifier(kolInfo);
 
       let matchIndex = -1;
 
@@ -353,9 +357,7 @@ const MySingleBookingRequestDetail = () => {
         matchIndex = remaining.findIndex((candidate) => {
           const candidateContractId =
             resolveFeedbackContractIdentifier(candidate);
-          return (
-            candidateContractId && candidateContractId === contractId
-          );
+          return candidateContractId && candidateContractId === contractId;
         });
       }
 
@@ -1156,48 +1158,114 @@ const MySingleBookingRequestDetail = () => {
               </section>
 
               {/* KOL Info */}
-              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6 md:p-8 space-y-6">
+                {/* Header */}
                 <Space>
                   <UserCircle2 size={18} />
                   <span className="text-lg font-semibold text-slate-900">
-                    Thông tin KOL
+                    Hồ sơ KOL
                   </span>
                 </Space>
-                {detail?.kol ? (
-                  <Descriptions
-                    bordered
-                    size="middle"
-                    column={1}
-                    className="mt-4"
-                  >
-                    <Descriptions.Item label="Tên KOL">
-                      {detail.kol.displayName ?? detail.kol.fullName ?? "--"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Quốc gia">
-                      {detail.kol.country ?? "--"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Thành phố">
-                      {detail.kol.city ?? "--"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Danh mục">
-                      {formatArray(
-                        detail.kol.categories
-                          ?.map((c) => c?.name)
-                          .filter(Boolean)
-                      )}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Kinh nghiệm">
-                      {detail.kol.experience ?? "--"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Mô tả">
-                      <Text style={{ whiteSpace: "pre-wrap" }}>
-                        {detail.kol.bio ?? "--"}
-                      </Text>
-                    </Descriptions.Item>
-                  </Descriptions>
-                ) : (
-                  <Empty description="Không có thông tin KOL" />
-                )}
+
+                {/* Thông tin KOL */}
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 md:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-800">
+                      Thông tin KOL
+                    </span>
+                  </div>
+
+                  {detail?.kol ? (
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={1}
+                      className="[&_.ant-descriptions-item-label]:w-56 [&_.ant-descriptions-item-label]:bg-slate-50 [&_.ant-descriptions-item-label]:font-medium [&_.ant-descriptions-item-label]:text-slate-700 [&_.ant-descriptions-item-content]:bg-white [&_.ant-descriptions-item-content]:text-slate-900 mt-2"
+                    >
+                      <Descriptions.Item label="Tên KOL">
+                        {detail.kol.displayName ?? detail.kol.fullName ?? "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Quốc gia">
+                        {detail.kol.country ?? "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Thành phố">
+                        {detail.kol.city ?? "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Danh mục">
+                        {formatArray(
+                          detail.kol.categories
+                            ?.map((c) => c?.name)
+                            .filter(Boolean)
+                        ) || "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Kinh nghiệm">
+                        {detail.kol.experience ?? "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Mô tả">
+                        <Text style={{ whiteSpace: "pre-wrap" }}>
+                          {detail.kol.bio ?? "--"}
+                        </Text>
+                      </Descriptions.Item>
+                    </Descriptions>
+                  ) : (
+                    <div className="py-6">
+                      <Empty description="Không có thông tin KOL" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Thông tin làm việc gần nhất */}
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 md:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-800">
+                      Thông tin làm việc gần nhất
+                    </span>
+                  </div>
+
+                  {latestKolWorktime ? (
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={1}
+                      className="[&_.ant-descriptions-item-label]:w-56 [&_.ant-descriptions-item-label]:bg-slate-50 [&_.ant-descriptions-item-label]:font-medium [&_.ant-descriptions-item-label]:text-slate-700 [&_.ant-descriptions-item-content]:bg-white [&_.ant-descriptions-item-content]:text-slate-900 mt-2"
+                    >
+                      <Descriptions.Item label="Trạng thái làm việc">
+                        {kolWorkTimesStatusLabel ? (
+                          <Tag
+                            color={
+                              STATUS_TAG_COLOR[kolWorkTimesStatusLabel] ??
+                              "default"
+                            }
+                          >
+                            {BOOKING_STATUS_LABEL[kolWorkTimesStatusLabel] ??
+                              latestKolWorktime?.status ??
+                              "--"}
+                          </Tag>
+                        ) : (
+                          "--"
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Ghi chú">
+                        {latestKolWorktime.note || "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Thời gian bắt đầu làm việc">
+                        {formatDateTime(
+                          latestKolWorktime.startAt ??
+                            latestKolWorktime.startTime
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Thời gian kết thúc làm việc">
+                        {formatDateTime(
+                          latestKolWorktime.endAt ?? latestKolWorktime.endTime
+                        )}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  ) : (
+                    <div className="py-6">
+                      <Empty description="Không có thông tin làm việc của KOL" />
+                    </div>
+                  )}
+                </div>
               </section>
 
               {/* Contract & Payment */}
@@ -1214,77 +1282,150 @@ const MySingleBookingRequestDetail = () => {
                     size="large"
                     className="w-full mt-4"
                   >
-                    {contractsWithFeedback.map(({ contract: c, feedbackSummary }) => {
-                      const paymentStatus = normalizeStatus(
-                        c?.paymentDTO?.status
-                      );
-                      const contractStatus = normalizeStatus(c?.status);
-                      return (
-                        <Card
-                          key={c?.id}
-                          type="inner"
-                          title={`Hợp đồng ${c?.contractNumber ?? ""}`}
-                          className="shadow-sm"
-                        >
-                          <Descriptions bordered size="middle" column={1}>
-                            <Descriptions.Item label="Trạng thái hợp đồng">
-                              <Tag
-                                color={
-                                  STATUS_TAG_COLOR[c?.status?.toUpperCase()] ??
-                                  "default"
-                                }
-                              >
-                                {BOOKING_STATUS_LABEL[
-                                  c?.status?.toUpperCase()
-                                ] ?? c?.status}
-                              </Tag>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Thanh toán">
-                              {paymentStatus ? (
+                    {contractsWithFeedback.map(
+                      ({ contract: c, feedbackSummary }) => {
+                        const paymentStatus = normalizeStatus(
+                          c?.paymentDTO?.status
+                        );
+                        const contractStatus = normalizeStatus(c?.status);
+                        return (
+                          <Card
+                            key={c?.id}
+                            type="inner"
+                            title={`Hợp đồng ${c?.contractNumber ?? ""}`}
+                            className="shadow-sm"
+                          >
+                            <Descriptions bordered size="middle" column={1}>
+                              <Descriptions.Item label="Trạng thái hợp đồng">
                                 <Tag
-                                  color={PAYMENT_STATUS_COLOR[paymentStatus]}
+                                  color={
+                                    STATUS_TAG_COLOR[
+                                      c?.status?.toUpperCase()
+                                    ] ?? "default"
+                                  }
                                 >
-                                  {PAYMENT_STATUS_LABEL[paymentStatus]}
+                                  {BOOKING_STATUS_LABEL[
+                                    c?.status?.toUpperCase()
+                                  ] ?? c?.status}
                                 </Tag>
-                              ) : (
-                                "--"
-                              )}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Tổng tiền">
-                              {formatCurrency(
-                                c?.paymentDTO?.totalAmount,
-                                c?.paymentDTO?.currency ?? "VND"
-                              )}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Đã thanh toán">
-                              {formatCurrency(
-                                c?.paymentDTO?.paidAmount,
-                                c?.paymentDTO?.currency ?? "VND"
-                              )}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Thời gian cập nhật">
-                              {formatDateTime(c?.paymentDTO?.updatedAt)}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Hết hạn thanh toán">
-                              {formatDateTime(c?.paymentDTO?.expiresAt)}
-                            </Descriptions.Item>
-                          </Descriptions>
-                          {contractStatus === "COMPLETED" && (
-                            <UserKolFeedbackSection
-                              contract={c}
-                              kol={detail?.kol}
-                              initialFeedback={feedbackSummary}
-                              onFeedbackUpdated={() =>
-                                refetchMyBookingRequestDetail()
-                              }
-                            />
-                          )}
-                        </Card>
-                      );
-                    })}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="Thanh toán">
+                                {paymentStatus ? (
+                                  <Tag
+                                    color={PAYMENT_STATUS_COLOR[paymentStatus]}
+                                  >
+                                    {PAYMENT_STATUS_LABEL[paymentStatus]}
+                                  </Tag>
+                                ) : (
+                                  "--"
+                                )}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="Tổng tiền">
+                                {formatCurrency(
+                                  c?.paymentDTO?.totalAmount,
+                                  c?.paymentDTO?.currency ?? "VND"
+                                )}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="Đã thanh toán">
+                                {formatCurrency(
+                                  c?.paymentDTO?.paidAmount,
+                                  c?.paymentDTO?.currency ?? "VND"
+                                )}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="Thời gian cập nhật">
+                                {formatDateTime(c?.paymentDTO?.updatedAt)}
+                              </Descriptions.Item>
+                              <Descriptions.Item label="Hết hạn thanh toán">
+                                {formatDateTime(c?.paymentDTO?.expiresAt)}
+                              </Descriptions.Item>
+                            </Descriptions>
+                            {contractStatus === "COMPLETED" && (
+                              <UserKolFeedbackSection
+                                contract={c}
+                                kol={detail?.kol}
+                                initialFeedback={feedbackSummary}
+                                onFeedbackUpdated={() =>
+                                  refetchMyBookingRequestDetail()
+                                }
+                              />
+                            )}
+                          </Card>
+                        );
+                      }
+                    )}
                   </Space>
                 ) : (
                   <Empty description="Không có thông tin hợp đồng" />
+                )}
+              </section>
+
+              {/* Refund */}
+              <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                <Space>
+                  <Layers size={18} />
+                  <span className="text-lg font-semibold text-slate-900">
+                    Hoàn tiền
+                  </span>
+                </Space>
+
+                {refund ? (
+                  <Card
+                    type="inner"
+                    className="shadow-sm mt-4"
+                    title="Thông tin hoàn tiền"
+                  >
+                    <Descriptions bordered size="middle" column={1}>
+                      <Descriptions.Item label="Trạng thái hoàn tiền">
+                        {refundStatus ? (
+                          <Tag
+                            color={
+                              PAYMENT_STATUS_COLOR[refundStatus] ?? "default"
+                            }
+                          >
+                            {PAYMENT_STATUS_LABEL[refundStatus] ??
+                              refund?.status ??
+                              "--"}
+                          </Tag>
+                        ) : (
+                          "--"
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Số tiền hoàn">
+                        {formatCurrency(
+                          refund.amount,
+                          // ưu tiên currency từ hợp đồng nếu có, fallback VND
+                          contracts?.[0]?.paymentDTO?.currency ?? "VND"
+                        )}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Lý do hoàn tiền">
+                        {refund.reason || "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Ngân hàng nhận">
+                        {refund.bankName && refund.bankNumber
+                          ? `${refund.bankName} – ${refund.bankNumber}`
+                          : "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Chủ tài khoản">
+                        {refund.ownerName || "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Ghi chú">
+                        {refund.description || "--"}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Thời gian yêu cầu hoàn tiền">
+                        {formatDateTime(refund.createdAt)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Thời gian đã hoàn">
+                        {refund.refundedAt
+                          ? formatDateTime(refund.refundedAt)
+                          : "--"}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Card>
+                ) : (
+                  <Empty
+                    description="Không có thông tin hoàn tiền"
+                    className="mt-4"
+                  />
                 )}
               </section>
 
