@@ -12,4 +12,8 @@ export const API_PATHS_SUPERADMIN = {
   DASHBOARD: {
     superAdminSummary: "/v1/superadmin/dashboard/summary",
   },
+  TRANSACTION: {
+    getAll: "/v1/superadmin/transactions/all",
+    getDetail: "/v1/superadmin/transactions/detail",
+  },
 };

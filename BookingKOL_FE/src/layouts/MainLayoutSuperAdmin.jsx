@@ -89,6 +89,10 @@ const MainLayoutSuperAdmin = () => {
       pattern: /^\/superadmin\/management-merchants(\/)?$/,
       key: "management-merchants",
     },
+    {
+      pattern: /^\/superadmin\/management-transactions(\/)?$/,
+      key: "management-transactions",
+    },
   ];
 
   const getSelectedKey = (pathname) => {
@@ -223,6 +227,15 @@ const MainLayoutSuperAdmin = () => {
           label: (
             <Link to="management-merchants">
               Quản lý phương thức thanh toán
+            </Link>
+          ),
+        },
+        {
+          key: "management-transactions",
+          icon: <BarChartOutlined />,
+          label: (
+            <Link to="management-transactions">
+              Quản lý giao dịch ngân hàng
             </Link>
           ),
         },

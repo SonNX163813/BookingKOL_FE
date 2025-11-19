@@ -9,20 +9,16 @@ import {
 } from "lucide-react";
 
 import { useGetHistoryBookingBackage } from "../../hook/booking_package/useGetHistoryBookingBackage";
-
-const STATUS_META = {
-  REQUESTED: { label: "Đang yêu cầu", color: "gold" },
-  APPROVED: { label: "Đã phê duyệt", color: "green" },
-  REJECTED: { label: "Đã từ chối", color: "red" },
-  COMPLETED: { label: "Hoàn tất", color: "blue" },
-};
+import {
+  BOOKING_STATUS_LABEL,
+  STATUS_TAG_COLOR,
+} from "../../constants/mySingleBookingStatuses";
 
 const resolvePackageStatus = (status) => {
   const normalized = status?.toUpperCase();
-  const meta = STATUS_META[normalized];
   return {
-    label: meta?.label ?? normalized ?? "--",
-    color: meta?.color ?? "default",
+    label: BOOKING_STATUS_LABEL[normalized] ?? normalized ?? "--",
+    color: STATUS_TAG_COLOR[normalized] ?? "default",
   };
 };
 
@@ -294,7 +290,9 @@ const HistoryBookingPackagePage = () => {
                   {data.map((record) => {
                     const key =
                       record?.id ?? record?.campaignId ?? Math.random();
-                    const statusMeta = resolvePackageStatus(record?.status);
+                    const statusMeta = resolvePackageStatus(
+                      record?.campaignStatus
+                    );
                     const kolNames = Array.isArray(record?.kols)
                       ? record.kols
                           .map((kol) => kol?.displayName)

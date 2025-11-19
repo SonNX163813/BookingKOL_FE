@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   Alert,
@@ -6,21 +6,14 @@ import {
   Box,
   Button,
   Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
-  IconButton,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { renderAsync } from "docx-preview";
-// import "docx-preview/dist/docx-preview.css";
-import CloseIcon from "@mui/icons-material/Close";
+import ContractTermsDialog from "../../components/home/booking/ContractTermsDialog";
 import {
   confirmSingleBookingRequest,
   cancelSingleBookingRequestById,
@@ -153,97 +146,6 @@ const extractUrlsFromText = (text) => {
   if (!matches) return [];
   const normalized = matches.map((url) => url.replace(/[),.]+$/, ""));
   return [...new Set(normalized)];
-};
-
-const ContractDocPreview = ({ url }) => {
-  const previewRef = useRef(null);
-  const [status, setStatus] = useState("idle");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!url) {
-      setStatus("idle");
-      setError("");
-      if (previewRef.current) {
-        previewRef.current.innerHTML = "";
-      }
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadDocument = async () => {
-      setStatus("loading");
-      setError("");
-      try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error("Không thể tải file hợp đồng.");
-        }
-        const buffer = await response.arrayBuffer();
-        if (!previewRef.current || !isMounted) return;
-        previewRef.current.innerHTML = "";
-        await renderAsync(buffer, previewRef.current, undefined, {
-          className: "docx-preview-content",
-          inWrapper: true,
-          ignoreWidth: true,
-          ignoreHeight: true,
-          breakPages: false,
-        });
-        if (isMounted) {
-          setStatus("ready");
-        }
-      } catch (loadError) {
-        if (!isMounted) return;
-        setStatus("error");
-        setError(
-          loadError?.message ||
-            "Không thể hiển thị file hợp đồng. Vui lòng thử lại."
-        );
-      }
-    };
-
-    loadDocument();
-
-    return () => {
-      isMounted = false;
-      if (previewRef.current) {
-        previewRef.current.innerHTML = "";
-      }
-    };
-  }, [url]);
-
-  if (!url) {
-    return (
-      <Typography sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}>
-        Không tìm thấy file hợp đồng.
-      </Typography>
-    );
-  }
-
-  return (
-    <Box sx={{ minHeight: 260 }}>
-      {status === "loading" ? (
-        <Typography sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}>
-          Đang tải file hợp đồng...
-        </Typography>
-      ) : null}
-      {status === "error" ? (
-        <Typography sx={{ color: "#d32f2f" }}>{error}</Typography>
-      ) : null}
-      <Box
-        ref={previewRef}
-        sx={{
-          "& .docx-wrapper": { backgroundColor: "transparent" },
-          "& .docx": {
-            backgroundColor: "transparent",
-            color: BOOKING_FLOW_STYLE.textPrimary,
-          },
-          "& .docx p": { color: BOOKING_FLOW_STYLE.textPrimary },
-        }}
-      />
-    </Box>
-  );
 };
 
 const BookingSingleReview = () => {
@@ -402,6 +304,12 @@ const BookingSingleReview = () => {
         contract.requestNumber ?? bookingRequest.requestNumber
       );
       const terms = typeof contract.terms === "string" ? contract.terms : "";
+      const amount =
+        typeof contract.amount === "number"
+          ? contract.amount
+          : typeof contract.paymentDTO?.amount === "number"
+          ? contract.paymentDTO.amount
+          : null;
       return {
         id: contract.id ?? contract.contractNumber ?? requestNumber,
         contractNumber,
@@ -409,6 +317,7 @@ const BookingSingleReview = () => {
         status: getContractStatusLabel(contract.status),
         createdAt: contract.createdAt ?? null,
         terms,
+        amount,
       };
     });
   }, [bookingRequest]);
@@ -499,7 +408,7 @@ const BookingSingleReview = () => {
         },
       });
     } catch (error) {
-      toast.error(errorMessageFromResponse(error));
+      // toast.error(errorMessageFromResponse(error));
     } finally {
       setConfirming(false);
     }
@@ -522,7 +431,7 @@ const BookingSingleReview = () => {
         },
       });
     } catch (error) {
-      toast.error(errorMessageFromResponse(error));
+      // toast.error(errorMessageFromResponse(error));
     } finally {
       setCancelling(false);
     }
@@ -979,6 +888,21 @@ const BookingSingleReview = () => {
                                       color: BOOKING_FLOW_STYLE.textSecondary,
                                     }}
                                   >
+                                    Giá thanh toán
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: 600 }}>
+                                    {formatCurrency(contract.amount)}
+                                  </Typography>
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  justifyContent="space-between"
+                                >
+                                  <Typography
+                                    sx={{
+                                      color: BOOKING_FLOW_STYLE.textSecondary,
+                                    }}
+                                  >
                                     Mã yêu cầu
                                   </Typography>
                                   <Typography sx={{ fontWeight: 600 }}>
@@ -1015,10 +939,45 @@ const BookingSingleReview = () => {
                                     {formatDateTime(contract.createdAt)}
                                   </Typography>
                                 </Stack>
-                                {/* {contractTerms ? (
+                              </Stack>
+                            );
+                          })}
+                        </Stack>
+                      </Stack>
+                    </>
+                  ) : null}
+
+                  <Divider />
+
+                  <Stack spacing={2}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        color: BOOKING_FLOW_STYLE.textPrimary,
+                      }}
+                    >
+                      Bản hợp đồng
+                    </Typography>
+                    {contractInfo.length > 0 ? (
+                      <>
+                        <Stack spacing={1.5}>
+                          {contractInfo.map((contract) => {
+                            const contractTerms = contractTermsById.get(
+                              contract.id
+                            );
+                            const hasReadTerms = readTermsIds.includes(
+                              contract.id
+                            );
+                            return (
+                              <Stack key={contract.id} spacing={1}>
+                                {contractTerms ? (
                                   <Stack spacing={0.75}>
                                     <Stack
-                                      direction={{ xs: "column", sm: "row" }}
+                                      direction={{
+                                        xs: "column",
+                                        sm: "row",
+                                      }}
                                       justifyContent="space-between"
                                       alignItems={{
                                         xs: "flex-start",
@@ -1031,7 +990,7 @@ const BookingSingleReview = () => {
                                             BOOKING_FLOW_STYLE.textSecondary,
                                         }}
                                       >
-                                        Điều khoản
+                                        Hợp đồng
                                       </Typography>
                                       <Stack direction="row" spacing={1}>
                                         <Button
@@ -1048,34 +1007,39 @@ const BookingSingleReview = () => {
                                             fontWeight: 600,
                                           }}
                                         >
-                                          Xem điều khoản
+                                          Xem hợp đồng
                                         </Button>
                                       </Stack>
                                     </Stack>
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color: hasReadTerms
-                                          ? BOOKING_FLOW_STYLE.textSecondary
-                                          : "#d32f2f",
-                                      }}
-                                    >
-                                      {hasReadTerms
-                                        ? "Bạn đã xem hết điều khoản hợp đồng."
-                                        : "Mở popup và đọc hết điều khoản trước khi tiếp tục."}
-                                    </Typography>
+                                    {/* <Typography
+                                variant="caption"
+                                sx={{
+                                  color: hasReadTerms
+                                    ? BOOKING_FLOW_STYLE.textSecondary
+                                    : "#d32f2f",
+                                }}
+                              >
+                                {hasReadTerms
+                                  ? "Bạn đã xem hết điều khoản hợp đồng."
+                                  : "Mở popup và đọc hết điều khoản trước khi tiếp tục."}
+                              </Typography> */}
                                   </Stack>
-                                ) : null} */}
+                                ) : null}
                               </Stack>
                             );
                           })}
                         </Stack>
-                      </Stack>
-                    </>
-                  ) : null}
+                      </>
+                    ) : (
+                      <Typography
+                        sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
+                      >
+                        Không có hợp đồng
+                      </Typography>
+                    )}
+                  </Stack>
 
                   <Divider />
-
                   <Stack spacing={1}>
                     <Typography
                       variant="subtitle1"
@@ -1098,69 +1062,7 @@ const BookingSingleReview = () => {
                   </Stack>
                 </Stack>
               </Paper>
-              {contractInfo.length > 0 ? (
-                <>
-                  <Divider />
-                  <Stack spacing={1.5}>
-                    {contractInfo.map((contract) => {
-                      const contractTerms = contractTermsById.get(contract.id);
-                      const hasReadTerms = readTermsIds.includes(contract.id);
-                      return (
-                        <Stack key={contract.id} spacing={1}>
-                          {contractTerms ? (
-                            <Stack spacing={0.75}>
-                              <Stack
-                                direction={{ xs: "column", sm: "row" }}
-                                justifyContent="space-between"
-                                alignItems={{
-                                  xs: "flex-start",
-                                  sm: "center",
-                                }}
-                              >
-                                <Typography
-                                  sx={{
-                                    color: BOOKING_FLOW_STYLE.textSecondary,
-                                  }}
-                                >
-                                  Điều khoản
-                                </Typography>
-                                <Stack direction="row" spacing={1}>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() =>
-                                      handleOpenContractTerms(contractTerms)
-                                    }
-                                    sx={{
-                                      textTransform: "none",
-                                      borderRadius: "12px",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Xem điều khoản
-                                  </Button>
-                                </Stack>
-                              </Stack>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color: hasReadTerms
-                                    ? BOOKING_FLOW_STYLE.textSecondary
-                                    : "#d32f2f",
-                                }}
-                              >
-                                {hasReadTerms
-                                  ? "Bạn đã xem hết điều khoản hợp đồng."
-                                  : "Mở popup và đọc hết điều khoản trước khi tiếp tục."}
-                              </Typography>
-                            </Stack>
-                          ) : null}
-                        </Stack>
-                      );
-                    })}
-                  </Stack>
-                </>
-              ) : null}
+
               <Alert
                 severity="warning"
                 sx={{
@@ -1224,114 +1126,13 @@ const BookingSingleReview = () => {
           </Paper>
         </Container>
       </Box>
-      <Dialog
+      <ContractTermsDialog
         open={Boolean(openContractTerms)}
+        contract={openContractTerms}
         onClose={handleCloseContractTerms}
-        fullWidth
-        maxWidth="md"
-        aria-labelledby="contract-terms-dialog-title"
-      >
-        {openContractTerms ? (
-          <>
-            <DialogTitle
-              id="contract-terms-dialog-title"
-              sx={{ pr: 6, fontWeight: 700 }}
-            >
-              Điều khoản hợp đồng
-            </DialogTitle>
-            <IconButton
-              onClick={handleCloseContractTerms}
-              aria-label="Đóng"
-              sx={{
-                position: "absolute",
-                right: 12,
-                top: 10,
-              }}
-            >
-              <CloseIcon />
-            </IconButton>
-            <DialogContent dividers sx={{ p: 0 }}>
-              <Box
-                sx={{
-                  maxHeight: 520,
-                  overflowY: "auto",
-                }}
-                onScroll={handleContractTermsScroll(openContractTerms.id)}
-              >
-                <Stack spacing={2.5} sx={{ p: 3 }}>
-                  <Stack spacing={0.5}>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      Số hợp đồng: {openContractTerms.contractNumber}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                    >
-                      Mã yêu cầu: {openContractTerms.requestNumber}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                    >
-                      Trạng thái: {openContractTerms.status}
-                    </Typography>
-                  </Stack>
-                  {openContractTerms.termLinks?.[0] ? (
-                    <ContractDocPreview url={openContractTerms.termLinks[0]} />
-                  ) : (
-                    <Typography
-                      sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
-                    >
-                      Không tìm thấy file hợp đồng để hiển thị.
-                    </Typography>
-                  )}
-                  {/* <Typography
-                    component="div"
-                    sx={{
-                      color: BOOKING_FLOW_STYLE.textPrimary,
-                      whiteSpace: "pre-line",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {openContractTerms.terms}
-                  </Typography> */}
-                  {openContractTerms.termLinks?.length > 0 ? (
-                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                      {openContractTerms.termLinks.map((url, index) => (
-                        <Button
-                          key={`${openContractTerms.id}-dialog-link-${index}`}
-                          component="a"
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          size="small"
-                          variant="outlined"
-                          sx={{
-                            textTransform: "none",
-                            borderRadius: "12px",
-                          }}
-                        >
-                          {openContractTerms.termLinks.length > 1
-                            ? `Tải file #${index + 1}`
-                            : "Tải file hợp đồng"}
-                        </Button>
-                      ))}
-                    </Stack>
-                  ) : null}
-                </Stack>
-              </Box>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, py: 2 }}>
-              <Button
-                onClick={handleCloseContractTerms}
-                sx={{ textTransform: "none", fontWeight: 600 }}
-              >
-                Đóng
-              </Button>
-            </DialogActions>
-          </>
-        ) : null}
-      </Dialog>
+        onScroll={handleContractTermsScroll}
+        formatCurrency={formatCurrency}
+      />
     </>
   );
 };

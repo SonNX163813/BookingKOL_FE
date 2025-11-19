@@ -32,6 +32,7 @@ import CreateBlog from "../pages/admin/blog/CreateBlog";
 
 import ManagementAllUser from "../pages/superAdmin/ManagementAllUser";
 import ManagementMerchant from "../pages/superAdmin/ManagementMerchant";
+import ManagementTransactions from "../pages/superAdmin/ManagementTransactions";
 
 export const routerSuperAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -44,6 +45,7 @@ export const routerSuperAdmin = [
       { path: "management-log-chat-ai", element: <ManagementLogAI /> },
       { path: "management-all-user", element: <ManagementAllUser /> },
       { path: "management-merchants", element: <ManagementMerchant /> },
+      { path: "management-transactions", element: <ManagementTransactions /> },
       { path: "management-customer", element: <ManagementCustomer /> },
       { path: "management-customer/:id", element: <UserDetailPage /> },
 
