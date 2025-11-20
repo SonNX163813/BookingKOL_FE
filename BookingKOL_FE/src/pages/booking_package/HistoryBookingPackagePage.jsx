@@ -325,6 +325,8 @@ const HistoryBookingPackagePage = () => {
   const renderBookingActions = useCallback(
     (record) => {
       const bookingRequestId = record?.bookingRequestId;
+      const campaignId = record?.campaignId ?? record?.id;
+      const canViewDetail = Boolean(campaignId);
       const campaignStatusSource =
         record?.campaignStatus ?? record?.status ?? record?.bookingStatus;
 
@@ -353,7 +355,7 @@ const HistoryBookingPackagePage = () => {
       return (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {canManageContract ? (
-            <Space size="small" className="flex flex-wrap">
+            <>
               <Button
                 type="primary"
                 style={{
@@ -372,18 +374,48 @@ const HistoryBookingPackagePage = () => {
               </Button>
               <Button
                 danger
-                className="!h-11 !rounded-xl !border-red-200 !bg-red-50 !px-5 !text-red-600 hover:!border-red-300 hover:!bg-red-100"
+                // className="!h-11 !rounded-xl !border-red-200 !bg-red-50 !px-5 !text-red-600 hover:!border-red-300 hover:!bg-red-100"
+                style={{
+                  height: "2.5rem",
+                  borderRadius: "16px",
+                  backgroundColor: "#fef2f2", // bg-red-50
+                  // paddingLeft: "1.25rem", // px-5
+                  // paddingRight: "1.25rem",
+                  color: "#dc2626", // text-red-600
+                  fontWeight: 600,
+                }}
                 onClick={() => openRejectModal(record)}
                 disabled={isSigningContract || isCancellingContract}
               >
                 Từ chối hợp đồng
               </Button>
-            </Space>
+            </>
           ) : null}
-
+          <Button
+            // className="!h-11 !rounded-xl !border-slate-200 !bg-white !px-5 hover:!border-indigo-500/60 hover:!text-indigo-600"
+            onClick={() => handleViewCampaignDetail(campaignId)}
+            disabled={!canViewDetail}
+            style={{
+              color: "#ffffff",
+              height: "2.5rem",
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "16px",
+              backgroundColor: BOOKING_FLOW_STYLE.accent,
+            }}
+          >
+            Xem chi tiết
+          </Button>
           <Button
             danger
-            className="!h-11 !rounded-xl !border-red-200 !bg-red-600 !px-5 !font-semibold !text-white hover:!bg-red-500"
+            // className="!h-11 !rounded-xl !border-red-200 !bg-red-600 !px-5 !font-semibold !text-white hover:!bg-red-500"
+            style={{
+              height: "2.5rem",
+              borderRadius: "16px",
+              backgroundColor: "#dc2626",
+              fontWeight: 600,
+              color: "#ffffff",
+            }}
             onClick={() => handleCancelBookingRequest(record)}
             disabled={
               !bookingRequestId ||
@@ -402,6 +434,7 @@ const HistoryBookingPackagePage = () => {
       handleAcceptContract,
       openRejectModal,
       handleCancelBookingRequest,
+      handleViewCampaignDetail,
       isSigningContract,
       isRejectingContract,
       isCancellingContract,
@@ -648,7 +681,6 @@ const HistoryBookingPackagePage = () => {
                           .map((live) => live?.displayName)
                           .filter(Boolean)
                       : [];
-                    const canViewDetail = Boolean(campaignId);
 
                     return (
                       <article
@@ -741,15 +773,7 @@ const HistoryBookingPackagePage = () => {
                           </div>
                         ) : null}
 
-                        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                          <Button
-                            icon={<Eye size={16} />}
-                            className="!h-11 !rounded-xl !border-slate-200 !bg-white !px-5 hover:!border-indigo-500/60 hover:!text-indigo-600"
-                            onClick={() => handleViewCampaignDetail(campaignId)}
-                            disabled={!canViewDetail}
-                          >
-                            Xem chi tiet chien dich
-                          </Button>
+                        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                           {renderBookingActions(record)}
                         </div>
                       </article>

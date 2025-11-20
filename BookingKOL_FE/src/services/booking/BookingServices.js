@@ -126,3 +126,31 @@ export const cancelUserContract = async (bookingRequestId) => {
     }/${encodeURIComponent(bookingRequestId)}`,
   });
 };
+
+export const initiateCampaignPayment = async (paymentScheduleId) => {
+  if (!paymentScheduleId) {
+    throw new Error("paymentScheduleId is required to create payment");
+  }
+
+  return post({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.initiateCampaignPayment(
+      paymentScheduleId
+    ),
+  });
+};
+
+export const checkCampaignPaymentStatus = async (
+  contractPaymentScheduleId
+) => {
+  if (!contractPaymentScheduleId) {
+    throw new Error(
+      "contractPaymentScheduleId is required to check payment status"
+    );
+  }
+
+  return get({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.checkCampaignPaymentStatus(
+      contractPaymentScheduleId
+    ),
+  });
+};

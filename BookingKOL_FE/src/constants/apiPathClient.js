@@ -72,6 +72,12 @@ export const CLIENT_API_PATHS = {
     cancelContract: "/v1/user/contracts/cancel",
     getUserCampaignDetail: (campaignId) =>
       `/v1/bookings/user/${encodeURIComponent(campaignId)}`,
+    initiateCampaignPayment: (paymentScheduleId) =>
+      `/v1/user/contracts/payment/${encodeURIComponent(paymentScheduleId)}`,
+    checkCampaignPaymentStatus: (contractPaymentScheduleId) =>
+      `/v1/payment/check/campaign/${encodeURIComponent(
+        contractPaymentScheduleId
+      )}`,
   },
   COURSE: {
     getAll: "/v1/courses/all",

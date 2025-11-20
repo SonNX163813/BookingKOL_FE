@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import { Alert, Button, Card, Empty, Skeleton, Tag, Typography } from "antd";
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { toast } from "react-toastify";
 
 import ContractTermsDialog from "../../components/home/booking/ContractTermsDialog";
 import { useGetCampaignBookingDetail } from "../../hook/booking_package/useGetCampaignBookingDetail";
@@ -19,6 +21,7 @@ import {
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_COLOR,
 } from "../../constants/mySingleBookingStatuses";
+import { initiateCampaignPayment } from "../../services/booking/BookingServices";
 
 const { Title, Text } = Typography;
 
@@ -79,6 +82,11 @@ const CampaignBookingDetailPage = () => {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const [contractPreview, setContractPreview] = useState(null);
+  const [initiatingScheduleId, setInitiatingScheduleId] = useState(null);
+  const initiatePaymentMutation = useMutation({
+    mutationFn: ({ paymentScheduleId }) =>
+      initiateCampaignPayment(paymentScheduleId),
+  });
 
   const {
     isGettingCampaignDetail,
@@ -167,6 +175,58 @@ const CampaignBookingDetailPage = () => {
     setContractPreview(null);
   }, []);
 
+  const handleInitiatePayment = useCallback(
+    async (schedule, request) => {
+      if (!schedule?.id) {
+        toast.error("Không tìm thấy đợt thanh toán hợp lệ.");
+        return;
+      }
+
+      try {
+        setInitiatingScheduleId(schedule.id);
+        const response = await initiatePaymentMutation.mutateAsync({
+          paymentScheduleId: schedule.id,
+        });
+
+        const paymentData = response?.data ?? response ?? null;
+        if (!paymentData) {
+          throw new Error("Không nhận được thông tin thanh toán.");
+        }
+
+        const normalizedPayment = {
+          ...paymentData,
+          contractPaymentScheduleId:
+            paymentData.contractPaymentScheduleId ??
+            paymentData.contractPaymentScheduleID ??
+            schedule.id,
+          installmentNumber:
+            paymentData.installmentNumber ?? schedule?.installmentNumber,
+          amount: paymentData.amount ?? schedule?.amount,
+          campaignId: detail?.id ?? paymentData?.campaignId,
+          campaignName: detail?.name ?? paymentData?.campaignName,
+        };
+
+        navigate("/don-booking-chien-dich/thanh-toan", {
+          state: {
+            payment: normalizedPayment,
+            campaign: detail,
+            bookingRequest: request,
+            paymentSchedule: schedule,
+          },
+        });
+      } catch (error) {
+        const message =
+          error?.response?.data?.message ??
+          error?.message ??
+          "Không thể khởi tạo thanh toán cho đợt này.";
+        toast.error(message);
+      } finally {
+        setInitiatingScheduleId(null);
+      }
+    },
+    [detail, initiatePaymentMutation, navigate]
+  );
+
   const renderNameList = (names, emptyLabel) =>
     names.length ? (
       <div className="mt-3 flex flex-wrap gap-2">
@@ -183,7 +243,7 @@ const CampaignBookingDetailPage = () => {
       <p className="mt-3 text-sm text-slate-500">{emptyLabel}</p>
     );
 
-  const renderPaymentSchedules = (schedules = []) => {
+  const renderPaymentSchedules = (schedules = [], parentRequest = null) => {
     if (!schedules.length) return null;
 
     return (
@@ -202,6 +262,20 @@ const CampaignBookingDetailPage = () => {
             const paymentStatus = schedule?.transactionStatus
               ? schedule.transactionStatus.toUpperCase()
               : null;
+            const isSchedulePaid =
+              normalizedStatus === "PAID" ||
+              paymentStatus === "PAID" ||
+              paymentStatus === "COMPLETED";
+            const canInitiatePayment =
+              !isSchedulePaid &&
+              normalizedStatus === "PENDING" &&
+              (paymentStatus === null ||
+                ["PENDING", "FAILED", "CANCELLED", "UNDERPAID"].includes(
+                  paymentStatus
+                ));
+            const isProcessingPayment =
+              initiatingScheduleId ===
+              (schedule?.id ?? schedule?.contractPaymentScheduleId);
 
             return (
               <div
@@ -245,6 +319,21 @@ const CampaignBookingDetailPage = () => {
                     </p>
                   </div>
                 </div>
+                {canInitiatePayment ? (
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      type="primary"
+                      icon={<Sparkles size={16} />}
+                      loading={isProcessingPayment}
+                      className="!h-10 !rounded-xl !px-5 font-semibold"
+                      onClick={() =>
+                        handleInitiatePayment(schedule, parentRequest)
+                      }
+                    >
+                      Thanh toán đợt này
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -354,7 +443,7 @@ const CampaignBookingDetailPage = () => {
         </div>
 
         <div className="mt-6">
-          {renderPaymentSchedules(request?.paymentSchedules)}
+          {renderPaymentSchedules(request?.paymentSchedules, request)}
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
