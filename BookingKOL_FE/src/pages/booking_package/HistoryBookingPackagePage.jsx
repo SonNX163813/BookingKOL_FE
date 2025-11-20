@@ -1,28 +1,48 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { Button, Pagination, Space, Tag } from "antd";
+import {
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Pagination,
+  Select,
+  Space,
+  Tag,
+} from "antd";
 import {
   CalendarRange,
   ClipboardList,
+  Eye,
+  RotateCcw,
   RefreshCcw,
+  Search,
   Sparkles,
 } from "lucide-react";
 
 import { useGetHistoryBookingBackage } from "../../hook/booking_package/useGetHistoryBookingBackage";
+import {
+  BOOKING_STATUS_LABEL,
+  BOOKING_STATUS_OPTIONS,
+  STATUS_TAG_COLOR,
+} from "../../constants/mySingleBookingStatuses";
+import {
+  cancelUserContract,
+  rejectUserContract,
+  signUserContract,
+} from "../../services/booking/BookingServices";
+import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
-const STATUS_META = {
-  REQUESTED: { label: "Đang yêu cầu", color: "gold" },
-  APPROVED: { label: "Đã phê duyệt", color: "green" },
-  REJECTED: { label: "Đã từ chối", color: "red" },
-  COMPLETED: { label: "Hoàn tất", color: "blue" },
-};
+const { RangePicker } = DatePicker;
 
 const resolvePackageStatus = (status) => {
   const normalized = status?.toUpperCase();
-  const meta = STATUS_META[normalized];
   return {
-    label: meta?.label ?? normalized ?? "--",
-    color: meta?.color ?? "default",
+    label: BOOKING_STATUS_LABEL[normalized] ?? normalized ?? "--",
+    color: STATUS_TAG_COLOR[normalized] ?? "default",
   };
 };
 
@@ -33,11 +53,11 @@ const formatCurrency = (value) => {
   return `${new Intl.NumberFormat("vi-VN").format(numeric)} ₫`;
 };
 
-const composeBudgetRange = (min, max) => {
-  if (min === null || min === undefined || max === null || max === undefined) {
+const composeBudgetRange = (targetPrice) => {
+  if (targetPrice === null || targetPrice === undefined) {
     return "--";
   }
-  return `${formatCurrency(min)} - ${formatCurrency(max)}`;
+  return `${formatCurrency(targetPrice)}`;
 };
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
@@ -58,26 +78,132 @@ const composeCampaignDuration = (start, end) => {
   return `${startLabel} → ${endLabel}`;
 };
 
+const PACKAGE_STATUS_FILTER_OPTIONS = BOOKING_STATUS_OPTIONS.filter((option) =>
+  ["REQUESTED", "NEGOTIATING", "ACCEPTED"].includes(option.value)
+);
+
 const HistoryBookingPackagePage = () => {
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
+  const [form] = Form.useForm();
+  const [filters, setFilters] = useState({});
+  const [rejectModalInfo, setRejectModalInfo] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectReasonError, setRejectReasonError] = useState("");
+  const [cancellingBookingRequestId, setCancellingBookingRequestId] =
+    useState(null);
 
   const {
     isGetHistoryBookingBackage,
     ResponseGetHistoryBookingPackage,
     refetchHistoryBookingPackage,
-  } = useGetHistoryBookingBackage(page, size);
+  } = useGetHistoryBookingBackage(page, size, filters);
+
+  const handleViewCampaignDetail = useCallback(
+    (campaignId) => {
+      if (!campaignId) return;
+      navigate(`/don-booking-chien-dich/${campaignId}`);
+    },
+    [navigate]
+  );
+
+  const handleFilterSubmit = (values = {}) => {
+    const keywordValue =
+      typeof values?.keyword === "string" ? values.keyword.trim() : "";
+    const statusValue =
+      typeof values?.status === "string"
+        ? values.status.toUpperCase()
+        : undefined;
+    const campaignRange = Array.isArray(values?.campaignDuration)
+      ? values.campaignDuration
+      : [];
+    const createdRange = Array.isArray(values?.createdRange)
+      ? values.createdRange
+      : [];
+
+    const nextFilters = {};
+
+    if (keywordValue) {
+      nextFilters.keyword = keywordValue;
+    }
+    if (statusValue) {
+      nextFilters.status = statusValue;
+    }
+    if (campaignRange.length === 2) {
+      const start = campaignRange[0]?.startOf("day");
+      const end = campaignRange[1]?.endOf("day");
+      if (start?.isValid()) {
+        nextFilters.campaignStartFrom = start.toISOString();
+      }
+      if (end?.isValid()) {
+        nextFilters.campaignEndTo = end.toISOString();
+      }
+    }
+    if (createdRange.length === 2) {
+      const createdFrom = createdRange[0]?.startOf("day");
+      const createdTo = createdRange[1]?.endOf("day");
+      if (createdFrom?.isValid()) {
+        nextFilters.createdFrom = createdFrom.toISOString();
+      }
+      if (createdTo?.isValid()) {
+        nextFilters.createdTo = createdTo.toISOString();
+      }
+    }
+
+    setFilters(nextFilters);
+    setPage(0);
+  };
+
+  const handleResetFilters = () => {
+    form.resetFields();
+    setFilters({});
+    setPage(0);
+  };
+
+  const closeRejectModal = () => {
+    setRejectModalInfo(null);
+    setRejectReason("");
+    setRejectReasonError("");
+  };
+
+  const signContractMutation = useMutation({
+    mutationFn: signUserContract,
+    onSuccess: () => {
+      refetchHistoryBookingPackage?.();
+    },
+  });
+
+  const rejectContractMutation = useMutation({
+    mutationFn: rejectUserContract,
+    onSuccess: () => {
+      closeRejectModal();
+      refetchHistoryBookingPackage?.();
+    },
+  });
+
+  const cancelContractMutation = useMutation({
+    mutationFn: cancelUserContract,
+    onSuccess: () => {
+      refetchHistoryBookingPackage?.();
+    },
+    onSettled: () => {
+      setCancellingBookingRequestId(null);
+    },
+  });
 
   const data =
     ResponseGetHistoryBookingPackage?.data?.content &&
     Array.isArray(ResponseGetHistoryBookingPackage.data.content)
       ? ResponseGetHistoryBookingPackage.data.content
       : [];
+
   const totalElements =
     ResponseGetHistoryBookingPackage?.data?.totalElements ?? 0;
 
   const hasData = data.length > 0;
   const isInitialLoading = isGetHistoryBookingBackage && !hasData;
+
   const skeletonItems = useMemo(
     () => Array.from({ length: Math.min(size, 6) }, (_, index) => index),
     [size]
@@ -96,9 +222,237 @@ const HistoryBookingPackagePage = () => {
     }
   }, [hasData, isGetHistoryBookingBackage, page]);
 
+  const isRejectModalOpen = Boolean(rejectModalInfo);
+  const rejectCampaignName = rejectModalInfo?.campaignName ?? "--";
+
+  const isSigningContract = signContractMutation.isPending;
+  const isRejectingContract = rejectContractMutation.isPending;
+  const isCancellingContract = cancelContractMutation.isPending;
+  const isAnyActionLoading =
+    isSigningContract || isRejectingContract || isCancellingContract;
+
+  const handleAcceptContract = useCallback(
+    (record) => {
+      const contractId = record?.contractId;
+      const bookingRequestId = record?.bookingRequestId;
+      if (!contractId || !bookingRequestId || isAnyActionLoading) {
+        return;
+      }
+      Modal.confirm({
+        title: "Chấp nhận hợp đồng",
+        content: `Bạn chắc chắn muốn chấp nhận hợp đồng cho chiến dịch "${
+          record?.campaignName ?? "--"
+        }"?`,
+        okText: "Chấp nhận",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () =>
+          signContractMutation.mutateAsync({
+            contractId,
+            bookingRequestId,
+          }),
+      });
+    },
+    [isAnyActionLoading, signContractMutation]
+  );
+
+  const openRejectModal = useCallback(
+    (record) => {
+      const contractId = record?.contractId;
+      const bookingRequestId = record?.bookingRequestId;
+      if (!contractId || !bookingRequestId || isAnyActionLoading) {
+        return;
+      }
+      setRejectModalInfo({
+        contractId,
+        bookingRequestId,
+        campaignName: record?.campaignName ?? "--",
+      });
+      setRejectReason("");
+      setRejectReasonError("");
+    },
+    [isAnyActionLoading]
+  );
+
+  const handleRejectReasonChange = (event) => {
+    if (rejectReasonError) {
+      setRejectReasonError("");
+    }
+    setRejectReason(event?.target?.value ?? "");
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectModalInfo?.contractId || !rejectModalInfo?.bookingRequestId) {
+      setRejectReasonError("Thiếu thông tin hợp đồng, vui lòng tải lại trang.");
+      return;
+    }
+    const normalizedReason = rejectReason.trim();
+    if (!normalizedReason) {
+      setRejectReasonError("Vui lòng nhập lý do từ chối hợp đồng.");
+      return;
+    }
+    await rejectContractMutation.mutateAsync({
+      contractId: rejectModalInfo.contractId,
+      bookingRequestId: rejectModalInfo.bookingRequestId,
+      reason: normalizedReason,
+    });
+  };
+
+  const handleCancelBookingRequest = useCallback(
+    (record) => {
+      const bookingRequestId = record?.bookingRequestId;
+      if (!bookingRequestId || isCancellingContract) {
+        return;
+      }
+      Modal.confirm({
+        title: "Hủy đơn đặt gói",
+        content: `Bạn có chắc chắn muốn hủy chiến dịch "${
+          record?.campaignName ?? "--"
+        }"? Thao tác này không thể hoàn tác.`,
+        okText: "Hủy đơn",
+        cancelText: "Giữ lại",
+        centered: true,
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setCancellingBookingRequestId(bookingRequestId);
+          return cancelContractMutation.mutateAsync(bookingRequestId);
+        },
+      });
+    },
+    [cancelContractMutation, isCancellingContract]
+  );
+
+  const renderBookingActions = useCallback(
+    (record) => {
+      const bookingRequestId = record?.bookingRequestId;
+      const campaignId = record?.campaignId ?? record?.id;
+      const canViewDetail = Boolean(campaignId);
+      const campaignStatusSource =
+        record?.campaignStatus ?? record?.status ?? record?.bookingStatus;
+
+      const normalizedCampaignStatus =
+        typeof campaignStatusSource === "string"
+          ? campaignStatusSource.toUpperCase()
+          : "";
+
+      const shouldDisplayActions =
+        bookingRequestId &&
+        normalizedCampaignStatus &&
+        !["COMPLETED", "CANCELLED"].includes(normalizedCampaignStatus);
+
+      const canManageContract =
+        normalizedCampaignStatus === "NEGOTIATING" &&
+        record?.contractId &&
+        bookingRequestId;
+
+      const isCancellingThisRow =
+        isCancellingContract && cancellingBookingRequestId === bookingRequestId;
+
+      if (!shouldDisplayActions) {
+        return null;
+      }
+
+      return (
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          {canManageContract ? (
+            <>
+              <Button
+                type="primary"
+                style={{
+                  color: "#ffffff",
+                  height: "2.5rem",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  borderRadius: "16px",
+                  backgroundColor: BOOKING_FLOW_STYLE.accent,
+                }}
+                onClick={() => handleAcceptContract(record)}
+                loading={isSigningContract}
+                disabled={isRejectingContract || isCancellingContract}
+              >
+                Chấp nhận hợp đồng
+              </Button>
+              <Button
+                danger
+                // className="!h-11 !rounded-xl !border-red-200 !bg-red-50 !px-5 !text-red-600 hover:!border-red-300 hover:!bg-red-100"
+                style={{
+                  height: "2.5rem",
+                  borderRadius: "16px",
+                  backgroundColor: "#fef2f2", // bg-red-50
+                  // paddingLeft: "1.25rem", // px-5
+                  // paddingRight: "1.25rem",
+                  color: "#dc2626", // text-red-600
+                  fontWeight: 600,
+                }}
+                onClick={() => openRejectModal(record)}
+                disabled={isSigningContract || isCancellingContract}
+              >
+                Từ chối hợp đồng
+              </Button>
+            </>
+          ) : null}
+          <Button
+            // className="!h-11 !rounded-xl !border-slate-200 !bg-white !px-5 hover:!border-indigo-500/60 hover:!text-indigo-600"
+            onClick={() => handleViewCampaignDetail(campaignId)}
+            disabled={!canViewDetail}
+            style={{
+              color: "#ffffff",
+              height: "2.5rem",
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "16px",
+              backgroundColor: BOOKING_FLOW_STYLE.accent,
+            }}
+          >
+            Xem chi tiết
+          </Button>
+          <Button
+            danger
+            // className="!h-11 !rounded-xl !border-red-200 !bg-red-600 !px-5 !font-semibold !text-white hover:!bg-red-500"
+            style={{
+              height: "2.5rem",
+              borderRadius: "16px",
+              backgroundColor: "#dc2626",
+              fontWeight: 600,
+              color: "#ffffff",
+            }}
+            onClick={() => handleCancelBookingRequest(record)}
+            disabled={
+              !bookingRequestId ||
+              isCancellingContract ||
+              isSigningContract ||
+              isRejectingContract
+            }
+            loading={isCancellingThisRow}
+          >
+            Hủy đơn
+          </Button>
+        </div>
+      );
+    },
+    [
+      handleAcceptContract,
+      openRejectModal,
+      handleCancelBookingRequest,
+      handleViewCampaignDetail,
+      isSigningContract,
+      isRejectingContract,
+      isCancellingContract,
+      cancellingBookingRequestId,
+    ]
+  );
+
+  const handleRejectModalCancel = () => {
+    if (rejectContractMutation.isPending) return;
+    closeRejectModal();
+  };
+
   const summaryCards = useMemo(() => {
     const counts = data.reduce((acc, item) => {
-      const key = item?.status?.toUpperCase();
+      const statusSource =
+        item?.campaignStatus ?? item?.status ?? item?.bookingStatus;
+      const key =
+        typeof statusSource === "string" ? statusSource.toUpperCase() : null;
       if (!key) return acc;
       acc[key] = (acc[key] ?? 0) + 1;
       return acc;
@@ -153,6 +507,7 @@ const HistoryBookingPackagePage = () => {
   };
 
   const handleRefresh = () => {
+    setPage(0);
     refetchHistoryBookingPackage?.();
   };
 
@@ -164,70 +519,82 @@ const HistoryBookingPackagePage = () => {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-10 px-4 md:px-6 lg:px-8">
-        {/* <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur">
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-rose-500/10" />
-          <div className="relative p-8 sm:p-10">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        {/* SECTION BỘ LỌC */}
+        <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.5)] backdrop-blur">
+          <div className="relative p-6 sm:p-8">
+            <div className="flex flex-col gap-2 border-b border-slate-200/60 pb-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.26em] text-indigo-600">
-                  <CalendarRange size={16} />
-                  <span>Đơn chiến dịch</span>
-                </div>
-                <h1 className="mt-5 text-3xl font-semibold text-slate-900 sm:text-4xl">
-                  Quản lý đơn đặt theo chiến dịch
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
-                  Theo dõi tiến độ, ngân sách và trạng thái của từng đơn chiến
-                  dịch bạn đã đặt. Giữ thông tin luôn cập nhật để phối hợp cùng
-                  đội ngũ KOL hiệu quả nhất.
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Bộ lọc thông minh
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Kiểm soát danh sách đơn theo trạng thái và thời gian.
                 </p>
               </div>
+              <Space size="middle" className="flex flex-wrap">
+                <Button
+                  icon={<RotateCcw size={16} />}
+                  onClick={handleResetFilters}
+                  className="!h-11 !rounded-xl !border-slate-200 !bg-white hover:!border-indigo-500/60 hover:!text-indigo-600"
+                >
+                  Đặt lại
+                </Button>
+                <Button
+                  icon={<RefreshCcw size={16} />}
+                  onClick={() => refetchHistoryBookingPackage?.()}
+                  loading={isGetHistoryBookingBackage}
+                  className="!h-11 !rounded-xl !border-transparent !bg-indigo-500 !text-white hover:!bg-indigo-600"
+                >
+                  Làm mới
+                </Button>
+              </Space>
+            </div>
 
-              <div className="self-start rounded-2xl border border-white/40 bg-white/70 px-6 py-4 shadow-inner shadow-slate-900/5">
-                <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                  <Sparkles size={18} className="text-indigo-500" />
-                  <span>Cập nhật lúc: {formatDateTime(new Date())}</span>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  Dùng danh sách dưới đây để kiểm tra nhanh các yêu cầu gần đây.
-                </p>
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleFilterSubmit}
+              className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-12"
+            >
+              <Form.Item
+                label="Trạng thái booking"
+                name="status"
+                className="lg:col-span-4"
+              >
+                <Select
+                  placeholder="Chọn trạng thái"
+                  allowClear
+                  options={PACKAGE_STATUS_FILTER_OPTIONS}
+                  className="w-full"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Ngày tạo"
+                name="createdRange"
+                className="lg:col-span-4"
+              >
+                <RangePicker
+                  className="w-full"
+                  placeholder={["Từ ngày", "Đến ngày"]}
+                />
+              </Form.Item>
+
+              <div className="md:col-span-2 lg:col-span-12 flex flex-wrap justify-end gap-3">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<Search size={16} />}
+                  className="!h-11 !rounded-xl !bg-slate-900 !px-6 hover:!bg-slate-800"
+                >
+                  Áp dụng bộ lọc
+                </Button>
               </div>
-            </div>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {summaryCards.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <div
-                    key={card.key}
-                    className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/90 p-5 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_70px_-35px_rgba(79,70,229,0.45)]"
-                  >
-                    <div
-                      className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
-                    />
-                    <div className="relative flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 transition-colors duration-300 group-hover:text-white/80">
-                        {card.label}
-                      </span>
-                      <span className="rounded-full bg-slate-900/5 p-2 text-slate-600 transition-colors duration-300 group-hover:bg-white/20 group-hover:text-white">
-                        <Icon size={18} />
-                      </span>
-                    </div>
-                    <div className="relative mt-3 text-3xl font-semibold text-slate-900 transition-colors duration-300 group-hover:text-white">
-                      {card.value}
-                    </div>
-                    {card.caption ? (
-                      <p className="relative mt-2 text-xs text-slate-500 transition-colors duration-300 group-hover:text-white/90">
-                        {card.caption}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+            </Form>
           </div>
-        </section> */}
+        </section>
 
+        {/* SECTION DANH SÁCH ĐƠN */}
         <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/90 shadow-[0_40px_80px_-50px_rgba(79,70,229,0.5)] backdrop-blur">
           <div className="relative p-4 sm:p-6">
             <div className="flex flex-col gap-3 border-b border-slate-200/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
@@ -294,12 +661,27 @@ const HistoryBookingPackagePage = () => {
                   {data.map((record) => {
                     const key =
                       record?.id ?? record?.campaignId ?? Math.random();
-                    const statusMeta = resolvePackageStatus(record?.status);
+                    const campaignId = record?.campaignId ?? record?.id;
+                    const campaignStatusSource =
+                      record?.campaignStatus ??
+                      record?.status ??
+                      record?.bookingStatus;
+
+                    const statusMeta =
+                      resolvePackageStatus(campaignStatusSource);
+
                     const kolNames = Array.isArray(record?.kols)
                       ? record.kols
                           .map((kol) => kol?.displayName)
                           .filter(Boolean)
                       : [];
+
+                    const liveNames = Array.isArray(record?.lives)
+                      ? record.lives
+                          .map((live) => live?.displayName)
+                          .filter(Boolean)
+                      : [];
+
                     return (
                       <article
                         key={key}
@@ -330,13 +712,10 @@ const HistoryBookingPackagePage = () => {
                             color="purple"
                             className="rounded-full px-3 py-1 text-sm font-medium"
                           >
-                            Gói: {record?.packageName ?? "--"}
+                            Gói {record?.packageName ?? "--"}
                           </Tag>
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-                            {composeBudgetRange(
-                              record?.budgetMin,
-                              record?.budgetMax
-                            )}
+                            {composeBudgetRange(record?.targetPrice)}
                           </span>
                         </div>
 
@@ -352,10 +731,26 @@ const HistoryBookingPackagePage = () => {
                           </div>
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">
-                              Số KOL tham gia
+                              Số Host Chính tham gia
                             </span>
                             <span className="text-right font-semibold text-indigo-600">
                               {kolNames.length}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số Trợ LIVE tham gia
+                            </span>
+                            <span className="text-right font-semibold text-indigo-600">
+                              {liveNames.length}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Mục tiêu chiến dịch
+                            </span>
+                            <span className="text-right font-semibold text-indigo-600">
+                              {record?.objective ?? "--"}
                             </span>
                           </div>
                         </div>
@@ -363,11 +758,24 @@ const HistoryBookingPackagePage = () => {
                         {kolNames.length ? (
                           <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                             <span className="font-semibold text-slate-700">
-                              Danh sách KOL:
+                              Danh sách Host Chính:
                             </span>{" "}
                             {kolNames.join(", ")}
                           </div>
                         ) : null}
+
+                        {liveNames.length ? (
+                          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <span className="font-semibold text-slate-700">
+                              Danh sách Trợ LIVE:
+                            </span>{" "}
+                            {liveNames.join(", ")}
+                          </div>
+                        ) : null}
+
+                        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                          {renderBookingActions(record)}
+                        </div>
                       </article>
                     );
                   })}
@@ -399,6 +807,38 @@ const HistoryBookingPackagePage = () => {
             </div>
           </div>
         </section>
+
+        {/* MODAL TỪ CHỐI HỢP ĐỒNG */}
+        <Modal
+          centered
+          title="Từ chối hợp đồng"
+          open={isRejectModalOpen}
+          onOk={handleRejectSubmit}
+          onCancel={handleRejectModalCancel}
+          okText="Từ chối hợp đồng"
+          cancelText="Hủy"
+          maskClosable={!rejectContractMutation.isPending}
+          confirmLoading={rejectContractMutation.isPending}
+        >
+          <p className="mb-4 text-sm text-slate-600">
+            Nhập lý do từ chối cho chiến dịch{" "}
+            <span className="font-semibold text-slate-900">
+              {rejectCampaignName}
+            </span>
+            .
+          </p>
+          <Input.TextArea
+            rows={4}
+            maxLength={1000}
+            showCount
+            value={rejectReason}
+            onChange={handleRejectReasonChange}
+            placeholder="Ví dụ: Điều khoản chưa phù hợp với ngân sách..."
+          />
+          {rejectReasonError ? (
+            <p className="mt-2 text-sm text-red-500">{rejectReasonError}</p>
+          ) : null}
+        </Modal>
       </div>
     </div>
   );

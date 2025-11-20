@@ -191,7 +191,7 @@ const BlogDetailPage = () => {
           </Stack>
         </Stack>
 
-        {blog?.thumbnail?.trim() && (
+        {/* {blog?.thumbnail?.trim() && (
           <Box
             component="img"
             src={blog.thumbnail}
@@ -204,7 +204,7 @@ const BlogDetailPage = () => {
               maxHeight: "100%",
             }}
           />
-        )}
+        )} */}
 
         <Box
           // sx={{
@@ -245,6 +245,48 @@ const BlogDetailPage = () => {
           //     marginBottom: 1,
           //   },
           // }}
+          component="article"
+          sx={{
+            mt: 1,
+            color: "#0f172a",
+            lineHeight: 1.8,
+            fontSize: 16,
+
+            // Headings trong nội dung
+            "& h1, & h2, & h3, & h4, & h5, & h6": {
+              fontWeight: 800,
+              lineHeight: 1.25,
+              // mt: 4,
+              // mb: 1.5,
+              color: "#0f172a",
+              textTransform: "none",
+            },
+            "& h2": { fontSize: 24, color: "#dc2626" },
+            "& h3": { fontSize: 20, color: "#dc2626" },
+
+            // ĐOẠN QUAN TRỌNG – khôi phục hiển thị list
+            "& ul, & ol": {
+              pl: "1.5rem",
+              mb: 2,
+              listStylePosition: "outside",
+            },
+            "& ul": { listStyleType: "disc" },
+            "& ol": { listStyleType: "decimal" },
+            "& li": {
+              // một số reset đặt display khác -> đảm bảo block
+              display: "list-item",
+            },
+
+            // Đoạn văn & chữ đậm
+            "& strong": { color: "#111827" },
+
+            // Link
+            "& a": {
+              color: "#2563eb",
+              textDecoration: "underline",
+              "&:hover": { color: "#1d4ed8" },
+            },
+          }}
           dangerouslySetInnerHTML={{ __html: contentHtml }}
         />
       </Stack>

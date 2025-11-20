@@ -483,6 +483,10 @@ const MySingleBookingRequests = () => {
         typeof values.bankName === "string" ? values.bankName.trim() : "";
       const bankNumber =
         typeof values.bankNumber === "string" ? values.bankNumber.trim() : "";
+      const ownerName =
+        typeof values.ownerName === "string" ? values.ownerName.trim() : "";
+      const reason =
+        typeof values.reason === "string" ? values.reason.trim() : "";
       const selectedBank = bankOptions.find(
         (option) => option.value === bankName
       );
@@ -495,6 +499,8 @@ const MySingleBookingRequests = () => {
       const requestPayload = {
         bankName,
         bankNumber,
+        ownerName,
+        reason,
       };
 
       if (bankShortName) {
@@ -824,7 +830,7 @@ const MySingleBookingRequests = () => {
                   className="w-full"
                 />
               </Form.Item>
-              <Form.Item
+              {/* <Form.Item
                 label="Thời gian thực hiện"
                 name="executionRange"
                 className="lg:col-span-4"
@@ -834,7 +840,7 @@ const MySingleBookingRequests = () => {
                   className="w-full"
                   placeholder={["Bắt đầu", "Kết thúc"]}
                 />
-              </Form.Item>
+              </Form.Item> */}
               <Form.Item
                 label="Ngày tạo"
                 name="createdRange"

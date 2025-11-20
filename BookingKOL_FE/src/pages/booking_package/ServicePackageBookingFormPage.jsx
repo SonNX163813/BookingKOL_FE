@@ -9,6 +9,7 @@ import {
   Select,
   message,
   Descriptions,
+  Upload,
 } from "antd";
 import dayjs from "dayjs";
 import { Crown, Megaphone, CheckCircle } from "lucide-react";
@@ -596,10 +597,14 @@ const ServicePackageBookingFormPage = () => {
             />
           </Form.Item>
 
-          <Form.Item label="Tệp đính kèm chiến dịch">
+          {/* <Form.Item
+            label="Tệp đính kèm chiến dịch"
+            rules={[{ required: true, message: "Vui lòng chọn tệp tải lên!" }]}
+          >
             <div className="space-y-2">
               <input
                 type="file"
+                required
                 accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
                 onChange={handleAttachmentChange}
                 className="block w-full cursor-pointer rounded-xl border border-dashed border-indigo-200 bg-white px-4 py-3 text-sm text-slate-600 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-indigo-300"
@@ -613,6 +618,28 @@ const ServicePackageBookingFormPage = () => {
                 </p>
               )}
             </div>
+          </Form.Item> */}
+          <Form.Item
+            label="Tệp đính kèm chiến dịch"
+            name="attachment"
+            rules={[{ required: true, message: "Vui lòng chọn tệp tải lên!" }]}
+            valuePropName="fileList"
+            getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+          >
+            <Upload
+              beforeUpload={() => false} // không upload tự động
+              accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
+              maxCount={1}
+              showUploadList={false} // ẩn danh sách file mặc định
+            >
+              <div
+                className="block w-full cursor-pointer rounded-xl border border-dashed border-indigo-200 bg-white px-4 py-3 text-sm text-slate-600 
+                 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-indigo-600 
+                 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-indigo-300"
+              >
+                Chọn tệp tải lên
+              </div>
+            </Upload>
           </Form.Item>
 
           {selectedPackage === "vip" && (

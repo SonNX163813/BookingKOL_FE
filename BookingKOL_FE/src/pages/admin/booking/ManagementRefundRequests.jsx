@@ -234,13 +234,13 @@ const ManagementRefundRequests = () => {
 
   const columns = useMemo(
     () => [
-      {
-        title: "Mã hoàn tiền",
-        dataIndex: "id",
-        key: "id",
-        render: (value) => value ?? "--",
-        // width: 220,
-      },
+      // {
+      //   title: "Mã hoàn tiền",
+      //   dataIndex: "id",
+      //   key: "id",
+      //   render: (value) => value ?? "--",
+      //   // width: 220,
+      // },
       {
         title: "Số tiền",
         dataIndex: "amount",
@@ -277,6 +277,13 @@ const ManagementRefundRequests = () => {
         // width: 160,
       },
       {
+        title: "Tên tài khoản",
+        dataIndex: "ownerName",
+        key: "ownerName",
+        render: (value) => value || "--",
+        // width: 160,
+      },
+      {
         title: "Ngân hàng",
         dataIndex: "bankName",
         key: "bankName",
@@ -284,9 +291,16 @@ const ManagementRefundRequests = () => {
         width: 300,
       },
       {
-        title: "Lý do",
+        title: "Lý do hoàn tiền",
         dataIndex: "reason",
         key: "reason",
+        render: (value) => value || "--",
+        width: 300,
+      },
+      {
+        title: "Mô tả thêm",
+        dataIndex: "description",
+        key: "description",
         render: (value) => value || "--",
         width: 300,
       },
@@ -469,8 +483,11 @@ const ManagementRefundRequests = () => {
                       </Tag>
                     )}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Lý do">
+                  <Descriptions.Item label="Lý do hoàn tiền">
                     {refundDetail.reason || "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Mô tả thêm">
+                    {refundDetail.description || "--"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Ngày tạo">
                     {formatDateTime(refundDetail.createdAt)}
@@ -487,6 +504,9 @@ const ManagementRefundRequests = () => {
                   </Descriptions.Item>
                   <Descriptions.Item label="Số tài khoản">
                     {refundDetail.bankNumber || "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Tên tài khoản">
+                    {refundDetail.ownerName || "--"}
                   </Descriptions.Item>
                 </Descriptions>
 

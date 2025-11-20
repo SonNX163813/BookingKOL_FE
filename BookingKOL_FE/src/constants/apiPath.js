@@ -37,10 +37,6 @@ export const API_PATHS = {
     deleteCategory: "/v1/categories",
     patchCategory: "/v1/categories",
   },
-  BOOKINGPACKAGE: {
-    createBookingPackage: "/v1/bookings/packages",
-    getHistoryBookingPackage: "/v1/user/bookings",
-  },
   BOOKING_CAMPAIGN: {
     list: "/v1/admin/bookings", // nếu Swagger của bạn KHÔNG có /v1 thì đổi thành "/admin/bookings"
     create: "/v1/admin/bookings/create",
@@ -91,5 +87,8 @@ export const API_PATHS = {
       `v1/admin/blogs/thumbnail/upload/${encodeURIComponent(blogId)}`,
     adminThumbnailDelete: (blogId) =>
       `v1/admin/blogs/thumbnail/delete/${encodeURIComponent(blogId)}`,
+  },
+  DASHBOARD: {
+    adminSummary: "/v1/admin/dashboard/summary",
   },
 };

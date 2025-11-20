@@ -64,6 +64,21 @@ export const CLIENT_API_PATHS = {
         worktimeId
       )}`,
   },
+  BOOKINGPACKAGE: {
+    createBookingPackage: "/v1/bookings/packages",
+    getHistoryBookingPackage: "/v1/user/bookings",
+    signContract: "/v1/user/contracts/sign",
+    rejectContract: "/v1/user/contracts/reject",
+    cancelContract: "/v1/user/contracts/cancel",
+    getUserCampaignDetail: (campaignId) =>
+      `/v1/bookings/user/${encodeURIComponent(campaignId)}`,
+    initiateCampaignPayment: (paymentScheduleId) =>
+      `/v1/user/contracts/payment/${encodeURIComponent(paymentScheduleId)}`,
+    checkCampaignPaymentStatus: (contractPaymentScheduleId) =>
+      `/v1/payment/check/campaign/${encodeURIComponent(
+        contractPaymentScheduleId
+      )}`,
+  },
   COURSE: {
     getAll: "/v1/courses/all",
     getDetail: "/v1/courses",
@@ -76,8 +91,9 @@ export const CLIENT_API_PATHS = {
     history: "/v1/user/course/history/all",
   },
   BLOG: {
-    getAll: "/v1/blogs/all",
-    getDetail: (blogId) => `/v1/blogs/detail/${encodeURIComponent(blogId)}`,
+    getAll: "/v1/public/blogs/all",
+    getDetail: (blogId) =>
+      `/v1/public/blogs/detail/${encodeURIComponent(blogId)}`,
   },
 
   SERVICE_PACKAGES: {

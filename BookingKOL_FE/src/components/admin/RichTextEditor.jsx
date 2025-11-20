@@ -190,7 +190,7 @@ import "tinymce/plugins/advlist";
 import "tinymce/plugins/anchor";
 import "tinymce/plugins/autolink";
 import "tinymce/plugins/autoresize";
-import "tinymce/plugins/autosave";
+// import "tinymce/plugins/autosave";
 import "tinymce/plugins/charmap";
 import "tinymce/plugins/code";
 import "tinymce/plugins/codesample";
@@ -229,7 +229,7 @@ const PLUGINS = [
   "anchor",
   "autolink",
   "autoresize",
-  "autosave",
+  // "autosave",
   "charmap",
   "code",
   "codesample",
@@ -289,8 +289,8 @@ const RichTextEditor = ({
       image_advtab: true,
       image_caption: true,
       table_default_attributes: { border: "1" },
-      content_style:
-        "body { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }",
+      // content_style:
+      //   "body { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }",
     };
 
     if (imageUploadHandler) {

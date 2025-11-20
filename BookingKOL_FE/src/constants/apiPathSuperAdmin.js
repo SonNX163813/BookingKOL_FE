@@ -9,4 +9,11 @@ export const API_PATHS_SUPERADMIN = {
     create: "/v1/superadmin/merchant/create",
     activate: "/v1/superadmin/merchant/active",
   },
+  DASHBOARD: {
+    superAdminSummary: "/v1/superadmin/dashboard/summary",
+  },
+  TRANSACTION: {
+    getAll: "/v1/superadmin/transactions/all",
+    getDetail: "/v1/superadmin/transactions/detail",
+  },
 };
