@@ -7,6 +7,8 @@ export const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hủy", value: "CANCELLED" },
   { label: "Đã thanh toán", value: "PAID" },
   { label: "Đợi hoàn tiền", value: "WAIT_FOR_REFUND" },
+  { label: "Đang đàm phán", value: "NEGOTIATING" },
+  { label: "Đã chấp nhận", value: "ACCEPTED" },
 ];
 
 export const BOOKING_STATUS_LABEL = {

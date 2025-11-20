@@ -830,7 +830,7 @@ const MySingleBookingRequests = () => {
                   className="w-full"
                 />
               </Form.Item>
-              <Form.Item
+              {/* <Form.Item
                 label="Thời gian thực hiện"
                 name="executionRange"
                 className="lg:col-span-4"
@@ -840,7 +840,7 @@ const MySingleBookingRequests = () => {
                   className="w-full"
                   placeholder={["Bắt đầu", "Kết thúc"]}
                 />
-              </Form.Item>
+              </Form.Item> */}
               <Form.Item
                 label="Ngày tạo"
                 name="createdRange"

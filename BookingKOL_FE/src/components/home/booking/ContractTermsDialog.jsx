@@ -15,6 +15,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { renderAsync } from "docx-preview";
 import { BOOKING_FLOW_STYLE } from "../../../constants/bookingFlowTextStyles";
+import { BOOKING_STATUS_LABEL } from "../../../constants/mySingleBookingStatuses";
 
 const ContractDocPreview = ({ url }) => {
   const previewRef = useRef(null);
@@ -113,10 +114,12 @@ const ContractTermsDialog = ({
   onClose,
   onScroll,
   formatCurrency,
+  acknowledgementRequired = true,
 }) => {
   const hasContract = Boolean(contract);
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const requireAcknowledgement = acknowledgementRequired !== false;
   const externalScrollHandler =
     contract?.id && typeof onScroll === "function"
       ? onScroll(contract.id)
@@ -124,10 +127,20 @@ const ContractTermsDialog = ({
 
   useEffect(() => {
     if (!open) {
-      setHasReachedBottom(false);
-      setAcceptedTerms(false);
+      setHasReachedBottom(!requireAcknowledgement);
+      setAcceptedTerms(!requireAcknowledgement);
+      return;
     }
-  }, [open, contract?.id]);
+
+    if (!requireAcknowledgement) {
+      setHasReachedBottom(true);
+      setAcceptedTerms(true);
+      return;
+    }
+
+    setHasReachedBottom(false);
+    setAcceptedTerms(false);
+  }, [open, contract?.id, requireAcknowledgement]);
 
   const handleContentScroll = (event) => {
     if (externalScrollHandler) {
@@ -148,14 +161,14 @@ const ContractTermsDialog = ({
       : (value) => value ?? "";
 
   const handleDialogClose = (event, reason) => {
-    if (!acceptedTerms) return;
+    if (requireAcknowledgement && !acceptedTerms) return;
     if (typeof onClose === "function") {
       onClose(event, reason);
     }
   };
 
   const handleCloseClick = () => {
-    if (!acceptedTerms) return;
+    if (requireAcknowledgement && !acceptedTerms) return;
     if (typeof onClose === "function") {
       onClose();
     }
@@ -192,7 +205,7 @@ const ContractTermsDialog = ({
           <IconButton
             onClick={handleCloseClick}
             aria-label="Đóng"
-            disabled={!acceptedTerms}
+            disabled={requireAcknowledgement && !acceptedTerms}
             sx={{
               position: "absolute",
               right: 12,
@@ -246,7 +259,7 @@ const ContractTermsDialog = ({
                         color: BOOKING_FLOW_STYLE.accent,
                       }}
                     >
-                      {contract.status}
+                      {BOOKING_STATUS_LABEL?.[contract.status] || contract.status}
                     </Box>
                   </Typography>
 
@@ -304,59 +317,67 @@ const ContractTermsDialog = ({
             </Box>
           </DialogContent>
 
-          {hasReachedBottom ? (
-            <Box
-              sx={{
-                px: 3,
-                py: 2,
-                borderTop: `1px solid ${BOOKING_FLOW_STYLE.border}`,
-                backgroundColor: "#f5f7ff",
-              }}
-            >
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={acceptedTerms}
-                    onChange={(event) => setAcceptedTerms(event.target.checked)}
-                    sx={{ color: BOOKING_FLOW_STYLE.accent }}
-                  />
-                }
-                label={
-                  <Typography sx={{ fontWeight: 500 }}>
-                    Tôi đã đọc và chấp nhận điều khoản hợp đồng.
-                  </Typography>
-                }
-              />
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                px: 3,
-                py: 2,
-                borderTop: `1px solid ${BOOKING_FLOW_STYLE.border}`,
-                backgroundColor: "#fff9f0",
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{ color: BOOKING_FLOW_STYLE.textSecondary, fontWeight: 500 }}
+          {requireAcknowledgement ? (
+            hasReachedBottom ? (
+              <Box
+                sx={{
+                  px: 3,
+                  py: 2,
+                  borderTop: `1px solid ${BOOKING_FLOW_STYLE.border}`,
+                  backgroundColor: "#f5f7ff",
+                }}
               >
-                Kéo xuống cuối tài liệu để xuất hiện phần xác nhận điều khoản.
-              </Typography>
-            </Box>
-          )}
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={acceptedTerms}
+                      onChange={(event) =>
+                        setAcceptedTerms(event.target.checked)
+                      }
+                      sx={{ color: BOOKING_FLOW_STYLE.accent }}
+                    />
+                  }
+                  label={
+                    <Typography sx={{ fontWeight: 500 }}>
+                      Tôi đã đọc và đồng ý với các điều khoản trong hợp đồng.
+                    </Typography>
+                  }
+                />
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  px: 3,
+                  py: 2,
+                  borderTop: `1px solid ${BOOKING_FLOW_STYLE.border}`,
+                  backgroundColor: "#fff9f0",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: BOOKING_FLOW_STYLE.textSecondary,
+                    fontWeight: 500,
+                  }}
+                >
+                  Vui lòng cuộn xuống cuối hợp đồng để có thể đồng ý với các
+                  điều khoản trong hợp đồng.
+                </Typography>
+              </Box>
+            )
+          ) : null}
 
           <DialogActions sx={{ px: 3, py: 2, backgroundColor: "#fafbff" }}>
             <Button
               onClick={handleCloseClick}
-              disabled={!acceptedTerms}
+              disabled={requireAcknowledgement && !acceptedTerms}
               sx={{
                 textTransform: "none",
                 fontWeight: 600,
                 borderRadius: "12px",
               }}
             >
-              Đóng
+              {requireAcknowledgement ? "Đồng ý" : "Đóng"}
             </Button>
           </DialogActions>
         </>
