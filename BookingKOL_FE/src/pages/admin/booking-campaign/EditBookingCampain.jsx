@@ -4,30 +4,96 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
+  Alert,
   Button,
   Card,
   Col,
   ConfigProvider,
   DatePicker,
+  Descriptions,
   Form,
+  Grid,
   Input,
   InputNumber,
   Row,
   Select,
   Space,
+  Tag,
+  Typography,
   message,
-  Alert,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
-import { ArrowLeft, Save, CalendarRange, XCircle } from "lucide-react";
+import { ArrowLeft, Save, CalendarRange, XCircle, Layers } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
 import { getKolProfiles, resolveAvatarUrl } from "../../../services/kol/KolAPI";
 import { adminCreateBookingFromCampaign } from "../../../services/admin/AdminBookingFromCampaignAPI";
 import { adminCreateContractPayments } from "../../../services/admin/AdminContractPaymentAPI";
+import { adminGetCampaignInfo } from "../../../services/admin/AdminBookingCampaignAPI";
 
 dayjs.locale("vi");
 
+const { Text } = Typography;
+const { useBreakpoint } = Grid;
+
 const REPEAT_TYPE_PLACEHOLDER =
   "Ví dụ: Hàng tuần, 2 buổi/tuần, mỗi T2-T4 trong 3 tuần...";
+
+/** Format helpers */
+const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
+  if (!value) return "--";
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format(pattern) : String(value);
+};
+
+const formatDate = (value, pattern = "DD/MM/YYYY") => {
+  if (!value) return "--";
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format(pattern) : String(value);
+};
+
+const formatCurrency = (value, currency = "VND") => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  const numeric = typeof value === "number" ? value : Number.parseFloat(value);
+  if (Number.isNaN(numeric)) return "--";
+
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(numeric);
+};
+
+const normalizeStatus = (status) =>
+  status && typeof status === "string" ? status.toUpperCase() : status;
+
+const formatArrayText = (items) => {
+  if (!Array.isArray(items) || !items.length) return "--";
+  return items
+    .map((x) => x?.displayName || x?.name || x?.id)
+    .filter(Boolean)
+    .join(", ");
+};
+
+// mapping nhỏ cho status campaign (giống trang Detail)
+const CAMPAIGN_STATUS_LABEL = {
+  REQUESTED: "Đang yêu cầu",
+  NEGOTIATING: "Đang thương lượng",
+  APPROVED: "Đã phê duyệt",
+  REJECTED: "Đã từ chối",
+  COMPLETED: "Hoàn tất",
+};
+
+const CAMPAIGN_STATUS_COLOR = {
+  REQUESTED: "gold",
+  NEGOTIATING: "orange",
+  APPROVED: "green",
+  REJECTED: "red",
+  COMPLETED: "blue",
+};
 
 /** Tag render: avatar nhỏ + tên, không hiện id */
 const createTagRender = (options) => (tagProps) => {
@@ -87,12 +153,35 @@ export default function EditBookingCampain() {
   const [liveOptions, setLiveOptions] = useState([]);
   const [loadingKols, setLoadingKols] = useState(false);
 
+  const screens = useBreakpoint();
+
   const row = location.state || {};
 
   // ✅ Ưu tiên campaignId từ state (BE trả), fallback từ query
   const campaignIdFromState = row.campaignId;
   const campaignIdFromQuery = search.get("campaignId");
   const campaignId = campaignIdFromState || campaignIdFromQuery || "";
+
+  // ====== Lấy thông tin Campaign /campaigns/{id} cho "Thông tin yêu cầu từ khách hàng" ======
+  const {
+    data: campaignResponse,
+    isLoading: isLoadingCampaign,
+    error: errorCampaign,
+  } = useQuery({
+    queryKey: ["admin-campaign-info", campaignId],
+    queryFn: () => adminGetCampaignInfo(campaignId),
+    enabled: !!campaignId,
+    retry: false,
+  });
+
+  const campaignInfo = campaignResponse?.data ?? campaignResponse ?? null;
+  const normalizedStatus = normalizeStatus(campaignInfo?.status);
+  const statusLabel =
+    CAMPAIGN_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
+  const responseTimestamp = campaignResponse?.timestamp ?? null;
+
+  // 🚫 Campaign đang NEGOTIATING thì không cho nhập / tạo booking
+  const isNegotiating = normalizedStatus === "NEGOTIATING";
 
   // Prefill
   useEffect(() => {
@@ -270,7 +359,8 @@ export default function EditBookingCampain() {
     };
   }, [watchInstallments, watchContractAmountRaw]);
 
-  const disableSave = sumState.sumMismatch;
+  // 🚫 Nếu campaign đang NEGOTIATING → cũng disable luôn nút submit
+  const disableSave = sumState.sumMismatch || isNegotiating;
 
   // ====== CHẶN PHÍM & PASTE CHO "Số lần thanh toán" (chỉ 1–5) ======
   const handleTotalInstallmentsKeyDown = (e) => {
@@ -303,6 +393,11 @@ export default function EditBookingCampain() {
 
   const onSubmit = async (values) => {
     try {
+      // 🚫 Double-check: nếu campaign đang NEGOTIATING thì không cho tạo
+      if (isNegotiating) {
+        return;
+      }
+
       if (!values.campaignId) {
         throw new Error("Campaign ID là bắt buộc và phải là campaignId");
       }
@@ -457,9 +552,107 @@ export default function EditBookingCampain() {
           </Space>
         </div>
 
+        {/* ✅ Thông tin yêu cầu từ khách hàng (từ /campaigns/{id}) */}
+        <Card
+          className="shadow-sm"
+          bordered={false}
+          title={
+            <Space>
+              <Layers size={18} />
+              <span>Thông tin yêu cầu từ khách hàng</span>
+            </Space>
+          }
+          loading={isLoadingCampaign}
+        >
+          {errorCampaign ? (
+            <Alert
+              type="error"
+              showIcon
+              message="Không thể tải thông tin yêu cầu từ khách hàng."
+              description={String(errorCampaign?.message ?? "")}
+            />
+          ) : campaignInfo ? (
+            <>
+              <Space size="middle" wrap className="justify-between w-full mb-4">
+                <Tag
+                  color={CAMPAIGN_STATUS_COLOR[normalizedStatus] ?? "default"}
+                >
+                  {statusLabel}
+                </Tag>
+
+                {responseTimestamp && (
+                  <Text type="secondary">
+                    Thời gian phản hồi: {formatDateTime(responseTimestamp)}
+                  </Text>
+                )}
+              </Space>
+
+              <Descriptions
+                bordered
+                size="middle"
+                column={screens.lg ? 3 : screens.md ? 2 : 1}
+                styles={{ label: { width: 180 } }}
+              >
+                <Descriptions.Item label="Tên Campaign">
+                  {campaignInfo?.name ?? "--"}
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Người tạo (email)">
+                  <Text copyable>{campaignInfo?.createdBy ?? "--"}</Text>
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Mục tiêu" span={screens.lg ? 3 : 1}>
+                  <Text style={{ whiteSpace: "pre-wrap" }}>
+                    {campaignInfo?.objective ?? "--"}
+                  </Text>
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Giá mục tiêu">
+                  {formatCurrency(campaignInfo?.targetPrice)}
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Ngày bắt đầu">
+                  {formatDate(campaignInfo?.startDate)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày kết thúc">
+                  {formatDate(campaignInfo?.endDate)}
+                </Descriptions.Item>
+
+                <Descriptions.Item
+                  label="KOL tham gia"
+                  span={screens.lg ? 3 : 1}
+                >
+                  {formatArrayText(campaignInfo?.kols)}
+                </Descriptions.Item>
+
+                <Descriptions.Item
+                  label="Trợ Live tham gia"
+                  span={screens.lg ? 3 : 1}
+                >
+                  {formatArrayText(campaignInfo?.lives)}
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Tạo lúc">
+                  {formatDateTime(campaignInfo?.createdAt)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Cập nhật lúc">
+                  {formatDateTime(campaignInfo?.updatedAt)}
+                </Descriptions.Item>
+              </Descriptions>
+            </>
+          ) : (
+            <Text type="secondary">Không có dữ liệu campaign.</Text>
+          )}
+        </Card>
+
         {/* Form */}
         <Card bordered={false} className="shadow-sm">
-          <Form form={form} layout="vertical" onFinish={onSubmit}>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={onSubmit}
+            disabled={isNegotiating} // 🚫 không cho nhập khi NEGOTIATING
+          >
             <Row gutter={[16, 16]}>
               {/* Campaign ID */}
               <Col xs={24} md={12}>
@@ -907,17 +1100,18 @@ export default function EditBookingCampain() {
             <div className="mt-4 flex items-center gap-3">
               <Button
                 htmlType="submit"
-                type="link"
-                className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-                style={{ backgroundColor: "#10B981" }}
-                title={
-                  disableSave
-                    ? "Tổng các đợt ≠ Giá trị hợp đồng — vui lòng điều chỉnh"
-                    : "Lưu booking & thanh toán"
-                }
+                type="primary"
+                icon={<Save size={16} />}
                 disabled={disableSave}
+                title={
+                  isNegotiating
+                    ? "Campaign đang thương lượng, không thể tạo yêu cầu booking"
+                    : disableSave
+                    ? "Tổng các đợt ≠ Giá trị hợp đồng — vui lòng điều chỉnh"
+                    : "Tạo yêu cầu booking từ campaign này"
+                }
               >
-                <Save size={18} />
+                Tạo yêu cầu booking
               </Button>
               <Button onClick={() => navigate(-1)}>Hủy</Button>
             </div>

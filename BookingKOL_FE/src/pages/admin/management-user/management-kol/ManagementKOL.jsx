@@ -1,3 +1,5 @@
+// src/pages/admin/management-user/management-kol/ManagementKOL.jsx
+
 import {
   Search,
   Trash2,
@@ -7,10 +9,9 @@ import {
   CalendarRange,
   CalendarDays,
   CheckCircle2,
-  BarChart3, // ✅ Icon thống kê
+  BarChart3, // Icon thống kê
+  Star, // Icon xem đánh giá
 } from "lucide-react";
-
-// src/pages/admin/management-user/management-kol/ManagementKOL.jsx
 
 import {
   Button,
@@ -20,7 +21,6 @@ import {
   Pagination,
   Table,
   Tag,
-  Rate,
   Tooltip,
   Image,
   Select,
@@ -67,7 +67,6 @@ const ManagementKOL = () => {
       searchValue // -> BE param 'search' (displayName)
     );
 
-  const dataResponse = ResponseGetAllKol?.data?.content;
   const totalElements = ResponseGetAllKol?.data?.totalElements ?? 0;
 
   useEffect(() => {
@@ -174,6 +173,16 @@ const ManagementKOL = () => {
     navigate(`/admin/kols/${record?.id}/metrics`);
   };
 
+  // 👉 Nút xem đánh giá / feedback của KOL
+  const handleOpenReviews = (record) => {
+    if (!record?.id) return;
+    navigate(`/admin/feedbacks/kol/${record.id}`, {
+      state: {
+        kolName: record.displayName, // 👈 truyền displayName sang
+      },
+    });
+  };
+
   const handleSearch = (values) => {
     const vSearch = values?.search?.trim() || undefined;
     const raw = values?.minBookingPrice;
@@ -247,13 +256,17 @@ const ManagementKOL = () => {
       key: "categories",
       dataIndex: "categories",
       render: (categories = []) => (
-        <>
+        <div className="flex flex-wrap gap-2">
           {categories.map((cat) => (
-            <Tag color="blue" key={cat.id}>
-              <div className="!h-10 !flex !items-center">{cat.name}</div>
+            <Tag
+              color="blue"
+              key={cat.id}
+              className="!h-8 !flex !items-center !mb-1"
+            >
+              {cat.name}
             </Tag>
           ))}
-        </>
+        </div>
       ),
     },
     {
@@ -266,21 +279,10 @@ const ManagementKOL = () => {
           : "N/A",
     },
     {
-      title: "Đánh giá",
-      key: "overallRating",
-      dataIndex: "overallRating",
-      render: (rating, record) => (
-        <span>
-          <Rate disabled value={Number(rating) || 0} /> (
-          {record?.feedbackCount ?? 0})
-        </span>
-      ),
-    },
-    {
       title: "Thao tác",
       key: "action",
       align: "center",
-      width: 400,
+      width: 480,
       render: (record) => (
         <div className="w-full flex justify-center gap-2">
           {/* Xem portfolio */}
@@ -327,6 +329,16 @@ const ManagementKOL = () => {
               className="!h-10 !bg-cyan-600 !text-white !border-none hover:!bg-cyan-700 transition-all"
             >
               <BarChart3 size={18} className="font-semibold" />
+            </Button>
+          </Tooltip>
+
+          {/* Xem đánh giá */}
+          <Tooltip title="Xem đánh giá / phản hồi">
+            <Button
+              onClick={() => handleOpenReviews(record)}
+              className="!h-10 !bg-rose-600 !text-white !border-none hover:!bg-rose-700 transition-all"
+            >
+              <Star size={18} className="font-semibold" />
             </Button>
           </Tooltip>
 

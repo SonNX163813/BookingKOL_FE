@@ -33,19 +33,31 @@ dayjs.locale("vi");
 const { RangePicker } = DatePicker;
 
 /* ====== STATUS mapping cho Campaign ====== */
-const CAMPAIGN_STATUS_OPTIONS = [
-  { label: "Đang yêu cầu", value: "REQUESTED" },
-  { label: "Đã phê duyệt", value: "APPROVED" },
-  { label: "Đã từ chối", value: "REJECTED" },
-  { label: "Hoàn tất", value: "COMPLETED" },
-];
+const CAMPAIGN_STATUS_LABEL = {
+  DRAFT: "Hủy bỏ",
+  REQUESTED: "Đang yêu cầu",
+  NEGOTIATING: "Đang thương lượng",
+  APPROVED: "Đã phê duyệt",
+  ACCEPTED: "Đã phê duyệt", // hoặc "Đã chấp nhận"
+  IN_PROGRESS: "Đang triển khai",
+  REJECTED: "Đã từ chối",
+  COMPLETED: "Hoàn tất",
+};
 
 const CAMPAIGN_STATUS_COLOR = {
+  DRAFT: "default",
   REQUESTED: "gold",
+  NEGOTIATING: "orange",
   APPROVED: "green",
+  ACCEPTED: "green",
+  IN_PROGRESS: "geekblue",
   REJECTED: "red",
   COMPLETED: "blue",
 };
+
+const CAMPAIGN_STATUS_OPTIONS = Object.entries(CAMPAIGN_STATUS_LABEL).map(
+  ([value, label]) => ({ value, label })
+);
 
 /* ====== helpers ====== */
 const fmt = (v, pattern = "DD/MM/YYYY") =>
@@ -79,7 +91,7 @@ export default function ManagementBookingCampaigns() {
 
   const [filters, setFilters] = useState({
     search: undefined,
-    status: undefined,
+    status: undefined, // campaignStatus
     packageType: undefined,
     executionRange: undefined,
   });
@@ -123,8 +135,9 @@ export default function ManagementBookingCampaigns() {
     const qEnd = hasRange ? filters.executionRange[1] : null;
 
     return serverContent.filter((r) => {
-      if (status && String(r?.status || "").toUpperCase() !== status)
-        return false;
+      const rowStatus = String(r?.campaignStatus || "").toUpperCase();
+      if (status && rowStatus !== status) return false;
+
       if (
         packageType &&
         String(r?.packageType || "").toLowerCase() !== packageType
@@ -194,21 +207,36 @@ export default function ManagementBookingCampaigns() {
 
   const goEdit = useCallback(
     (r) => {
-      // ✅ PHẢI DÙNG campaignId từ API, KHÔNG dùng id
       const campaignId = r?.campaignId;
-      if (!campaignId) {
-        // Nếu không có campaignId thì không điều hướng (hoặc log ra để debug)
-        // console.error("Row không có campaignId:", r);
-        return;
-      }
+      if (!campaignId) return;
 
       navigate(
         `/admin/bookings/create?campaignId=${encodeURIComponent(campaignId)}`,
         {
-          // truyền đầy đủ row + campaignId chuẩn
           state: {
             ...r,
             campaignId,
+          },
+        }
+      );
+    },
+    [navigate]
+  );
+
+  // Nút chỉnh sửa Campaign / lịch
+  const goEditSchedule = useCallback(
+    (r) => {
+      const campaignId = r?.campaignId || r?.id || r?.code;
+      if (!campaignId) return;
+
+      navigate(
+        `/admin/management-booking-campaigns/${encodeURIComponent(
+          campaignId
+        )}/schedule`,
+        {
+          state: {
+            campaignId,
+            campaignName: r?.campaignName,
           },
         }
       );
@@ -255,18 +283,15 @@ export default function ManagementBookingCampaigns() {
           v ? String(v).toUpperCase() : r?.packageName || "--",
       },
       {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        width: 150,
+        title: "Trạng thái Campaign",
+        dataIndex: "campaignStatus",
+        key: "campaignStatus",
+        width: 170,
         render: (s) => {
           const k = String(s || "").toUpperCase();
-          const cfg = CAMPAIGN_STATUS_OPTIONS.find((o) => o.value === k);
-          return (
-            <Tag color={CAMPAIGN_STATUS_COLOR[k] || "default"}>
-              {cfg?.label || k || "--"}
-            </Tag>
-          );
+          const label = CAMPAIGN_STATUS_LABEL[k] || k || "--";
+          const color = CAMPAIGN_STATUS_COLOR[k] || "default";
+          return <Tag color={color}>{label}</Tag>;
         },
       },
       {
@@ -280,31 +305,45 @@ export default function ManagementBookingCampaigns() {
         title: "Thao tác",
         key: "actions",
         fixed: "right",
-        width: 150,
-        render: (_, r) => (
-          <Space>
-            <Button
-              type="link"
-              onClick={() => goDetail(r)}
-              className="!h-10 !w-10 !p-0 !rounded-xl !bg-blue-600 !text-white !border-none hover:!bg-blue-700 flex items-center justify-center"
-              title="Xem"
-            >
-              <Eye size={18} />
-            </Button>
-            <Button
-              type="link"
-              onClick={() => goEdit(r)}
-              className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-              style={{ backgroundColor: "#10B981" }}
-              title="Tạo booking từ campaign"
-            >
-              <Pencil size={18} />
-            </Button>
-          </Space>
-        ),
+        width: 230,
+        render: (_, r) => {
+          return (
+            <Space>
+              <Button
+                type="link"
+                onClick={() => goDetail(r)}
+                className="!h-10 !w-10 !p-0 !rounded-xl !bg-blue-600 !text-white !border-none hover:!bg-blue-700 flex items-center justify-center"
+                title="Xem"
+              >
+                <Eye size={18} />
+              </Button>
+
+              {/* Luôn hiện nút lịch làm việc */}
+              <Button
+                type="link"
+                onClick={() => goEditSchedule(r)}
+                className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
+                style={{ backgroundColor: "#6366F1" }}
+                title="Chỉnh sửa Campaign / lịch"
+              >
+                <CalendarRange size={18} />
+              </Button>
+
+              <Button
+                type="link"
+                onClick={() => goEdit(r)}
+                className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
+                style={{ backgroundColor: "#10B981" }}
+                title="Tạo booking từ campaign"
+              >
+                <Pencil size={18} />
+              </Button>
+            </Space>
+          );
+        },
       },
     ],
-    [goDetail, goEdit]
+    [goDetail, goEdit, goEditSchedule]
   );
 
   return (
@@ -353,7 +392,7 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            <Form.Item label="Trạng thái" name="status">
+            <Form.Item label="Trạng thái Campaign" name="status">
               <Select
                 allowClear
                 placeholder="Chọn trạng thái"
