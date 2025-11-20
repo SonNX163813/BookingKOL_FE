@@ -32,7 +32,10 @@ import ManagementBlog from "../pages/admin/blog/ManagementBlog";
 import AdminBlogDetail from "../pages/admin/blog/AdminBlogDetail";
 import CreateBlog from "../pages/admin/blog/CreateBlog";
 
+import BookingCampaignSchedule from "../pages/admin/booking-campaign/BookingCampaignSchedule";
 import AdminKolLivestreamMetrics from "../pages/admin/management-user/management-kol/AdminKolLivestreamMetrics";
+
+import AdminKolFeedbackList from "../pages/admin/management-user/management-kol/AdminKolFeedbackList";
 
 export const routerAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -65,7 +68,14 @@ export const routerAdmin = [
         path: "management-booking-requests/:requestId",
         element: <BookingRequestDetail />,
       },
-
+      {
+        path: "management-booking-campaigns/:campaignId/schedule",
+        element: <BookingCampaignSchedule />,
+      },
+      {
+        path: "feedbacks/kol/:kolId",
+        element: <AdminKolFeedbackList />,
+      },
       { path: "management-course", element: <ManagementCourse /> },
       {
         path: "management-course-history",

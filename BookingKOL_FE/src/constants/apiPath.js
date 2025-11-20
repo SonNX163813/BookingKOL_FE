@@ -72,6 +72,12 @@ export const API_PATHS = {
     kolFreeTime: "/v1/availabilities/free-time", // + /{kolId}
     // Admin xem timeline (booking) của KOL
     kolTimeline: "/v1/availabilities/time-line/kol", // + /{kolId}
+    kolTimelineAll: "/v1/availabilities/time-line/kol/all", // list lịch rảnh của tất cả KOL (do dev đặt tên sai)
+  },
+  WORKTIME_ADMIN: {
+    create: "/v1/availabilities/admin/worktime/create",
+
+    getByBooking: "/v1/availabilities/admin/booking", // + /{bookingRequestId}
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",
@@ -91,5 +97,16 @@ export const API_PATHS = {
       `v1/admin/blogs/thumbnail/upload/${encodeURIComponent(blogId)}`,
     adminThumbnailDelete: (blogId) =>
       `v1/admin/blogs/thumbnail/delete/${encodeURIComponent(blogId)}`,
+  },
+  FEEDBACK_ADMIN: {
+    // GET /v1/admin/feedbacks/kol/{kolId}?page=&size=&minRating=&fromDate=&toDate=
+    getByKol: "/v1/admin/feedbacks/kol", // + /{kolId}
+    // PATCH /v1/admin/feedbacks/hide/{feedbackId}
+    hide: (feedbackId) =>
+      `/v1/admin/feedbacks/hide/${encodeURIComponent(feedbackId)}`,
+
+    // PATCH /v1/admin/feedbacks/show/{feedbackId}
+    show: (feedbackId) =>
+      `/v1/admin/feedbacks/show/${encodeURIComponent(feedbackId)}`,
   },
 };
