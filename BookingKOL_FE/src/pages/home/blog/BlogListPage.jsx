@@ -60,22 +60,8 @@ const BlogListPage = () => {
     loadBlogs(page);
   }, [loadBlogs, page]);
 
-  const featuredBlog = useMemo(
-    () => (blogs.length > 0 ? blogs[0] : null),
-    [blogs]
-  );
-  const sideBlogs = useMemo(
-    () => (blogs.length > 1 ? blogs.slice(1, 5) : []),
-    [blogs]
-  );
-  const hasBlogs = blogs.length > 0;
-
   const handleRetry = () => loadBlogs(page);
   const handlePageChange = (_event, value) => setPage(value - 1);
-  const totalPages = useMemo(
-    () => Math.max(pageMeta.totalPages, hasBlogs ? 1 : 0),
-    [pageMeta.totalPages, hasBlogs]
-  );
   const handleSelectBlog = useCallback(
     (blogId) => blogId && navigate(`/blog/${blogId}`),
     [navigate]
@@ -126,6 +112,18 @@ const BlogListPage = () => {
 
     return arr;
   }, [blogs, activeTab, sortBy]);
+
+  const featuredBlog = filteredSortedBlogs[0] ?? null;
+  const sideBlogs = useMemo(
+    () => filteredSortedBlogs.slice(1, 4),
+    [filteredSortedBlogs]
+  );
+  const gridBlogs = filteredSortedBlogs;
+  const hasBlogs = filteredSortedBlogs.length > 0;
+  const totalPages = useMemo(
+    () => Math.max(pageMeta.totalPages, hasBlogs ? 1 : 0),
+    [pageMeta.totalPages, hasBlogs]
+  );
 
   return (
     <Box
@@ -179,7 +177,7 @@ const BlogListPage = () => {
                   />
 
                   <BlogGridSection
-                    blogs={filteredSortedBlogs}
+                    blogs={gridBlogs}
                     onSelectBlog={handleSelectBlog}
                     page={page}
                     totalPages={totalPages}

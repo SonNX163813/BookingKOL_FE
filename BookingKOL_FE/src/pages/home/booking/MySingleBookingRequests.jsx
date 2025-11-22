@@ -985,7 +985,7 @@ const MySingleBookingRequests = () => {
                               {locationLabel}
                             </span>
                           </div>
-                          <div className="flex items-start justify-between gap-3">
+                          {/* <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Thanh toán</span>
                             <Tag
                               color={paymentMeta.color}
@@ -993,7 +993,7 @@ const MySingleBookingRequests = () => {
                             >
                               {paymentMeta.label}
                             </Tag>
-                          </div>
+                          </div> */}
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Tổng tiền</span>
                             <span className="text-right font-semibold text-indigo-600">

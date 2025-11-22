@@ -350,7 +350,15 @@ const ManagementTransactions = () => {
                 />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col
+              xs={24}
+              md={8}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <div className="flex item-center gap-3">
                 <Button type="primary" htmlType="submit">
                   Áp dụng bộ lọc

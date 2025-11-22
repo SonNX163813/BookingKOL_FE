@@ -238,19 +238,9 @@ const HistoryBookingPackagePage = () => {
       if (!contractId || !bookingRequestId || isAnyActionLoading) {
         return;
       }
-      Modal.confirm({
-        title: "Chấp nhận hợp đồng",
-        content: `Bạn chắc chắn muốn chấp nhận hợp đồng cho chiến dịch "${
-          record?.campaignName ?? "--"
-        }"?`,
-        okText: "Chấp nhận",
-        cancelText: "Hủy",
-        centered: true,
-        onOk: () =>
-          signContractMutation.mutateAsync({
-            contractId,
-            bookingRequestId,
-          }),
+      signContractMutation.mutate({
+        contractId,
+        bookingRequestId,
       });
     },
     [isAnyActionLoading, signContractMutation]
@@ -626,7 +616,7 @@ const HistoryBookingPackagePage = () => {
               )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            {/* <div className="mt-6 flex justify-end">
               <Button
                 icon={<RefreshCcw size={16} />}
                 onClick={handleRefresh}
@@ -635,7 +625,7 @@ const HistoryBookingPackagePage = () => {
               >
                 Làm mới
               </Button>
-            </div>
+            </div> */}
 
             <div className="mt-4">
               {isInitialLoading ? (
@@ -819,6 +809,10 @@ const HistoryBookingPackagePage = () => {
           cancelText="Hủy"
           maskClosable={!rejectContractMutation.isPending}
           confirmLoading={rejectContractMutation.isPending}
+          styles={{
+            content: { borderRadius: 20 },
+            header: { borderRadius: "20px 20px 0 0" },
+          }}
         >
           <p className="mb-4 text-sm text-slate-600">
             Nhập lý do từ chối cho chiến dịch{" "}
@@ -834,6 +828,11 @@ const HistoryBookingPackagePage = () => {
             value={rejectReason}
             onChange={handleRejectReasonChange}
             placeholder="Ví dụ: Điều khoản chưa phù hợp với ngân sách..."
+            style={{
+              borderRadius: 12,
+              padding: "10px 12px",
+              marginBottom: 20,
+            }}
           />
           {rejectReasonError ? (
             <p className="mt-2 text-sm text-red-500">{rejectReasonError}</p>

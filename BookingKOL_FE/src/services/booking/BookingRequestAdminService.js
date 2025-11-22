@@ -60,3 +60,11 @@ export const getWorktimeLivestreamMetrics = async (worktimeId) => {
     url: API_PATHS.BOOKING_REQUEST.getWorktimeLivestreamMetrics(worktimeId),
   });
 };
+
+export const exportBookingRequestsExcel = async (type) => {
+  return await get({
+    url: API_PATHS.BOOKING_REQUEST.exportExcel,
+    params: { type },
+    config: { responseType: "blob" },
+  });
+};

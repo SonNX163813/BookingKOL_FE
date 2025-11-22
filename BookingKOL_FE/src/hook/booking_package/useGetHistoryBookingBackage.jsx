@@ -10,7 +10,8 @@ export const useGetHistoryBookingBackage = (page, size, filters = {}) => {
     queryKey: ["useGetHistoryBookingBackage", page, size, filters],
     queryFn: () => getHistoryBookingPackage({ page, size, filters }),
     retry: false,
-    refetchOnMount: false,
+    // Always refetch when entering the page so data is fresh
+    refetchOnMount: "always",
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   });
