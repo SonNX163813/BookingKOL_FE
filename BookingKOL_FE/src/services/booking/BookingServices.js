@@ -127,6 +127,18 @@ export const cancelUserContract = async (bookingRequestId) => {
   });
 };
 
+export const cancelUserBookingRequest = async (bookingRequestId) => {
+  if (!bookingRequestId) {
+    throw new Error("bookingRequestId is required to cancel booking request");
+  }
+
+  return post({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.cancelBookingRequest(
+      bookingRequestId
+    ),
+  });
+};
+
 export const initiateCampaignPayment = async (paymentScheduleId) => {
   if (!paymentScheduleId) {
     throw new Error("paymentScheduleId is required to create payment");

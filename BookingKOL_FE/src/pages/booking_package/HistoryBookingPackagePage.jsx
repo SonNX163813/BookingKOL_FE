@@ -31,6 +31,7 @@ import {
 } from "../../constants/mySingleBookingStatuses";
 import {
   cancelUserContract,
+  cancelUserBookingRequest,
   rejectUserContract,
   signUserContract,
 } from "../../services/booking/BookingServices";
@@ -91,8 +92,10 @@ const HistoryBookingPackagePage = () => {
   const [rejectModalInfo, setRejectModalInfo] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectReasonError, setRejectReasonError] = useState("");
+  const [cancellingContractId, setCancellingContractId] = useState(null);
   const [cancellingBookingRequestId, setCancellingBookingRequestId] =
     useState(null);
+  const [modal, modalContextHolder] = Modal.useModal();
 
   const {
     isGetHistoryBookingBackage,
@@ -188,6 +191,16 @@ const HistoryBookingPackagePage = () => {
       refetchHistoryBookingPackage?.();
     },
     onSettled: () => {
+      setCancellingContractId(null);
+    },
+  });
+
+  const cancelBookingRequestMutation = useMutation({
+    mutationFn: cancelUserBookingRequest,
+    onSuccess: () => {
+      refetchHistoryBookingPackage?.();
+    },
+    onSettled: () => {
       setCancellingBookingRequestId(null);
     },
   });
@@ -228,8 +241,12 @@ const HistoryBookingPackagePage = () => {
   const isSigningContract = signContractMutation.isPending;
   const isRejectingContract = rejectContractMutation.isPending;
   const isCancellingContract = cancelContractMutation.isPending;
+  const isCancellingBookingRequest = cancelBookingRequestMutation.isPending;
   const isAnyActionLoading =
-    isSigningContract || isRejectingContract || isCancellingContract;
+    isSigningContract ||
+    isRejectingContract ||
+    isCancellingContract ||
+    isCancellingBookingRequest;
 
   const handleAcceptContract = useCallback(
     (record) => {
@@ -291,12 +308,12 @@ const HistoryBookingPackagePage = () => {
   const handleCancelBookingRequest = useCallback(
     (record) => {
       const bookingRequestId = record?.bookingRequestId;
-      if (!bookingRequestId || isCancellingContract) {
+      if (!bookingRequestId || isCancellingBookingRequest) {
         return;
       }
-      Modal.confirm({
-        title: "Hủy đơn đặt gói",
-        content: `Bạn có chắc chắn muốn hủy chiến dịch "${
+      modal.confirm({
+        title: "Hủy đơn",
+        content: `Bạn có chắc nhắn muốn hủy đơn cho chiến dịch "${
           record?.campaignName ?? "--"
         }"? Thao tác này không thể hoàn tác.`,
         okText: "Hủy đơn",
@@ -305,11 +322,35 @@ const HistoryBookingPackagePage = () => {
         okButtonProps: { danger: true },
         onOk: () => {
           setCancellingBookingRequestId(bookingRequestId);
+          return cancelBookingRequestMutation.mutateAsync(bookingRequestId);
+        },
+      });
+    },
+    [cancelBookingRequestMutation, isCancellingBookingRequest, modal]
+  );
+
+  const handleCancelContract = useCallback(
+    (record) => {
+      const bookingRequestId = record?.bookingRequestId;
+      if (!bookingRequestId || isCancellingContract) {
+        return;
+      }
+      modal.confirm({
+        title: "Hủy hợp đồng",
+        content: `Bạn có chắc chắn hủy hợp đồng cho chiến dịch "${
+          record?.campaignName ?? "--"
+        }"? Thao tác này không thể hoàn tác.`,
+        okText: "Hủy hợp đồng",
+        cancelText: "Giữ lại",
+        centered: true,
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setCancellingContractId(bookingRequestId);
           return cancelContractMutation.mutateAsync(bookingRequestId);
         },
       });
     },
-    [cancelContractMutation, isCancellingContract]
+    [cancelContractMutation, isCancellingContract, modal]
   );
 
   const renderBookingActions = useCallback(
@@ -325,20 +366,42 @@ const HistoryBookingPackagePage = () => {
           ? campaignStatusSource.toUpperCase()
           : "";
 
-      const shouldDisplayActions =
-        bookingRequestId &&
-        normalizedCampaignStatus &&
-        !["COMPLETED", "CANCELLED"].includes(normalizedCampaignStatus);
+      const isTerminalStatus = ["COMPLETED", "CANCELLED"].includes(
+        normalizedCampaignStatus
+      );
+
+      // const kolWorktimes = resolveKolWorktimes(record);
+      // const hasKolSchedule = kolWorktimes.length > 0;
+
+      const canCancelBookingRequest =
+        normalizedCampaignStatus === "ACCEPTED" && bookingRequestId;
+      //  &&
+      // hasKolSchedule;
+
+      const canCancelContract =
+        !isTerminalStatus &&
+        !["NEGOTIATING", "CANCELLED", "REJECTED"].includes(
+          normalizedCampaignStatus
+        ) &&
+        record?.contractId &&
+        bookingRequestId;
 
       const canManageContract =
+        !isTerminalStatus &&
         normalizedCampaignStatus === "NEGOTIATING" &&
         record?.contractId &&
         bookingRequestId;
 
-      const isCancellingThisRow =
-        isCancellingContract && cancellingBookingRequestId === bookingRequestId;
+      const hasNonViewActions =
+        canManageContract || canCancelContract || canCancelBookingRequest;
 
-      if (!shouldDisplayActions) {
+      const isCancellingContractThisRow =
+        isCancellingContract && cancellingContractId === bookingRequestId;
+      const isCancellingBookingRequestThisRow =
+        isCancellingBookingRequest &&
+        cancellingBookingRequestId === bookingRequestId;
+
+      if (!canViewDetail && !hasNonViewActions) {
         return null;
       }
 
@@ -358,76 +421,99 @@ const HistoryBookingPackagePage = () => {
                 }}
                 onClick={() => handleAcceptContract(record)}
                 loading={isSigningContract}
-                disabled={isRejectingContract || isCancellingContract}
+                disabled={
+                  isRejectingContract ||
+                  isCancellingContract ||
+                  isCancellingBookingRequest
+                }
               >
                 Chấp nhận hợp đồng
               </Button>
               <Button
                 danger
-                // className="!h-11 !rounded-xl !border-red-200 !bg-red-50 !px-5 !text-red-600 hover:!border-red-300 hover:!bg-red-100"
                 style={{
                   height: "2.5rem",
                   borderRadius: "16px",
-                  backgroundColor: "#fef2f2", // bg-red-50
-                  // paddingLeft: "1.25rem", // px-5
-                  // paddingRight: "1.25rem",
-                  color: "#dc2626", // text-red-600
+                  backgroundColor: "#fef2f2",
+                  color: "#dc2626",
                   fontWeight: 600,
                 }}
                 onClick={() => openRejectModal(record)}
-                disabled={isSigningContract || isCancellingContract}
+                disabled={
+                  isSigningContract ||
+                  isCancellingContract ||
+                  isCancellingBookingRequest
+                }
               >
                 Từ chối hợp đồng
               </Button>
             </>
           ) : null}
-          <Button
-            // className="!h-11 !rounded-xl !border-slate-200 !bg-white !px-5 hover:!border-indigo-500/60 hover:!text-indigo-600"
-            onClick={() => handleViewCampaignDetail(campaignId)}
-            disabled={!canViewDetail}
-            style={{
-              color: "#ffffff",
-              height: "2.5rem",
-              textTransform: "none",
-              fontWeight: 600,
-              borderRadius: "16px",
-              backgroundColor: BOOKING_FLOW_STYLE.accent,
-            }}
-          >
-            Xem chi tiết
-          </Button>
-          <Button
-            danger
-            // className="!h-11 !rounded-xl !border-red-200 !bg-red-600 !px-5 !font-semibold !text-white hover:!bg-red-500"
-            style={{
-              height: "2.5rem",
-              borderRadius: "16px",
-              backgroundColor: "#dc2626",
-              fontWeight: 600,
-              color: "#ffffff",
-            }}
-            onClick={() => handleCancelBookingRequest(record)}
-            disabled={
-              !bookingRequestId ||
-              isCancellingContract ||
-              isSigningContract ||
-              isRejectingContract
-            }
-            loading={isCancellingThisRow}
-          >
-            Hủy đơn
-          </Button>
+          {canViewDetail ? (
+            <Button
+              onClick={() => handleViewCampaignDetail(campaignId)}
+              disabled={!canViewDetail}
+              style={{
+                color: "#ffffff",
+                height: "2.5rem",
+                textTransform: "none",
+                fontWeight: 600,
+                borderRadius: "16px",
+                backgroundColor: BOOKING_FLOW_STYLE.accent,
+              }}
+            >
+              Xem chi tiết
+            </Button>
+          ) : null}
+          {canCancelContract ? (
+            <Button
+              danger
+              style={{
+                height: "2.5rem",
+                borderRadius: "16px",
+                backgroundColor: "#dc2626",
+                fontWeight: 600,
+                color: "#ffffff",
+              }}
+              onClick={() => handleCancelContract(record)}
+              disabled={!bookingRequestId || isAnyActionLoading}
+              loading={isCancellingContractThisRow}
+            >
+              Hủy hợp đồng
+            </Button>
+          ) : null}
+          {canCancelBookingRequest ? (
+            <Button
+              danger
+              style={{
+                height: "2.5rem",
+                borderRadius: "16px",
+                backgroundColor: "#dc2626",
+                fontWeight: 600,
+                color: "#ffffff",
+              }}
+              onClick={() => handleCancelBookingRequest(record)}
+              disabled={!bookingRequestId || isAnyActionLoading}
+              loading={isCancellingBookingRequestThisRow}
+            >
+              Hủy đơn
+            </Button>
+          ) : null}
         </div>
       );
     },
     [
       handleAcceptContract,
       openRejectModal,
+      handleCancelContract,
       handleCancelBookingRequest,
       handleViewCampaignDetail,
       isSigningContract,
       isRejectingContract,
       isCancellingContract,
+      isCancellingBookingRequest,
+      isAnyActionLoading,
+      cancellingContractId,
       cancellingBookingRequestId,
     ]
   );
@@ -503,6 +589,7 @@ const HistoryBookingPackagePage = () => {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden py-12 flex items-center justify-center">
+      {modalContextHolder}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 rounded-full bg-sky-400/10 blur-3xl" />
