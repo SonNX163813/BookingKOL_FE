@@ -6,6 +6,11 @@ const ensureNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const ensureNumberOrNull = (value) => {
+  if (value === null || value === undefined) return null;
+  return ensureNumber(value);
+};
+
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
 const normalizeStats = (stats) => {
@@ -31,6 +36,72 @@ const normalizeStats = (stats) => {
 };
 
 const normalizeList = (list, mapper) => ensureArray(list).map(mapper);
+
+const normalizeDashboardAnalysis = (analysis) => {
+  const buildSection = (section, fields) => {
+    const safeSection =
+      section && typeof section === "object" ? section : Object.create(null);
+    return fields.reduce(
+      (acc, key) => ({ ...acc, [key]: ensureNumberOrNull(safeSection[key]) }),
+      Object.create(null)
+    );
+  };
+
+  const charts =
+    analysis?.charts && typeof analysis.charts === "object"
+      ? analysis.charts
+      : {};
+
+  return {
+    financialOverview: buildSection(analysis?.financialOverview, [
+      "totalRevenue",
+      "totalOrders",
+      "avgOrderValue",
+      "totalGpm",
+      "totalProductsSold",
+    ]),
+    engagementOverview: buildSection(analysis?.engagementOverview, [
+      "totalViews",
+      "pcuPeak",
+      "totalComments",
+      "avgViewDurationSeconds",
+    ]),
+    conversionFunnel: buildSection(analysis?.conversionFunnel, [
+      "totalViews",
+      "clickRate",
+      "addToCartShortTerm",
+      "buyers",
+      "viewerToBuyerRate",
+    ]),
+    qualityScore: buildSection(analysis?.qualityScore, [
+      "retentionRate",
+      "earlyEngagementRate",
+      "revenuePerView",
+    ]),
+    charts: {
+      revenueByPlatform: normalizeList(
+        charts.revenueByPlatform,
+        (item = {}) => ({
+          platform: item.platform ?? "",
+          value: ensureNumber(item.value),
+          percentage: ensureNumber(item.percentage),
+        })
+      ),
+      durationByPlatform: normalizeList(
+        charts.durationByPlatform,
+        (item = {}) => ({
+          platform: item.platform ?? "",
+          value: ensureNumber(item.value),
+          percentage: ensureNumber(item.percentage),
+        })
+      ),
+      revenueOverTime: normalizeList(charts.revenueOverTime, (item = {}) => ({
+        timePoint: item.timePoint ?? "",
+        value: ensureNumber(item.value),
+      })),
+    },
+  };
+};
 
 const normalizeSummary = (rawData) => {
   const summary = rawData && typeof rawData === "object" ? rawData : {};
@@ -99,6 +170,8 @@ const normalizeSummary = (rawData) => {
       totalRevenue: ensureNumber(item.totalRevenue),
       date: item.date ?? "",
     })),
+    dashboardAnalysis: normalizeDashboardAnalysis(summary.dashboardAnalysis),
+    timestamp: summary.timestamp ?? summary.timeStamp ?? null,
   };
 };
 

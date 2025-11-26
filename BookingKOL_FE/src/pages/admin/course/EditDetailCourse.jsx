@@ -44,8 +44,11 @@ const addDots = (digits) =>
 export default function EditDetailCourse() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isLoadingGetDetailCourse, ResponseGetDetailCourse } =
-    useGetDetailCourse(id);
+  const {
+    isLoadingGetDetailCourse,
+    ResponseGetDetailCourse,
+    refetchDetailCourse,
+  } = useGetDetailCourse(id);
 
   const data = ResponseGetDetailCourse?.data;
 
@@ -179,8 +182,6 @@ export default function EditDetailCourse() {
       : "—";
 
   // ===== Actions =====
-  const hardReload = () => window.location.reload();
-
   const onSave = async () => {
     try {
       const values = await form.validateFields();
@@ -199,7 +200,7 @@ export default function EditDetailCourse() {
         description: values.description?.trim(),
       });
       message.success("Đã lưu thay đổi khoá học.");
-      hardReload();
+      await refetchDetailCourse();
     } catch (e) {
       if (!e?.errorFields) {
         console.error(e);
@@ -220,7 +221,7 @@ export default function EditDetailCourse() {
       setUploadingImg(true);
       await adminCourseMediasUpload(id, file, { fileType: "IMAGE" });
       message.success("Đã tải ảnh lên.");
-      hardReload();
+      await refetchDetailCourse();
     } catch (err) {
       console.error(err);
       message.error(err?.response?.data?.message || "Tải ảnh thất bại.");
@@ -239,7 +240,7 @@ export default function EditDetailCourse() {
       setUploadingVid(true);
       await adminCourseMediasUpload(id, file, { fileType: "VIDEO" });
       message.success("Đã tải video lên.");
-      hardReload();
+      await refetchDetailCourse();
     } catch (err) {
       console.error(err);
       message.error(err?.response?.data?.message || "Tải video thất bại.");
@@ -253,7 +254,7 @@ export default function EditDetailCourse() {
     try {
       await adminRemoveCourseMedias(id, [usageId]); // PUT + query fileUsageIds
       message.success("Đã xoá media.");
-      hardReload();
+      await refetchDetailCourse();
     } catch (e) {
       console.error(e);
       message.error(e?.response?.data?.message || "Xoá media thất bại.");
@@ -267,7 +268,7 @@ export default function EditDetailCourse() {
       setSettingCoverUsageId(fileId); // chỉ để hiển thị loading, có thể tách state riêng nếu muốn
       await adminCourseSetCoverImage(id, fileId); // gửi đúng fileId
       message.success("Đã đặt ảnh bìa.");
-      hardReload();
+      await refetchDetailCourse();
     } catch (e) {
       console.error(e);
       message.error(e?.response?.data?.message || "Đặt ảnh bìa thất bại.");
@@ -277,7 +278,7 @@ export default function EditDetailCourse() {
   };
 
   const handleBack = () => {
-    window.location.assign("/admin/management-course"); // reload list
+    navigate("/admin/management-course"); // reload list
   };
 
   return (
@@ -470,7 +471,7 @@ export default function EditDetailCourse() {
             <div className="border rounded-xl p-3 bg-gray-50 border-gray-300">
               <div className="flex items-center justify-between mb-2">
                 <Text strong>Thông tin khoá học</Text>
-                <Tag color={data?.isAvailable ? "green" : "default"}>
+                <Tag color={data?.isAvailable ? "green" : "red"}>
                   {data?.isAvailable ? "Có sẵn" : "Không hoạt động"}
                 </Tag>
               </div>
