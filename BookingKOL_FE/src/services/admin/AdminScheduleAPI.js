@@ -1,5 +1,5 @@
 // src/services/admin/AdminScheduleAPI.js
-import { get } from "../../config/axios-config";
+import { get, post } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 import dayjs from "dayjs";
 
@@ -313,4 +313,82 @@ export const adminFetchKolDayDuties = async ({
     }));
 
   return { goalList };
+};
+/**
+ * POST (Admin) /v1/availabilities/admin/schedule
+ * Admin tạo lịch rảnh + lịch làm (workTimes) giống hệt nhau cho KOL.
+ */
+export const adminRegisterKolSchedule = async ({ kolId, shifts, signal }) => {
+  if (!kolId) throw new Error("kolId is required");
+  if (!Array.isArray(shifts) || shifts.length === 0)
+    throw new Error("`shifts` must be a non-empty array");
+
+  const url = S_PATHS.adminSchedule;
+  const results = [];
+
+  for (let i = 0; i < shifts.length; i++) {
+    const s = shifts[i];
+    if (!s.start || !s.end) {
+      throw new Error(`Thiếu thời gian cho ca ${i + 1}`);
+    }
+
+    const start = dayjs(s.start);
+    const end = dayjs(s.end);
+
+    if (!start.isValid() || !end.isValid() || !end.isAfter(start)) {
+      throw new Error(`Khoảng thời gian ca ${i + 1} không hợp lệ`);
+    }
+
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
+
+    const body = {
+      kolId,
+      startAt: startISO,
+      endAt: endISO,
+      status: "AVAILABLE",
+      note: "",
+      workTimes: [
+        {
+          startAt: startISO,
+          endAt: endISO,
+          status: "AVAILABLE",
+          note: "",
+        },
+      ],
+    };
+
+    try {
+      const res = await post({
+        url,
+        data: body,
+        config: signal ? { signal } : undefined,
+      });
+      results.push(res?.data ?? res);
+    } catch (e) {
+      const httpStatus = e?.response?.status;
+      const payload = e?.response?.data;
+
+      const beMsg =
+        payload?.message ||
+        (Array.isArray(payload?.messages) && payload.messages[0]) ||
+        "";
+
+      const label = `${start.format("HH:mm")}–${end.format(
+        "HH:mm"
+      )}, ${start.format("DD/MM/YYYY")}`;
+
+      const friendly =
+        beMsg ||
+        `Ca ${i + 1} (${label}) bị trùng với lịch khác hoặc không hợp lệ.`;
+
+      const err = new Error(friendly);
+      err.status = httpStatus || 400;
+      err.conflict = httpStatus === 400 || httpStatus === 409;
+      err.conflictShift = { index: i, startAt: startISO, endAt: endISO };
+      throw err;
+    }
+  }
+
+  return results;
 };

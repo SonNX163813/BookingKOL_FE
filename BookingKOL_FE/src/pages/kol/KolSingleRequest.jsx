@@ -48,12 +48,17 @@ const toUpper = (v) => normalize(v).toUpperCase();
 const getStatus = (r) =>
   toUpper(r?.status ?? r?.bookingStatus ?? r?.state ?? r?.requestStatus ?? "");
 
+/* Lấy requestId dùng chung */
+const getRequestId = (record) =>
+  record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
+
 /* Helpers */
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format(pattern) : "--";
 };
+
 const composeExecutionTime = (rec) => {
   const start = rec?.startAt ?? rec?.startTime ?? rec?.executionStart ?? null;
   const end = rec?.endAt ?? rec?.endTime ?? rec?.executionEnd ?? null;
@@ -72,6 +77,7 @@ const composeExecutionTime = (rec) => {
       )}`
     : `${s} -> ${e}`;
 };
+
 const pickValue = (record, keys, fallback = "--") => {
   for (const k of keys) {
     const v = record?.[k];
@@ -129,7 +135,7 @@ export default function KolSingleRequest() {
     (typeof raw?.total === "number" && raw.total) ||
     0;
 
-  // Ẩn DRAFT/EXPIRED ở UI
+  // Ẩn DRAFT/EXPIRED/CANCELLED/REFUNDED ở UI
   const dataSource = useMemo(
     () =>
       serverList.filter(
@@ -189,17 +195,19 @@ export default function KolSingleRequest() {
         align: "center",
         width: 220,
         render: (record) => {
-          const requestId =
-            record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
+          const requestId = getRequestId(record);
           const normalized = getStatus(record);
           const isInProgress = normalized === "IN_PROGRESS";
           return (
             <div className="w-full flex justify-center gap-3">
               <Button
-                onClick={() =>
+                onClick={(e) => {
+                  e.stopPropagation(); // ⛔ không cho click lan lên row
                   requestId &&
-                  navigate(`/kol/booking/single-requests/detail/${requestId}`)
-                }
+                    navigate(
+                      `/kol/booking/single-requests/detail/${requestId}`
+                    );
+                }}
                 className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
               >
                 <Eye size={18} className="font-semibold" />
@@ -207,11 +215,12 @@ export default function KolSingleRequest() {
               {isInProgress && requestId && (
                 <Button
                   className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
-                  onClick={() =>
+                  onClick={(e) => {
+                    e.stopPropagation(); // ⛔ không cho click lan lên row
                     navigate(
                       `/kol/booking/single-requests/detail/${requestId}?metrics=1`
-                    )
-                  }
+                    );
+                  }}
                 >
                   <BarChart3 size={18} />
                 </Button>
@@ -256,9 +265,7 @@ export default function KolSingleRequest() {
           loading={isLoading}
           pagination={false}
           rowKey={(r) =>
-            r?.id ??
-            r?.requestId ??
-            r?.bookingRequestId ??
+            getRequestId(r) ??
             r?.requestNumber ??
             r?.code ??
             r?.bookingCode ??
@@ -266,6 +273,16 @@ export default function KolSingleRequest() {
           }
           scroll={{ x: "auto" }}
           locale={{ emptyText: "Không có booking hợp lệ trên trang này." }}
+          // 💡 Click bất kỳ chỗ nào trên row sẽ vào chi tiết
+          onRow={(record) => ({
+            onClick: () => {
+              const requestId = getRequestId(record);
+              if (requestId) {
+                navigate(`/kol/booking/single-requests/detail/${requestId}`);
+              }
+            },
+            style: { cursor: "pointer" },
+          })}
         />
 
         <div className="!my-4 py-5">

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # ĐẢM BẢO cài devDependencies (đừng set NODE_ENV=production ở đây)
-RUN npm ci
+RUN npm install
 
 # Copy code
 COPY . .

@@ -1,6 +1,6 @@
 // src/services/admin/AdminLivestreamMetricAPI.js
 import { get } from "../../config/axios-config";
-import { API_PATHS } from "../../constants/apiPath"; // chỉnh đúng path file của bạn
+import { API_PATHS } from "../../constants/apiPath";
 
 export async function adminGetKolLivestreamMetricsByKolId(
   kolId,
@@ -21,6 +21,8 @@ export async function adminGetKolLivestreamMetricsByKolId(
     config: {
       params: { page, size },
       ...(signal ? { signal } : {}),
+      // 👇 Không cho axios interceptor hiển thị toast lỗi cho API này
+      skipErrorToast: true,
     },
   });
 
