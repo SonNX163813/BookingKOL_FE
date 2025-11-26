@@ -1,9 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import dayjs from "dayjs";
+import { DatePicker } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import ReactECharts from "echarts-for-react";
 import { useSuperAdminDashboardSummary } from "../../../hook/superadmin/dashboard/useSuperAdminDashboardSummary";
-import { BOOKING_STATUS_LABEL } from "../../../constants/mySingleBookingStatuses";
+import {
+  BOOKING_STATUS_LABEL,
+  STATUS_TAG_COLOR,
+} from "../../../constants/mySingleBookingStatuses";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -24,13 +28,31 @@ const formatDateTime = (value) =>
 const ensureNumber = (value) => (Number.isFinite(value) ? value : 0);
 const normalizeStatusKey = (status) =>
   status ? status.toString().trim().toUpperCase() : "";
-const formatStatusLabel = (status) => {
-  const key = normalizeStatusKey(status);
-  if (!key) return "N/A";
-  return BOOKING_STATUS_LABEL[key] || status || key;
+const PIE_COLORS = ["#4f8dfd", "#f6c358", "#f97316", "#22c55e", "#a855f7"];
+const { RangePicker } = DatePicker;
+
+// Map Ant Design tag colors to hex codes for chart usage.
+const TAG_COLOR_TO_HEX = {
+  default: "#cbd5e1",
+  processing: "#4f8dfd",
+  cyan: "#06b6d4",
+  success: "#22c55e",
+  blue: "#3b82f6",
+  gold: "#fbbf24",
+  magenta: "#d946ef",
+  error: "#ef4444",
+  purple: "#a855f7",
+  volcano: "#fb923c",
+  warning: "#f59e0b",
 };
 
-const PIE_COLORS = ["#4f8dfd", "#f6c358", "#f97316", "#22c55e", "#a855f7"];
+const getStatusColor = (statusKey, fallbackIndex = 0) => {
+  const tagColor = STATUS_TAG_COLOR[statusKey];
+  if (tagColor && TAG_COLOR_TO_HEX[tagColor]) {
+    return TAG_COLOR_TO_HEX[tagColor];
+  }
+  return PIE_COLORS[fallbackIndex % PIE_COLORS.length];
+};
 
 const EMPTY_ANALYSIS = {
   financialOverview: {
@@ -110,23 +132,13 @@ const DashboardSkeleton = () => (
         />
       ))}
     </div>
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      <div className="h-80 bg-slate-100 rounded-2xl xl:col-span-2" />
-      <div className="h-80 bg-slate-100 rounded-2xl" />
-    </div>
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <div className="h-80 bg-slate-100 rounded-2xl" />
-      <div className="h-80 bg-slate-100 rounded-2xl" />
-    </div>
   </div>
 );
 
 const MetricCard = ({ label, value, formatter, gradient, icon }) => (
   <div
     className="relative overflow-hidden rounded-2xl text-white p-5 shadow-sm"
-    style={{
-      background: gradient,
-    }}
+    style={{ background: gradient }}
   >
     <div className="flex items-start justify-between">
       <div className="text-2xl">{icon}</div>
@@ -148,18 +160,84 @@ const ChartCard = ({ title, subtitle, children, className = "" }) => (
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-semibold text-slate-900">{title}</p>
-        {subtitle ? (
+        {subtitle && (
           <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
-        ) : null}
+        )}
       </div>
     </div>
     <div className="mt-4">{children}</div>
   </div>
 );
 
+const SimpleCard = ({ label, value, formatter }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col gap-1">
+    <p className="text-sm text-slate-500">{label}</p>
+    <p className="text-2xl font-semibold text-slate-900">
+      {formatter ? formatter(value) : value}
+    </p>
+  </div>
+);
+
+const DataTable = ({ columns, data, emptyText }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm text-left">
+        <thead>
+          <tr className="text-slate-500">
+            {columns.map((col) => (
+              <th key={col.key} className="py-2 pr-4 font-semibold">
+                {col.title}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.length ? (
+            data.map((row, idx) => (
+              <tr key={row.key || idx} className="border-t border-slate-100">
+                {columns.map((col) => (
+                  <td key={col.key} className="py-2 pr-4 text-slate-900">
+                    {col.render
+                      ? col.render(row[col.dataIndex], row)
+                      : row[col.dataIndex]}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td className="py-3 text-slate-400" colSpan={columns.length}>
+                {emptyText}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
 const SuperAdminDashBoard = () => {
+  const [dateRange, setDateRange] = useState(null);
+
+  const startDateParam = dateRange?.[0]
+    ? dayjs(dateRange[0]).startOf("day").toISOString()
+    : undefined;
+  const endDateParam = dateRange?.[1]
+    ? dayjs(dateRange[1]).endOf("day").toISOString()
+    : undefined;
+
   const { data, isLoading, isError, error, refetch, isFetching } =
-    useSuperAdminDashboardSummary();
+    useSuperAdminDashboardSummary(
+      {
+        startDate: startDateParam,
+        endDate: endDateParam,
+      },
+      {
+        // Initial load hits the base endpoint; range selection sends start/end.
+        enabled: true,
+      }
+    );
 
   const summary = data ?? EMPTY_SUMMARY;
   const analysis = summary.dashboardAnalysis || EMPTY_ANALYSIS;
@@ -209,17 +287,17 @@ const SuperAdminDashBoard = () => {
   });
 
   const platformPieOption = useMemo(() => {
-    const data = analysis.charts.revenueByPlatform;
+    const pieData = analysis.charts.revenueByPlatform;
     return {
       tooltip: {
         trigger: "item",
         formatter: ({ name, value, percent }) =>
-          `${name || "Không xác định"}<br/>${formatCurrency(value)} (${
+          `${name || "Khong xac dinh"}<br/>${formatCurrency(value)} (${
             percent?.toFixed?.(1) || 0
           }%)`,
       },
       legend: {
-        bottom: 0,
+        top: 0,
         left: "center",
         textStyle: { color: "#475569" },
       },
@@ -229,7 +307,7 @@ const SuperAdminDashBoard = () => {
           radius: ["45%", "70%"],
           label: { formatter: "{b}\n{d}%", fontSize: 12 },
           itemStyle: { borderColor: "#fff", borderWidth: 2 },
-          data: data.map((item, idx) => ({
+          data: pieData.map((item, idx) => ({
             value: ensureNumber(item.value),
             name: item.platform || `Nền tảng ${idx + 1}`,
           })),
@@ -275,7 +353,7 @@ const SuperAdminDashBoard = () => {
             name: item.label,
             rawStatus: item.rawStatus,
             itemStyle: {
-              color: PIE_COLORS[index % PIE_COLORS.length],
+              color: getStatusColor(item.rawStatus, index),
             },
           })),
         },
@@ -338,6 +416,115 @@ const SuperAdminDashBoard = () => {
     [revenueTrend]
   );
 
+  const revenueChartOption = useMemo(
+    () => ({
+      grid: { left: 40, right: 10, top: 20, bottom: 40 },
+      tooltip: {
+        trigger: "axis",
+        formatter: ({ 0: point }) =>
+          point ? `${point.name}<br/>${formatCurrency(point.value)}` : "",
+      },
+      xAxis: {
+        type: "category",
+        data: summary.revenueChart.map((item) => item.label || "--"),
+        axisLabel: { color: "#94a3b8", rotate: 25 },
+        axisLine: { lineStyle: { color: "#e2e8f0" } },
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: {
+          color: "#94a3b8",
+          formatter: (val) => `${Math.round(val / 1000)}k`,
+        },
+        splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+      },
+      series: [
+        {
+          type: "bar",
+          data: summary.revenueChart.map((item) => ensureNumber(item.value)),
+          itemStyle: {
+            borderRadius: [6, 6, 0, 0],
+            color: "#4f8dfd",
+          },
+        },
+      ],
+    }),
+    [summary.revenueChart]
+  );
+
+  const platformDistributionOption = useMemo(
+    () => ({
+      grid: { left: 80, right: 10, top: 10, bottom: 30 },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter: ({ 0: point }) =>
+          point ? `${point.name}: ${formatInteger(point.value)} booking` : "",
+      },
+      xAxis: {
+        type: "value",
+        axisLabel: { color: "#94a3b8" },
+        splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+      },
+      yAxis: {
+        type: "category",
+        data: summary.platformDistribution.map((item) => item.platform || "--"),
+        axisLabel: { color: "#475569", fontWeight: 600 },
+      },
+      series: [
+        {
+          type: "bar",
+          barWidth: 16,
+          data: summary.platformDistribution.map((item) =>
+            ensureNumber(item.count)
+          ),
+          itemStyle: {
+            borderRadius: [8, 8, 8, 8],
+            color: "#10b981",
+          },
+        },
+      ],
+    }),
+    [summary.platformDistribution]
+  );
+
+  const bookingTrendOption = useMemo(
+    () => ({
+      grid: { left: 40, right: 10, top: 20, bottom: 40 },
+      tooltip: {
+        trigger: "axis",
+        formatter: ({ 0: point }) =>
+          point
+            ? `${point.name}<br/>${formatInteger(point.value)} booking`
+            : "",
+      },
+      xAxis: {
+        type: "category",
+        data: summary.bookingTrend.map(
+          (item) => `${item.month}/${item.year || ""}`
+        ),
+        axisLabel: { color: "#94a3b8" },
+        axisLine: { lineStyle: { color: "#e2e8f0" } },
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: { color: "#94a3b8" },
+        splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+      },
+      series: [
+        {
+          type: "line",
+          smooth: true,
+          data: summary.bookingTrend.map((item) => ensureNumber(item.count)),
+          itemStyle: { color: "#6366f1" },
+          lineStyle: { color: "#6366f1", width: 3 },
+          symbolSize: 8,
+        },
+      ],
+    }),
+    [summary.bookingTrend]
+  );
+
   const conversionBarOption = useMemo(() => {
     const clickCount =
       analysis.conversionFunnel.totalViews *
@@ -347,7 +534,7 @@ const SuperAdminDashBoard = () => {
         label: "Lượt xem",
         value: ensureNumber(analysis.conversionFunnel.totalViews),
       },
-      { label: "Lượt nhấp", value: ensureNumber(clickCount) },
+      { label: "Tỷ lệ xem sản phẩm", value: ensureNumber(clickCount) },
       {
         label: "Thêm vào giỏ",
         value: ensureNumber(analysis.conversionFunnel.addToCartShortTerm),
@@ -398,29 +585,47 @@ const SuperAdminDashBoard = () => {
   const qualityRadarOption = useMemo(() => {
     const metrics = [
       {
+        key: "retentionRate",
         name: "Giữ chân",
         value: ensureNumber(analysis.qualityScore.retentionRate),
       },
       {
+        key: "earlyEngagementRate",
         name: "Tương tác sớm",
         value: ensureNumber(analysis.qualityScore.earlyEngagementRate),
       },
       {
+        key: "revenuePerView",
         name: "Doanh thu / lượt xem",
         value: ensureNumber(analysis.qualityScore.revenuePerView),
       },
     ];
+
     const maxValue = Math.max(...metrics.map((item) => item.value), 1);
+
     return {
+      tooltip: {
+        formatter: () =>
+          metrics
+            .map((m) => `${m.name}: ${formatInteger(Math.round(m.value))}`)
+            .join("<br/>"),
+      },
+
       radar: {
         indicator: metrics.map((item) => ({
-          name: item.name,
+          name: `${item.name}\n${formatInteger(Math.round(item.value))}`,
           max: Math.ceil(maxValue * 1.2),
         })),
         splitLine: { lineStyle: { color: "#e2e8f0" } },
         splitArea: { areaStyle: { color: ["#f8fafc", "#f1f5f9"] } },
         axisLine: { lineStyle: { color: "#cbd5e1" } },
+        axisName: {
+          color: "#475569",
+          fontSize: 12,
+          fontWeight: 600,
+        },
       },
+
       series: [
         {
           type: "radar",
@@ -430,6 +635,12 @@ const SuperAdminDashBoard = () => {
               areaStyle: { color: "rgba(79, 141, 253, 0.25)" },
               lineStyle: { color: "#4f8dfd", width: 2 },
               itemStyle: { color: "#4f8dfd" },
+              // label: {
+              //   show: true,
+              //   formatter: ({ value }) => formatInteger(Math.round(value)),
+              //   color: "#1e293b",
+              //   fontWeight: 600,
+              // },
             },
           ],
         },
@@ -499,6 +710,14 @@ const SuperAdminDashBoard = () => {
 
   const showSkeleton = isLoading && !data;
 
+  const handleDateRangeChange = (range) => {
+    if (!range || range.length < 2 || !range[0] || !range[1]) {
+      setDateRange(null);
+      return;
+    }
+    setDateRange(range);
+  };
+
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
@@ -540,14 +759,24 @@ const SuperAdminDashBoard = () => {
             Cập nhật: {formatDateTime(summary.timestamp)}
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-600 transition bg-white"
-          disabled={isFetching}
-        >
-          <ReloadOutlined className={isFetching ? "animate-spin" : undefined} />
-          Làm mới
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <RangePicker
+            value={dateRange || []}
+            onChange={handleDateRangeChange}
+            format="DD/MM/YYYY"
+            allowClear
+          />
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-600 transition bg-white"
+            disabled={isFetching}
+          >
+            <ReloadOutlined
+              className={isFetching ? "animate-spin" : undefined}
+            />
+            Làm mới
+          </button>
+        </div>
       </div>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -556,10 +785,41 @@ const SuperAdminDashBoard = () => {
         ))}
       </section>
 
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {[
+          { label: "Tổng booking", value: summary.stats.totalBookings },
+          { label: "Hoàn thành", value: summary.stats.completedBookings },
+          { label: "Đang xử lý", value: summary.stats.inProgressBookings },
+          {
+            label: "Doanh thu",
+            value: summary.stats.totalRevenue,
+            formatter: formatCurrency,
+          },
+          {
+            label: "Đã thu",
+            value: summary.stats.earnedRevenue,
+            formatter: formatCurrency,
+          },
+          {
+            label: "Chờ thu",
+            value: summary.stats.pendingRevenue,
+            formatter: formatCurrency,
+          },
+          {
+            label: "Hủy / thất thoát",
+            value: summary.stats.cancelledLoss,
+            formatter: formatCurrency,
+          },
+        ].map((card, idx) => (
+          <SimpleCard key={`${card.label}-${idx}`} {...card} />
+        ))}
+      </section>
+
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <ChartCard
           title="Trạng thái hợp đồng"
           subtitle="Phân bổ hợp đồng theo trạng thái"
+          className="xl:col-span-2"
         >
           <div className="h-80">
             {statusPieData.length ? (
@@ -576,7 +836,28 @@ const SuperAdminDashBoard = () => {
             )}
           </div>
         </ChartCard>
+        <ChartCard
+          title="Xu hướng booking"
+          subtitle="Tổng booking theo tháng/năm"
+        >
+          <div className="h-80">
+            {summary.bookingTrend.length ? (
+              <ReactECharts
+                option={bookingTrendOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu xu hướng booking.
+              </div>
+            )}
+          </div>
+        </ChartCard>
+      </section>
 
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartCard
           title="Doanh thu theo nền tảng"
           subtitle="Tỷ trọng doanh thu trên từng sàn"
@@ -613,6 +894,29 @@ const SuperAdminDashBoard = () => {
             ) : (
               <div className="h-full flex items-center justify-center text-slate-400 text-sm">
                 Chưa có dữ liệu thời gian.
+              </div>
+            )}
+          </div>
+        </ChartCard>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-1 gap-6">
+        <ChartCard
+          title="Doanh thu theo mốc ngày"
+          subtitle="Toàn bộ dữ liệu revenueChart trả về"
+          className="xl:col-span-2"
+        >
+          <div className="h-80">
+            {summary.revenueChart.length ? (
+              <ReactECharts
+                option={revenueChartOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu revenueChart.
               </div>
             )}
           </div>
@@ -661,6 +965,183 @@ const SuperAdminDashBoard = () => {
             )}
           </div>
         </ChartCard>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <ChartCard title="Nền tảng được đặt" subtitle="Phân bố theo nền tảng">
+          <div className="h-72">
+            {summary.platformDistribution.length ? (
+              <ReactECharts
+                option={platformDistributionOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu nền tảng.
+              </div>
+            )}
+          </div>
+        </ChartCard>
+
+        <ChartCard
+          title="Tổng quan doanh thu"
+          subtitle="Tổng hợp lượt mua khóa học"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              {
+                label: "Tổng doanh thu",
+                value: summary.revenueOverview.totalRevenue,
+                formatter: formatCurrency,
+              },
+              {
+                label: "Tổng đơn hàng",
+                value: summary.revenueOverview.totalPurchases,
+                formatter: formatInteger,
+              },
+              {
+                label: "Người dùng duy nhất",
+                value: summary.revenueOverview.uniqueUsers,
+                formatter: formatInteger,
+              },
+              {
+                label: "Chưa gán KOL",
+                value: summary.revenueOverview.notAssignedPurchase,
+                formatter: formatInteger,
+              },
+            ].map((item) => (
+              <SimpleCard key={item.label} {...item} />
+            ))}
+          </div>
+        </ChartCard>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <DataTable
+          columns={[
+            { key: "kol", title: "KOL", dataIndex: "kolName" },
+            {
+              key: "bookingCount",
+              title: "Số booking",
+              dataIndex: "bookingCount",
+              render: formatInteger,
+            },
+          ]}
+          data={summary.topKolsByBookings}
+          emptyText="Chưa có top KOL theo booking."
+        />
+
+        <DataTable
+          columns={[
+            { key: "kol", title: "KOL", dataIndex: "kolName" },
+            {
+              key: "revenue",
+              title: "Doanh thu",
+              dataIndex: "totalRevenue",
+              render: formatCurrency,
+            },
+          ]}
+          data={summary.topKolsByRevenue}
+          emptyText="Chưa có top KOL theo doanh thu."
+        />
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <DataTable
+          columns={[
+            { key: "course", title: "Khóa học", dataIndex: "courseName" },
+            {
+              key: "sales",
+              title: "Số lượng",
+              dataIndex: "totalSales",
+              render: formatInteger,
+            },
+            {
+              key: "rev",
+              title: "Doanh thu",
+              dataIndex: "totalRevenue",
+              render: formatCurrency,
+            },
+          ]}
+          data={summary.courseRevenue}
+          emptyText="Chưa có dữ liệu courseRevenue."
+        />
+
+        <DataTable
+          columns={[
+            { key: "date", title: "Ngày", dataIndex: "date" },
+            {
+              key: "rev",
+              title: "Doanh thu",
+              dataIndex: "totalRevenue",
+              render: formatCurrency,
+            },
+          ]}
+          data={summary.revenueByDate}
+          emptyText="Chưa có dữ liệu revenueByDate."
+        />
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <DataTable
+          columns={[
+            { key: "label", title: "Trạng thái", dataIndex: "label" },
+            {
+              key: "value",
+              title: "Số lượng",
+              dataIndex: "value",
+              render: formatInteger,
+            },
+            {
+              key: "percentage",
+              title: "Tỷ lệ (%)",
+              dataIndex: "percentage",
+              render: (val) => formatPercent(val, 2),
+            },
+          ]}
+          data={summary.statusDistribution}
+          emptyText="Chưa có statusDistribution."
+        />
+
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-3">
+          <p className="text-sm font-semibold text-slate-900">
+            Booking sắp tới
+          </p>
+          {summary.upcomingBookingRequests.length ? (
+            <div className="space-y-2 max-h-72 overflow-auto text-xs">
+              {summary.upcomingBookingRequests.map((item, idx) => (
+                <pre
+                  key={idx}
+                  className="bg-slate-50 rounded-lg p-2 text-slate-700 whitespace-pre-wrap break-words"
+                >
+                  {JSON.stringify(item, null, 2)}
+                </pre>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-400 text-sm">Chưa có booking sắp tới.</p>
+          )}
+
+          <p className="text-sm font-semibold text-slate-900">
+            Booking gần nhất
+          </p>
+          {summary.recentBookingRequests.length ? (
+            <div className="space-y-2 max-h-72 overflow-auto text-xs">
+              {summary.recentBookingRequests.map((item, idx) => (
+                <pre
+                  key={idx}
+                  className="bg-slate-50 rounded-lg p-2 text-slate-700 whitespace-pre-wrap break-words"
+                >
+                  {JSON.stringify(item, null, 2)}
+                </pre>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-400 text-sm">Chưa có booking gần nhất.</p>
+          )}
+        </div>
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

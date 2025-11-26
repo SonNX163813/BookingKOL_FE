@@ -31,6 +31,7 @@ export const BOOKING_STATUS_LABEL = {
   WAIT_FOR_REFUND: "Đợi hoàn tiền",
   REFUNDED: "Đã hoàn tiền",
   OVERPAID: "Thanh toán thừa",
+  SIGNED: "Đã ký",
 };
 
 export const STATUS_TAG_COLOR = {
@@ -52,6 +53,7 @@ export const STATUS_TAG_COLOR = {
   PAID: "success",
   WAIT_FOR_REFUND: "cyan",
   REFUNDED: "purple",
+  SIGNED: "magenta",
 };
 
 export const PAYMENT_STATUS_OPTIONS = [

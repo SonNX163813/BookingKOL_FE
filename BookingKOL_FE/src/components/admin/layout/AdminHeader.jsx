@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import NotificationBell from "../../common/NotificationBell";
 
-const SuperAdminHeader = () => {
+const AdminHeader = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const navigate = useNavigate();
@@ -85,4 +85,4 @@ const SuperAdminHeader = () => {
   );
 };
 
-export default SuperAdminHeader;
+export default AdminHeader;

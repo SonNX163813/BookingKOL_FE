@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import AdminHeader from "../components/admin/layout/AdminHeader";
+import SuperAdminHeader from "../components/admin/layout/SuperAdminHeader";
 import { Menu } from "antd";
 import {
   StackedBarChartOutlined,
@@ -252,7 +252,7 @@ const MainLayoutSuperAdmin = () => {
 
   return (
     <>
-      <AdminHeader />
+      <SuperAdminHeader />
       <div className="flex h-[calc(100vh-80px)]">
         <aside
           className={`bg-white transition-all duration-300 ${

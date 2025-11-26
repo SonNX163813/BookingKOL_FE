@@ -17,10 +17,10 @@ const SuperAdminHeader = () => {
 
   const handleLogout = async () => {
     handleClose();
-    await logout(); // ?.?,? khA'ng truy??n tham s?
-    toast.success("�??�ng xu??t thA�nh cA�ng.");
-    navigate("/login", { replace: true }); // ch?n Back quay l?i trang c?
-    // N?u v?n c?n cache t? Redux/React Query th� th�m:
+    await logout(); // không truyền tham số
+    toast.success("Đăng xuất thành công.");
+    navigate("/login", { replace: true }); // chặn Back quay lại trang cũ
+    // Nếu vẫn còn cache từ Redux/React Query thì thêm:
     // window.location.reload();
   };
 
@@ -35,7 +35,7 @@ const SuperAdminHeader = () => {
       </div>
 
       <div className="flex items-center gap-4">
-        <NotificationBell
+        {/* <NotificationBell
           loggedIn={Boolean(user)}
           iconButtonSx={{
             color: "#fff",
@@ -49,7 +49,7 @@ const SuperAdminHeader = () => {
             },
           }}
           menuPaperSx={{ mt: 1.5 }}
-        />
+        /> */}
 
         <div>
           <IconButton
@@ -58,7 +58,7 @@ const SuperAdminHeader = () => {
           >
             <VerifiedUserOutlined className="w-6 h-6" />
             <Typography className="font-medium">
-              {user?.fullName || user?.username || "TA�i kho?n"}
+              {user?.fullName || user?.username || "Tài khoản"}
             </Typography>
           </IconButton>
           <Menu
@@ -69,7 +69,7 @@ const SuperAdminHeader = () => {
             transformOrigin={{ vertical: "top", horizontal: "right" }}
           >
             <MenuItem onClick={handleLogout}>
-              <LogoutOutlined className="mr-2" /> �??�ng xu??t
+              <LogoutOutlined className="mr-2" /> Đăng xuất
             </MenuItem>
           </Menu>
         </div>

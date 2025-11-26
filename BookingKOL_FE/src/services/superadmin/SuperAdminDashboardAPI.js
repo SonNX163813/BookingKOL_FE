@@ -175,9 +175,18 @@ const normalizeSummary = (rawData) => {
   };
 };
 
-export const getSuperAdminDashboardSummary = async ({ signal } = {}) => {
+export const getSuperAdminDashboardSummary = async ({
+  signal,
+  startDate,
+  endDate,
+} = {}) => {
+  const params = Object.create(null);
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+
   const payload = await get({
     url: API_PATHS_SUPERADMIN.DASHBOARD.superAdminSummary,
+    params,
     config: signal ? { signal } : undefined,
   });
 

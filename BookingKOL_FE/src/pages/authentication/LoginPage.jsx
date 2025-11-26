@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import "./login.css";
 import logo from "../../assets/logocty.png";
 import googleLogo from "../../assets/google_logo.svg.png";
-import { API_BASE } from "../../utils/config";
+import { API_BASE, BASE_URL } from "../../utils/config";
 import { useAuth } from "../../context/AuthContext";
 
 export default function LoginPage() {
@@ -209,7 +209,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    alert("UI-only: Gắn đăng nhập Google sau.");
+    window.location.href = `${BASE_URL}/v1/oauth2/authorization/google`;
   };
 
   return (
