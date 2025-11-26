@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -23,6 +23,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import logoweb from "../../assets/logocty.png";
 import { useAuth } from "../../context/AuthContext";
+import NotificationBell from "../common/NotificationBell";
 
 const navItems = [
   { label: "Trang chủ", to: "/" },
@@ -298,6 +299,7 @@ const Navbar = () => {
                   </>
                 ) : (
                   <>
+                    <NotificationBell loggedIn={loggedIn} />
                     {/* Nút tài khoản: hover mở tạm, click ghim */}
                     <Button
                       onMouseEnter={handleAccountHover}
@@ -349,6 +351,7 @@ const Navbar = () => {
                   </>
                 ) : (
                   <>
+                    <NotificationBell loggedIn={loggedIn} />
                     {/* Mobile: click mở (không hover) */}
                     <Button
                       onClick={handleAccountClick}

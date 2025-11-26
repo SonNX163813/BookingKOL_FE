@@ -4,8 +4,9 @@ import { Menu, MenuItem, IconButton, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
+import NotificationBell from "../../common/NotificationBell";
 
-const AdminHeader = () => {
+const SuperAdminHeader = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ const AdminHeader = () => {
 
   const handleLogout = async () => {
     handleClose();
-    await logout(); // ⬅️ không truyền tham số
+    await logout(); // không truyền tham số
     toast.success("Đăng xuất thành công.");
     navigate("/login", { replace: true }); // chặn Back quay lại trang cũ
     // Nếu vẫn còn cache từ Redux/React Query thì thêm:
@@ -27,31 +28,51 @@ const AdminHeader = () => {
     <header className="w-full bg-gray-900 text-white px-6 py-3 flex justify-between items-center shadow-md h-20">
       <div className="flex items-center space-x-3">
         <h1 className="text-xl font-semibold overflow-hidden whitespace-nowrap relative">
-          <span className="animate-marquee inline-block">Admin Dashboard</span>
+          <span className="animate-marquee inline-block">
+            Super Admin Dashboard
+          </span>
         </h1>
       </div>
 
-      <div>
-        <IconButton
-          onClick={handleClick}
-          className="!text-white flex items-center space-x-2"
-        >
-          <VerifiedUserOutlined className="w-6 h-6" />
-          <Typography className="font-medium">
-            {user?.fullName || user?.username || "Tài khoản"}
-          </Typography>
-        </IconButton>
-        <Menu
-          anchorEl={anchorEl}
-          open={open}
-          onClose={handleClose}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <MenuItem onClick={handleLogout}>
-            <LogoutOutlined className="mr-2" /> Đăng xuất
-          </MenuItem>
-        </Menu>
+      <div className="flex items-center gap-4">
+        <NotificationBell
+          loggedIn={Boolean(user)}
+          iconButtonSx={{
+            color: "#fff",
+            "&:hover": { backgroundColor: "rgba(255,255,255,0.08)" },
+          }}
+          badgeProps={{
+            sx: {
+              "& .MuiBadge-badge": {
+                color: "#fff",
+              },
+            },
+          }}
+          menuPaperSx={{ mt: 1.5 }}
+        />
+
+        <div>
+          <IconButton
+            onClick={handleClick}
+            className="!text-white flex items-center space-x-2"
+          >
+            <VerifiedUserOutlined className="w-6 h-6" />
+            <Typography className="font-medium">
+              {user?.fullName || user?.username || "Tài khoản"}
+            </Typography>
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <MenuItem onClick={handleLogout}>
+              <LogoutOutlined className="mr-2" /> Đăng xuất
+            </MenuItem>
+          </Menu>
+        </div>
       </div>
 
       <style>
@@ -64,4 +85,4 @@ const AdminHeader = () => {
   );
 };
 
-export default AdminHeader;
+export default SuperAdminHeader;
