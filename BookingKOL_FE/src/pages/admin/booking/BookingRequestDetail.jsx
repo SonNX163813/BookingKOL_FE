@@ -1,4 +1,5 @@
-﻿import { useMemo } from "react";
+﻿// src/pages/admin/booking/BookingRequestDetail.jsx
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -156,9 +157,6 @@ const renderImageField = (fileUrl, label) => {
         style={{ objectFit: "cover", borderRadius: 12 }}
         preview={{ mask: "Xem ảnh" }}
       />
-      {/* <Text copyable style={{ wordBreak: "break-all" }}>
-        {fileUrl}
-      </Text> */}
     </Space>
   );
 };
@@ -201,6 +199,19 @@ const formatLivestreamMetricValue = (key, value) => {
   return value;
 };
 
+// 🔹 Helper: lấy tên file từ URL
+const getFileNameFromUrl = (url) => {
+  if (!url || typeof url !== "string") return "";
+  try {
+    const pathname = new URL(url).pathname;
+    const parts = pathname.split("/").filter(Boolean);
+    return parts[parts.length - 1] || url;
+  } catch (e) {
+    const parts = url.split("/").filter(Boolean);
+    return parts[parts.length - 1] || url;
+  }
+};
+
 const BookingRequestDetail = () => {
   const { requestId } = useParams();
   const navigate = useNavigate();
@@ -215,8 +226,8 @@ const BookingRequestDetail = () => {
   } = useGetBookingRequestDetail(requestId);
 
   const detail = bookingRequestDetailResponse?.data ?? null;
-  const responseMessage = bookingRequestDetailResponse?.message ?? null;
   const responseTimestamp = bookingRequestDetailResponse?.timestamp ?? null;
+
   const worktimeIds = useMemo(
     () =>
       Array.isArray(detail?.kolWorkTimes)
@@ -275,29 +286,12 @@ const BookingRequestDetail = () => {
         key: "targetId",
         width: 220,
       },
-      // {
-      //   title: "Ảnh bìa",
-      //   dataIndex: "isCover",
-      //   key: "isCover",
-      //   render: formatBoolean,
-      // },
-      // {
-      //   title: "Hoạt động",
-      //   dataIndex: "isActive",
-      //   key: "isActive",
-      //   render: formatBoolean,
-      // },
       {
         title: "Tạo lúc",
         dataIndex: "createdAt",
         key: "createdAt",
         render: (v) => formatDateTime(v),
       },
-      // {
-      //   title: "Tên tệp",
-      //   key: "fileName",
-      //   render: (_, r) => r?.file?.fileName ?? "--",
-      // },
       {
         title: "Loại tệp",
         key: "fileType",
@@ -313,14 +307,6 @@ const BookingRequestDetail = () => {
             fileName: record?.file?.fileName,
           }),
       },
-      // {
-      //   title: "Kích thước (bytes)",
-      //   key: "sizeBytes",
-      //   render: (_, r) =>
-      //     r?.file?.sizeBytes !== undefined && r?.file?.sizeBytes !== null
-      //       ? r.file.sizeBytes
-      //       : "--",
-      // },
       {
         title: "Trạng thái tệp",
         key: "fileStatus",
@@ -337,21 +323,6 @@ const BookingRequestDetail = () => {
         key: "contractNumber",
         width: 220,
         render: (_, record) => record?.contractNumber ?? record?.id ?? "--",
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        render: (v) => {
-          const status = v;
-          if (!status) return "--";
-
-          return (
-            <Tag color={PAYMENT_STATUS_COLOR[status] ?? "default"}>
-              {PAYMENT_STATUS_LABEL[status] ?? status}
-            </Tag>
-          );
-        },
       },
       {
         title: "Tạo lúc",
@@ -476,9 +447,6 @@ const BookingRequestDetail = () => {
                 <Tag color={STATUS_TAG_COLOR[normalizedStatus] ?? "default"}>
                   {statusLabel}
                 </Tag>
-                {detail?.bookingType && (
-                  <Tag color="blue">{normalizeStatus(detail.bookingType)}</Tag>
-                )}
                 {primaryPaymentLabel && (
                   <Tag color={primaryPaymentColor ?? "purple"}>
                     {primaryPaymentLabel}
@@ -505,21 +473,12 @@ const BookingRequestDetail = () => {
               <Descriptions.Item label="Mã yêu cầu">
                 {detail?.requestNumber ?? detail?.id ?? "--"}
               </Descriptions.Item>
-              <Descriptions.Item label="Mã chiến dịch">
-                {detail?.campaignId ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Mã khuyến mãi KOL">
-                {detail?.kolPromoId ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Loại đặt chỗ">
-                {normalizeStatus(detail?.bookingType) ?? "--"}
-              </Descriptions.Item>
+
+              {/* Đã bỏ "Loại đặt chỗ" */}
               <Descriptions.Item label="Trạng thái">
                 {statusLabel}
               </Descriptions.Item>
-              <Descriptions.Item label="Đã xác nhận điều khoản">
-                {formatBoolean(detail?.isConfirmWithTerms)}
-              </Descriptions.Item>
+
               <Descriptions.Item label="Mô tả" span={screens.lg ? 3 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.description || "--"}
@@ -648,43 +607,6 @@ const BookingRequestDetail = () => {
                 {formatDateTime(detail?.kol?.deletedAt)}
               </Descriptions.Item>
             </Descriptions>
-
-            {/* 
-  <Divider />
-  <Title level={5} className="!mb-2 flex items-center gap-2">
-    <Layers size={16} /> Danh mục
-  </Title>
-  <Space size={[8, 8]} wrap>
-    {detail?.kol?.categories && detail.kol.categories.length > 0 ? (
-      detail.kol.categories.map((category) => (
-        <Tag color="blue" key={category?.id ?? category?.key}>
-          {category?.name ?? category?.key ?? "--"}
-        </Tag>
-      ))
-    ) : (
-      <Text type="secondary">Không có danh mục</Text>
-    )}
-  </Space>
-
-  <Divider />
-
-  <Title level={5} className="!mb-2 flex items-center gap-2">
-    <FileText size={16} /> Sử dụng tệp
-  </Title>
-  {detail?.kol?.fileUsageDtos && detail.kol.fileUsageDtos.length ? (
-    <Table
-      columns={fileUsageColumns}
-      dataSource={detail.kol.fileUsageDtos}
-      rowKey={(record) =>
-        record?.id ?? record?.file?.id ?? Math.random()
-      }
-      pagination={false}
-      scroll={{ x: 960 }}
-    />
-  ) : (
-    <Empty description="Không có dữ liệu tệp" />
-  )}
-  */}
           </Card>
 
           {/* --- Thông tin người yêu cầu --- */}
@@ -777,6 +699,13 @@ const BookingRequestDetail = () => {
                   const paymentStatus = normalizeStatus(
                     contract?.paymentDTO?.status
                   );
+
+                  // 🔹 URL file hợp đồng (hiện giờ bạn đang lưu trong `terms`)
+                  const contractFileUrl = contract?.terms;
+                  const contractFileName = contractFileUrl
+                    ? getFileNameFromUrl(contractFileUrl)
+                    : "";
+
                   return (
                     <Card
                       key={
@@ -796,22 +725,23 @@ const BookingRequestDetail = () => {
                         column={screens.lg ? 3 : screens.md ? 2 : 1}
                         labelStyle={{ width: 180 }}
                       >
-                        <Descriptions.Item label="Trạng thái">
-                          {normalizeStatus(contract?.status) ?? "--"}
-                        </Descriptions.Item>
                         <Descriptions.Item
-                          label="Điều khoản"
+                          label="File hợp đồng"
                           span={screens.lg ? 3 : 1}
                         >
-                          <Text style={{ whiteSpace: "pre-wrap" }}>
-                            {contract?.terms ?? "--"}
-                          </Text>
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Ký bởi thương hiệu">
-                          {formatDateTime(contract?.signedAtBrand)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Ký bởi KOL">
-                          {formatDateTime(contract?.signedAtKol)}
+                          {contractFileUrl ? (
+                            <a
+                              href={contractFileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={contractFileName || true}
+                              className="text-blue-600 hover:text-blue-500"
+                            >
+                              {contractFileName}
+                            </a>
+                          ) : (
+                            "--"
+                          )}
                         </Descriptions.Item>
                         <Descriptions.Item label="Tạo lúc">
                           {formatDateTime(contract?.createdAt)}
@@ -836,9 +766,6 @@ const BookingRequestDetail = () => {
                         column={screens.lg ? 3 : screens.md ? 2 : 1}
                         labelStyle={{ width: 180 }}
                       >
-                        {/* <Descriptions.Item label="Mã thanh toán">
-                {contract?.paymentDTO?.id ?? "--"}
-              </Descriptions.Item> */}
                         <Descriptions.Item label="Trạng thái">
                           {paymentStatus ? (
                             <Tag
@@ -931,50 +858,23 @@ const BookingRequestDetail = () => {
                   metricsError?.response?.data?.message ??
                   metricsError?.message;
 
+                const isNotFoundMetricsError =
+                  !!metricsError &&
+                  (metricsError?.response?.status === 404 ||
+                    metricsError?.response?.data?.code === "NOT_FOUND" ||
+                    /Không tìm thấy Livestream Metric/i.test(
+                      metricsError?.response?.data?.message ??
+                        metricsError?.message ??
+                        ""
+                    ));
+
                 return (
                   <Card
                     key={worktimeId ?? index}
                     className="mb-4 last:mb-0"
                     type="inner"
-                    title={`Phiên làm việc ${worktimeId ?? ""}`}
+                    title={`Ca làm việc ${index + 1}`}
                   >
-                    <Descriptions
-                      bordered
-                      size="middle"
-                      column={screens.lg ? 3 : screens.md ? 2 : 1}
-                      labelStyle={{ width: 180 }}
-                    >
-                      <Descriptions.Item label="Bắt đầu lúc">
-                        {formatDateTime(worktime?.startAt)}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Kết thúc lúc">
-                        {formatDateTime(worktime?.endAt)}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Trạng thái">
-                        {/* {normalizeStatus(worktime?.status) ?? "--"} */}
-                        {worktime?.status ? (
-                          <Tag
-                            color={
-                              STATUS_TAG_COLOR[worktime?.status] ?? "default"
-                            }
-                          >
-                            {BOOKING_STATUS_LABEL[worktime?.status] ??
-                              worktime?.status}
-                          </Tag>
-                        ) : (
-                          "--"
-                        )}
-                      </Descriptions.Item>
-                      <Descriptions.Item
-                        label="Ghi chú"
-                        span={screens.lg ? 3 : 1}
-                      >
-                        <Text style={{ whiteSpace: "pre-wrap" }}>
-                          {worktime?.note ?? "--"}
-                        </Text>
-                      </Descriptions.Item>
-                    </Descriptions>
-
                     <Divider />
 
                     <Title level={5} className="!mb-2">
@@ -983,7 +883,7 @@ const BookingRequestDetail = () => {
 
                     {isMetricsLoading ? (
                       <Skeleton active paragraph={{ rows: 6 }} />
-                    ) : metricsError ? (
+                    ) : metricsError && !isNotFoundMetricsError ? (
                       <Alert
                         type="error"
                         showIcon
@@ -1006,7 +906,10 @@ const BookingRequestDetail = () => {
                         ))}
                       </Descriptions>
                     ) : (
-                      <Empty description="Không có dữ liệu thống kê" />
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={null}
+                      />
                     )}
                   </Card>
                 );

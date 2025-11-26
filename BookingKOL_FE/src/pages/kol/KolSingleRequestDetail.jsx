@@ -399,7 +399,6 @@ export default function KolSingleRequestDetail() {
               showIcon
               className="mb-3"
               message="Không tìm thấy ca livestream trong chi tiết yêu cầu."
-              description="API có thể trả key 'kolWorkTimes' thay vì 'workTimes'. Component đã hỗ trợ cả hai."
             />
           )}
 
@@ -570,7 +569,6 @@ export default function KolSingleRequestDetail() {
                 type="info"
                 showIcon
                 message="Chưa có ca livestream được chọn."
-                description="Hãy chọn 'ca livestream' trong hộp thoại nhập số liệu khi có nhiều worktime."
               />
             ) : isBadRequest(metricsError) ? (
               // ⬅️ Nếu 400 Bad Request → coi như chưa có metric → hiển thị Empty

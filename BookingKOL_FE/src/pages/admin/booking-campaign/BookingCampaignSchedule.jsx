@@ -67,6 +67,11 @@ export default function BookingCampaignSchedule() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [freeSlotKolFilter, setFreeSlotKolFilter] = useState(undefined);
 
+  // Bộ lọc cho "Lịch đăng ký của KOL / trợ live"
+  // 👉 mặc định: xem theo THÁNG hiện tại
+  const [worktimeFilterMode, setWorktimeFilterMode] = useState("month"); // all | day | week | month
+  const [worktimeFilterDate, setWorktimeFilterDate] = useState(dayjs());
+
   // ===== disabledDate cho khoảng thời gian tìm lịch rảnh: chỉ từ hôm nay trở đi =====
   const disabledSearchDate = (current) => {
     if (!current) return false;
@@ -136,6 +141,47 @@ export default function BookingCampaignSchedule() {
     const content = worktimeResp?.content ?? [];
     return Array.isArray(content) ? content : [];
   }, [worktimeResp]);
+
+  // Áp dụng filter theo ngày / tuần / tháng cho lịch đăng ký
+  const visibleWorktimes = useMemo(() => {
+    if (!worktimeList || worktimeList.length === 0) return [];
+    if (worktimeFilterMode === "all" || !worktimeFilterDate) {
+      return worktimeList;
+    }
+
+    const ref = worktimeFilterDate;
+
+    return worktimeList.filter((w) => {
+      if (!w?.startAt) return false;
+      const start = dayjs(w.startAt);
+      if (!start.isValid()) return false;
+
+      if (worktimeFilterMode === "day") {
+        // theo NGÀY: so sánh cùng ngày
+        return start.isSame(ref, "day");
+      }
+
+      if (worktimeFilterMode === "week") {
+        // theo TUẦN: tuần chứa ngày ref (Chủ Nhật -> Thứ Bảy)
+        const refDayStart = ref.startOf("day");
+        const dow = refDayStart.day(); // 0 (CN) - 6 (Th7)
+        const weekStart = refDayStart.subtract(dow, "day");
+        const weekEnd = weekStart.add(7, "day");
+
+        return (
+          (start.isSame(weekStart) || start.isAfter(weekStart)) &&
+          start.isBefore(weekEnd)
+        );
+      }
+
+      if (worktimeFilterMode === "month") {
+        // theo THÁNG: cùng tháng/năm
+        return start.year() === ref.year() && start.month() === ref.month();
+      }
+
+      return true;
+    });
+  }, [worktimeList, worktimeFilterMode, worktimeFilterDate]);
 
   // ===== OPTION KOL / TRỢ LIVE TỪ DANH SÁCH SLOT RẢNH =====
   const freeSlotKolOptions = useMemo(() => {
@@ -403,7 +449,10 @@ export default function BookingCampaignSchedule() {
       dataIndex: "status",
       key: "status",
       width: 120,
-      render: (v) => v || "AVAILABLE",
+      render: (v) => {
+        const s = String(v || "AVAILABLE").toUpperCase();
+        return s === "AVAILABLE" ? "Sẵn Sàng" : v || "Sẵn Sàng";
+      },
     },
     {
       title: "Thao tác",
@@ -463,9 +512,12 @@ export default function BookingCampaignSchedule() {
                 setFreeSlots([]);
                 setSelectedSlot(null);
                 setFreeSlotKolFilter(undefined);
+                // Reset filter về mặc định: xem theo tháng hiện tại
+                setWorktimeFilterMode("month");
+                setWorktimeFilterDate(dayjs());
               }}
             >
-              Tạo lại
+              Reset
             </Button>
           </Space>
         </div>
@@ -701,14 +753,51 @@ export default function BookingCampaignSchedule() {
             />
           ) : (
             <>
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <Text strong>
                   Danh sách lịch cho Booking: {bookingRequestId}
                 </Text>
+
+                <Space size="small" wrap>
+                  <Select
+                    value={worktimeFilterMode}
+                    onChange={(val) => {
+                      setWorktimeFilterMode(val);
+                      if (val === "all") {
+                        setWorktimeFilterDate(null);
+                      } else if (!worktimeFilterDate) {
+                        // nếu đang null -> set mặc định ngày hiện tại
+                        setWorktimeFilterDate(dayjs());
+                      }
+                    }}
+                    style={{ width: 150 }}
+                    options={[
+                      { value: "all", label: "Tất cả" },
+                      { value: "day", label: "Theo ngày" },
+                      { value: "week", label: "Theo tuần" },
+                      { value: "month", label: "Theo tháng" },
+                    ]}
+                  />
+                  {worktimeFilterMode !== "all" && (
+                    <DatePicker
+                      picker={worktimeFilterMode === "month" ? "month" : "date"}
+                      allowClear={false}
+                      placeholder={
+                        worktimeFilterMode === "day"
+                          ? "Chọn ngày"
+                          : worktimeFilterMode === "week"
+                          ? "Chọn ngày trong tuần"
+                          : "Chọn tháng"
+                      }
+                      value={worktimeFilterDate}
+                      onChange={(val) => setWorktimeFilterDate(val || dayjs())}
+                    />
+                  )}
+                </Space>
               </div>
 
               <Table
-                dataSource={worktimeList}
+                dataSource={visibleWorktimes}
                 columns={worktimeColumns}
                 rowKey={(r) => r.id || `${r.startAt}_${r.endAt}`}
                 loading={loadingWorktimes}

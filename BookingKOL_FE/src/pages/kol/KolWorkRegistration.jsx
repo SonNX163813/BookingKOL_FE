@@ -1,4 +1,4 @@
-// src/pages/kol/KolWorkRegistrationMui.jsx
+// src/pages/kol/KolWorkRegistration.jsx
 import * as React from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
@@ -25,6 +25,7 @@ import {
   getKolTimeline,
   getKolFreeTime,
 } from "../../services/kol/KolAPI";
+import { adminRegisterKolSchedule } from "../../services/admin/AdminScheduleAPI";
 
 dayjs.locale("vi");
 
@@ -154,7 +155,11 @@ const mergeSortedIntervals = (arr) => {
   return out;
 };
 
-export default function KolWorkRegistrationMui() {
+export default function KolWorkRegistrationMui({
+  isAdmin = false,
+  adminKolId = null,
+  onSuccess,
+}) {
   const { kolId: kolIdParam } = useParams();
 
   const [resolvedUserId, setResolvedUserId] = React.useState(null);
@@ -186,6 +191,17 @@ export default function KolWorkRegistrationMui() {
     (async () => {
       try {
         setResolving(true);
+
+        // ✅ Mode ADMIN: dùng thẳng adminKolId / kolIdParam, không phụ thuộc auth_user
+        if (isAdmin) {
+          if (mounted) {
+            setResolvedKolId(adminKolId || kolIdParam || null);
+            setResolvedUserId(null);
+          }
+          return;
+        }
+
+        // ===== Mode KOL (user tự đăng ký) =====
         const authUser = getAuthUserFromStorage();
 
         // 1. Nếu URL có kolIdParam
@@ -252,7 +268,7 @@ export default function KolWorkRegistrationMui() {
     return () => {
       mounted = false;
     };
-  }, [kolIdParam]);
+  }, [kolIdParam, isAdmin, adminKolId]);
 
   /* -------- Blocked (từ timeline) -------- */
   React.useEffect(() => {
@@ -382,7 +398,6 @@ export default function KolWorkRegistrationMui() {
 
     if (shifts.length) {
       const last = shifts[shifts.length - 1];
-      // đảm bảo cộng theo block giờ
       start = last.end.add(MIN_GAP_MINUTES, "minute").minute(0).second(0);
       end = start.add(1, "hour").minute(0).second(0);
     }
@@ -457,46 +472,63 @@ export default function KolWorkRegistrationMui() {
       setSnack({ open: true, type: "error", message: err });
       return;
     }
-    if (!resolvedUserId) {
-      setSnack({
-        open: true,
-        type: "error",
-        message: "Không xác định được User ID của KOL.",
-      });
-      return;
-    }
 
     try {
       setSaving(true);
-      const result = await registerKolAvailabilities({
-        kolId: resolvedUserId, // backend: /schedule/{userId}
-        date: pickedDate,
-        shifts,
-      });
 
-      if (Array.isArray(result)) {
-        const bad = result.find(
-          (x) => typeof x?.status === "number" && x.status !== 200
-        );
-        if (bad) {
-          const beMsg =
-            (Array.isArray(bad?.message) && bad.message[0]) ||
-            bad?.message ||
-            "Khoảng thời gian này đã bị trùng với lịch làm việc khác";
-          throw new Error(beMsg);
+      if (isAdmin) {
+        // ✅ ADMIN: dùng API /v1/availabilities/admin/schedule với kolId
+        if (!resolvedKolId) {
+          throw new Error("Không xác định được KOL ID để tạo lịch.");
+        }
+
+        await adminRegisterKolSchedule({
+          kolId: resolvedKolId,
+          shifts,
+        });
+      } else {
+        // ✅ KOL: giữ nguyên API cũ – /availabilities/schedule/{userId}
+        if (!resolvedUserId) {
+          throw new Error("Không xác định được User ID của KOL.");
+        }
+
+        const result = await registerKolAvailabilities({
+          kolId: resolvedUserId, // backend: /schedule/{userId}
+          date: pickedDate,
+          shifts,
+        });
+
+        if (Array.isArray(result)) {
+          const bad = result.find(
+            (x) =>
+              typeof x?.status === "number" &&
+              x.status !== 201 &&
+              x.status !== 200
+          );
+          if (bad) {
+            const beMsg =
+              (Array.isArray(bad?.message) && bad.message[0]) ||
+              bad?.message ||
+              "Khoảng thời gian này đã bị trùng với lịch làm việc khác";
+            throw new Error(beMsg);
+          }
         }
       }
 
       setSnack({
         open: true,
         type: "success",
-        message: "Đăng ký ca làm thành công!",
+        message: isAdmin
+          ? "Tạo lịch làm việc thành công!"
+          : "Đăng ký ca làm thành công!",
       });
       setShifts([]);
 
       if (resolvedKolId) {
         await reloadMonthSchedule();
       }
+
+      if (onSuccess) onSuccess();
     } catch (e) {
       const httpStatus = e?.response?.status;
       const appStatus = e?.appStatus;
@@ -528,7 +560,7 @@ export default function KolWorkRegistrationMui() {
     }
   };
 
-  const loadingUI = resolving || !resolvedUserId;
+  const loadingUI = resolving || (!isAdmin && !resolvedUserId);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
@@ -539,7 +571,7 @@ export default function KolWorkRegistrationMui() {
 
         {loadingUI ? (
           <Typography>Đang tải thông tin KOL...</Typography>
-        ) : !resolvedUserId ? (
+        ) : !isAdmin && !resolvedUserId ? (
           <Typography color="error">
             Không tìm thấy User ID. Vui lòng đăng nhập bằng tài khoản KOL.
           </Typography>
@@ -659,8 +691,8 @@ export default function KolWorkRegistrationMui() {
                           value={sh.start}
                           onChange={(v) => updateShift(idx, "start", v)}
                           ampm={false}
-                          views={["hours"]} // ✅ chỉ chọn giờ
-                          format="HH" // hiển thị giờ, phút = 00 ngầm định
+                          views={["hours"]} // chỉ chọn giờ
+                          format="HH" // hiển thị giờ, phút = 00
                           maxTime={maxStartTime || undefined}
                           disabled={saving}
                         />
@@ -670,10 +702,9 @@ export default function KolWorkRegistrationMui() {
                           value={sh.end}
                           onChange={(v) => updateShift(idx, "end", v)}
                           ampm={false}
-                          views={["hours"]} // ✅ chỉ chọn giờ
+                          views={["hours"]} // chỉ chọn giờ
                           format="HH"
                           minTime={minEndTime || undefined}
-                          // ✅ phải chọn start trước rồi mới cho chọn end
                           disabled={saving || !sh.start}
                         />
 
