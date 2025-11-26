@@ -14,70 +14,67 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 const formatCurrency = (value) => currencyFormatter.format(value || 0);
 const formatInteger = (value) =>
   Number.isFinite(value) ? value.toLocaleString("vi-VN") : "0";
-
-const formatDateLabel = (value) =>
-  dayjs(value).isValid() ? dayjs(value).format("DD/MM") : value || "--";
-
-const formatFullDate = (value) =>
+const formatPercent = (value, digits = 1) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? `${num.toFixed(digits)}%` : "0%";
+};
+const formatDateTime = (value) =>
   dayjs(value).isValid() ? dayjs(value).format("DD/MM/YYYY HH:mm") : "--";
 
-const formatBookingRange = (startAt, endAt) => {
-  const start = formatFullDate(startAt);
-  const end = dayjs(endAt).isValid()
-    ? dayjs(endAt).format("HH:mm, DD/MM")
-    : undefined;
-  return end ? `${start} -> ${end}` : start;
-};
-
-const bookingStatusClass = (status) => {
-  switch (status) {
-    case "PAID":
-      return "bg-emerald-100 text-emerald-700";
-    case "IN_PROGRESS":
-      return "bg-amber-100 text-amber-700";
-    case "CANCELLED":
-      return "bg-rose-100 text-rose-700";
-    case "WAIT_FOR_REFUND":
-      return "bg-sky-100 text-sky-700";
-    default:
-      return "bg-slate-100 text-slate-600";
-  }
-};
-
+const ensureNumber = (value) => (Number.isFinite(value) ? value : 0);
 const normalizeStatusKey = (status) =>
   status ? status.toString().trim().toUpperCase() : "";
-
 const formatStatusLabel = (status) => {
   const key = normalizeStatusKey(status);
   if (!key) return "N/A";
-  return BOOKING_STATUS_LABEL[key] || key;
+  return BOOKING_STATUS_LABEL[key] || status || key;
 };
 
-const PIE_COLORS = [
-  "#4f46e5",
-  "#0ea5e9",
-  "#f59e0b",
-  "#10b981",
-  "#ec4899",
-  "#9333ea",
-  "#14b8a6",
-];
+const PIE_COLORS = ["#4f8dfd", "#f6c358", "#f97316", "#22c55e", "#a855f7"];
 
-const STAT_CARDS = [
-  { key: "totalBookings", label: "Tổng số booking", type: "number" },
-  { key: "completedBookings", label: "Đã hoàn thành", type: "number" },
-  { key: "inProgressBookings", label: "Đang xử lý", type: "number" },
-  { key: "totalRevenue", label: "Tổng doanh thu", type: "currency" },
-  { key: "earnedRevenue", label: "Đã ghi nhận", type: "currency" },
-  { key: "pendingRevenue", label: "Doanh thu chờ", type: "currency" },
-  { key: "cancelledLoss", label: "Tổn thất do huỷ", type: "currency" },
-];
+const EMPTY_ANALYSIS = {
+  financialOverview: {
+    totalRevenue: 0,
+    totalOrders: 0,
+    avgOrderValue: 0,
+    totalGpm: 0,
+    totalProductsSold: 0,
+  },
+  engagementOverview: {
+    totalViews: 0,
+    pcuPeak: 0,
+    totalComments: 0,
+    avgViewDurationSeconds: 0,
+  },
+  conversionFunnel: {
+    totalViews: 0,
+    clickRate: 0,
+    addToCartShortTerm: 0,
+    buyers: 0,
+    viewerToBuyerRate: 0,
+  },
+  qualityScore: {
+    retentionRate: 0,
+    earlyEngagementRate: 0,
+    revenuePerView: 0,
+  },
+  charts: {
+    revenueByPlatform: [],
+    durationByPlatform: [],
+    revenueOverTime: [],
+  },
+};
 
 const EMPTY_SUMMARY = {
-  stats: STAT_CARDS.reduce(
-    (acc, card) => ({ ...acc, [card.key]: 0 }),
-    Object.create(null)
-  ),
+  stats: {
+    totalBookings: 0,
+    completedBookings: 0,
+    inProgressBookings: 0,
+    totalRevenue: 0,
+    earnedRevenue: 0,
+    pendingRevenue: 0,
+    cancelledLoss: 0,
+  },
   revenueChart: [],
   statusContractBreakdown: [],
   upcomingBookingRequests: [],
@@ -95,6 +92,8 @@ const EMPTY_SUMMARY = {
   },
   courseRevenue: [],
   revenueByDate: [],
+  dashboardAnalysis: EMPTY_ANALYSIS,
+  timestamp: null,
 };
 
 const DashboardSkeleton = () => (
@@ -104,9 +103,9 @@ const DashboardSkeleton = () => (
       <div className="h-5 w-80 bg-slate-100 rounded" />
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      {Array.from({ length: 7 }).map((_, idx) => (
+      {Array.from({ length: 4 }).map((_, idx) => (
         <div
-          key={`stat-skeleton-${idx}`}
+          key={`metric-skeleton-${idx}`}
           className="h-28 bg-slate-100 rounded-2xl"
         />
       ))}
@@ -122,48 +121,39 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-const TopKolList = ({ title, items, valueKey, valueFormatter }) => (
-  <div className="bg-white rounded-2xl border border-slate-100 p-5 flex-1 min-w-[240px]">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <span className="text-sm text-slate-500">{items.length} KOL</span>
+const MetricCard = ({ label, value, formatter, gradient, icon }) => (
+  <div
+    className="relative overflow-hidden rounded-2xl text-white p-5 shadow-sm"
+    style={{
+      background: gradient,
+    }}
+  >
+    <div className="flex items-start justify-between">
+      <div className="text-2xl">{icon}</div>
+      <span className="text-[11px] px-2 py-1 rounded-full bg-white/25 font-semibold">
+        Số liệu thời gian thực
+      </span>
     </div>
-    <div className="space-y-4">
-      {items.length ? (
-        items.map((item, index) => (
-          <div
-            key={item.kolId || item.kolName || index}
-            className="flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-semibold">
-                {index + 1}
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 truncate">
-                  {item.kolName || "Không rõ"}
-                </p>
-                <p className="text-xs text-slate-500 truncate">
-                  {item.kolId?.slice(0, 8) ?? "—"}
-                </p>
-              </div>
-            </div>
-            <span className="text-sm font-semibold text-slate-900">
-              {valueFormatter(item[valueKey])}
-            </span>
-          </div>
-        ))
-      ) : (
-        <p className="text-sm text-slate-500">Chưa có dữ liệu.</p>
-      )}
-    </div>
+    <p className="mt-6 text-sm font-semibold opacity-80">{label}</p>
+    <p className="text-3xl font-bold mt-1 drop-shadow-sm">
+      {formatter ? formatter(value) : value}
+    </p>
   </div>
 );
 
-const SectionTitle = ({ title, subtitle }) => (
-  <div>
-    <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-    {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
+const ChartCard = ({ title, subtitle, children, className = "" }) => (
+  <div
+    className={`bg-white rounded-2xl border border-slate-100 p-5 shadow-sm ${className}`}
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-semibold text-slate-900">{title}</p>
+        {subtitle ? (
+          <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+        ) : null}
+      </div>
+    </div>
+    <div className="mt-4">{children}</div>
   </div>
 );
 
@@ -172,14 +162,15 @@ const SuperAdminDashBoard = () => {
     useSuperAdminDashboardSummary();
 
   const summary = data ?? EMPTY_SUMMARY;
+  const analysis = summary.dashboardAnalysis || EMPTY_ANALYSIS;
 
-  const revenueSeries = useMemo(
+  const revenueTrend = useMemo(
     () =>
-      summary.revenueChart.map((item, idx) => ({
-        ...item,
-        label: item.label ? formatDateLabel(item.label) : `Ngày ${idx + 1}`,
+      analysis.charts.revenueOverTime.map((item) => ({
+        time: item.timePoint || "--",
+        value: ensureNumber(item.value),
       })),
-    [summary.revenueChart]
+    [analysis.charts.revenueOverTime]
   );
 
   const breakdownMap = summary.statusContractBreakdown.reduce((acc, item) => {
@@ -217,85 +208,36 @@ const SuperAdminDashBoard = () => {
     });
   });
 
-  const courseRevenueData = summary.courseRevenue.map((item) => ({
-    ...item,
-    courseName: item.courseName || "Không rõ",
-  }));
-
-  const overviewCards = [
-    {
-      label: "Doanh thu khoá học",
-      value: summary.revenueOverview.totalRevenue,
-      type: "currency",
-    },
-    {
-      label: "Số giao dịch",
-      value: summary.revenueOverview.totalPurchases,
-      type: "number",
-    },
-    {
-      label: "Người mua duy nhất",
-      value: summary.revenueOverview.uniqueUsers,
-      type: "number",
-    },
-    {
-      label: "Đơn chưa gán KOL",
-      value: summary.revenueOverview.notAssignedPurchase,
-      type: "number",
-    },
-  ];
-
-  const revenueOption = useMemo(() => {
-    const labels = revenueSeries.map((item) => item.label);
-    const values = revenueSeries.map((item) => item.value);
-
+  const platformPieOption = useMemo(() => {
+    const data = analysis.charts.revenueByPlatform;
     return {
-      grid: { left: 40, right: 20, top: 20, bottom: 30 },
       tooltip: {
-        trigger: "axis",
-        formatter: (params = []) => {
-          const [point] = Array.isArray(params) ? params : [params];
-          if (!point) return "";
-          const val = Array.isArray(point.value)
-            ? point.value.at(-1)
-            : point.value;
-          return `${point.axisValueLabel}<br/>${formatCurrency(val)}`;
-        },
+        trigger: "item",
+        formatter: ({ name, value, percent }) =>
+          `${name || "Không xác định"}<br/>${formatCurrency(value)} (${
+            percent?.toFixed?.(1) || 0
+          }%)`,
       },
-      xAxis: {
-        type: "category",
-        boundaryGap: false,
-        data: labels,
-        axisLabel: { color: "#64748b" },
-        axisLine: { lineStyle: { color: "#cbd5f5" } },
-      },
-      yAxis: {
-        type: "value",
-        axisLabel: {
-          color: "#64748b",
-          formatter: (value) => `${Math.round(value / 1000)}k`,
-        },
-        splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+      legend: {
+        bottom: 0,
+        left: "center",
+        textStyle: { color: "#475569" },
       },
       series: [
         {
-          name: "Doanh thu",
-          type: "line",
-          smooth: true,
-          symbolSize: 8,
-          lineStyle: { color: "#4f46e5", width: 3 },
-          areaStyle: { color: "rgba(79, 70, 229, 0.18)" },
-          itemStyle: { color: "#4f46e5" },
-          data: values,
+          type: "pie",
+          radius: ["45%", "70%"],
+          label: { formatter: "{b}\n{d}%", fontSize: 12 },
+          itemStyle: { borderColor: "#fff", borderWidth: 2 },
+          data: data.map((item, idx) => ({
+            value: ensureNumber(item.value),
+            name: item.platform || `Nền tảng ${idx + 1}`,
+          })),
         },
       ],
+      color: ["#4f8dfd", "#f6c358", "#4ade80", "#f97316", "#a855f7"],
     };
-  }, [revenueSeries]);
-
-  const totalStatusContracts = useMemo(
-    () => statusPieData.reduce((sum, item) => sum + item.value, 0),
-    [statusPieData]
-  );
+  }, [analysis.charts.revenueByPlatform]);
 
   const statusPieOption = useMemo(
     () => ({
@@ -309,28 +251,20 @@ const SuperAdminDashBoard = () => {
         left: "center",
         textStyle: { color: "#475569" },
       },
-      // graphic: [
-      //   {
-      //     type: "text",
-      //     left: "center",
-      //     top: "center",
-      //     style: {
-      //       text: `${formatInteger(totalStatusContracts)}\nTong so`,
-      //       textAlign: "center",
-      //       fill: "#0f172a",
-      //       fontWeight: 700,
-      //       fontSize: 16,
-      //     },
-      //   },
-      // ],
       series: [
         {
           name: "Trạng thái hợp đồng",
           type: "pie",
           radius: ["40%", "70%"],
           avoidLabelOverlap: true,
-          label: { formatter: "{b}\n{d}%", fontSize: 12 },
-          labelLine: { smooth: true },
+          label: {
+            show: true,
+            position: "inside",
+            formatter: ({ percent }) => `${percent}%`,
+            fontSize: 10,
+            color: "#fff",
+          },
+          labelLine: { show: false },
           itemStyle: {
             borderRadius: 10,
             borderColor: "#fff",
@@ -349,42 +283,219 @@ const SuperAdminDashBoard = () => {
     }),
     [statusPieData]
   );
-  const courseRevenueOption = useMemo(
+
+  const revenueLineOption = useMemo(
     () => ({
-      grid: { left: 120, right: 20, top: 20, bottom: 20 },
+      grid: { left: 40, right: 20, top: 20, bottom: 30 },
       tooltip: {
         trigger: "axis",
-        axisPointer: { type: "shadow" },
-        formatter: ({ 0: point }) =>
-          point ? `${point.name}<br/>${formatCurrency(point.value)}` : "",
+        formatter: (params = []) => {
+          const [point] = Array.isArray(params) ? params : [params];
+          if (!point) return "";
+          return `${point.axisValueLabel}<br/>${formatCurrency(point.value)}`;
+        },
       },
       xAxis: {
+        type: "category",
+        boundaryGap: false,
+        data: revenueTrend.map((item) => item.time),
+        axisLabel: { color: "#94a3b8" },
+        axisLine: { lineStyle: { color: "#e2e8f0" } },
+      },
+      yAxis: {
         type: "value",
         axisLabel: {
-          color: "#64748b",
+          color: "#94a3b8",
           formatter: (value) => `${Math.round(value / 1000)}k`,
         },
         splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
       },
+      series: [
+        {
+          type: "line",
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 8,
+          lineStyle: { color: "#4f8dfd", width: 3 },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(79, 141, 253, 0.25)" },
+                { offset: 1, color: "rgba(79, 141, 253, 0.03)" },
+              ],
+            },
+          },
+          itemStyle: { color: "#4f8dfd" },
+          data: revenueTrend.map((item) => item.value),
+        },
+      ],
+    }),
+    [revenueTrend]
+  );
+
+  const conversionBarOption = useMemo(() => {
+    const clickCount =
+      analysis.conversionFunnel.totalViews *
+      (analysis.conversionFunnel.clickRate / 100);
+    const rows = [
+      {
+        label: "Lượt xem",
+        value: ensureNumber(analysis.conversionFunnel.totalViews),
+      },
+      { label: "Lượt nhấp", value: ensureNumber(clickCount) },
+      {
+        label: "Thêm vào giỏ",
+        value: ensureNumber(analysis.conversionFunnel.addToCartShortTerm),
+      },
+      {
+        label: "Người mua",
+        value: ensureNumber(analysis.conversionFunnel.buyers),
+      },
+    ];
+    const maxVal = Math.max(...rows.map((row) => row.value), 1);
+    return {
+      grid: { left: 100, right: 20, top: 10, bottom: 10 },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter: ({ 0: point }) =>
+          point
+            ? `${point.name}: ${formatInteger(point.value)}`
+            : "Không có dữ liệu",
+      },
+      xAxis: {
+        type: "value",
+        max: Math.ceil(maxVal * 1.1),
+        axisLabel: { color: "#94a3b8" },
+        splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+      },
       yAxis: {
         type: "category",
-        data: courseRevenueData.map((item) => item.courseName),
-        axisLabel: { color: "#475569" },
+        data: rows.map((row) => row.label),
+        axisLabel: { color: "#475569", fontWeight: 600 },
       },
       series: [
         {
           type: "bar",
-          data: courseRevenueData.map((item) => item.totalRevenue),
-          barWidth: 18,
+          data: rows.map((row) => row.value),
+          barWidth: 16,
           itemStyle: {
-            color: "#0ea5e9",
-            borderRadius: [6, 6, 6, 6],
+            borderRadius: [8, 8, 8, 8],
+            color: (params) =>
+              ["#4f8dfd", "#f59e0b", "#22c55e", "#f97316"][params.dataIndex] ||
+              "#4f8dfd",
           },
         },
       ],
-    }),
-    [courseRevenueData]
+    };
+  }, [analysis.conversionFunnel]);
+
+  const qualityRadarOption = useMemo(() => {
+    const metrics = [
+      {
+        name: "Giữ chân",
+        value: ensureNumber(analysis.qualityScore.retentionRate),
+      },
+      {
+        name: "Tương tác sớm",
+        value: ensureNumber(analysis.qualityScore.earlyEngagementRate),
+      },
+      {
+        name: "Doanh thu / lượt xem",
+        value: ensureNumber(analysis.qualityScore.revenuePerView),
+      },
+    ];
+    const maxValue = Math.max(...metrics.map((item) => item.value), 1);
+    return {
+      radar: {
+        indicator: metrics.map((item) => ({
+          name: item.name,
+          max: Math.ceil(maxValue * 1.2),
+        })),
+        splitLine: { lineStyle: { color: "#e2e8f0" } },
+        splitArea: { areaStyle: { color: ["#f8fafc", "#f1f5f9"] } },
+        axisLine: { lineStyle: { color: "#cbd5e1" } },
+      },
+      series: [
+        {
+          type: "radar",
+          data: [
+            {
+              value: metrics.map((item) => item.value),
+              areaStyle: { color: "rgba(79, 141, 253, 0.25)" },
+              lineStyle: { color: "#4f8dfd", width: 2 },
+              itemStyle: { color: "#4f8dfd" },
+            },
+          ],
+        },
+      ],
+    };
+  }, [analysis.qualityScore]);
+
+  const miniMetrics = useMemo(
+    () => [
+      {
+        label: "Giá trị đơn hàng TB (AOV)",
+        value: analysis.financialOverview.avgOrderValue,
+        formatter: formatCurrency,
+      },
+      {
+        label: "Sản phẩm đã bán",
+        value: analysis.financialOverview.totalProductsSold,
+        formatter: formatInteger,
+      },
+      {
+        label: "Số người xem đồng thời cao nhất",
+        value: analysis.engagementOverview.pcuPeak,
+        formatter: formatInteger,
+      },
+      {
+        label: "Tỷ lệ xem → mua",
+        value: analysis.conversionFunnel.viewerToBuyerRate,
+        formatter: (val) => formatPercent(val, 1),
+      },
+    ],
+    [analysis]
   );
+
+  const highlightCards = [
+    {
+      label: "Tổng doanh thu",
+      value:
+        analysis.financialOverview.totalRevenue || summary.stats.totalRevenue,
+      formatter: formatCurrency,
+      gradient: "linear-gradient(135deg, #5b8def 0%, #8bc6fd 100%)",
+      icon: "💰",
+    },
+    {
+      label: "Đơn hàng",
+      value:
+        analysis.financialOverview.totalOrders ||
+        summary.stats.completedBookings,
+      formatter: formatInteger,
+      gradient: "linear-gradient(135deg, #c084fc 0%, #e2c8ff 100%)",
+      icon: "🧾",
+    },
+    {
+      label: "Tổng lượt xem",
+      value: analysis.engagementOverview.totalViews,
+      formatter: formatInteger,
+      gradient: "linear-gradient(135deg, #f8d66d 0%, #ffe8a3 100%)",
+      icon: "👀",
+    },
+    {
+      label: "Tỷ lệ xem → mua",
+      value: analysis.conversionFunnel.viewerToBuyerRate,
+      formatter: (val) => formatPercent(val, 1),
+      gradient: "linear-gradient(135deg, #f9a8a0 0%, #ffd0c7 100%)",
+      icon: "🎯",
+    },
+  ];
 
   const showSkeleton = isLoading && !data;
 
@@ -392,7 +503,7 @@ const SuperAdminDashBoard = () => {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
         <p className="text-xl font-semibold text-rose-500">
-          Không thể tải dữ liệu Dashboard
+          Không thể tải dữ liệu bảng điều khiển
         </p>
         <p className="text-sm text-slate-500 max-w-sm">
           {(error && error.message) || "Vui lòng thử lại sau."}
@@ -412,22 +523,26 @@ const SuperAdminDashBoard = () => {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6 bg-[#f6f8fb] min-h-screen">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-indigo-500 font-semibold">
-            Báo cáo tổng quan
+            Báo cáo livestream
           </p>
           <h1 className="text-3xl font-bold text-slate-900 mt-2">
-            Dashboard quản trị viên
+            Bảng điều khiển Super Admin
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Dữ liệu mới nhất từ hệ thống Nexus Social.
+            Ảnh & màu sắc tương tự mẫu tham khảo – số liệu live và booking mới
+            nhất.
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            Cập nhật: {formatDateTime(summary.timestamp)}
           </p>
         </div>
         <button
           onClick={() => refetch()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-600 transition"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-600 transition bg-white"
           disabled={isFetching}
         >
           <ReloadOutlined className={isFetching ? "animate-spin" : undefined} />
@@ -436,50 +551,17 @@ const SuperAdminDashBoard = () => {
       </div>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {STAT_CARDS.map((card) => (
-          <div
-            key={card.key}
-            className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex flex-col gap-2"
-          >
-            <p className="text-sm text-slate-500">{card.label}</p>
-            <p className="text-3xl font-semibold text-slate-900">
-              {card.type === "currency"
-                ? formatCurrency(summary.stats[card.key])
-                : formatInteger(summary.stats[card.key])}
-            </p>
-          </div>
+        {highlightCards.map((card) => (
+          <MetricCard key={card.label} {...card} />
         ))}
       </section>
 
-      <section className=" gap-6">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 xl:col-span-2">
-          <SectionTitle
-            title="Biểu đồ doanh thu"
-            subtitle="Tổng hợp doanh thu theo ngày"
-          />
-          <div className="h-80 mt-4">
-            {revenueSeries.length ? (
-              <ReactECharts
-                option={revenueOption}
-                style={{ width: "100%", height: "100%" }}
-                notMerge
-                lazyUpdate
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                Chưa có dữ liệu biểu đồ.
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-      <section className="gap-6">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <SectionTitle
-            title="Trạng thái hợp đồng"
-            subtitle="Phân bổ theo trạng thái"
-          />
-          <div className="h-80 mt-4">
+      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <ChartCard
+          title="Trạng thái hợp đồng"
+          subtitle="Phân bổ hợp đồng theo trạng thái"
+        >
+          <div className="h-80">
             {statusPieData.length ? (
               <ReactECharts
                 option={statusPieOption}
@@ -493,148 +575,108 @@ const SuperAdminDashBoard = () => {
               </div>
             )}
           </div>
-        </div>
-      </section>
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 xl:col-span-2">
-          <SectionTitle
-            title="Lịch booking sắp tới"
-            subtitle="Theo múi giờ hệ thống"
-          />
-          <div className="mt-4 divide-y divide-slate-100">
-            {summary.upcomingBookingRequests.length ? (
-              summary.upcomingBookingRequests.map((booking) => (
-                <div
-                  key={booking.bookingId}
-                  className="py-4 flex flex-wrap items-center justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">
-                      {booking.clientName || "Khách lẻ"}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                      {booking.location || "Không rõ địa điểm"}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {formatBookingRange(booking.startAt, booking.endAt)}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${bookingStatusClass(
-                        booking.status
-                      )}`}
-                    >
-                      {formatStatusLabel(booking.status)}
-                    </span>
-                    <p className="text-xs text-slate-400">
-                      {booking.requestNumber || booking.bookingId}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500 text-center py-10">
-                Chưa có yêu cầu booking mới.
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5">
-          <SectionTitle
-            title="Hoạt động gần đây"
-            subtitle="Các booking mới nhất"
-          />
-          <div className="mt-4 space-y-4">
-            {summary.recentBookingRequests.length ? (
-              summary.recentBookingRequests.map((booking) => (
-                <div
-                  key={booking.bookingId}
-                  className="border border-slate-100 rounded-xl p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-slate-900">
-                      {booking.clientName || "Khách lẻ"}
-                    </p>
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${bookingStatusClass(
-                        booking.status
-                      )}`}
-                    >
-                      {formatStatusLabel(booking.status)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-500 mt-2">
-                    {booking.location || "Không rõ địa điểm"}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {formatBookingRange(booking.startAt, booking.endAt)}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500 text-center py-12">
-                Chưa có hoạt động mới.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
+        </ChartCard>
 
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="flex flex-col gap-4 xl:col-span-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {overviewCards.map((card) => (
-              <div
-                key={card.label}
-                className="bg-white rounded-2xl border border-slate-100 p-4"
-              >
-                <p className="text-sm text-slate-500">{card.label}</p>
-                <p className="text-2xl font-semibold text-slate-900 mt-2">
-                  {card.type === "currency"
-                    ? formatCurrency(card.value)
-                    : formatInteger(card.value)}
-                </p>
+        <ChartCard
+          title="Doanh thu theo nền tảng"
+          subtitle="Tỷ trọng doanh thu trên từng sàn"
+        >
+          <div className="h-80">
+            {analysis.charts.revenueByPlatform.length ? (
+              <ReactECharts
+                option={platformPieOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu nền tảng.
               </div>
-            ))}
+            )}
           </div>
+        </ChartCard>
 
-          <div className="bg-white rounded-2xl border border-slate-100 p-5">
-            <SectionTitle
-              title="Doanh thu theo khoá học"
-              subtitle="Top khoá học mang lại doanh thu"
-            />
-            <div className="h-72 mt-6">
-              {courseRevenueData.length ? (
-                <ReactECharts
-                  option={courseRevenueOption}
-                  style={{ width: "100%", height: "100%" }}
-                  notMerge
-                  lazyUpdate
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                  Chưa có số liệu doanh thu khoá học.
-                </div>
-              )}
-            </div>
+        <ChartCard
+          title="Doanh thu theo thời gian"
+          subtitle="Biến động GMV theo mốc thời gian live"
+          className="xl:col-span-1"
+        >
+          <div className="h-80">
+            {revenueTrend.length ? (
+              <ReactECharts
+                option={revenueLineOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu thời gian.
+              </div>
+            )}
           </div>
-        </div>
+        </ChartCard>
+      </section>
 
-        <div className="flex flex-col gap-4">
-          <TopKolList
-            title="Top KOL theo lượt booking"
-            items={summary.topKolsByBookings}
-            valueKey="bookingCount"
-            valueFormatter={(value) => `${formatInteger(value)} lượt`}
-          />
-          <TopKolList
-            title="Top KOL theo doanh thu"
-            items={summary.topKolsByRevenue}
-            valueKey="totalRevenue"
-            valueFormatter={(value) => formatCurrency(value)}
-          />
-        </div>
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <ChartCard
+          title="Phễu chuyển đổi"
+          subtitle="Từ lượt xem tới hành động mua"
+        >
+          <div className="h-72">
+            {analysis.conversionFunnel.totalViews ? (
+              <ReactECharts
+                option={conversionBarOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu phễu chuyển đổi.
+              </div>
+            )}
+          </div>
+        </ChartCard>
+
+        <ChartCard
+          title="Điểm chất lượng"
+          subtitle="Giữ chân, tương tác sớm và doanh thu / lượt xem"
+        >
+          <div className="h-72">
+            {analysis.qualityScore.retentionRate ||
+            analysis.qualityScore.earlyEngagementRate ||
+            analysis.qualityScore.revenuePerView ? (
+              <ReactECharts
+                option={qualityRadarOption}
+                style={{ width: "100%", height: "100%" }}
+                notMerge
+                lazyUpdate
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Chưa có dữ liệu chất lượng phiên live.
+              </div>
+            )}
+          </div>
+        </ChartCard>
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {miniMetrics.map((metric) => (
+          <div
+            key={metric.label}
+            className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col gap-1"
+          >
+            <p className="text-sm text-slate-500">{metric.label}</p>
+            <p className="text-2xl font-semibold text-slate-900">
+              {metric.formatter
+                ? metric.formatter(metric.value)
+                : formatInteger(metric.value)}
+            </p>
+          </div>
+        ))}
       </section>
     </div>
   );

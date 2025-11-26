@@ -1,4 +1,8 @@
 export const CLIENT_API_PATHS = {
+  CONTACT: {
+    lead: "/v1/public/contact/user",
+    kol: "/v1/public/contact/kol",
+  },
   KOL: {
     getAllAvailable: "/v1/kol-profiles/all-available",
     getDetailByKolId: "/v1/kol-profiles/kol-id",
@@ -70,6 +74,10 @@ export const CLIENT_API_PATHS = {
     signContract: "/v1/user/contracts/sign",
     rejectContract: "/v1/user/contracts/reject",
     cancelContract: "/v1/user/contracts/cancel",
+    cancelBookingRequest: (bookingRequestId) =>
+      `/v1/user/bookings/cancel/bookingrequest/${encodeURIComponent(
+        bookingRequestId
+      )}`,
     getUserCampaignDetail: (campaignId) =>
       `/v1/bookings/user/${encodeURIComponent(campaignId)}`,
     initiateCampaignPayment: (paymentScheduleId) =>

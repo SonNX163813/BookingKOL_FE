@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useGetAllBookingRequests } from "../../../hook/admin/booking/useGetAllBookingRequests";
+import { exportBookingRequestsExcel } from "../../../services/booking/BookingRequestAdminService";
 import {
   BOOKING_STATUS_LABEL,
   BOOKING_STATUS_OPTIONS,
@@ -149,6 +150,7 @@ const ManagementBookingRequests = () => {
   const [form] = Form.useForm();
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
+  const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState({
     requestNumber: undefined,
     status: undefined,
@@ -251,6 +253,29 @@ const ManagementBookingRequests = () => {
     setPage(0);
   };
 
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      const blob = await exportBookingRequestsExcel("SINGLE");
+      if (!blob) return;
+
+      const downloadUrl = URL.createObjectURL(
+        blob instanceof Blob ? blob : new Blob([blob])
+      );
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", "booking-requests-single.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Failed to export booking requests", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const columns = useMemo(
     () => [
       // {
@@ -267,7 +292,9 @@ const ManagementBookingRequests = () => {
         width: 180,
         render: (_, record) => {
           const contract = getPrimaryContract(record);
-          return contract?.contractNumber ?? pickValue(record, ["contractNumber"]);
+          return (
+            contract?.contractNumber ?? pickValue(record, ["contractNumber"])
+          );
         },
       },
       {
@@ -459,7 +486,7 @@ const ManagementBookingRequests = () => {
           </Form.Item>
 
           <div>
-            <Space size="middle" wrap>
+            <Space size="middle">
               <Button
                 type="primary"
                 htmlType="submit"
@@ -476,6 +503,13 @@ const ManagementBookingRequests = () => {
                 loading={isFetchingBookingRequests}
               >
                 Làm mới
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleExportExcel}
+                loading={isExporting}
+              >
+                Xuất dữ liệu booking lẻ
               </Button>
             </Space>
           </div>

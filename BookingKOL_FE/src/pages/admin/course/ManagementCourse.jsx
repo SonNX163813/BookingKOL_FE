@@ -1,5 +1,13 @@
 // src/pages/admin/course/ManagementCourse.jsx
-import { Search, Trash2, Eye, Plus, Pencil } from "lucide-react";
+import {
+  Search,
+  Trash2,
+  Eye,
+  Plus,
+  Pencil,
+  Power,
+  EyeClosed,
+} from "lucide-react";
 import {
   Button,
   Card,
@@ -15,11 +23,15 @@ import {
   Select, // <== THÊM
   message,
 } from "antd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGetAllCourse } from "../../../hook/admin/course/useGetAllCourse";
 import { SchoolOutlined } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { adminCourseDelete } from "../../../services/admin/AdminAPI";
+import {
+  adminCourseDelete,
+  adminCourseUpdate,
+} from "../../../services/admin/AdminAPI";
+import { CheckCircle, XCircle } from "lucide-react";
 
 const { Title, Text } = Typography;
 
@@ -59,12 +71,19 @@ const ManagementCourse = () => {
       searchValue
     );
 
+  useEffect(() => {
+    if (typeof refetchGetAllCourse === "function") {
+      refetchGetAllCourse();
+    }
+  }, [refetchGetAllCourse]);
+
   const dataResponse = ResponseGetAllCourse?.data?.content || [];
 
   // ===== Modal state =====
   const [openView, setOpenView] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [deletingCourseId, setDeletingCourseId] = useState(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
   const handleSearch = (value) => {
     setSearchValue(value.search);
@@ -106,6 +125,27 @@ const ManagementCourse = () => {
 
   const handleEdit = (record) => {
     navigate(`/admin/edit-detail-course/${record.id}`);
+  };
+
+  const handleToggleStatus = async (record) => {
+    if (!record?.id) return;
+    const nextStatus = !record.isAvailable;
+    try {
+      setUpdatingStatusId(record.id);
+      await adminCourseUpdate(record.id, { isAvailable: nextStatus });
+      message.success(nextStatus ? "Đã bật khóa học." : "Đã tắt khóa học.");
+      if (typeof refetchGetAllCourse === "function") {
+        await refetchGetAllCourse();
+      }
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Cập nhật trạng thái thất bại. Vui lòng thử lại.";
+      message.error(errMsg);
+    } finally {
+      setUpdatingStatusId(null);
+    }
   };
 
   const handleDeleteCourse = (record) => {
@@ -273,6 +313,22 @@ const ManagementCourse = () => {
             title="Chỉnh sửa"
           >
             <Pencil size={18} className="font-semibold" />
+          </Button>
+          <Button
+            onClick={() => handleToggleStatus(record)}
+            loading={updatingStatusId === record.id}
+            className={`!h-10 !border-none transition-all ${
+              record.isAvailable
+                ? "!bg-green-600 hover:!bg-green-700 !text-white"
+                : "!bg-gray-400 hover:!bg-gray-500"
+            }`}
+            title="Bật/Tắt trạng thái"
+          >
+            {record.isAvailable ? (
+              <Eye size={20} className="text-white" />
+            ) : (
+              <EyeClosed size={20} className="text-white" />
+            )}
           </Button>
           <Button
             onClick={() => handleDeleteCourse(record)}

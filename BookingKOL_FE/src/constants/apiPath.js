@@ -17,6 +17,7 @@ export const API_PATHS = {
     adminKolMediaDelete: "/v1/admin/kol/medias/delete", // + /{fileId}
     adminKolCoverChange: "/v1/admin/kol/cover-image", // + /{kolId}?fileId=...
     adminKolCreate: "/v1/admin/kol/create-new-kol",
+    adminKolExportExcel: "/v1/admin/kol/export/excel",
   },
   COURSE: {
     getAllCourse: "/v1/admin/course/all",
@@ -50,6 +51,7 @@ export const API_PATHS = {
     getDetail: "/v1/admin/booking/single-requests/detail",
     getAllByKol: "/v1/admin/booking/single-requests/all/by-kol",
     getAllByUser: "/v1/admin/booking/single-requests/all/by-user",
+    exportExcel: "/v1/admin/booking/single-requests/export/excel",
     getWorktimeLivestreamMetrics: (worktimeId) =>
       `v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
         worktimeId

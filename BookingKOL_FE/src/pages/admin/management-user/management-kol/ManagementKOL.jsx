@@ -29,7 +29,10 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetAllKol } from "../../../../hook/admin/management-user/useGetAllKol";
-import { adminGetKolsByCategory } from "../../../../services/admin/AdminAPI";
+import {
+  adminExportKolExcel,
+  adminGetKolsByCategory,
+} from "../../../../services/admin/AdminAPI";
 import { getAllCategory } from "../../../../services/CategoryServices";
 import imgdef from "../../../../assets/default.png";
 import { VerifiedUserOutlined } from "@mui/icons-material";
@@ -51,6 +54,7 @@ const ManagementKOL = () => {
   const [searchValue, setSearchValue] = useState();
   const [searchMinBookingPrice, setSearchMinBookingPrice] = useState();
   const [minRating, setMinRating] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Category
   const [categoryId, setCategoryId] = useState(null);
@@ -156,6 +160,29 @@ const ManagementKOL = () => {
 
   const handleCreateKol = () => {
     navigate("/admin/kols/create");
+  };
+
+  const handleExportKol = async () => {
+    try {
+      setIsExporting(true);
+      const blob = await adminExportKolExcel();
+      if (!blob) return;
+
+      const downloadUrl = URL.createObjectURL(
+        blob instanceof Blob ? blob : new Blob([blob])
+      );
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", "kols.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Failed to export KOL excel", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // 👉 Nút lịch: Admin xem lịch KOL (mặc định view=month)
@@ -482,6 +509,15 @@ const ManagementKOL = () => {
             >
               <Plus size={18} />
               Tạo KOL
+            </Button>
+          </Form.Item>
+          <Form.Item>
+            <Button
+              onClick={handleExportKol}
+              loading={isExporting}
+              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+            >
+              Xuất dữ liệu KOL
             </Button>
           </Form.Item>
         </Form>

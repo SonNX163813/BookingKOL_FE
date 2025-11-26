@@ -495,7 +495,7 @@ const DashBoard = () => {
           </div>
         </div>
       </section>
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl border border-slate-100 p-5 xl:col-span-2">
           <SectionTitle
             title="Lịch booking sắp tới"
@@ -579,9 +579,9 @@ const DashBoard = () => {
             )}
           </div>
         </div>
-      </section>
+      </section> */}
 
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 xl:grid-cols-1 gap-6">
         <div className="flex flex-col gap-4 xl:col-span-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {overviewCards.map((card) => (
@@ -621,7 +621,7 @@ const DashBoard = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        {/* <div className="flex flex-col gap-4">
           <TopKolList
             title="Top KOL theo lượt booking"
             items={summary.topKolsByBookings}
@@ -634,7 +634,7 @@ const DashBoard = () => {
             valueKey="totalRevenue"
             valueFormatter={(value) => formatCurrency(value)}
           />
-        </div>
+        </div> */}
       </section>
     </div>
   );

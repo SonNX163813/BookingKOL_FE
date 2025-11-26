@@ -1,11 +1,19 @@
-﻿export const useSubmitLead = () => {
-  const submitLead = (payload) => {
-    console.log("Submitting lead payload", payload);
-    // TODO integrate with CRM:
-    // - Gắn tag dịch vụ theo form
-    // - Gửi email cảm ơn tự động
-    // - Tạo deal trong CRM nội bộ
-    // - Push thông báo Slack/Zalo OA cho đội vận hành
+import {
+  submitClientContact,
+  submitKolContact,
+} from "../../../services/contact/ContactServices";
+
+export const useSubmitLead = () => {
+  const submitLead = async ({ type, payload } = {}) => {
+    if (type === "client") {
+      return submitClientContact(payload);
+    }
+
+    if (type === "kol") {
+      return submitKolContact(payload);
+    }
+
+    throw new Error("Unsupported lead form type");
   };
 
   return { submitLead };

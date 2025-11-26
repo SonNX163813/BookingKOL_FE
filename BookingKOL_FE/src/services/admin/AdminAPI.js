@@ -103,6 +103,14 @@ export const adminGetKols = async ({ signal, params } = {}) => {
   return { ...(typeof data === "object" ? data : {}), content };
 };
 
+export const adminExportKolExcel = async ({ signal } = {}) => {
+  const blob = await get({
+    url: PATHS.adminKolExportExcel,
+    config: { responseType: "blob", signal },
+  });
+  return blob;
+};
+
 /* ==== NEW: Lấy KOL theo category (FE sẽ tự lọc thêm theo tên/giá/rating) ==== */
 const KOL_CATEGORY_BASE = "/v1/kol-profiles/category"; // axios-config sẽ tự thêm '/api' nếu có
 
@@ -431,3 +439,5 @@ export const useGetAllCourse = (
     keepPreviousData: true,
   });
 };
+
+

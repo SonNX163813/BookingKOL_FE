@@ -121,7 +121,7 @@ const CampaignBookingDetailPage = () => {
   const isInitialLoading = isGettingCampaignDetail && !detail;
 
   const handleBack = useCallback(() => {
-    navigate(-1);
+    navigate("/don-booking-chien-dich");
   }, [navigate]);
 
   const handleOpenContractPreview = useCallback((request) => {
@@ -246,97 +246,143 @@ const CampaignBookingDetailPage = () => {
   const renderPaymentSchedules = (schedules = [], parentRequest = null) => {
     if (!schedules.length) return null;
 
+    const normalizedSchedules = schedules.map((schedule) => {
+      const normalizedStatus =
+        typeof schedule?.status === "string"
+          ? schedule.status.toUpperCase()
+          : schedule?.status;
+      const statusMeta = resolveStatusMeta(normalizedStatus);
+      const paymentStatus = schedule?.transactionStatus
+        ? schedule.transactionStatus.toUpperCase()
+        : null;
+      const isSchedulePaid =
+        normalizedStatus === "PAID" ||
+        paymentStatus === "PAID" ||
+        paymentStatus === "COMPLETED";
+      const canInitiateBase =
+        !isSchedulePaid &&
+        normalizedStatus === "PENDING" &&
+        (paymentStatus === null ||
+          ["PENDING", "FAILED", "CANCELLED", "UNDERPAID"].includes(
+            paymentStatus
+          ));
+
+      return {
+        schedule,
+        statusMeta,
+        paymentStatus,
+        isSchedulePaid,
+        canInitiateBase,
+      };
+    });
+
+    const nextPayableScheduleId = (() => {
+      const candidates = normalizedSchedules
+        .filter((entry) => entry.canInitiateBase)
+        .sort((a, b) => {
+          const aNumber = Number(a.schedule?.installmentNumber);
+          const bNumber = Number(b.schedule?.installmentNumber);
+          const aIsValid = Number.isFinite(aNumber);
+          const bIsValid = Number.isFinite(bNumber);
+          if (aIsValid && bIsValid) return aNumber - bNumber;
+          if (aIsValid) return -1;
+          if (bIsValid) return 1;
+          return 0;
+        });
+
+      const nextSchedule = candidates[0]?.schedule;
+      return (
+        nextSchedule?.id ?? nextSchedule?.contractPaymentScheduleId ?? null
+      );
+    })();
+
     return (
       <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
           <Sparkles size={16} />
+          {/* Tiêu đề box */}
           <span>Tiến độ thanh toán</span>
+          {/* hoặc: <span>Lịch thanh toán</span> */}
         </div>
         <div className="space-y-3">
-          {schedules.map((schedule) => {
-            const normalizedStatus =
-              typeof schedule?.status === "string"
-                ? schedule.status.toUpperCase()
-                : schedule?.status;
-            const statusMeta = resolveStatusMeta(normalizedStatus);
-            const paymentStatus = schedule?.transactionStatus
-              ? schedule.transactionStatus.toUpperCase()
-              : null;
-            const isSchedulePaid =
-              normalizedStatus === "PAID" ||
-              paymentStatus === "PAID" ||
-              paymentStatus === "COMPLETED";
-            const canInitiatePayment =
-              !isSchedulePaid &&
-              normalizedStatus === "PENDING" &&
-              (paymentStatus === null ||
-                ["PENDING", "FAILED", "CANCELLED", "UNDERPAID"].includes(
-                  paymentStatus
-                ));
-            const isProcessingPayment =
-              initiatingScheduleId ===
-              (schedule?.id ?? schedule?.contractPaymentScheduleId);
+          {normalizedSchedules.map(
+            ({ schedule, statusMeta, paymentStatus, canInitiateBase }) => {
+              const isProcessingPayment =
+                initiatingScheduleId ===
+                (schedule?.id ?? schedule?.contractPaymentScheduleId);
+              const canInitiatePayment =
+                canInitiateBase &&
+                (schedule?.id ?? schedule?.contractPaymentScheduleId) ===
+                  nextPayableScheduleId;
 
-            return (
-              <div
-                key={schedule?.id ?? schedule?.installmentNumber}
-                className="rounded-2xl border border-slate-200 bg-white/90 p-3 text-sm shadow-sm"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold text-slate-900">
-                    Đợt {schedule?.installmentNumber ?? "--"}
-                  </span>
-                  <Tag
-                    color={statusMeta.color}
-                    className="rounded-full px-3 py-1 text-xs font-semibold"
-                  >
-                    {statusMeta.label}
-                  </Tag>
-                  {paymentStatus ? (
+              return (
+                <div
+                  key={schedule?.id ?? schedule?.installmentNumber}
+                  className="rounded-2xl border border-slate-200 bg-white/90 p-3 text-sm shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Đợt thanh toán */}
+                    <span className="font-semibold text-slate-900">
+                      Đợt {schedule?.installmentNumber ?? "--"}
+                    </span>
+
+                    {/* Trạng thái lịch thanh toán */}
                     <Tag
-                      color={PAYMENT_STATUS_COLOR[paymentStatus] ?? "blue"}
+                      color={statusMeta.color}
                       className="rounded-full px-3 py-1 text-xs font-semibold"
                     >
-                      {PAYMENT_STATUS_LABEL[paymentStatus] ?? paymentStatus}
+                      {statusMeta.label}
                     </Tag>
+
+                    {/* Trạng thái giao dịch thanh toán */}
+                    {paymentStatus ? (
+                      <Tag
+                        color={PAYMENT_STATUS_COLOR[paymentStatus] ?? "blue"}
+                        className="rounded-full px-3 py-1 text-xs font-semibold"
+                      >
+                        {PAYMENT_STATUS_LABEL[paymentStatus] ?? paymentStatus}
+                      </Tag>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 grid gap-3 text-slate-600 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Số tiền
+                      </p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {formatCurrency(schedule?.amount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Hạn thanh toán
+                      </p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {formatDateTime(schedule?.dueDate, "DD/MM/YYYY")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canInitiatePayment ? (
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        type="primary"
+                        icon={<Sparkles size={16} />}
+                        loading={isProcessingPayment}
+                        className="!h-10 !rounded-xl !px-5 font-semibold"
+                        onClick={() =>
+                          handleInitiatePayment(schedule, parentRequest)
+                        }
+                      >
+                        Thanh toán đợt này
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
-                <div className="mt-3 grid gap-3 text-slate-600 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
-                      Số tiền
-                    </p>
-                    <p className="text-base font-semibold text-slate-900">
-                      {formatCurrency(schedule?.amount)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
-                      Hạn thanh toán
-                    </p>
-                    <p className="text-base font-semibold text-slate-900">
-                      {formatDateTime(schedule?.dueDate, "DD/MM/YYYY")}
-                    </p>
-                  </div>
-                </div>
-                {canInitiatePayment ? (
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      type="primary"
-                      icon={<Sparkles size={16} />}
-                      loading={isProcessingPayment}
-                      className="!h-10 !rounded-xl !px-5 font-semibold"
-                      onClick={() =>
-                        handleInitiatePayment(schedule, parentRequest)
-                      }
-                    >
-                      Thanh toán đợt này
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+              );
+            }
+          )}
         </div>
       </div>
     );

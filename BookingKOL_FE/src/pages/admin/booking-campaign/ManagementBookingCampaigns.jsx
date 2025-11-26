@@ -28,6 +28,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { adminGetCampaignBookings } from "../../../services/admin/AdminBookingCampaignAPI";
+import { exportBookingRequestsExcel } from "../../../services/booking/BookingRequestAdminService";
 
 dayjs.locale("vi");
 const { RangePicker } = DatePicker;
@@ -88,6 +89,7 @@ export default function ManagementBookingCampaigns() {
 
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [filters, setFilters] = useState({
     search: undefined,
@@ -243,6 +245,29 @@ export default function ManagementBookingCampaigns() {
     },
     [navigate]
   );
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      const blob = await exportBookingRequestsExcel("CAMPAIGN");
+      if (!blob) return;
+
+      const downloadUrl = URL.createObjectURL(
+        blob instanceof Blob ? blob : new Blob([blob])
+      );
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", "booking-campaigns.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Failed to export booking requests", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const columns = useMemo(
     () => [
@@ -418,7 +443,7 @@ export default function ManagementBookingCampaigns() {
             </Form.Item>
 
             <div>
-              <Space size="middle" wrap>
+              <Space size="middle">
                 <Button
                   type="primary"
                   htmlType="submit"
@@ -435,6 +460,13 @@ export default function ManagementBookingCampaigns() {
                   loading={isFetching}
                 >
                   Làm mới
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={handleExportExcel}
+                  loading={isExporting}
+                >
+                  Xuất dữ liệu booking Campaign
                 </Button>
               </Space>
             </div>
