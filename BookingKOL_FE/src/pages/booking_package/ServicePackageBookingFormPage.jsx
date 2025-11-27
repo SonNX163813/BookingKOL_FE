@@ -9,7 +9,6 @@ import {
   Select,
   message,
   Descriptions,
-  Upload,
 } from "antd";
 import dayjs from "dayjs";
 import { Crown, Megaphone, CheckCircle } from "lucide-react";
@@ -18,6 +17,26 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getKolProfiles, resolveAvatarUrl } from "../../services/kol/KolAPI";
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
+
+// MUI imports cho form tải tệp
+import {
+  Stack,
+  Typography,
+  Button as MuiButton,
+  Alert,
+  IconButton,
+} from "@mui/material";
+import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
+import AttachmentRoundedIcon from "@mui/icons-material/AttachmentRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+
+const STYLE = {
+  textPrimary: "#0f172a",
+  textSecondary: "#6b7280",
+  border: "#e5e7eb",
+  accent: "#4f46e5",
+  subtleSurface: "#f9fafb",
+};
 
 const normalizePackageType = (type) => {
   if (!type) {
@@ -52,6 +71,16 @@ const HERO_STATS = [
 ];
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_ATTACHMENTS = 5;
+
+const attachmentHint = `Tối đa ${MAX_ATTACHMENTS} tệp, mỗi tệp ≤ 10MB`;
+
+const formatFileSize = (size) => {
+  if (!size && size !== 0) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 /** Tag render: avatar nhỏ + tên, không hiện id */
 const createTagRender = (options) => (tagProps) => {
@@ -186,7 +215,11 @@ const ServicePackageBookingFormPage = () => {
   const [form] = Form.useForm();
   const [campaignData, setCampaignData] = useState({});
   const [vipExtraData, setVipExtraData] = useState({});
-  const [attachmentFile, setAttachmentFile] = useState(null);
+
+  // attachments: [{ id, file, name, size }]
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState("");
+
   const stepsWrapperRef = useRef(null);
 
   const hasExternalPackageSelection = Boolean(initialPackageType);
@@ -361,6 +394,13 @@ const ServicePackageBookingFormPage = () => {
 
   const handleCampaignFormFinish = (values) => {
     const { kol, assistant, startDate, endDate, ...rest } = values;
+
+    // đảm bảo có file
+    if (!attachments.length) {
+      setAttachmentError("Vui lòng chọn tệp tải lên!");
+      return;
+    }
+
     const formatted = {
       ...rest,
       startDate: startDate.format("YYYY-MM-DD"),
@@ -392,7 +432,7 @@ const ServicePackageBookingFormPage = () => {
 
   const onSuccess = () => {
     form.resetFields();
-    setAttachmentFile(null);
+    setAttachments([]);
     setVipExtraData({});
     navigate("/");
   };
@@ -400,15 +440,57 @@ const ServicePackageBookingFormPage = () => {
   const { isLoadingCreateBooking, handleCreateBooking } =
     useCreateBooking(onSuccess);
 
-  const handleAttachmentChange = (event) => {
-    const file = event.target.files?.[0];
-    if (file && file.size > MAX_ATTACHMENT_SIZE) {
-      message.error("Vui lòng chọn tệp nhỏ hơn 10MB.");
-      event.target.value = "";
-      return;
+  // Xử lý chọn file (MUI input)
+  const handleFileInputChange = (event) => {
+    const fileList = Array.from(event.target.files || []);
+    if (!fileList.length) return;
+
+    let merged = [...attachments];
+
+    for (const file of fileList) {
+      const size = typeof file.size === "number" ? file.size : 0;
+
+      if (size > MAX_ATTACHMENT_SIZE) {
+        message.error(
+          `"${file.name}" vượt quá 10MB, vui lòng chọn tệp nhỏ hơn.`
+        );
+        continue;
+      }
+
+      const key = `${file.name}-${size}-${file.lastModified || ""}`;
+      const exists = merged.some((item) => item.id === key);
+      if (exists) continue;
+
+      merged.push({
+        id: key,
+        file,
+        name: file.name,
+        size,
+      });
     }
-    setAttachmentFile(file || null);
+
+    if (merged.length > MAX_ATTACHMENTS) {
+      message.warning(`Chỉ hỗ trợ tối đa ${MAX_ATTACHMENTS} tệp đính kèm.`);
+      merged = merged.slice(0, MAX_ATTACHMENTS);
+    }
+
+    setAttachments(merged);
+    setAttachmentError("");
+    // cập nhật lỗi trong Form nếu có custom validator
+    form.validateFields(["attachment"]).catch(() => {});
+    // reset input để có thể chọn lại cùng file
     event.target.value = "";
+  };
+
+  const handleRemoveAttachment = (id) => {
+    const next = attachments.filter((item) => item.id !== id);
+    setAttachments(next);
+    if (!next.length) {
+      setAttachmentError("Vui lòng chọn tệp tải lên!");
+    } else {
+      setAttachmentError("");
+    }
+    form.validateFields(["attachment"]).catch(() => {});
   };
 
   const handleConfirm = () => {
@@ -422,6 +504,17 @@ const ServicePackageBookingFormPage = () => {
 
     if (!resolvedPackageId) {
       message.error("Không tìm thấy thông tin gói dịch vụ.");
+      return;
+    }
+
+    const finalAttachments = attachments
+      .map((item) => item.file)
+      .filter(Boolean);
+
+    if (!finalAttachments.length) {
+      message.error(
+        "Vui lòng chọn tệp đính kèm chiến dịch (tối đa 5 tệp, mỗi tệp ≤ 10MB)."
+      );
       return;
     }
 
@@ -441,7 +534,7 @@ const ServicePackageBookingFormPage = () => {
         selectedPackage === "vip" && Array.isArray(vipExtraData.kol)
           ? vipExtraData.kol
           : undefined,
-      attachment: attachmentFile || undefined,
+      attachment: finalAttachments,
     };
 
     handleCreateBooking(data);
@@ -451,20 +544,6 @@ const ServicePackageBookingFormPage = () => {
     title: "Chọn gói dịch vụ",
     content: (
       <div className="space-y-8">
-        {/* <div className="rounded-3xl border border-white/50 bg-gradient-to-r from-[#3117ff] via-[#6d37ff] to-[#a125ff] p-6 text-white shadow-2xl shadow-indigo-500/40">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-white/80">
-            Bước 1
-          </p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-tight">
-            Chọn cách đồng hành
-          </h3>
-          <p className="mt-3 text-sm text-white/85">
-            Hãy cùng chúng tôi xây dựng một chiến dịch livestream ấn tượng với
-            đội ngũ KOL và trợ lý giàu kinh nghiệm. Mỗi gói được chuẩn hoá như
-            giao diện CourseLivestream: sang trọng, cập nhật rõ ràng, thao tác
-            nhanh.
-          </p>
-        </div> */}
         <div className="grid gap-8 lg:grid-cols-2">
           <PricingCard
             title="Gói Thường"
@@ -497,18 +576,6 @@ const ServicePackageBookingFormPage = () => {
     title: "Nhập thông tin chiến dịch",
     content: (
       <div className="space-y-8">
-        {/* <div className="rounded-3xl border border-slate-200/60 bg-white/70 p-6 shadow-lg shadow-slate-200/60 backdrop-blur">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-blue-600">
-            Bước 2
-          </p>
-          <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            Mô tả chiến dịch
-          </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Điền các thông tin tương tự bố cục CourseLivestream: rõ ràng, tinh
-            gọn và tạo cảm hứng.
-          </p>
-        </div> */}
         <Form
           form={form}
           layout="vertical"
@@ -597,49 +664,119 @@ const ServicePackageBookingFormPage = () => {
             />
           </Form.Item>
 
-          {/* <Form.Item
-            label="Tệp đính kèm chiến dịch"
-            rules={[{ required: true, message: "Vui lòng chọn tệp tải lên!" }]}
-          >
-            <div className="space-y-2">
-              <input
-                type="file"
-                required
-                accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
-                onChange={handleAttachmentChange}
-                className="block w-full cursor-pointer rounded-xl border border-dashed border-indigo-200 bg-white px-4 py-3 text-sm text-slate-600 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-indigo-300"
-              />
-              <p className="text-xs text-slate-500">
-                Hỗ trợ PNG, JPG, PDF hoặc DOC, tối đa 10MB.
-              </p>
-              {attachmentFile && (
-                <p className="text-sm font-medium text-slate-700">
-                  Đã chọn: {attachmentFile.name}
-                </p>
-              )}
-            </div>
-          </Form.Item> */}
+          {/* FORM TẢI TỆP MUI */}
           <Form.Item
-            label="Tệp đính kèm chiến dịch"
             name="attachment"
-            rules={[{ required: true, message: "Vui lòng chọn tệp tải lên!" }]}
-            valuePropName="fileList"
-            getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            // fake field chỉ để validator, UI tự quản attachments
+            rules={[
+              {
+                validator: () => {
+                  if (!attachments.length) {
+                    return Promise.reject(
+                      new Error("Vui lòng chọn tệp tải lên!")
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+            validateStatus={attachmentError ? "error" : ""}
+            help={attachmentError || undefined}
           >
-            <Upload
-              beforeUpload={() => false} // không upload tự động
-              accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
-              maxCount={1}
-              showUploadList={false} // ẩn danh sách file mặc định
-            >
-              <div
-                className="block w-full cursor-pointer rounded-xl border border-dashed border-indigo-200 bg-white px-4 py-3 text-sm text-slate-600 
-                 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-indigo-600 
-                 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-indigo-300"
+            <Stack spacing={1.5}>
+              <Typography
+                variant="subtitle2"
+                sx={{ color: STYLE.textPrimary, fontWeight: 600 }}
               >
-                Chọn tệp tải lên
-              </div>
-            </Upload>
+                Tệp đính kèm{" "}
+                <Typography
+                  component="span"
+                  sx={{ color: "error.main", ml: 0.25 }}
+                >
+                  *
+                </Typography>
+              </Typography>
+
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <MuiButton
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadRoundedIcon />}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: "14px",
+                    borderColor: STYLE.border,
+                    color: STYLE.textPrimary,
+                    "&:hover": { borderColor: STYLE.accent },
+                  }}
+                >
+                  Tải lên tệp
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={handleFileInputChange}
+                  />
+                </MuiButton>
+                <Typography variant="body2" sx={{ color: STYLE.textSecondary }}>
+                  {attachmentHint}
+                </Typography>
+              </Stack>
+
+              {attachmentError && (
+                <Alert severity="error" sx={{ borderRadius: "14px" }}>
+                  {attachmentError}
+                </Alert>
+              )}
+
+              {attachments.length > 0 && (
+                <Stack spacing={1}>
+                  {attachments.map((item) => (
+                    <Stack
+                      key={item.id}
+                      direction="row"
+                      alignItems="center"
+                      spacing={1.25}
+                      sx={{
+                        borderRadius: "14px",
+                        backgroundColor: STYLE.subtleSurface,
+                        border: `1px solid ${STYLE.border}`,
+                        px: 1.5,
+                        py: 1,
+                      }}
+                    >
+                      <AttachmentRoundedIcon
+                        sx={{ color: STYLE.accent, fontSize: 20 }}
+                      />
+                      <Stack sx={{ flex: 1 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: STYLE.textPrimary, fontWeight: 500 }}
+                        >
+                          {item.name}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: STYLE.textSecondary }}
+                        >
+                          {formatFileSize(item.size)}
+                        </Typography>
+                      </Stack>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveAttachment(item.id)}
+                        sx={{
+                          color: STYLE.textSecondary,
+                          "&:hover": { color: STYLE.accent },
+                        }}
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Stack>
           </Form.Item>
 
           {selectedPackage === "vip" && (
@@ -743,18 +880,6 @@ const ServicePackageBookingFormPage = () => {
     title: "Xác nhận",
     content: (
       <div className="space-y-8">
-        {/* <div className="rounded-3xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 via-white to-white p-6 shadow-lg shadow-emerald-100/70">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-emerald-500">
-            Bước 3
-          </p>
-          <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            Kiểm tra lần cuối trước khi gửi
-          </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Tổng kết thông tin chiến dịch rõ ràng, sang trọng và dễ đối chiếu.
-          </p>
-        </div> */}
-
         <div className="grid gap-6">
           <div>
             <Descriptions
@@ -786,9 +911,9 @@ const ServicePackageBookingFormPage = () => {
               <Descriptions.Item label="Tần suất triển khai">
                 {campaignData.recurrencePattern}
               </Descriptions.Item>
-              {attachmentFile && (
+              {attachments.length > 0 && (
                 <Descriptions.Item label="Tệp đính kèm">
-                  {attachmentFile.name}
+                  {attachments.map((f) => f.name).join(", ")}
                 </Descriptions.Item>
               )}
             </Descriptions>
@@ -853,63 +978,7 @@ const ServicePackageBookingFormPage = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8">
-        {/* <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div>
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 shadow-sm">
-              Booking Package
-            </span>
-            <h1 className="mt-6 text-4xl font-extrabold leading-tight text-slate-900 sm:text-5xl">
-              Hãy cùng chúng tôi xây dựng một chiến dịch Livestream đỉnh cao
-            </h1>
-            <p className="mt-4 text-lg text-slate-600">
-              Lấy tinh thần thiết kế của trang CourseLivestream và mang vào quy
-              trình đặt gói: giao diện trong trẻo, thông tin minh bạch, trải
-              nghiệm cập nhật liên tục.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <button
-                type="button"
-                onClick={handleScrollToForm}
-                className="rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/40 transition hover:-translate-y-0.5"
-              >
-                Bắt đầu đặt gói
-              </button>
-              <button
-                type="button"
-                onClick={handleScrollToForm}
-                className="rounded-full border border-slate-300/80 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5"
-              >
-                Xem quy trình
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {HERO_HIGHLIGHTS.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-xl shadow-slate-200/70 backdrop-blur"
-              >
-                <p className="text-sm font-semibold text-slate-500">{item.title}</p>
-                <p className="mt-2 text-sm text-slate-600">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          {HERO_STATS.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-white/60 bg-white/90 px-5 py-4 shadow-lg shadow-slate-200/80 backdrop-blur"
-            >
-              <p className="text-3xl font-semibold text-blue-600">{stat.value}</p>
-              <p className="mt-1 text-sm text-slate-500">{stat.label}</p>
-            </div>
-          ))}
-        </div> */}
-      </div>
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8" />
 
       <div
         ref={stepsWrapperRef}
