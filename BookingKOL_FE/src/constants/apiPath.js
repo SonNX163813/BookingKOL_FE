@@ -53,11 +53,11 @@ export const API_PATHS = {
     getAllByUser: "/v1/admin/booking/single-requests/all/by-user",
     exportExcel: "/v1/admin/booking/single-requests/export/excel",
     getWorktimeLivestreamMetrics: (worktimeId) =>
-      `v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
+      `/v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
         worktimeId
       )}`,
     getLivestreamMetricsByKol: (kolId) =>
-      `v1/admin/requests/worktime/livestream-metrics/kol/${encodeURIComponent(
+      `/v1/admin/requests/worktime/livestream-metrics/kol/${encodeURIComponent(
         kolId
       )}`,
   },

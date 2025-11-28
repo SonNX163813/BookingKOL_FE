@@ -80,7 +80,7 @@ const CAMPAIGN_STATUS_LABEL = {
 
 const CAMPAIGN_STATUS_COLOR = {
   REQUESTED: "gold",
-  NEGOTIATING: "orange",
+  NEGOTIATING: "purple",
   APPROVED: "green",
   REJECTED: "red",
   COMPLETED: "blue",

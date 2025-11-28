@@ -16,6 +16,7 @@ import {
   Table,
   Tag,
   Typography,
+  Tooltip,
 } from "antd";
 import {
   ArrowLeft,
@@ -48,15 +49,10 @@ const formatBoolean = (value) => {
 };
 
 const formatCurrency = (value, currency = "VND") => {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
+  if (value === null || value === undefined || value === "") return "--";
 
   const numeric = typeof value === "number" ? value : Number.parseFloat(value);
-
-  if (Number.isNaN(numeric)) {
-    return "--";
-  }
+  if (Number.isNaN(numeric)) return "--";
 
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -69,14 +65,8 @@ const normalizeStatus = (status) =>
   status && typeof status === "string" ? status.toUpperCase() : status;
 
 const formatArrayOrValue = (value) => {
-  if (Array.isArray(value)) {
-    return value.length ? value.join(", ") : "--";
-  }
-
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "--";
+  if (value === null || value === undefined || value === "") return "--";
   return String(value);
 };
 
@@ -97,12 +87,28 @@ const renderMessage = (message) => {
 const normalizeFileType = (fileType) =>
   fileType && typeof fileType === "string" ? fileType.toUpperCase() : "";
 
+/** Cắt chuỗi + tooltip */
+const renderEllipsisText = (text, maxLength = 42) => {
+  const raw = text ?? "";
+  const str = String(raw);
+  if (!str) return "--";
+  if (str.length <= maxLength) return str;
+
+  const short = `${str.slice(0, maxLength)}...`;
+  return (
+    <Tooltip title={str}>
+      <span>{short}</span>
+    </Tooltip>
+  );
+};
+
 const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
-  if (!fileUrl) {
-    return "--";
-  }
+  if (!fileUrl) return "--";
 
   const normalizedType = normalizeFileType(fileType);
+
+  // ưu tiên tên file để hiển thị
+  const displayText = fileName || fileUrl;
 
   if (normalizedType === "IMAGE") {
     return (
@@ -119,33 +125,35 @@ const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
 
   if (normalizedType === "VIDEO") {
     return (
+      <Tooltip title={fileUrl}>
+        <a
+          href={fileUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-600 hover:text-blue-500"
+        >
+          Xem video
+        </a>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip title={fileUrl}>
       <a
         href={fileUrl}
         target="_blank"
         rel="noreferrer"
         className="text-blue-600 hover:text-blue-500"
       >
-        Xem video
+        {renderEllipsisText(displayText, 48)}
       </a>
-    );
-  }
-
-  return (
-    <a
-      href={fileUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="text-blue-600 hover:text-blue-500"
-    >
-      {fileName ?? fileUrl}
-    </a>
+    </Tooltip>
   );
 };
 
 const renderImageField = (fileUrl, label) => {
-  if (!fileUrl) {
-    return "--";
-  }
+  if (!fileUrl) return "--";
 
   return (
     <Space direction="vertical" size={8}>
@@ -180,26 +188,15 @@ const LIVESTREAM_METRIC_LABELS = [
 ];
 
 const formatLivestreamMetricValue = (key, value) => {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-
-  if (key === "revenue" || key === "avgOrderValue") {
+  if (value === null || value === undefined || value === "") return "--";
+  if (key === "revenue" || key === "avgOrderValue")
     return formatCurrency(value);
-  }
-
-  if (key === "isConfirmed") {
-    return formatBoolean(value);
-  }
-
-  if (key === "createdAt" || key === "confirmedAt") {
+  if (key === "isConfirmed") return formatBoolean(value);
+  if (key === "createdAt" || key === "confirmedAt")
     return formatDateTime(value);
-  }
-
   return value;
 };
 
-// 🔹 Helper: lấy tên file từ URL
 const getFileNameFromUrl = (url) => {
   if (!url || typeof url !== "string") return "";
   try {
@@ -210,6 +207,21 @@ const getFileNameFromUrl = (url) => {
     const parts = url.split("/").filter(Boolean);
     return parts[parts.length - 1] || url;
   }
+};
+
+const hasAnyLivestreamMetricValue = (metrics) => {
+  if (!metrics || typeof metrics !== "object") return false;
+  return LIVESTREAM_METRIC_LABELS.some(({ key }) => {
+    const v = metrics?.[key];
+    return !(v === null || v === undefined || v === "");
+  });
+};
+
+const hasMeaningfulValue = (v) => {
+  if (v === null || v === undefined) return false;
+  if (typeof v === "string") return v.trim().length > 0;
+  if (Array.isArray(v)) return v.filter(Boolean).length > 0;
+  return true;
 };
 
 const BookingRequestDetail = () => {
@@ -249,11 +261,9 @@ const BookingRequestDetail = () => {
 
   const worktimeMetricsQueryMap = useMemo(() => {
     const queryMap = new Map();
-
     resolvedWorktimeIds.forEach((id, index) => {
       queryMap.set(id, worktimeLivestreamMetricQueries[index]);
     });
-
     return queryMap;
   }, [resolvedWorktimeIds, worktimeLivestreamMetricQueries]);
 
@@ -261,116 +271,31 @@ const BookingRequestDetail = () => {
   const statusLabel =
     BOOKING_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
 
-  const primaryPaymentStatus = normalizeStatus(
-    detail?.contracts?.find((contract) => contract?.paymentDTO?.status)
-      ?.paymentDTO?.status
-  );
-  const primaryPaymentColor = primaryPaymentStatus
-    ? PAYMENT_STATUS_COLOR[primaryPaymentStatus] ?? "purple"
-    : undefined;
-  const primaryPaymentLabel = primaryPaymentStatus
-    ? PAYMENT_STATUS_LABEL[primaryPaymentStatus] ?? primaryPaymentStatus
-    : null;
-
-  const fileUsageColumns = useMemo(
-    () => [
-      { title: "ID", dataIndex: "id", key: "id", width: 220 },
-      {
-        title: "Loại đối tượng",
-        dataIndex: "targetType",
-        key: "targetType",
-      },
-      {
-        title: "ID đối tượng",
-        dataIndex: "targetId",
-        key: "targetId",
-        width: 220,
-      },
-      {
-        title: "Tạo lúc",
-        dataIndex: "createdAt",
-        key: "createdAt",
-        render: (v) => formatDateTime(v),
-      },
-      {
-        title: "Loại tệp",
-        key: "fileType",
-        render: (_, r) => r?.file?.fileType ?? "--",
-      },
-      {
-        title: "Liên kết tệp",
-        key: "fileUrl",
-        render: (_, record) =>
-          renderFilePreviewCell({
-            fileType: record?.file?.fileType,
-            fileUrl: record?.file?.fileUrl,
-            fileName: record?.file?.fileName,
-          }),
-      },
-      {
-        title: "Trạng thái tệp",
-        key: "fileStatus",
-        render: (_, r) => r?.file?.status ?? "--",
-      },
-    ],
-    []
-  );
-
-  const contractColumns = useMemo(
-    () => [
-      {
-        title: "Mã hợp đồng",
-        key: "contractNumber",
-        width: 220,
-        render: (_, record) => record?.contractNumber ?? record?.id ?? "--",
-      },
-      {
-        title: "Tạo lúc",
-        dataIndex: "createdAt",
-        key: "createdAt",
-        render: (v) => formatDateTime(v),
-      },
-      {
-        title: "Trạng thái thanh toán",
-        key: "paymentStatus",
-        render: (_, r) => {
-          const status = r?.paymentDTO?.status;
-          if (!status) return "--";
-
-          return (
-            <Tag color={PAYMENT_STATUS_COLOR[status] ?? "default"}>
-              {PAYMENT_STATUS_LABEL[status] ?? status}
-            </Tag>
-          );
-        },
-      },
-      {
-        title: "Tổng tiền",
-        key: "totalAmount",
-        render: (_, r) => formatCurrency(r?.paymentDTO?.totalAmount),
-      },
-      {
-        title: "Đã thanh toán",
-        key: "paidAmount",
-        render: (_, r) => formatCurrency(r?.paymentDTO?.paidAmount),
-      },
-    ],
-    []
-  );
-
+  // ✅ Tệp đính kèm: đổi ID -> STT + ellipsis cho tên/link
   const attachedFileColumns = useMemo(
     () => [
-      { title: "ID", dataIndex: "id", key: "id", width: 220 },
+      {
+        title: "STT",
+        key: "stt",
+        width: 70,
+        align: "center",
+        render: (_v, _r, index) => index + 1,
+      },
       {
         title: "Tên tệp",
         key: "fileName",
-        render: (_, record) =>
-          record?.file?.fileName ?? record?.fileName ?? "--",
+        render: (_v, record) => {
+          const name = record?.file?.fileName ?? record?.fileName;
+          // nếu không có name thì thử lấy từ url
+          const url = record?.file?.fileUrl ?? record?.fileUrl;
+          const fallback = url ? getFileNameFromUrl(url) : "";
+          return renderEllipsisText(name || fallback || "--", 50);
+        },
       },
       {
         title: "Liên kết tệp",
         key: "fileUrl",
-        render: (_, record) =>
+        render: (_v, record) =>
           renderFilePreviewCell({
             fileType: record?.file?.fileType ?? record?.fileType,
             fileUrl: record?.file?.fileUrl ?? record?.fileUrl,
@@ -380,13 +305,15 @@ const BookingRequestDetail = () => {
       {
         title: "Loại tệp",
         key: "fileType",
-        render: (_, record) =>
+        width: 120,
+        render: (_v, record) =>
           record?.file?.fileType ?? record?.fileType ?? "--",
       },
       {
         title: "Tạo lúc",
         dataIndex: "createdAt",
         key: "createdAt",
+        width: 180,
         render: (v) => formatDateTime(v),
       },
     ],
@@ -447,11 +374,6 @@ const BookingRequestDetail = () => {
                 <Tag color={STATUS_TAG_COLOR[normalizedStatus] ?? "default"}>
                   {statusLabel}
                 </Tag>
-                {primaryPaymentLabel && (
-                  <Tag color={primaryPaymentColor ?? "purple"}>
-                    {primaryPaymentLabel}
-                  </Tag>
-                )}
               </Space>
               <Space size="small" direction="vertical" className="text-right">
                 {responseTimestamp && (
@@ -467,14 +389,18 @@ const BookingRequestDetail = () => {
             <Descriptions
               bordered
               size="middle"
+              title={
+                <Space>
+                  <UserCircle2 size={18} />
+                  <span>Thông tin Booking</span>
+                </Space>
+              }
               column={screens.lg ? 3 : screens.md ? 2 : 1}
               labelStyle={{ width: 180 }}
             >
               <Descriptions.Item label="Mã yêu cầu">
                 {detail?.requestNumber ?? detail?.id ?? "--"}
               </Descriptions.Item>
-
-              {/* Đã bỏ "Loại đặt chỗ" */}
               <Descriptions.Item label="Trạng thái">
                 {statusLabel}
               </Descriptions.Item>
@@ -484,9 +410,11 @@ const BookingRequestDetail = () => {
                   {detail?.description || "--"}
                 </Text>
               </Descriptions.Item>
+
               <Descriptions.Item label="Địa điểm" span={screens.lg ? 3 : 1}>
                 {detail?.location || "--"}
               </Descriptions.Item>
+
               <Descriptions.Item label="Bắt đầu lúc">
                 {formatDateTime(detail?.startAt)}
               </Descriptions.Item>
@@ -496,8 +424,50 @@ const BookingRequestDetail = () => {
               <Descriptions.Item label="Tạo lúc">
                 {formatDateTime(detail?.createdAt)}
               </Descriptions.Item>
-              <Descriptions.Item label="Cập nhật lúc">
-                {formatDateTime(detail?.updatedAt)}
+
+              {hasMeaningfulValue(detail?.updatedAt) && (
+                <Descriptions.Item label="Cập nhật lúc">
+                  {formatDateTime(detail?.updatedAt)}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+          </Card>
+
+          {/* --- Thông tin người yêu cầu --- */}
+          <Card
+            className="shadow-sm"
+            bordered={false}
+            title={
+              <Space>
+                <UserCircle2 size={18} />
+                <span>Thông tin người yêu cầu</span>
+              </Space>
+            }
+          >
+            <Descriptions
+              bordered
+              size="middle"
+              column={screens.lg ? 3 : screens.md ? 2 : 1}
+              labelStyle={{ width: 180 }}
+            >
+              <Descriptions.Item label="Họ tên đầy đủ">
+                {detail?.user?.fullName ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Email">
+                <Text copyable>{detail?.user?.email ?? "--"}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">
+                {detail?.user?.phone ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Giới tính">
+                {detail?.user?.gender === "Male"
+                  ? "Nam"
+                  : detail?.user?.gender === "Female"
+                  ? "Nữ"
+                  : "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ">
+                {detail?.user?.address ?? "--"}
               </Descriptions.Item>
             </Descriptions>
           </Card>
@@ -519,160 +489,52 @@ const BookingRequestDetail = () => {
               column={screens.lg ? 3 : screens.md ? 2 : 1}
               labelStyle={{ width: 180 }}
             >
-              <Descriptions.Item label="Mã KOL">
-                {detail?.kol?.id ?? "--"}
-              </Descriptions.Item>
-
               <Descriptions.Item label="Họ tên đầy đủ">
                 {detail?.kol?.fullName ?? "--"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Tên hiển thị">
                 {detail?.kol?.displayName ?? "--"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Ảnh đại diện" span={screens.lg ? 3 : 1}>
                 {renderImageField(
                   detail?.kol?.avatarUrl,
                   detail?.kol?.displayName ?? detail?.kol?.fullName
                 )}
               </Descriptions.Item>
-
               <Descriptions.Item label="Ngày sinh">
                 {formatDateTime(detail?.kol?.dob, "DD/MM/YYYY")}
               </Descriptions.Item>
-
               <Descriptions.Item label="Tiểu sử" span={screens.lg ? 3 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.bio ?? "--"}
                 </Text>
               </Descriptions.Item>
-
               <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 3 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.experience ?? "--"}
                 </Text>
               </Descriptions.Item>
 
-              <Descriptions.Item label="Quốc gia">
-                {detail?.kol?.country ?? "--"}
-              </Descriptions.Item>
-
               <Descriptions.Item label="Thành phố">
                 {detail?.kol?.city ?? "--"}
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Ngôn ngữ">
-                {detail?.kol?.languages ?? "--"}
-              </Descriptions.Item>
-
-              <Descriptions.Item
-                label="Ghi chú bảng giá"
-                span={screens.lg ? 3 : 1}
-              >
-                <Text style={{ whiteSpace: "pre-wrap" }}>
-                  {detail?.kol?.rateCardNote ?? "--"}
-                </Text>
               </Descriptions.Item>
 
               <Descriptions.Item label="Giá đặt tối thiểu">
                 {formatCurrency(detail?.kol?.minBookingPrice)}
               </Descriptions.Item>
-
               <Descriptions.Item label="Khả dụng">
                 {formatBoolean(detail?.kol?.isAvailable)}
               </Descriptions.Item>
-
-              <Descriptions.Item label="Đánh giá tổng thể">
+              <Descriptions.Item label="Đánh giá">
                 {detail?.kol?.overallRating ?? "--"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Số lượng phản hồi">
                 {detail?.kol?.feedbackCount ?? "--"}
               </Descriptions.Item>
-
-              <Descriptions.Item label="Vai trò">
-                {detail?.kol?.role ?? "--"}
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Tạo lúc">
-                {formatDateTime(detail?.kol?.createdAt)}
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Cập nhật lúc">
-                {formatDateTime(detail?.kol?.updatedAt)}
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Xóa lúc">
-                {formatDateTime(detail?.kol?.deletedAt)}
-              </Descriptions.Item>
             </Descriptions>
           </Card>
 
-          {/* --- Thông tin người yêu cầu --- */}
-          <Card
-            className="shadow-sm"
-            bordered={false}
-            title={
-              <Space>
-                <UserCircle2 size={18} />
-                <span>Thông tin người yêu cầu</span>
-              </Space>
-            }
-          >
-            <Descriptions
-              bordered
-              size="middle"
-              column={screens.lg ? 3 : screens.md ? 2 : 1}
-              labelStyle={{ width: 180 }}
-            >
-              <Descriptions.Item label="Mã người dùng">
-                {detail?.user?.id ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Họ tên đầy đủ">
-                {detail?.user?.fullName ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Email">
-                <Text copyable>{detail?.user?.email ?? "--"}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Số điện thoại">
-                {detail?.user?.phone ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Giới tính">
-                {detail?.user?.gender === "Male"
-                  ? "Nam"
-                  : detail?.user?.gender === "Female"
-                  ? "Nữ"
-                  : "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Địa chỉ">
-                {detail?.user?.address ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ảnh đại diện" span={screens.lg ? 3 : 1}>
-                {renderImageField(
-                  detail?.user?.avatarUrl,
-                  detail?.user?.fullName ?? detail?.user?.email
-                )}
-              </Descriptions.Item>
-              <Descriptions.Item label="Trạng thái">
-                {detail?.user?.status ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Đăng nhập gần nhất">
-                {formatDateTime(detail?.user?.lastLoginAt)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Múi giờ">
-                {detail?.user?.timezone ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Tạo lúc">
-                {formatDateTime(detail?.user?.createdAt)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Cập nhật lúc">
-                {formatDateTime(detail?.user?.updatedAt)}
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
-
-          {/* --- Hợp đồng & Thanh toán --- */}
+          {/* ✅ Hợp đồng & Thanh toán (ẩn các field nếu null) */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -684,148 +546,142 @@ const BookingRequestDetail = () => {
             }
           >
             {detail?.contracts && detail.contracts.length > 0 ? (
-              <>
-                <Table
-                  columns={contractColumns}
-                  dataSource={detail.contracts}
-                  rowKey={(record) =>
-                    record?.contractNumber ?? record?.id ?? Math.random()
-                  }
-                  pagination={false}
-                  scroll={{ x: 720 }}
-                />
-                <Divider />
-                {detail.contracts.map((contract) => {
-                  const paymentStatus = normalizeStatus(
-                    contract?.paymentDTO?.status
-                  );
+              detail.contracts.map((contract) => {
+                const paymentStatus = normalizeStatus(
+                  contract?.paymentDTO?.status
+                );
+                const contractFileUrl = contract?.terms;
+                const contractFileName = contractFileUrl
+                  ? getFileNameFromUrl(contractFileUrl)
+                  : "";
 
-                  // 🔹 URL file hợp đồng (hiện giờ bạn đang lưu trong `terms`)
-                  const contractFileUrl = contract?.terms;
-                  const contractFileName = contractFileUrl
-                    ? getFileNameFromUrl(contractFileUrl)
-                    : "";
+                const failureReason = contract?.paymentDTO?.failureReason;
+                const transactionIds = contract?.paymentDTO?.transactionIds;
+                const refundIds = contract?.paymentDTO?.refundIds;
 
-                  return (
-                    <Card
-                      key={
-                        contract?.contractNumber ??
-                        contract?.id ??
-                        Math.random()
-                      }
-                      className="mb-4 last:mb-0"
-                      type="inner"
-                      title={`Hợp đồng ${
-                        contract?.contractNumber ?? contract?.id ?? ""
-                      }`}
+                return (
+                  <Card
+                    key={
+                      contract?.contractNumber ?? contract?.id ?? Math.random()
+                    }
+                    className="mb-4 last:mb-0"
+                    type="inner"
+                    title={`Hợp đồng ${
+                      contract?.contractNumber ?? contract?.id ?? ""
+                    }`}
+                  >
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 180 }}
                     >
-                      <Descriptions
-                        bordered
-                        size="middle"
-                        column={screens.lg ? 3 : screens.md ? 2 : 1}
-                        labelStyle={{ width: 180 }}
+                      <Descriptions.Item
+                        label="File hợp đồng"
+                        span={screens.lg ? 3 : 1}
                       >
-                        <Descriptions.Item
-                          label="File hợp đồng"
-                          span={screens.lg ? 3 : 1}
-                        >
-                          {contractFileUrl ? (
-                            <a
-                              href={contractFileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              download={contractFileName || true}
-                              className="text-blue-600 hover:text-blue-500"
-                            >
-                              {contractFileName}
-                            </a>
-                          ) : (
-                            "--"
-                          )}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Tạo lúc">
-                          {formatDateTime(contract?.createdAt)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Cập nhật lúc">
-                          {formatDateTime(contract?.updatedAt)}
-                        </Descriptions.Item>
-                      </Descriptions>
+                        {contractFileUrl ? (
+                          <a
+                            href={contractFileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={contractFileName || true}
+                            className="text-blue-600 hover:text-blue-500"
+                          >
+                            {renderEllipsisText(contractFileName, 60)}
+                          </a>
+                        ) : (
+                          "--"
+                        )}
+                      </Descriptions.Item>
 
-                      <Divider />
+                      <Descriptions.Item label="Tạo lúc">
+                        {formatDateTime(contract?.createdAt)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Cập nhật lúc">
+                        {formatDateTime(contract?.updatedAt)}
+                      </Descriptions.Item>
+                    </Descriptions>
 
-                      <Title
-                        level={5}
-                        className="!mb-2 flex items-center gap-2"
-                      >
-                        <Layers size={16} /> Thanh toán
-                      </Title>
+                    <Divider />
 
-                      <Descriptions
-                        bordered
-                        size="middle"
-                        column={screens.lg ? 3 : screens.md ? 2 : 1}
-                        labelStyle={{ width: 180 }}
-                      >
-                        <Descriptions.Item label="Trạng thái">
-                          {paymentStatus ? (
-                            <Tag
-                              color={
-                                PAYMENT_STATUS_COLOR[paymentStatus] ?? "default"
-                              }
-                            >
-                              {PAYMENT_STATUS_LABEL[paymentStatus] ??
-                                paymentStatus}
-                            </Tag>
-                          ) : (
-                            "--"
-                          )}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Tổng tiền">
-                          {formatCurrency(contract?.paymentDTO?.totalAmount)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Đã thanh toán">
-                          {formatCurrency(contract?.paymentDTO?.paidAmount)}
-                        </Descriptions.Item>
+                    <Title level={5} className="!mb-2 flex items-center gap-2">
+                      <Layers size={16} /> Thanh toán
+                    </Title>
+
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 180 }}
+                    >
+                      <Descriptions.Item label="Trạng thái">
+                        {paymentStatus ? (
+                          <Tag
+                            color={
+                              PAYMENT_STATUS_COLOR[paymentStatus] ?? "default"
+                            }
+                          >
+                            {PAYMENT_STATUS_LABEL[paymentStatus] ??
+                              paymentStatus}
+                          </Tag>
+                        ) : (
+                          "--"
+                        )}
+                      </Descriptions.Item>
+
+                      <Descriptions.Item label="Tổng tiền">
+                        {formatCurrency(contract?.paymentDTO?.totalAmount)}
+                      </Descriptions.Item>
+
+                      <Descriptions.Item label="Đã thanh toán">
+                        {formatCurrency(contract?.paymentDTO?.paidAmount)}
+                      </Descriptions.Item>
+
+                      {hasMeaningfulValue(failureReason) && (
                         <Descriptions.Item
                           label="Lý do thất bại"
                           span={screens.lg ? 3 : 1}
                         >
-                          {contract?.paymentDTO?.failureReason ?? "--"}
+                          {String(failureReason)}
                         </Descriptions.Item>
-                        <Descriptions.Item label="Tạo lúc">
-                          {formatDateTime(contract?.paymentDTO?.createdAt)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Cập nhật lúc">
-                          {formatDateTime(contract?.paymentDTO?.updatedAt)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Hết hạn lúc">
-                          {formatDateTime(contract?.paymentDTO?.expiresAt)}
-                        </Descriptions.Item>
+                      )}
+
+                      <Descriptions.Item label="Tạo lúc">
+                        {formatDateTime(contract?.paymentDTO?.createdAt)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Cập nhật lúc">
+                        {formatDateTime(contract?.paymentDTO?.updatedAt)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Hết hạn lúc">
+                        {formatDateTime(contract?.paymentDTO?.expiresAt)}
+                      </Descriptions.Item>
+
+                      {hasMeaningfulValue(transactionIds) && (
                         <Descriptions.Item
                           label="Mã giao dịch"
                           span={screens.lg ? 3 : 1}
                         >
                           <Text style={{ whiteSpace: "pre-wrap" }}>
-                            {formatArrayOrValue(
-                              contract?.paymentDTO?.transactionIds
-                            )}
+                            {formatArrayOrValue(transactionIds)}
                           </Text>
                         </Descriptions.Item>
+                      )}
+
+                      {hasMeaningfulValue(refundIds) && (
                         <Descriptions.Item
                           label="Mã hoàn tiền"
                           span={screens.lg ? 3 : 1}
                         >
                           <Text style={{ whiteSpace: "pre-wrap" }}>
-                            {formatArrayOrValue(
-                              contract?.paymentDTO?.refundIds
-                            )}
+                            {formatArrayOrValue(refundIds)}
                           </Text>
                         </Descriptions.Item>
-                      </Descriptions>
-                    </Card>
-                  );
-                })}
-              </>
+                      )}
+                    </Descriptions>
+                  </Card>
+                );
+              })
             ) : (
               <Empty description="Không có hợp đồng" />
             )}
@@ -845,28 +701,36 @@ const BookingRequestDetail = () => {
             {detail?.kolWorkTimes && detail.kolWorkTimes.length > 0 ? (
               detail.kolWorkTimes.map((worktime, index) => {
                 const worktimeId = worktime?.id;
+
                 const metrics = worktimeId
                   ? worktimeLivestreamMetricsMap.get(worktimeId)
                   : null;
+
                 const queryState = worktimeId
                   ? worktimeMetricsQueryMap.get(worktimeId)
                   : null;
+
                 const isMetricsLoading =
                   queryState?.isPending || queryState?.isFetching;
-                const metricsError = queryState?.error;
-                const errorMessage =
-                  metricsError?.response?.data?.message ??
-                  metricsError?.message;
 
-                const isNotFoundMetricsError =
+                const metricsError = queryState?.error;
+
+                const rawMessage = metricsError?.response?.data?.message;
+                const statusCode = metricsError?.response?.status;
+
+                const messageText = Array.isArray(rawMessage)
+                  ? rawMessage.filter(Boolean).join(" | ")
+                  : rawMessage ?? metricsError?.message ?? "";
+
+                const isNoMetricsError =
                   !!metricsError &&
-                  (metricsError?.response?.status === 404 ||
-                    metricsError?.response?.data?.code === "NOT_FOUND" ||
-                    /Không tìm thấy Livestream Metric/i.test(
-                      metricsError?.response?.data?.message ??
-                        metricsError?.message ??
-                        ""
-                    ));
+                  statusCode === 400 &&
+                  /không tìm thấy\s+livestream\s+metric/i.test(
+                    String(messageText)
+                  );
+
+                const shouldShowEmptyForNoData =
+                  !metrics || !hasAnyLivestreamMetricValue(metrics);
 
                 return (
                   <Card
@@ -876,23 +740,27 @@ const BookingRequestDetail = () => {
                     title={`Ca làm việc ${index + 1}`}
                   >
                     <Divider />
-
                     <Title level={5} className="!mb-2">
                       Thống kê chi tiết
                     </Title>
 
                     {isMetricsLoading ? (
                       <Skeleton active paragraph={{ rows: 6 }} />
-                    ) : metricsError && !isNotFoundMetricsError ? (
+                    ) : metricsError && !isNoMetricsError ? (
                       <Alert
                         type="error"
                         showIcon
                         message="Không thể tải thống kê livestream."
                         description={
-                          errorMessage ? String(errorMessage) : undefined
+                          messageText ? String(messageText) : undefined
                         }
                       />
-                    ) : metrics ? (
+                    ) : isNoMetricsError || shouldShowEmptyForNoData ? (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="Không có dữ liệu"
+                      />
+                    ) : (
                       <Descriptions
                         bordered
                         size="middle"
@@ -905,11 +773,6 @@ const BookingRequestDetail = () => {
                           </Descriptions.Item>
                         ))}
                       </Descriptions>
-                    ) : (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description={null}
-                      />
                     )}
                   </Card>
                 );
@@ -919,7 +782,7 @@ const BookingRequestDetail = () => {
             )}
           </Card>
 
-          {/* ---------------------- TỆP ĐÍNH KÈM ---------------------- */}
+          {/* --- Tệp đính kèm --- */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -934,7 +797,8 @@ const BookingRequestDetail = () => {
               <Table
                 columns={attachedFileColumns}
                 dataSource={detail.attachedFiles}
-                rowKey={(record) => record?.id}
+                // ✅ rowKey vẫn dùng id (ẩn khỏi UI), fallback tránh lỗi nếu thiếu id
+                rowKey={(record, idx) => record?.id ?? `file-${idx}`}
                 pagination={false}
                 scroll={{ x: 720 }}
               />

@@ -118,6 +118,36 @@ const MainLayoutAdmin = () => {
         },
       ],
     },
+
+    {
+      key: "management-booking",
+      icon: <EventNoteOutlined />,
+      label: "Quản lý booking",
+      children: [
+        {
+          key: "management-booking-requests",
+          icon: <CalendarMonthOutlined />,
+          label: (
+            <Link to="management-booking-requests">Quản lý booking lẻ</Link>
+          ),
+        },
+        // NEW: nút vào trang Campaign
+        {
+          key: "management-booking-campaigns",
+          icon: <BarChartOutlined />,
+          label: (
+            <Link to="management-booking-campaigns">
+              Quản lý booking Campaign
+            </Link>
+          ),
+        },
+        {
+          key: "management-refunds",
+          icon: <MonetizationOnOutlined />,
+          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
+        },
+      ],
+    },
     {
       key: "management-cate",
       icon: <LocalOfferOutlined />,
@@ -162,35 +192,7 @@ const MainLayoutAdmin = () => {
       icon: <ArticleOutlined />,
       label: <Link to="management-blogs">Quản lý blog</Link>,
     },
-    {
-      key: "management-booking",
-      icon: <EventNoteOutlined />,
-      label: "Quản lý booking",
-      children: [
-        {
-          key: "management-refunds",
-          icon: <MonetizationOnOutlined />,
-          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
-        },
-        {
-          key: "management-booking-requests",
-          icon: <CalendarMonthOutlined />,
-          label: (
-            <Link to="management-booking-requests">Quản lý booking lẻ</Link>
-          ),
-        },
-        // NEW: nút vào trang Campaign
-        {
-          key: "management-booking-campaigns",
-          icon: <BarChartOutlined />,
-          label: (
-            <Link to="management-booking-campaigns">
-              Quản lý booking Campaign
-            </Link>
-          ),
-        },
-      ],
-    },
+
     // {
     //   key: "management-refund",
     //   icon: <MonetizationOnOutlined />,

@@ -277,7 +277,7 @@ const ManagementKOL = () => {
       },
     },
     { title: "Tên KOL", key: "displayName", dataIndex: "displayName" },
-    { title: "Quốc gia", key: "country", dataIndex: "country" },
+
     {
       title: "Chuyên mục",
       key: "categories",

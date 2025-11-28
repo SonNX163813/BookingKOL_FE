@@ -286,17 +286,7 @@ const ManagementBookingRequests = () => {
       //     <span className="font-semibold">#{page * size + index + 1}</span>
       //   ),
       // },
-      {
-        title: "Mã hợp đồng",
-        key: "code-hopdong",
-        width: 180,
-        render: (_, record) => {
-          const contract = getPrimaryContract(record);
-          return (
-            contract?.contractNumber ?? pickValue(record, ["contractNumber"])
-          );
-        },
-      },
+
       {
         title: "Mã yêu cầu",
         key: "code-yc",
@@ -350,30 +340,7 @@ const ManagementBookingRequests = () => {
           );
         },
       },
-      {
-        title: "Thanh toán",
-        key: "paymentStatus",
-        width: 160,
-        render: (_, record) => {
-          const payment = getPrimaryPayment(record);
-          const normalized = payment?.status
-            ? String(payment.status).toUpperCase()
-            : null;
 
-          if (!normalized) {
-            return "--";
-          }
-          const displayLabel =
-            PAYMENT_STATUS_LABEL?.[normalized] ??
-            PAYMENT_STATUS_OPTIONS.find((p) => p.value === normalized)?.label ??
-            normalized;
-          return (
-            <Tag color={PAYMENT_STATUS_COLOR[normalized] ?? "default"}>
-              {displayLabel}
-            </Tag>
-          );
-        },
-      },
       {
         title: "Thời gian thực hiện",
         key: "time",

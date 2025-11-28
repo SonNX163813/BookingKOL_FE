@@ -48,7 +48,7 @@ const CAMPAIGN_STATUS_LABEL = {
 const CAMPAIGN_STATUS_COLOR = {
   DRAFT: "default",
   REQUESTED: "gold",
-  NEGOTIATING: "orange",
+  NEGOTIATING: "purple",
   APPROVED: "green",
   ACCEPTED: "green",
   IN_PROGRESS: "geekblue",
