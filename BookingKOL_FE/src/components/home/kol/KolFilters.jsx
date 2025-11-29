@@ -7,11 +7,6 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
 } from "@mui/material";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 
@@ -26,13 +21,12 @@ const KolFilters = ({
   filters,
   onFilterInputChange,
   onMinRatingChange,
+  onRoleChange,
   onApply,
   onReset,
   loading,
   hasActiveFilters,
   hasFilterChanges,
-  categoryOptions,
-  loadingCategories,
 }) => (
   <Box
     sx={{
@@ -79,6 +73,29 @@ const KolFilters = ({
       <Stack spacing={3}>
         <Stack spacing={2} direction={{ xs: "column", sm: "row" }}>
           <TextField
+            label="Tìm theo tên"
+            type="text"
+            size="medium"
+            value={filters.nameKeyword}
+            onChange={onFilterInputChange("nameKeyword")}
+            placeholder="Nhập tên KOL / Trợ Live"
+            fullWidth
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 3,
+                backgroundColor: "rgba(74, 116, 218, 0.02)",
+                transition: "all 0.3s ease",
+                "&:hover": {
+                  backgroundColor: "rgba(74, 116, 218, 0.04)",
+                },
+                "&.Mui-focused": {
+                  backgroundColor: "#ffffff",
+                  boxShadow: "0 4px 12px rgba(74, 116, 218, 0.12)",
+                },
+              },
+            }}
+          />
+          {/* <TextField
             label="Giá tối thiểu (VND)"
             type="number"
             size="medium"
@@ -100,59 +117,72 @@ const KolFilters = ({
                 },
               },
             }}
-          />
+          /> */}
+        </Stack>
 
-          {/* <FormControl
-            fullWidth
-            size="medium"
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{
+            flexWrap: { xs: "wrap", sm: "wrap" },
+            rowGap: { xs: 2, sm: 1.5 },
+          }}
+        >
+          <Typography
+            variant="body2"
             sx={{
-              "& .MuiOutlinedInput-root": {
+              fontWeight: 600,
+              color: "rgba(15,23,42,0.75)",
+              minWidth: "fit-content",
+            }}
+          >
+            Vai trò
+          </Typography>
+          <ToggleButtonGroup
+            size="medium"
+            exclusive
+            color="primary"
+            value={filters.role || ""}
+            onChange={onRoleChange}
+            sx={{
+              width: "100%",
+              gap: { xs: 1.5, sm: 1 },
+              display: "flex",
+              justifyContent: "center",
+              flexGrow: 1,
+              "& .MuiToggleButton-root": {
                 borderRadius: 3,
-                backgroundColor: "rgba(74, 116, 218, 0.02)",
+                textTransform: "none",
+                fontWeight: 600,
+                px: 3,
+                py: 1,
+                border: "1px solid rgba(74, 116, 218, 0.2)",
                 transition: "all 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                boxSizing: "border-box",
+                flex: { xs: "1 1 calc(50% - 12px)", sm: "0 0 auto" },
+                maxWidth: { xs: "calc(50% - 12px)", sm: "none" },
+                minWidth: { xs: "calc(50% - 12px)", sm: "auto" },
                 "&:hover": {
-                  backgroundColor: "rgba(74, 116, 218, 0.04)",
+                  backgroundColor: "rgba(74, 116, 218, 0.08)",
                 },
-                "&.Mui-focused": {
-                  backgroundColor: "#ffffff",
-                  boxShadow: "0 4px 12px rgba(74, 116, 218, 0.12)",
+                "&.Mui-selected": {
+                  backgroundColor: "rgba(74, 116, 218, 0.12)",
+                  color: "#4a74da",
+                  // fontWeight: 700,
+                  "&:hover": {
+                    backgroundColor: "rgba(74, 116, 218, 0.18)",
+                  },
                 },
               },
             }}
           >
-            <InputLabel id="kol-filter-category-label">
-              Lĩnh vực hoạt động
-            </InputLabel>
-            <Select
-              labelId="kol-filter-category-label"
-              label="Lĩnh vực hoạt động"
-              value={filters.categoryId}
-              onChange={onFilterInputChange("categoryId")}
-              disabled={loadingCategories && !categoryOptions.length}
-            >
-              <MenuItem key="kol-filter-category-all" value="">
-                <em>Tất cả lĩnh vực</em>
-              </MenuItem>
-              {loadingCategories && (
-                <MenuItem key="kol-filter-category-loading" value="" disabled>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    sx={{ py: 0.5 }}
-                  >
-                    <CircularProgress size={18} />
-                    <Typography variant="body2">Đang tải...</Typography>
-                  </Stack>
-                </MenuItem>
-              )}
-              {categoryOptions.map((category) => (
-                <MenuItem key={category.id} value={category.id}>
-                  {category.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl> */}
+            <ToggleButton value="KOL">Host chính</ToggleButton>
+            <ToggleButton value="LIVE">Trợ Live</ToggleButton>
+          </ToggleButtonGroup>
         </Stack>
 
         <Stack
@@ -230,9 +260,10 @@ const KolFilters = ({
 
       <Stack
         spacing={1.5}
-        direction={{ xs: "column", sm: "row" }}
+        direction="column"
         justifyContent="flex-end"
-        alignItems={{ xs: "stretch", sm: "center" }}
+        alignItems="center"
+        width="100%"
       >
         <Button
           variant="outlined"
@@ -245,7 +276,7 @@ const KolFilters = ({
             textTransform: "none",
             borderRadius: 3,
             px: 3,
-            width: { xs: "100%", sm: "auto" },
+            width: "100%",
           }}
         >
           Làm mới bộ lọc
@@ -261,7 +292,7 @@ const KolFilters = ({
             textTransform: "none",
             borderRadius: 3,
             px: 3,
-            width: { xs: "100%", sm: "auto" },
+            width: "100%",
             "&:hover": {
               backgroundColor: "#3b5ec8",
             },

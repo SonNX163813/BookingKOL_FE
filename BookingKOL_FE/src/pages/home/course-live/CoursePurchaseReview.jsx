@@ -364,7 +364,7 @@ const CoursePurchaseReview = () => {
                 )} */}
 
                 {/* Thông tin khóa học */}
-                <Stack spacing={3}>
+                {/* <Stack spacing={3}>
                   <Typography
                     variant="h5"
                     sx={{
@@ -382,7 +382,7 @@ const CoursePurchaseReview = () => {
                   >
                     {courseDescription}
                   </Typography>
-                </Stack>
+                </Stack> */}
 
                 {/* Chi tiết thanh toán */}
                 <Paper

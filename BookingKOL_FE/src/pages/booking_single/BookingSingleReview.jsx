@@ -1098,7 +1098,7 @@ const BookingSingleReview = () => {
                   variant="outlined"
                   color="error"
                   onClick={handleCancel}
-                  disabled={actionButtonsDisabled}
+                  disabled={confirming || cancelling}
                   sx={{
                     textTransform: "none",
                     fontWeight: 600,

@@ -768,6 +768,12 @@ const MySingleBookingRequestDetail = () => {
               <>
                 {/* Booking Info */}
                 <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                  <Space>
+                    <UserCircle2 size={18} />
+                    <span className="text-lg font-semibold text-slate-900">
+                      Thông tin đơn booking
+                    </span>
+                  </Space>
                   <Space direction="vertical" size="large" className="w-full">
                     <Descriptions bordered size="middle" column={1}>
                       <Descriptions.Item label="Trạng thái">
@@ -965,6 +971,27 @@ const MySingleBookingRequestDetail = () => {
                       </div>
                     </Form>
                   </Space>
+                </section>
+
+                {/* Attached Files */}
+                <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                  <Space>
+                    <FileText size={18} />
+                    <span className="text-lg font-semibold text-slate-900">
+                      Tệp đính kèm
+                    </span>
+                  </Space>
+                  {attachedFiles.length > 0 ? (
+                    <Table
+                      columns={attachedFileColumns}
+                      dataSource={attachedFiles}
+                      pagination={false}
+                      rowKey={(r) => r?.id ?? Math.random()}
+                      className="mt-4"
+                    />
+                  ) : (
+                    <Empty description="Không có tệp đính kèm" />
+                  )}
                 </section>
 
                 {/* Worktimes & Metrics */}
@@ -1198,7 +1225,7 @@ const MySingleBookingRequestDetail = () => {
                 </section>
 
                 {/* User Info */}
-                <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
+                {/* <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
                   <Space>
                     <UserCircle2 size={18} />
                     <span className="text-lg font-semibold text-slate-900">
@@ -1228,7 +1255,7 @@ const MySingleBookingRequestDetail = () => {
                   ) : (
                     <Empty description="Không có thông tin người đặt" />
                   )}
-                </section>
+                </section> */}
 
                 {/* KOL Info */}
                 <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6 md:p-8 space-y-6">
@@ -1517,27 +1544,6 @@ const MySingleBookingRequestDetail = () => {
                       description="Không có thông tin hoàn tiền"
                       className="mt-4"
                     />
-                  )}
-                </section>
-
-                {/* Attached Files */}
-                <section className="rounded-3xl border border-white/40 bg-white/95 shadow-[0_45px_90px_-55px_rgba(15,23,42,0.45)] backdrop-blur p-6">
-                  <Space>
-                    <FileText size={18} />
-                    <span className="text-lg font-semibold text-slate-900">
-                      Tệp đính kèm
-                    </span>
-                  </Space>
-                  {attachedFiles.length > 0 ? (
-                    <Table
-                      columns={attachedFileColumns}
-                      dataSource={attachedFiles}
-                      pagination={false}
-                      rowKey={(r) => r?.id ?? Math.random()}
-                      className="mt-4"
-                    />
-                  ) : (
-                    <Empty description="Không có tệp đính kèm" />
                   )}
                 </section>
               </>

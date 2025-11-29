@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -23,6 +23,7 @@ import {
   fetchNotifications,
   markAllNotificationsAsRead,
 } from "../../services/notification/notificationService";
+import { toast } from "react-toastify";
 
 const formatTimestamp = (value) => {
   if (!value) return "";
@@ -46,6 +47,8 @@ const formatTimestamp = (value) => {
   if (diffMonths < 12) return `${diffMonths} tháng trước`;
   return `${diffYears} năm trước`;
 };
+const MAX_FAILURES = 3;
+const MAX_BACKOFF = 5 * 60 * 1000;
 
 const NotificationBell = ({
   loggedIn,
@@ -60,6 +63,7 @@ const NotificationBell = ({
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const failureCountRef = useRef(0);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item?.read).length,
@@ -86,19 +90,35 @@ const NotificationBell = ({
 
   useEffect(() => {
     let mounted = true;
-    let timer;
+    let timeoutId = null;
+
+    const scheduleNext = (delay) => {
+      if (!mounted) return;
+      timeoutId = window.setTimeout(() => {
+        load({ initial: false });
+      }, delay);
+    };
 
     const load = async ({ initial = false } = {}) => {
+      if (!mounted) return;
+
       if (!loggedIn) {
-        if (mounted) setNotifications([]);
+        setNotifications([]);
+        failureCountRef.current = 0;
         return;
       }
+
+      // ❌ BỎ đoạn này đi, để không dừng hẳn
+      // if (failureCountRef.current >= MAX_FAILURES) return;
 
       if (initial) setLoading(true);
 
       try {
         const data = await fetchNotifications();
         if (!mounted) return;
+
+        // ✅ thành công → reset đếm lỗi
+        failureCountRef.current = 0;
 
         const list = Array.isArray(data)
           ? data
@@ -107,27 +127,62 @@ const NotificationBell = ({
           : [];
 
         setNotifications(list);
+
+        // thành công → gọi lại với pollInterval bình thường
+        scheduleNext(pollInterval);
       } catch (error) {
         console.error("Lỗi khi tải thông báo", error);
+
+        // tăng số lần lỗi
+        failureCountRef.current += 1;
+
+        // ✅ CHỈ show toast trong 3 lần đầu
+        if (failureCountRef.current <= MAX_FAILURES) {
+          toast.error("Không thể tải thông báo, vui lòng thử lại sau.");
+        }
+
+        // vẫn tiếp tục backoff & poll tiếp
+        const backoffDelay = Math.min(
+          pollInterval * 2 ** failureCountRef.current,
+          MAX_BACKOFF
+        );
+        scheduleNext(backoffDelay);
       } finally {
         if (initial && mounted) setLoading(false);
       }
     };
 
-    load({ initial: true });
+    const handleVisibilityChange = () => {
+      if (!mounted) return;
+      if (!document.hidden && loggedIn) {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        load({ initial: false });
+      }
+    };
 
-    if (loggedIn) {
-      timer = setInterval(() => load(), pollInterval);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
     }
+
+    load({ initial: true });
 
     return () => {
       mounted = false;
-      if (timer) clearInterval(timer);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (typeof document !== "undefined") {
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange
+        );
+      }
     };
   }, [loggedIn, pollInterval]);
 
   const handleMarkAllAsRead = async () => {
-    if (!notifications.length) return;
+    if (!notifications.length || updating) return;
 
     try {
       setUpdating(true);
@@ -155,12 +210,18 @@ const NotificationBell = ({
     }
   };
 
+  const handleBellClick = async (event) => {
+    setAnchorEl(event.currentTarget);
+    if (!notifications.length || !hasUnread || updating) return;
+    await handleMarkAllAsRead();
+  };
+
   return (
     <>
       <Tooltip title="Thông báo">
         <IconButton
           color="inherit"
-          onClick={(e) => setAnchorEl(e.currentTarget)}
+          onClick={handleBellClick}
           sx={{
             borderRadius: 2,
             position: "relative",

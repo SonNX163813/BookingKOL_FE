@@ -27,7 +27,7 @@ import NotificationBell from "../common/NotificationBell";
 
 const navItems = [
   { label: "Trang chủ", to: "/" },
-  { label: "Về chúng tôi", to: "/ve-chung-toi" },
+  // { label: "Về chúng tôi", to: "/ve-chung-toi" },
   {
     label: "Các gói dịch vụ",
     hasDropdown: true,
@@ -38,7 +38,7 @@ const navItems = [
     ],
   },
   { label: "Blog", to: "/blog" },
-  { label: "Quy trình hoàn thiện", to: "/quy-trinh" },
+  // { label: "Quy trình hoàn thiện", to: "/quy-trinh" },
   { label: "Trợ lý ảo AI", to: "/chat-AI" },
 ];
 

@@ -83,3 +83,100 @@ a {
     /* Base sáng hơn một tông (ít “trắng” hơn) */
       linear-gradient(90deg, #eaf3ff 0%, #e7ecff 45%, #ffeaf3 100%);
 }
+
+/* Messenger */
+.vr-messenger .phone-vr-circle,
+.vr-messenger .phone-vr-circle-fill {
+  background-color: #6a4ffe7f;
+}
+
+/* Zalo */
+.vr-zalo .phone-vr-circle,
+.vr-zalo .phone-vr-circle-fill {
+  background-color: #2196f3b3;
+}
+
+/* Phone */
+.vr-phone .phone-vr-circle,
+.vr-phone .phone-vr-circle-fill {
+  background-color: #e60808;
+}
+/* Vòng sóng OUTER */
+.phone-vr-circle {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgba(255, 28, 28, 0.4);
+  animation: phone-vr-circle 1.2s infinite ease-in-out;
+}
+
+/* Vòng sóng INNER */
+.phone-vr-circle-fill {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background-color: rgba(255, 28, 28, 0.6);
+  animation: phone-vr-circle-fill 1s infinite ease-in-out;
+}
+
+/* Rung icon */
+.phone-vr-img-circle {
+  animation: phone-vr-img-circle 1s infinite ease-in-out;
+}
+
+/* KEYFRAMES */
+@keyframes phone-vr-circle {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.2;
+  }
+  70% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+@keyframes phone-vr-circle-fill {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+}
+
+@keyframes phone-vr-img-circle {
+  0% {
+    transform: rotate(0);
+  }
+  10% {
+    transform: rotate(-25deg);
+  }
+  20% {
+    transform: rotate(25deg);
+  }
+  30% {
+    transform: rotate(-25deg);
+  }
+  40% {
+    transform: rotate(25deg);
+  }
+  50% {
+    transform: rotate(0);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
