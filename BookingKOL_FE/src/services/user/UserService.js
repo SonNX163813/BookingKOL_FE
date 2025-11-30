@@ -1,6 +1,15 @@
 import { get, patch, post } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
+export const changeMyPassword = async ({ data, config } = {}) => {
+  const response = await post({
+    url: CLIENT_API_PATHS.AUTH.changePassword,
+    data,
+    config,
+  });
+  return response?.data ?? response ?? null;
+};
+
 export const getMyUserProfile = async ({ signal } = {}) => {
   const config = signal ? { signal } : undefined;
   const response = await get({

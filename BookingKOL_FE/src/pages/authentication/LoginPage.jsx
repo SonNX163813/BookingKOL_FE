@@ -217,7 +217,9 @@ export default function LoginPage() {
       {/* LEFT HERO giữ nguyên như bạn đang dùng */}
       <section className="left-hero">
         <div className="brand">
-          <img src={logo} alt="Logo" className="logo" />
+          <a href="/">
+            <img src={logo} alt="Logo" className="logo" />
+          </a>
         </div>
 
         <h1>
@@ -305,7 +307,9 @@ export default function LoginPage() {
       {/* RIGHT CARD */}
       <section className="right-card">
         <div className="login-header">
-          <img src={logo} alt="Logo" className="login-logo-top" />
+          <a href="/">
+            <img src={logo} alt="Logo" className="login-logo-top" />
+          </a>
           <h2 className="login-title">Đăng nhập</h2>
         </div>
 

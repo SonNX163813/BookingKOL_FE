@@ -385,12 +385,6 @@ const Navbar = () => {
               </Box>
             )}
           </Box>
-
-          {!trigger && (
-            <Divider
-              sx={{ mt: 1.25, opacity: 0.6, borderColor: "rgba(2,6,23,0.06)" }}
-            />
-          )}
         </Box>
       </Toolbar>
 

@@ -13,11 +13,18 @@ import {
   TextField,
   Typography,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import LockResetRoundedIcon from "@mui/icons-material/LockResetRounded";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 
@@ -26,6 +33,7 @@ import AppSnackbar from "../../../components/UI/AppSnackbar";
 import {
   getMyUserProfile,
   updateMyUserProfile,
+  changeMyPassword,
 } from "../../../services/user/UserService";
 import { USER_PROFILE_COPY, USER_PROFILE_SECTIONS } from "./userProfileCopy";
 
@@ -47,6 +55,11 @@ const sectionCardStyles = {
   px: { xs: 2.5, md: 3 },
   py: { xs: 2.25, md: 2.75 },
 };
+
+const PASSWORD_RULE_TEXT =
+  "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt, tối thiểu là 8 ký tự";
+const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 const normalizeGender = (value) => {
   if (value === undefined || value === null) return "";
@@ -175,6 +188,21 @@ const formatDateDisplay = (value) => {
 
 const isSignalAborted = (signal) => Boolean(signal && signal.aborted);
 
+// Hàm tạo lỗi cho form mật khẩu (dùng cho realtime & submit)
+const computePasswordErrors = (values) => {
+  const errors = {};
+  if (!values.oldPassword) {
+    errors.oldPassword = "Vui lòng nhập mật khẩu hiện tại";
+  }
+  if (!PASSWORD_REGEX.test(values.newPassword || "")) {
+    errors.newPassword = PASSWORD_RULE_TEXT;
+  }
+  if ((values.confirmPassword || "") !== (values.newPassword || "")) {
+    errors.confirmPassword = "Mật khẩu xác nhận không khớp";
+  }
+  return errors;
+};
+
 export default function UserProfile() {
   const [profile, setProfile] = useState(null);
   const [formValues, setFormValues] = useState(deriveFormValues(null));
@@ -184,6 +212,21 @@ export default function UserProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+
+  const [passwordValues, setPasswordValues] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
+
+  // trạng thái show/hide mật khẩu
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const fetchProfile = useCallback(
     async ({ signal, showGlobalLoading = true } = {}) => {
@@ -206,8 +249,8 @@ export default function UserProfile() {
         if (!abortedOrCanceled) {
           const message =
             err?.response?.data?.message ??
-            message ??
-            "Khong the tai du lieu ho so. Vui long thu lai.";
+            err?.message ??
+            "Không thể tải dữ liệu hồ sơ. Vui lòng thử lại.";
           setError(message);
           setShowErrorSnackbar(true);
         }
@@ -284,11 +327,56 @@ export default function UserProfile() {
       const message =
         err?.response?.data?.message ??
         err?.message ??
-        "Khong the cap nhat ho so. Vui long thu lai.";
+        "Không thể cập nhật hồ sơ. Vui lòng thử lại.";
       setError(message);
       setShowErrorSnackbar(true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // validate realtime khi user gõ
+  const handlePasswordFieldChange = (event) => {
+    const { name, value } = event.target;
+    setPasswordValues((prev) => ({ ...prev, [name]: value }));
+    setPasswordMessage("");
+  };
+
+  const validatePasswordForm = () => {
+    const errors = computePasswordErrors(passwordValues);
+    setPasswordErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleChangePasswordSubmit = async (event) => {
+    event.preventDefault();
+    if (changingPassword) return;
+    setPasswordMessage("");
+
+    const isValid = validatePasswordForm();
+    if (!isValid) return;
+
+    setChangingPassword(true);
+    try {
+      await changeMyPassword({ data: passwordValues });
+      setPasswordValues({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setPasswordErrors({});
+      setPasswordMessage("");
+      setOpenPasswordDialog(false);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể đổi mật khẩu. Vui lòng thử lại.";
+      const normalized =
+        Array.isArray(message) && message.length ? message[0] : message;
+      setPasswordMessage(normalized);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -461,7 +549,7 @@ export default function UserProfile() {
             "& .MuiInputBase-input": {
               py: fieldConfig.multiline ? 1.5 : 1.2,
             },
-            ...(gridProps?.sx || {}), // nhận style bổ sung từ renderField
+            ...(gridProps?.sx || {}),
           }}
         >
           {fieldConfig.select &&
@@ -473,6 +561,10 @@ export default function UserProfile() {
         </TextField>
       </Grid>
     );
+  };
+
+  const handleMouseDownPassword = (event) => {
+    event.preventDefault();
   };
 
   return (
@@ -640,6 +732,21 @@ export default function UserProfile() {
                 >
                   {editing ? buttons.editing : buttons.edit}
                 </Button>
+                <Button
+                  variant={editing ? "contained" : "outlined"}
+                  color="primary"
+                  onClick={() => setOpenPasswordDialog(true)}
+                  startIcon={<LockResetRoundedIcon />}
+                  disabled={loading}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: "14px",
+                    px: 2.5,
+                  }}
+                >
+                  Đổi mật khẩu
+                </Button>
               </Stack>
             </Stack>
 
@@ -741,26 +848,6 @@ export default function UserProfile() {
                 </Stack>
               </Stack>
 
-              {/* <Stack spacing={2.25} sx={sectionCardStyles}>
-                  <Stack spacing={0.75}>
-                    <Typography
-                      variant="h6"
-                      sx={{ color: textPrimary, fontWeight: 700 }}
-                    >
-                      {bioSection?.title}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: textSecondary, maxWidth: 620 }}
-                    >
-                      {bioSection?.description}
-                    </Typography>
-                  </Stack>
-                  <Grid container spacing={2.5} alignItems="stretch">
-                    {renderField(bioIntroductionField)}
-                  </Grid>
-                </Stack> */}
-
               {editing && (
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -805,48 +892,223 @@ export default function UserProfile() {
         </MotionBox>
       </Container>
 
-      {/* <AppSnackbar
-        open={showErrorSnackbar}
-        onClose={handleCloseSnackbar}
-        severity="error"
-        message={error}
-        action={
-          <Stack direction="row" spacing={1} alignItems="center">
+      {/* Dialog đổi mật khẩu */}
+      <Dialog
+        open={openPasswordDialog}
+        onClose={() => setOpenPasswordDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <Box component="form" noValidate onSubmit={handleChangePasswordSubmit}>
+          <DialogTitle sx={{ fontWeight: 700 }}>Đổi mật khẩu</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2.5} mt={1}>
+              <TextField
+                fullWidth
+                name="oldPassword"
+                type={showOldPassword ? "text" : "password"}
+                label="Mật khẩu hiện tại"
+                value={passwordValues.oldPassword}
+                onChange={handlePasswordFieldChange}
+                autoComplete="current-password"
+                error={Boolean(passwordErrors.oldPassword)}
+                helperText={
+                  passwordErrors.oldPassword || "Nhập mật khẩu bạn đang sử dụng"
+                }
+                FormHelperTextProps={{
+                  sx: {
+                    color: passwordErrors.oldPassword
+                      ? "#d32f2f"
+                      : textSecondary,
+                    fontWeight: 500,
+                    mt: 1,
+                  },
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowOldPassword((prev) => !prev)}
+                        onMouseDown={handleMouseDownPassword}
+                        edge="end"
+                      >
+                        {showOldPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255, 255, 255, 0.96)",
+                    height: "60px",
+                    "& fieldset": {
+                      borderColor: "rgba(74, 116, 218, 0.28)",
+                    },
+                    "&:hover fieldset": {
+                      borderColor: "#4a74da",
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: "#4a74da",
+                      borderWidth: 2,
+                      boxShadow: "0 0 0 3px rgba(74, 116, 218, 0.15)",
+                    },
+                  },
+                }}
+                disabled={changingPassword}
+              />
+
+              <TextField
+                fullWidth
+                name="newPassword"
+                type={showNewPassword ? "text" : "password"}
+                label="Mật khẩu mới"
+                value={passwordValues.newPassword}
+                onChange={handlePasswordFieldChange}
+                autoComplete="new-password"
+                error={Boolean(passwordErrors.newPassword)}
+                helperText={passwordErrors.newPassword || PASSWORD_RULE_TEXT}
+                FormHelperTextProps={{
+                  sx: {
+                    color: passwordErrors.newPassword
+                      ? "#d32f2f"
+                      : textSecondary,
+                    fontWeight: 500,
+                    mt: 1,
+                  },
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowNewPassword((prev) => !prev)}
+                        onMouseDown={handleMouseDownPassword}
+                        edge="end"
+                      >
+                        {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255, 255, 255, 0.96)",
+                    height: "60px",
+                    "& fieldset": {
+                      borderColor: "rgba(74, 116, 218, 0.28)",
+                    },
+                    "&:hover fieldset": {
+                      borderColor: "#4a74da",
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: "#4a74da",
+                      borderWidth: 2,
+                      boxShadow: "0 0 0 3px rgba(74, 116, 218, 0.15)",
+                    },
+                  },
+                }}
+                disabled={changingPassword}
+              />
+
+              <TextField
+                fullWidth
+                name="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                label="Nhập lại mật khẩu mới"
+                value={passwordValues.confirmPassword}
+                onChange={handlePasswordFieldChange}
+                autoComplete="new-password"
+                error={Boolean(passwordErrors.confirmPassword)}
+                helperText={
+                  passwordErrors.confirmPassword || "Xác nhận lại mật khẩu mới"
+                }
+                FormHelperTextProps={{
+                  sx: {
+                    color: passwordErrors.confirmPassword
+                      ? "#d32f2f"
+                      : textSecondary,
+                    fontWeight: 500,
+                    mt: 1,
+                  },
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        onMouseDown={handleMouseDownPassword}
+                        edge="end"
+                      >
+                        {showConfirmPassword ? (
+                          <VisibilityOff />
+                        ) : (
+                          <Visibility />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "16px",
+                    backgroundColor: "rgba(255, 255, 255, 0.96)",
+                    height: "60px",
+                    "& fieldset": {
+                      borderColor: "rgba(74, 116, 218, 0.28)",
+                    },
+                    "&:hover fieldset": {
+                      borderColor: "#4a74da",
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: "#4a74da",
+                      borderWidth: 2,
+                      boxShadow: "0 0 0 3px rgba(74, 116, 218, 0.15)",
+                    },
+                  },
+                }}
+                disabled={changingPassword}
+              />
+
+              {/* {passwordMessage && (
+                <Typography color="error" sx={{ fontWeight: 600 }}>
+                  {passwordMessage}
+                </Typography>
+              )} */}
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ p: 2.5 }}>
             <Button
-              size="small"
-              variant="outlined"
-              onClick={handleRetry}
+              type="button"
+              onClick={() => setOpenPasswordDialog(false)}
+              disabled={changingPassword}
+              sx={{ textTransform: "none", fontWeight: 600 }}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={
+                changingPassword ? (
+                  <CircularProgress size={18} thickness={4} />
+                ) : (
+                  <SaveRoundedIcon />
+                )
+              }
+              disabled={changingPassword}
               sx={{
                 textTransform: "none",
                 fontWeight: 600,
-                borderRadius: "999px",
-                borderColor: "rgba(230, 244, 239, 0.6)",
-                color: "#E6F4EF",
-                px: 1.75,
-                "&:hover": {
-                  borderColor: "#E6F4EF",
-                  bgcolor: "rgba(255, 255, 255, 0.08)",
-                },
+                borderRadius: "14px",
+                px: 3,
               }}
             >
-              {snackbar.retry}
+              Lưu mật khẩu
             </Button>
-            <IconButton
-              size="small"
-              onClick={handleCloseSnackbar}
-              sx={{
-                color: "#E6F4EF",
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.12)",
-                },
-              }}
-              aria-label={snackbar.closeAria}
-            >
-              <CloseRoundedIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        }
-      /> */}
+          </DialogActions>
+        </Box>
+      </Dialog>
     </Box>
   );
 }

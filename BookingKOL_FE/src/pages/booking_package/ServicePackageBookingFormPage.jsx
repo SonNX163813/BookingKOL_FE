@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Steps,
   Form,
@@ -6,17 +12,22 @@ import {
   InputNumber,
   DatePicker,
   Button,
+  ConfigProvider,
   Select,
   message,
   Descriptions,
 } from "antd";
 import dayjs from "dayjs";
-import { Crown, Megaphone, CheckCircle } from "lucide-react";
+import "dayjs/locale/vi";
+import viVN from "antd/locale/vi_VN";
+import { Crown, Megaphone, CheckCircle, ArrowLeft } from "lucide-react";
 import { useCreateBooking } from "../../hook/booking_package/useCreateBooking";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getKolProfiles, resolveAvatarUrl } from "../../services/kol/KolAPI";
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
+
+dayjs.locale("vi");
 
 // MUI imports cho form tải tệp
 import {
@@ -971,55 +982,71 @@ const ServicePackageBookingFormPage = () => {
     }
   }, [current, steps.length]);
 
+  const handleBack = useCallback(() => {
+    navigate("/goi-chien-dich");
+  }, [navigate]);
+
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#eef2ff] text-slate-900">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(90%_90%_at_20%_20%,rgba(59,130,246,0.15),rgba(147,197,253,0)_60%),radial-gradient(80%_80%_at_80%_0%,rgba(244,114,182,0.18),rgba(244,114,182,0)_70%)]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white" />
-      </div>
+    <ConfigProvider locale={viVN}>
+      <section className="relative min-h-screen overflow-hidden bg-[#eef2ff] text-slate-900">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(90%_90%_at_20%_20%,rgba(59,130,246,0.15),rgba(147,197,253,0)_60%),radial-gradient(80%_80%_at_80%_0%,rgba(244,114,182,0.18),rgba(244,114,182,0)_70%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white" />
+        </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8" />
-
-      <div
-        ref={stepsWrapperRef}
-        className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8"
-      >
-        <div className="rounded-[32px] border border-white/70 bg-white/80 shadow-[0_30px_160px_rgba(15,23,42,0.18)] backdrop-blur">
-          <div className="flex flex-col gap-6 px-6 pb-8 pt-8 sm:px-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-blue-600">
-                  Quy trình đặt gói
-                </p>
-
-                <p className="text-sm text-slate-500">
-                  Cập nhật rõ ràng từng giai đoạn, từ chọn gói, cung cấp thông
-                  tin đến xác nhận.
-                </p>
-              </div>
-              {routePackageName && (
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm">
-                  Đang đặt gói: {routePackageName}
-                </span>
-              )}
-            </div>
-
-            <Steps
-              current={current}
-              className="px-2"
-              items={steps.map((s, index) => ({
-                key: index,
-                title: s.title,
-              }))}
-            />
-          </div>
-
-          <div className="rounded-b-[32px] border-t border-slate-100 bg-white/90 px-4 py-6 sm:px-10 sm:py-10">
-            {steps[current]?.content}
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-16 sm:px-6 lg:px-8 py-6">
+          <div className="inline-flex">
+            <Button
+              icon={<ArrowLeft size={16} />}
+              onClick={handleBack}
+              className="!flex !items-center !gap-2 !h-11 !rounded-[32px] !border !border-white/70 !bg-white !text-indigo-600 !font-semibold !shadow-sm hover:!border-indigo-500/60 hover:!text-indigo-700 hover:!bg-indigo-50 transition-all duration-300"
+            >
+              Trở về gói chiến dịch
+            </Button>
           </div>
         </div>
-      </div>
-    </section>
+
+        <div
+          ref={stepsWrapperRef}
+          className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8"
+        >
+          <div className="rounded-[32px] border border-white/70 bg-white/80 shadow-[0_30px_160px_rgba(15,23,42,0.18)] backdrop-blur">
+            <div className="flex flex-col gap-6 px-6 pb-8 pt-8 sm:px-10">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.4em] text-blue-600">
+                    Quy trình đặt gói
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    Cập nhật rõ ràng từng giai đoạn, từ chọn gói, cung cấp thông
+                    tin đến xác nhận.
+                  </p>
+                </div>
+                {routePackageName && (
+                  <span className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm">
+                    Đang đặt gói: {routePackageName}
+                  </span>
+                )}
+              </div>
+
+              <Steps
+                current={current}
+                className="px-2"
+                items={steps.map((s, index) => ({
+                  key: index,
+                  title: s.title,
+                }))}
+              />
+            </div>
+
+            <div className="rounded-b-[32px] border-t border-slate-100 bg-white/90 px-4 py-6 sm:px-10 sm:py-10">
+              {steps[current]?.content}
+            </div>
+          </div>
+        </div>
+      </section>
+    </ConfigProvider>
   );
 };
 

@@ -276,7 +276,9 @@ export default function RegisterPage() {
       {/* LEFT */}
       <section className="left-hero">
         <div className="brand">
-          <img src={logo} alt="Logo" className="logo" />
+          <a href="/">
+            <img src={logo} alt="Logo" className="logo" />
+          </a>
         </div>
 
         <h1>
@@ -364,7 +366,9 @@ export default function RegisterPage() {
       {/* RIGHT */}
       <section className="right-card register">
         <div className="login-header">
-          <img src={logo} alt="Logo" className="login-logo-top" />
+          <a href="/">
+            <img src={logo} alt="Logo" className="login-logo-top" />
+          </a>
           <h2 className="login-title">Đăng ký</h2>
           <p className="login-sub">Tạo tài khoản để bắt đầu khám phá.</p>
         </div>

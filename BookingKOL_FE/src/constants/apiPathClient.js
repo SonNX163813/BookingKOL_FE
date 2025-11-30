@@ -1,4 +1,7 @@
 export const CLIENT_API_PATHS = {
+  AUTH: {
+    changePassword: "/v1/auth/change-password",
+  },
   CONTACT: {
     lead: "/v1/public/contact/user",
     kol: "/v1/public/contact/kol",
