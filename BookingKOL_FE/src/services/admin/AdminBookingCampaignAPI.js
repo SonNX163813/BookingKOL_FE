@@ -8,7 +8,8 @@ const PATH_DETAIL = API_PATHS.BOOKING_CAMPAIGN.detail;
 // 👇 thêm path cho API /v1/campaigns/{id}
 const PATH_CAMPAIGN_DETAIL = API_PATHS.CAMPAIGN.detail;
 
-// Chỉ 4 tham số theo Swagger: search, startDate, endDate, packageType (+ tuỳ chọn page/size nếu BE có)
+// Cho phép thêm sort (nếu BE support). Ví dụ Spring:
+// ?page=0&size=20&sort=createdAt,desc
 const ALLOWED = new Set([
   "search",
   "startDate",
@@ -16,6 +17,7 @@ const ALLOWED = new Set([
   "packageType",
   "page",
   "size",
+  "sort", // ✅ thêm
 ]);
 
 const toISO = (v) => {
@@ -42,7 +44,6 @@ const toISO = (v) => {
       return v.toISOString();
     }
   } catch (_err) {
-    // Bỏ qua lỗi parse/format, trả về undefined để hợp lệ với no-empty
     return undefined;
   }
   return undefined;
@@ -63,6 +64,8 @@ const buildParams = (params = {}) =>
       return acc;
     }
 
+    // sort có thể là string "createdAt,desc" hoặc array (tùy BE),
+    // ở đây giữ nguyên v để gửi lên.
     acc[k] = v;
     return acc;
   }, {});
@@ -91,11 +94,8 @@ export const adminGetCampaignBookingDetail = async (
   campaignId,
   { signal } = {}
 ) => {
-  if (!campaignId) {
-    return Promise.reject(new Error("campaignId is required"));
-  }
+  if (!campaignId) return Promise.reject(new Error("campaignId is required"));
 
-  // Giữ nguyên wrapper: { status, message, data, timestamp }
   return get({
     url: `${PATH_DETAIL}/${encodeURIComponent(campaignId)}`,
     config: signal ? { signal } : undefined,
@@ -104,11 +104,8 @@ export const adminGetCampaignBookingDetail = async (
 
 // ================== CAMPAIGN INFO /campaigns/{campaignId} ==================
 export const adminGetCampaignInfo = async (campaignId, { signal } = {}) => {
-  if (!campaignId) {
-    return Promise.reject(new Error("campaignId is required"));
-  }
+  if (!campaignId) return Promise.reject(new Error("campaignId is required"));
 
-  // BE trả về: { status, message, data, timestamp } (hoặc tương tự)
   return get({
     url: `${PATH_CAMPAIGN_DETAIL}/${encodeURIComponent(campaignId)}`,
     config: signal ? { signal } : undefined,

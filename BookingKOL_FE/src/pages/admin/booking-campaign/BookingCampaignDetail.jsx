@@ -73,17 +73,37 @@ const formatArrayText = (items) => {
 const CAMPAIGN_STATUS_LABEL = {
   REQUESTED: "Đang yêu cầu",
   NEGOTIATING: "Đang thương lượng",
-  APPROVED: "Đã phê duyệt",
+  ACCEPTED: "Đã chấp nhận",
   REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  IN_PROGRESS: "Đang triển khai",
   COMPLETED: "Hoàn tất",
 };
 
 const CAMPAIGN_STATUS_COLOR = {
   REQUESTED: "gold",
   NEGOTIATING: "purple",
-  APPROVED: "green",
+  ACCEPTED: "green",
   REJECTED: "red",
+  CANCELLED: "default",
+  IN_PROGRESS: "geekblue",
   COMPLETED: "blue",
+};
+
+/** Label + Color cho trạng thái hợp đồng */
+const CONTRACT_STATUS_LABEL = {
+  REQUESTED: "Đang yêu cầu",
+  NEGOTIATING: "Đang thương lượng",
+  ACCEPTED: "Đã chấp nhận",
+  REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn tất",
+};
+
+const getStatusColor = (status) => {
+  if (!status) return "default";
+  return STATUS_TAG_COLOR[status] ?? CAMPAIGN_STATUS_COLOR[status] ?? "default";
 };
 
 const BookingCampaignDetail = () => {
@@ -91,7 +111,6 @@ const BookingCampaignDetail = () => {
   const navigate = useNavigate();
   const screens = useBreakpoint();
 
-  // 1) API lấy danh sách bookingRequests theo campaign
   const {
     data: bookingsResponse,
     isLoading: isLoadingBookings,
@@ -105,7 +124,6 @@ const BookingCampaignDetail = () => {
     retry: false,
   });
 
-  // 2) API mới /campaigns/{id} cho phần "Thông tin Campaign"
   const {
     data: campaignResponse,
     isLoading: isLoadingCampaign,
@@ -145,7 +163,6 @@ const BookingCampaignDetail = () => {
     refetchBookings();
   };
 
-  // Table: lịch thanh toán
   const paymentScheduleColumns = useMemo(
     () => [
       {
@@ -198,7 +215,6 @@ const BookingCampaignDetail = () => {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
-      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Space size="middle" wrap>
           <Button
@@ -226,7 +242,6 @@ const BookingCampaignDetail = () => {
         </div>
       </div>
 
-      {/* Error */}
       {errorAll ? (
         <Card>
           <Alert
@@ -238,7 +253,6 @@ const BookingCampaignDetail = () => {
         </Card>
       ) : (
         <>
-          {/* Thông tin Campaign từ /campaigns/{id} */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -266,9 +280,7 @@ const BookingCampaignDetail = () => {
               bordered
               size="middle"
               column={screens.lg ? 3 : screens.md ? 2 : 1}
-              styles={{
-                label: { width: 180 },
-              }}
+              styles={{ label: { width: 180 } }}
             >
               <Descriptions.Item label="Tên Campaign">
                 {campaignInfo?.name ?? "--"}
@@ -294,8 +306,6 @@ const BookingCampaignDetail = () => {
                 {formatDate(campaignInfo?.endDate)}
               </Descriptions.Item>
 
-              {/* ✅ ĐÃ BỎ 3 field: Tổng booking / Tổng KOL / Tổng Livestream */}
-
               <Descriptions.Item label="KOL tham gia" span={screens.lg ? 3 : 1}>
                 {formatArrayText(campaignInfo?.kols)}
               </Descriptions.Item>
@@ -316,7 +326,6 @@ const BookingCampaignDetail = () => {
             </Descriptions>
           </Card>
 
-          {/* Các Booking thuộc Campaign – vẫn dùng /admin/bookings/admin/{campaignId} */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -329,9 +338,28 @@ const BookingCampaignDetail = () => {
           >
             {bookingRequests.length ? (
               bookingRequests.map((record, index) => {
-                const schedules = Array.isArray(record?.paymentSchedules)
-                  ? record.paymentSchedules
-                  : [];
+                // ✅ sort dueDate tăng dần (ngày sớm lên trước)
+                const schedules = (
+                  Array.isArray(record?.paymentSchedules)
+                    ? record.paymentSchedules
+                    : []
+                )
+                  .slice()
+                  .sort((a, b) => {
+                    const da = a?.dueDate ? dayjs(a.dueDate) : null;
+                    const db = b?.dueDate ? dayjs(b.dueDate) : null;
+
+                    const va =
+                      da && da.isValid()
+                        ? da.valueOf()
+                        : Number.POSITIVE_INFINITY;
+                    const vb =
+                      db && db.isValid()
+                        ? db.valueOf()
+                        : Number.POSITIVE_INFINITY;
+
+                    return va - vb;
+                  });
 
                 const bookingStatus = normalizeStatus(record?.status);
 
@@ -348,6 +376,11 @@ const BookingCampaignDetail = () => {
                     : STATUS_TAG_COLOR[bookingStatus] ?? "default";
 
                 const contractStatus = normalizeStatus(record?.contractStatus);
+                const contractStatusLabel =
+                  CONTRACT_STATUS_LABEL[contractStatus] ??
+                  contractStatus ??
+                  "--";
+                const contractStatusColor = getStatusColor(contractStatus);
 
                 const contractFileUrl =
                   record?.contractFileUrl?.match(/https?:\/\/\S+/)?.[0] ??
@@ -369,16 +402,12 @@ const BookingCampaignDetail = () => {
                       record?.bookingNumber ?? `#${index + 1}`
                     }`}
                   >
-                    {/* THÔNG TIN CHUNG CỦA BOOKING */}
                     <Descriptions
                       bordered
                       size="middle"
                       column={screens.lg ? 3 : screens.md ? 2 : 1}
                       styles={{ label: { width: 200 } }}
                     >
-                      <Descriptions.Item label="Mã booking">
-                        {record?.bookingNumber ?? "--"}
-                      </Descriptions.Item>
                       <Descriptions.Item label="Trạng thái">
                         {bookingStatus ? (
                           <Tag color={bookingStatusColor}>
@@ -433,7 +462,6 @@ const BookingCampaignDetail = () => {
 
                     <Divider />
 
-                    {/* HỢP ĐỒNG – 1 hàng 2 ô */}
                     <Title level={5} className="!mb-2">
                       Hợp đồng
                     </Title>
@@ -447,8 +475,15 @@ const BookingCampaignDetail = () => {
                       <Descriptions.Item label="Mã hợp đồng">
                         {record?.contractNumber ?? "--"}
                       </Descriptions.Item>
+
                       <Descriptions.Item label="Trạng thái hợp đồng">
-                        {contractStatus ?? "--"}
+                        {contractStatus ? (
+                          <Tag color={contractStatusColor}>
+                            {contractStatusLabel}
+                          </Tag>
+                        ) : (
+                          "--"
+                        )}
                       </Descriptions.Item>
 
                       <Descriptions.Item label="File hợp đồng">
@@ -464,15 +499,10 @@ const BookingCampaignDetail = () => {
                           "--"
                         )}
                       </Descriptions.Item>
-
-                      <Descriptions.Item label="Ký bởi thương hiệu">
-                        {formatDateTime(record?.signedAtBrand)}
-                      </Descriptions.Item>
                     </Descriptions>
 
                     <Divider />
 
-                    {/* LỊCH THANH TOÁN */}
                     <Title level={5} className="!mb-2">
                       Lịch thanh toán
                     </Title>

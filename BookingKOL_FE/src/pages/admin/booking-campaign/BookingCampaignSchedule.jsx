@@ -517,7 +517,7 @@ export default function BookingCampaignSchedule() {
                 setWorktimeFilterDate(dayjs());
               }}
             >
-              Reset
+              Làm mới
             </Button>
           </Space>
         </div>

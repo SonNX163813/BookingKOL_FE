@@ -29,44 +29,105 @@ import { useQuery } from "@tanstack/react-query";
 import { getKolProfiles, resolveAvatarUrl } from "../../../services/kol/KolAPI";
 import { adminCreateBookingFromCampaign } from "../../../services/admin/AdminBookingFromCampaignAPI";
 import { adminCreateContractPayments } from "../../../services/admin/AdminContractPaymentAPI";
-import { adminGetCampaignInfo } from "../../../services/admin/AdminBookingCampaignAPI";
+import {
+  adminGetCampaignInfo,
+  adminGetCampaignBookingDetail,
+} from "../../../services/admin/AdminBookingCampaignAPI";
 
 dayjs.locale("vi");
 
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
-const REPEAT_TYPE_PLACEHOLDER =
-  "Ví dụ: Hàng tuần, 2 buổi/tuần, mỗi T2-T4 trong 3 tuần...";
+/** ===== Repeat type (1 dropdown) ===== */
+const REPEAT_NONE = "NONE";
+const REPEAT_DAILY = "DAILY";
 
-/** Format helpers */
+const DOW = [
+  { key: "MON", label: "T2" },
+  { key: "TUE", label: "T3" },
+  { key: "WED", label: "T4" },
+  { key: "THU", label: "T5" },
+  { key: "FRI", label: "T6" },
+  { key: "SAT", label: "T7" },
+  { key: "SUN", label: "CN" },
+];
+const DOW_ORDER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const isDowKey = (v) => DOW_ORDER.includes(v);
+
+const buildRepeatTypeTextFromSelection = (selection = []) => {
+  const sel = Array.isArray(selection) ? selection : [];
+  if (sel.includes(REPEAT_DAILY)) return "Hàng ngày";
+
+  const days = sel.filter(isDowKey);
+  if (days.length) {
+    const sorted = [...new Set(days)].sort(
+      (a, b) => DOW_ORDER.indexOf(a) - DOW_ORDER.indexOf(b)
+    );
+    const labels = sorted
+      .map((k) => DOW.find((x) => x.key === k)?.label)
+      .filter(Boolean);
+    return `Hàng tuần: ${labels.join(", ")}`;
+  }
+  return "";
+};
+
+const parseRepeatTypeTextToSelection = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return [];
+
+  const lower = text.toLowerCase();
+  if (lower.includes("hàng ngày")) return [REPEAT_DAILY];
+
+  const mapLabelToKey = {
+    T2: "MON",
+    T3: "TUE",
+    T4: "WED",
+    T5: "THU",
+    T6: "FRI",
+    T7: "SAT",
+    CN: "SUN",
+  };
+
+  const m = text.match(/Hàng tuần:\s*(.*)$/i);
+  if (m?.[1]) {
+    const labels = m[1]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const days = labels.map((lb) => mapLabelToKey[lb]).filter(Boolean);
+    return [...new Set(days)];
+  }
+
+  const found = Object.keys(mapLabelToKey).filter((lb) => text.includes(lb));
+  if (found.length) {
+    return [...new Set(found.map((lb) => mapLabelToKey[lb]).filter(Boolean))];
+  }
+
+  return [];
+};
+
+/** Helpers */
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format(pattern) : String(value);
 };
-
 const formatDate = (value, pattern = "DD/MM/YYYY") => {
   if (!value) return "--";
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format(pattern) : String(value);
 };
-
 const formatCurrency = (value, currency = "VND") => {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-
+  if (value === null || value === undefined || value === "") return "--";
   const numeric = typeof value === "number" ? value : Number.parseFloat(value);
   if (Number.isNaN(numeric)) return "--";
-
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
   }).format(numeric);
 };
-
 const normalizeStatus = (status) =>
   status && typeof status === "string" ? status.toUpperCase() : status;
 
@@ -78,7 +139,6 @@ const formatArrayText = (items) => {
     .join(", ");
 };
 
-// mapping nhỏ cho status campaign (giống trang Detail)
 const CAMPAIGN_STATUS_LABEL = {
   REQUESTED: "Đang yêu cầu",
   NEGOTIATING: "Đang thương lượng",
@@ -86,7 +146,6 @@ const CAMPAIGN_STATUS_LABEL = {
   REJECTED: "Đã từ chối",
   COMPLETED: "Hoàn tất",
 };
-
 const CAMPAIGN_STATUS_COLOR = {
   REQUESTED: "gold",
   NEGOTIATING: "orange",
@@ -126,15 +185,12 @@ const createTagRender = (options) => (tagProps) => {
   );
 };
 
-/** Format số: giữ digit, group mỗi 3 số bằng dấu phẩy */
 const formatNumberWithCommas = (value) => {
   if (value === undefined || value === null) return "";
   const digits = String(value).replace(/\D/g, "");
   if (!digits) return "";
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
-
-/** Parse "1,000,000" -> number | undefined */
 const parseAmount = (value) => {
   if (value === undefined || value === null) return undefined;
   const raw = String(value).replace(/,/g, "").trim();
@@ -153,16 +209,17 @@ export default function EditBookingCampain() {
   const [liveOptions, setLiveOptions] = useState([]);
   const [loadingKols, setLoadingKols] = useState(false);
 
-  const screens = useBreakpoint();
+  // ✅ repeat selection (1 dropdown): ["DAILY"] | ["NONE"] | ["MON","WED",...]
+  const [repeatSelection, setRepeatSelection] = useState([]);
 
+  const screens = useBreakpoint();
   const row = location.state || {};
 
-  // ✅ Ưu tiên campaignId từ state (BE trả), fallback từ query
   const campaignIdFromState = row.campaignId;
   const campaignIdFromQuery = search.get("campaignId");
   const campaignId = campaignIdFromState || campaignIdFromQuery || "";
 
-  // ====== Lấy thông tin Campaign /campaigns/{id} cho "Thông tin yêu cầu từ khách hàng" ======
+  // ====== Campaign info ======
   const {
     data: campaignResponse,
     isLoading: isLoadingCampaign,
@@ -180,18 +237,163 @@ export default function EditBookingCampain() {
     CAMPAIGN_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
   const responseTimestamp = campaignResponse?.timestamp ?? null;
 
-  // 🚫 Campaign đang NEGOTIATING thì không cho nhập / tạo booking
   const isNegotiating = normalizedStatus === "NEGOTIATING";
+  const mode = isNegotiating ? "edit" : "create";
 
-  // Prefill
+  // ✅ LẤY bookingRequests theo campaignId
+  const {
+    data: campaignBookingRes,
+    isLoading: isLoadingCampaignBooking,
+    error: errorCampaignBooking,
+  } = useQuery({
+    queryKey: ["admin-campaign-booking-detail", campaignId],
+    queryFn: () => adminGetCampaignBookingDetail(campaignId),
+    enabled: mode === "edit" && !!campaignId,
+    retry: false,
+  });
+
+  const bookingsDetail = campaignBookingRes?.data ?? campaignBookingRes ?? null;
+
+  const bookingRequests = useMemo(() => {
+    return Array.isArray(bookingsDetail?.bookingRequests)
+      ? bookingsDetail.bookingRequests
+      : [];
+  }, [bookingsDetail?.bookingRequests]);
+
+  const targetBookingRecord = useMemo(() => {
+    if (!bookingRequests.length) return null;
+    return (
+      bookingRequests.find(
+        (r) => normalizeStatus(r?.status) === "NEGOTIATING"
+      ) || bookingRequests[0]
+    );
+  }, [bookingRequests]);
+
+  const bookingRequestId =
+    targetBookingRecord?.id ||
+    targetBookingRecord?.bookingRequestId ||
+    targetBookingRecord?.bookingId ||
+    row?.bookingRequestId ||
+    search.get("bookingRequestId") ||
+    "";
+
+  const hasCampaignKols =
+    Array.isArray(campaignInfo?.kols) && campaignInfo.kols.length > 0;
+  const hasCampaignLives =
+    Array.isArray(campaignInfo?.lives) && campaignInfo.lives.length > 0;
+
+  // Prefill (create mode)
   useEffect(() => {
     const stateRow = location.state || {};
+    if (mode !== "create") return;
+
     form.setFieldsValue({
       campaignId,
       description: stateRow.objective || stateRow.campaignName || "",
       repeatType: "",
     });
-  }, [campaignId, form, location.state]);
+
+    setRepeatSelection([]);
+  }, [campaignId, form, location.state, mode]);
+
+  // Prefill (edit mode) từ targetBookingRecord
+  useEffect(() => {
+    if (mode !== "edit") return;
+    if (!targetBookingRecord) return;
+
+    const source = targetBookingRecord;
+
+    const rawInst =
+      source?.installments ||
+      source?.paymentSchedules ||
+      source?.contractPayments ||
+      source?.payments ||
+      [];
+
+    const installments = Array.isArray(rawInst)
+      ? rawInst.slice(0, 5).map((it) => ({
+          amount: formatNumberWithCommas(it?.amount ?? it?.paymentAmount ?? ""),
+          dueDate: it?.dueDate ? dayjs(it.dueDate) : null,
+        }))
+      : [];
+
+    const totalInstallments = installments.length || undefined;
+
+    const startAtRaw = source?.startAt || source?.start_time || null;
+    const repeatUntilRaw = source?.repeatUntil || source?.repeat_until || null;
+
+    const startAt = startAtRaw ? dayjs(startAtRaw).minute(0).second(0) : null;
+    const repeatUntil = repeatUntilRaw ? dayjs(repeatUntilRaw) : null;
+
+    const contractAmount =
+      source?.contractAmount ??
+      source?.contract_amount ??
+      source?.contract?.amount ??
+      "";
+
+    const repeatTypeText = source?.repeatType ?? source?.repeat_type ?? "";
+
+    form.setFieldsValue({
+      campaignId: source?.campaignId || campaignId,
+      description: source?.description || "",
+      startAt,
+      repeatUntil,
+      contractAmount: formatNumberWithCommas(contractAmount),
+      kolIds:
+        source?.kolIds || source?.kols?.map((k) => k?.id).filter(Boolean) || [],
+      liveIds:
+        source?.liveIds ||
+        source?.lives?.map((l) => l?.id).filter(Boolean) ||
+        [],
+      totalInstallments,
+      installments,
+      repeatType: "",
+    });
+
+    setRepeatSelection(parseRepeatTypeTextToSelection(repeatTypeText));
+
+    setTimeout(() => {
+      form.validateFields(["installments", "__sumGuard"]).catch(() => {});
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, targetBookingRecord]);
+
+  // ✅ Sync repeatType hidden field từ repeatSelection
+  useEffect(() => {
+    const text = buildRepeatTypeTextFromSelection(repeatSelection);
+    form.setFieldValue("repeatType", text || "");
+  }, [repeatSelection, form]);
+
+  // ✅ Select logic: exclusive NONE/DAILY vs multiple DOW
+  const handleRepeatSelect = (val) => {
+    if (val === REPEAT_NONE) {
+      setRepeatSelection([REPEAT_NONE]);
+      return;
+    }
+    if (val === REPEAT_DAILY) {
+      setRepeatSelection([REPEAT_DAILY]);
+      return;
+    }
+    if (isDowKey(val)) {
+      setRepeatSelection((prev) => {
+        const days = prev.filter(isDowKey);
+        const next = Array.from(new Set([...days, val]));
+        return next;
+      });
+    }
+  };
+
+  const handleRepeatDeselect = (val) => {
+    setRepeatSelection((prev) => {
+      if (val === REPEAT_NONE || val === REPEAT_DAILY) return [];
+      if (isDowKey(val)) {
+        const next = prev.filter((x) => x !== val);
+        const stillHasDays = next.some(isDowKey);
+        return stillHasDays ? next.filter(isDowKey) : [];
+      }
+      return prev;
+    });
+  };
 
   // Load KOL / LIVE
   useEffect(() => {
@@ -270,24 +472,34 @@ export default function EditBookingCampain() {
     };
   }, []);
 
-  /** disabledDate cho startAt: chỉ từ hôm nay trở đi */
   const disabledStartDate = (current) => {
     if (!current) return false;
     return current < dayjs().startOf("day");
   };
 
-  /** disabledDate cho repeatUntil: phải sau ngày startAt (tính theo ngày) */
   const disabledRepeatUntilDate = (current) => {
     if (!current) return false;
     const startAt = form.getFieldValue("startAt");
-    if (!startAt) {
-      return current < dayjs().startOf("day");
-    }
+    if (!startAt) return current < dayjs().startOf("day");
     const minEndDate = dayjs(startAt).startOf("day").add(1, "day");
     return current < minEndDate;
   };
 
-  /** Khi đổi số lần thanh toán: sync Form.List installments (1-5) */
+  const disabledDueDateByIndex = (current, index) => {
+    if (!current) return false;
+
+    const today = dayjs().startOf("day");
+    if (index === 0) return current < today;
+
+    const installments = form.getFieldValue("installments") || [];
+    const prev = installments?.[index - 1]?.dueDate;
+
+    if (!prev) return current < today;
+
+    const min = dayjs(prev).startOf("day").add(1, "day");
+    return current < min;
+  };
+
   const handleTotalInstallmentsChange = (val) => {
     let n = Number(val);
     if (!Number.isFinite(n)) n = 0;
@@ -306,10 +518,7 @@ export default function EditBookingCampain() {
     }
 
     if (n < 1) {
-      form.setFieldsValue({
-        totalInstallments: undefined,
-        installments: [],
-      });
+      form.setFieldsValue({ totalInstallments: undefined, installments: [] });
       return;
     }
 
@@ -319,19 +528,16 @@ export default function EditBookingCampain() {
     const next = [...current];
 
     if (n > next.length) {
-      for (let i = next.length; i < n; i++) {
+      for (let i = next.length; i < n; i++)
         next.push({ amount: "", dueDate: null });
-      }
     } else if (n < next.length) {
       next.length = n;
     }
 
     form.setFieldsValue({ installments: next });
-    // validate lại tổng tiền
     form.validateFields(["installments", "__sumGuard"]).catch(() => {});
   };
 
-  /* ====== WATCH & TÍNH TỔNG ====== */
   const watchInstallments = Form.useWatch("installments", form);
   const watchContractAmountRaw = Form.useWatch("contractAmount", form);
 
@@ -345,7 +551,6 @@ export default function EditBookingCampain() {
     const hasAnyInstallmentAmount = amounts.length > 0;
     const sumInstallments = amounts.reduce((acc, v) => acc + v, 0);
 
-    // Chỉ check khi có contractAmount & có cấu hình installments
     const sumMismatch =
       !!contractAmount &&
       hasAnyInstallmentAmount &&
@@ -359,10 +564,6 @@ export default function EditBookingCampain() {
     };
   }, [watchInstallments, watchContractAmountRaw]);
 
-  // 🚫 Nếu campaign đang NEGOTIATING → cũng disable luôn nút submit
-  const disableSave = sumState.sumMismatch || isNegotiating;
-
-  // ====== CHẶN PHÍM & PASTE CHO "Số lần thanh toán" (chỉ 1–5) ======
   const handleTotalInstallmentsKeyDown = (e) => {
     const controlKeys = [
       "Backspace",
@@ -375,69 +576,43 @@ export default function EditBookingCampain() {
       "End",
     ];
     if (controlKeys.includes(e.key)) return;
-
-    // chỉ cho nhập 1,2,3,4,5
-    if (!/^[1-5]$/.test(e.key)) {
-      e.preventDefault();
-    }
+    if (!/^[1-5]$/.test(e.key)) e.preventDefault();
   };
 
   const handleTotalInstallmentsPaste = (e) => {
     const text = (e.clipboardData || window.clipboardData)
       .getData("text")
       .trim();
-    if (!/^[1-5]$/.test(text)) {
-      e.preventDefault();
-    }
+    if (!/^[1-5]$/.test(text)) e.preventDefault();
   };
+
+  const normalizeStartAtMinute = (val) => {
+    if (!val) return val;
+    const d = dayjs(val);
+    if (!d.isValid()) return val;
+    return d.minute(0).second(0);
+  };
+
+  const disableSave =
+    sumState.sumMismatch ||
+    (mode === "edit" &&
+      (isLoadingCampaignBooking ||
+        !!errorCampaignBooking ||
+        !targetBookingRecord));
 
   const onSubmit = async (values) => {
     try {
-      // 🚫 Double-check: nếu campaign đang NEGOTIATING thì không cho tạo
-      if (isNegotiating) {
-        return;
+      if (!values.campaignId) throw new Error("Campaign ID là bắt buộc");
+
+      // không bắt buộc chọn repeat, nhưng nếu chọn weekly thì phải có ít nhất 1 thứ
+      const hasWeeklyDays = repeatSelection.some(isDowKey);
+      const isDaily = repeatSelection.includes(REPEAT_DAILY);
+
+      if (!isDaily && hasWeeklyDays === false && values.repeatType) {
+        // nếu repeatType có text mà state không hợp lệ (hiếm), clear
+        form.setFieldValue("repeatType", "");
       }
 
-      if (!values.campaignId) {
-        throw new Error("Campaign ID là bắt buộc và phải là campaignId");
-      }
-
-      // 1. Tạo booking từ campaign
-      const bookingPayload = {
-        campaignId: values.campaignId,
-        description: values.description,
-        repeatType: values.repeatType || undefined,
-        startAt: values.startAt,
-        repeatUntil: values.repeatUntil,
-        contractAmount: values.contractAmount,
-        kolIds: values.kolIds,
-        liveIds: values.liveIds,
-      };
-
-      const bookingResult = await adminCreateBookingFromCampaign(
-        bookingPayload
-      );
-
-      // 2. Lấy contractId & bookingRequestId từ response để tạo payments
-      const data = (bookingResult && bookingResult.data) || bookingResult || {};
-
-      const contractId =
-        data.contractId ||
-        data.contract_id ||
-        data.contract?.id ||
-        data.contract?.contractId ||
-        null;
-
-      const bookingRequestId =
-        data.bookingRequestId ||
-        data.booking_request_id ||
-        data.bookingRequest?.id ||
-        data.booking?.id ||
-        data.bookingId ||
-        data.id ||
-        null;
-
-      // 3. Chuẩn bị installments (nếu có)
       const rawInstallments = Array.isArray(values.installments)
         ? values.installments
         : [];
@@ -447,9 +622,9 @@ export default function EditBookingCampain() {
           const amount = parseAmount(ins?.amount);
 
           let dueDate;
-          if (dayjs.isDayjs(ins?.dueDate)) {
+          if (dayjs.isDayjs(ins?.dueDate))
             dueDate = ins.dueDate.format("YYYY-MM-DD");
-          } else if (ins?.dueDate) {
+          else if (ins?.dueDate) {
             const d = dayjs(ins.dueDate);
             dueDate = d.isValid() ? d.format("YYYY-MM-DD") : undefined;
           }
@@ -465,36 +640,67 @@ export default function EditBookingCampain() {
       }
       if (totalInstallments > 5) totalInstallments = 5;
 
-      // 4. Gọi API tạo lịch thanh toán hợp đồng (nếu có installments hợp lệ)
-      if (cleanedInstallments.length > 0) {
-        if (!contractId || !bookingRequestId) {
-          message.open({
-            type: "error",
-            content:
-              "Đã tạo booking nhưng không lấy được contractId/bookingRequestId để tạo lịch thanh toán. Vui lòng kiểm tra lại phản hồi từ server.",
-            icon: <XCircle size={18} className="text-red-500" />,
-          });
-        } else {
-          try {
-            await adminCreateContractPayments({
-              contractId,
-              bookingRequestId,
-              totalInstallments,
-              installments: cleanedInstallments,
-            });
-          } catch (e) {
-            console.error("Create payments error:", e);
+      if (mode === "create") {
+        const bookingPayload = {
+          campaignId: values.campaignId,
+          description: values.description,
+          repeatType: values.repeatType || undefined,
+          startAt: values.startAt,
+          repeatUntil: values.repeatUntil,
+          contractAmount: values.contractAmount,
+          kolIds: values.kolIds,
+          liveIds: values.liveIds,
+        };
+
+        const bookingResult = await adminCreateBookingFromCampaign(
+          bookingPayload
+        );
+        const data =
+          (bookingResult && bookingResult.data) || bookingResult || {};
+
+        const contractId =
+          data.contractId ||
+          data.contract_id ||
+          data.contract?.id ||
+          data.contract?.contractId ||
+          null;
+
+        const bookingRequestIdCreated =
+          data.bookingRequestId ||
+          data.booking_request_id ||
+          data.bookingRequest?.id ||
+          data.booking?.id ||
+          data.bookingId ||
+          data.id ||
+          null;
+
+        if (cleanedInstallments.length > 0) {
+          if (!contractId || !bookingRequestIdCreated) {
             message.open({
               type: "error",
               content:
-                "Đã tạo booking, nhưng tạo lịch thanh toán thất bại. Vui lòng kiểm tra lại trong mục Hợp đồng.",
+                "Đã tạo booking nhưng không lấy được contractId/bookingRequestId để tạo lịch thanh toán.",
               icon: <XCircle size={18} className="text-red-500" />,
+            });
+          } else {
+            await adminCreateContractPayments({
+              contractId,
+              bookingRequestId: bookingRequestIdCreated,
+              totalInstallments,
+              installments: cleanedInstallments,
             });
           }
         }
+
+        message.success("Tạo booking request thành công");
+        navigate("/admin/management-booking-campaigns");
+        return;
       }
 
-      message.success("Tạo booking request thành công");
+      // EDIT mode: hiện tại đang đổ dữ liệu theo campaignId + bookingRequests.
+      message.success(
+        "Đã đổ dữ liệu từ bookingRequests theo campaignId để chỉnh sửa."
+      );
       navigate("/admin/management-booking-campaigns");
     } catch (err) {
       const beMsg =
@@ -514,12 +720,30 @@ export default function EditBookingCampain() {
       } else {
         message.open({
           type: "error",
-          content: beMsg || "Tạo booking thất bại",
+          content:
+            beMsg ||
+            (mode === "edit" ? "Cập nhật thất bại" : "Tạo booking thất bại"),
           icon: <XCircle size={18} className="text-red-500" />,
         });
       }
     }
   };
+
+  // options cho 1 dropdown
+  const repeatOptions = useMemo(() => {
+    const base = [
+      { value: REPEAT_NONE, label: "Không lặp" },
+      { value: REPEAT_DAILY, label: "Hàng ngày" },
+    ];
+    const days = DOW.map((d) => ({ value: d.key, label: d.label }));
+    return [
+      { label: "Tuỳ chọn", options: base },
+      { label: "Chọn thứ (Hàng tuần)", options: days },
+    ];
+  }, []);
+
+  const repeatHint =
+    buildRepeatTypeTextFromSelection(repeatSelection) || "Không lặp";
 
   return (
     <ConfigProvider locale={viVN}>
@@ -532,11 +756,14 @@ export default function EditBookingCampain() {
             </div>
             <div>
               <h1 className="text-[18px] font-bold uppercase">
-                Tạo/Chỉnh sửa Booking Campaign
+                {mode === "edit"
+                  ? "Chỉnh sửa Booking Request (NEGOTIATING)"
+                  : "Tạo/Chỉnh sửa Booking Campaign"}
               </h1>
               <p className="text-[14px] text-gray-600">
-                Gửi yêu cầu booking từ Campaign, sinh hợp đồng và cấu hình thanh
-                toán.
+                {mode === "edit"
+                  ? "Lấy dữ liệu từ /admin/bookings/admin/{campaignId} và đổ bookingRequests vào form."
+                  : "Gửi yêu cầu booking từ Campaign, sinh hợp đồng và cấu hình thanh toán."}
               </p>
             </div>
           </div>
@@ -552,7 +779,7 @@ export default function EditBookingCampain() {
           </Space>
         </div>
 
-        {/* ✅ Thông tin yêu cầu từ khách hàng (từ /campaigns/{id}) */}
+        {/* Campaign info */}
         <Card
           className="shadow-sm"
           bordered={false}
@@ -568,7 +795,7 @@ export default function EditBookingCampain() {
             <Alert
               type="error"
               showIcon
-              message="Không thể tải thông tin yêu cầu từ khách hàng."
+              message="Không thể tải thông tin campaign."
               description={String(errorCampaign?.message ?? "")}
             />
           ) : campaignInfo ? (
@@ -614,27 +841,33 @@ export default function EditBookingCampain() {
                 <Descriptions.Item label="Ngày bắt đầu">
                   {formatDate(campaignInfo?.startDate)}
                 </Descriptions.Item>
+
                 <Descriptions.Item label="Ngày kết thúc">
                   {formatDate(campaignInfo?.endDate)}
                 </Descriptions.Item>
 
-                <Descriptions.Item
-                  label="KOL tham gia"
-                  span={screens.lg ? 3 : 1}
-                >
-                  {formatArrayText(campaignInfo?.kols)}
-                </Descriptions.Item>
+                {hasCampaignKols && (
+                  <Descriptions.Item
+                    label="KOL tham gia"
+                    span={screens.lg ? 3 : 1}
+                  >
+                    {formatArrayText(campaignInfo?.kols)}
+                  </Descriptions.Item>
+                )}
 
-                <Descriptions.Item
-                  label="Trợ Live tham gia"
-                  span={screens.lg ? 3 : 1}
-                >
-                  {formatArrayText(campaignInfo?.lives)}
-                </Descriptions.Item>
+                {hasCampaignLives && (
+                  <Descriptions.Item
+                    label="Trợ Live tham gia"
+                    span={screens.lg ? 3 : 1}
+                  >
+                    {formatArrayText(campaignInfo?.lives)}
+                  </Descriptions.Item>
+                )}
 
                 <Descriptions.Item label="Tạo lúc">
                   {formatDateTime(campaignInfo?.createdAt)}
                 </Descriptions.Item>
+
                 <Descriptions.Item label="Cập nhật lúc">
                   {formatDateTime(campaignInfo?.updatedAt)}
                 </Descriptions.Item>
@@ -647,12 +880,7 @@ export default function EditBookingCampain() {
 
         {/* Form */}
         <Card bordered={false} className="shadow-sm">
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={onSubmit}
-            disabled={isNegotiating} // 🚫 không cho nhập khi NEGOTIATING
-          >
+          <Form form={form} layout="vertical" onFinish={onSubmit}>
             <Row gutter={[16, 16]}>
               {/* Campaign ID */}
               <Col xs={24} md={12}>
@@ -663,15 +891,50 @@ export default function EditBookingCampain() {
                 >
                   <Input
                     placeholder="e7d9-... (campaignId)"
-                    disabled={!!campaignId}
+                    disabled={!!campaignId || mode === "edit"}
                   />
                 </Form.Item>
               </Col>
 
-              {/* Repeat type: nhập chữ */}
+              {/* ✅ Kiểu lặp (1 dropdown: Không lặp + Hàng ngày + Thứ) */}
               <Col xs={24} md={12}>
-                <Form.Item label="Kiểu lặp" name="repeatType">
-                  <Input placeholder={REPEAT_TYPE_PLACEHOLDER} />
+                <Form.Item label="Kiểu lặp">
+                  <Space direction="vertical" className="w-full" size={8}>
+                    <Select
+                      className="w-full"
+                      mode="multiple"
+                      allowClear
+                      placeholder="Chọn: Không lặp / Hàng ngày / hoặc chọn các thứ"
+                      options={repeatOptions}
+                      value={repeatSelection}
+                      maxTagCount="responsive"
+                      onSelect={handleRepeatSelect}
+                      onDeselect={handleRepeatDeselect}
+                      onClear={() => setRepeatSelection([])}
+                      onChange={(vals) => {
+                        // fallback cho trường hợp AntD set thẳng values
+                        if (!Array.isArray(vals)) return;
+                        // nếu user paste/copy hoặc setup lạ: normalize nhanh
+                        if (vals.includes(REPEAT_NONE)) {
+                          setRepeatSelection([REPEAT_NONE]);
+                          return;
+                        }
+                        if (vals.includes(REPEAT_DAILY)) {
+                          setRepeatSelection([REPEAT_DAILY]);
+                          return;
+                        }
+                        const days = vals.filter(isDowKey);
+                        setRepeatSelection(days);
+                      }}
+                    />
+
+                    <div className="text-xs text-gray-500">{repeatHint}</div>
+                  </Space>
+                </Form.Item>
+
+                {/* hidden field dùng để submit đúng format BE */}
+                <Form.Item name="repeatType" hidden>
+                  <Input />
                 </Form.Item>
               </Col>
 
@@ -699,10 +962,22 @@ export default function EditBookingCampain() {
                 >
                   <DatePicker
                     className="w-full"
-                    showTime
+                    showTime={{
+                      format: "HH:mm",
+                      minuteStep: 60,
+                      defaultValue: dayjs().minute(0).second(0),
+                    }}
                     format="DD/MM/YYYY HH:mm"
                     placeholder="Chọn ngày giờ bắt đầu"
                     disabledDate={disabledStartDate}
+                    inputReadOnly
+                    onChange={(val) => {
+                      const fixed = normalizeStartAtMinute(val);
+                      if (fixed) form.setFieldValue("startAt", fixed);
+                      setTimeout(() => {
+                        form.validateFields(["repeatUntil"]).catch(() => {});
+                      }, 0);
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -721,9 +996,8 @@ export default function EditBookingCampain() {
                         if (!startAt) return Promise.resolve();
                         const startDate = dayjs(startAt).startOf("day");
                         const endDate = dayjs(value).startOf("day");
-                        if (endDate.isAfter(startDate)) {
+                        if (endDate.isAfter(startDate))
                           return Promise.resolve();
-                        }
                         return Promise.reject(
                           new Error("Ngày kết thúc phải sau ngày bắt đầu.")
                         );
@@ -736,6 +1010,7 @@ export default function EditBookingCampain() {
                     format="DD/MM/YYYY"
                     placeholder="Chọn ngày kết thúc lặp"
                     disabledDate={disabledRepeatUntilDate}
+                    inputReadOnly
                   />
                 </Form.Item>
               </Col>
@@ -769,7 +1044,6 @@ export default function EditBookingCampain() {
                     }
                     const limited = digits.slice(0, 13);
                     const formatted = formatNumberWithCommas(limited);
-                    // validate lại tổng installments khi đổi giá trị hợp đồng
                     setTimeout(() => {
                       form
                         .validateFields(["installments", "__sumGuard"])
@@ -781,20 +1055,17 @@ export default function EditBookingCampain() {
                     { required: true, message: "Bắt buộc" },
                     {
                       validator: (_, v) => {
-                        if (!v || String(v).trim() === "") {
+                        if (!v || String(v).trim() === "")
                           return Promise.resolve();
-                        }
                         const raw = String(v).replace(/,/g, "").trim();
-                        if (!/^\d+$/.test(raw)) {
+                        if (!/^\d+$/.test(raw))
                           return Promise.reject(
                             new Error("Số tiền không hợp lệ")
                           );
-                        }
-                        if (raw.length > 13) {
+                        if (raw.length > 13)
                           return Promise.reject(
                             new Error("Chỉ có thể nhập tối đa 13 chữ số")
                           );
-                        }
                         return Promise.resolve();
                       },
                     },
@@ -806,11 +1077,7 @@ export default function EditBookingCampain() {
 
               {/* KOL IDs */}
               <Col xs={24} md={12}>
-                <Form.Item
-                  label="KOL IDs (KOL chính)"
-                  name="kolIds"
-                  tooltip="Chọn từ danh sách KOL (role = KOL)"
-                >
+                <Form.Item label="KOL IDs (KOL chính)" name="kolIds">
                   <Select
                     mode="multiple"
                     placeholder="Chọn KOL (không bắt buộc)"
@@ -831,11 +1098,7 @@ export default function EditBookingCampain() {
 
               {/* LIVE IDs */}
               <Col xs={24} md={12}>
-                <Form.Item
-                  label="LIVE IDs (Trợ live)"
-                  name="liveIds"
-                  tooltip="Chọn từ danh sách trợ LIVE (role = LIVE)"
-                >
+                <Form.Item label="LIVE IDs (Trợ live)" name="liveIds">
                   <Select
                     mode="multiple"
                     placeholder="Chọn trợ LIVE (không bắt buộc)"
@@ -861,7 +1124,6 @@ export default function EditBookingCampain() {
                 Cấu hình thanh toán hợp đồng
               </h2>
 
-              {/* Thông báo mismatch hiện ngay tại section */}
               {sumState.sumMismatch && (
                 <Alert
                   type="error"
@@ -880,7 +1142,6 @@ export default function EditBookingCampain() {
                 />
               )}
 
-              {/* Guard validator ẩn: chặn submit khi mismatch */}
               <Form.Item
                 name="__sumGuard"
                 style={{ display: "none" }}
@@ -908,26 +1169,21 @@ export default function EditBookingCampain() {
                   <Form.Item
                     label="Số lần thanh toán (1 - 5)"
                     name="totalInstallments"
-                    tooltip="Nhập hoặc chọn, tự sinh số đợt phía dưới"
                     rules={[
                       { required: true, message: "Bắt buộc" },
                       {
                         validator: (_, v) => {
-                          if (v === undefined || v === null || v === "") {
-                            // rule required sẽ xử lý
+                          if (v === undefined || v === null || v === "")
                             return Promise.resolve();
-                          }
                           const n = Number(v);
-                          if (!Number.isFinite(n)) {
+                          if (!Number.isFinite(n))
                             return Promise.reject(
                               new Error("Giá trị không hợp lệ")
                             );
-                          }
-                          if (n < 1 || n > 5) {
+                          if (n < 1 || n > 5)
                             return Promise.reject(
                               new Error("Chỉ được tối đa thanh toán 5 đợt")
                             );
-                          }
                           return Promise.resolve();
                         },
                       },
@@ -959,7 +1215,6 @@ export default function EditBookingCampain() {
                             name={[field.name, "amount"]}
                             fieldKey={[field.fieldKey, "amount"]}
                             label={index === 0 ? "Số tiền đợt thanh toán" : ""}
-                            tooltip="Tự format, tối đa 13 chữ số"
                             getValueFromEvent={(e) => {
                               const input = e?.target?.value || "";
                               const digits = input.replace(/\D/g, "");
@@ -972,7 +1227,6 @@ export default function EditBookingCampain() {
                               }
                               const limited = digits.slice(0, 13);
                               const formatted = formatNumberWithCommas(limited);
-                              // validate lại tổng khi sửa từng đợt
                               setTimeout(() => {
                                 form
                                   .validateFields([
@@ -987,25 +1241,21 @@ export default function EditBookingCampain() {
                               { required: true, message: "Bắt buộc" },
                               {
                                 validator: (_, v) => {
-                                  if (!v || String(v).trim() === "") {
-                                    // required rule xử lý case rỗng
+                                  if (!v || String(v).trim() === "")
                                     return Promise.resolve();
-                                  }
                                   const raw = String(v)
                                     .replace(/,/g, "")
                                     .trim();
-                                  if (!/^\d+$/.test(raw)) {
+                                  if (!/^\d+$/.test(raw))
                                     return Promise.reject(
                                       new Error("Số tiền không hợp lệ")
                                     );
-                                  }
-                                  if (raw.length > 13) {
+                                  if (raw.length > 13)
                                     return Promise.reject(
                                       new Error(
                                         "Chỉ có thể nhập tối đa 13 chữ số"
                                       )
                                     );
-                                  }
                                   return Promise.resolve();
                                 },
                               },
@@ -1023,12 +1273,57 @@ export default function EditBookingCampain() {
                             label={
                               index === 0 ? "Hạn thanh toán (dueDate)" : ""
                             }
-                            rules={[{ required: true, message: "Bắt buộc" }]}
+                            dependencies={
+                              index > 0
+                                ? [["installments", index - 1, "dueDate"]]
+                                : undefined
+                            }
+                            rules={[
+                              { required: true, message: "Bắt buộc" },
+                              ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                  if (!value) return Promise.resolve();
+
+                                  const today = dayjs().startOf("day");
+                                  const cur = dayjs(value).startOf("day");
+                                  if (cur.isBefore(today)) {
+                                    return Promise.reject(
+                                      new Error(
+                                        "Hạn thanh toán phải chọn từ ngày hôm nay trở đi."
+                                      )
+                                    );
+                                  }
+
+                                  if (index > 0) {
+                                    const installments =
+                                      getFieldValue("installments") || [];
+                                    const prev =
+                                      installments?.[index - 1]?.dueDate;
+                                    if (prev) {
+                                      const prevDay =
+                                        dayjs(prev).startOf("day");
+                                      if (!cur.isAfter(prevDay)) {
+                                        return Promise.reject(
+                                          new Error(
+                                            "Hạn thanh toán của đợt sau phải sau đợt trước."
+                                          )
+                                        );
+                                      }
+                                    }
+                                  }
+                                  return Promise.resolve();
+                                },
+                              }),
+                            ]}
                           >
                             <DatePicker
                               className="w-full"
                               format="DD/MM/YYYY"
                               placeholder="Chọn hạn thanh toán"
+                              disabledDate={(current) =>
+                                disabledDueDateByIndex(current, index)
+                              }
+                              inputReadOnly
                             />
                           </Form.Item>
                         </Col>
@@ -1085,12 +1380,6 @@ export default function EditBookingCampain() {
                         </Button>
                       </Form.Item>
                     )}
-
-                    {fields.length >= 5 && (
-                      <div className="text-[12px] text-red-500 mt-1">
-                        Chỉ được tối đa thanh toán 5 đợt.
-                      </div>
-                    )}
                   </>
                 )}
               </Form.List>
@@ -1103,15 +1392,10 @@ export default function EditBookingCampain() {
                 type="primary"
                 icon={<Save size={16} />}
                 disabled={disableSave}
-                title={
-                  isNegotiating
-                    ? "Campaign đang thương lượng, không thể tạo yêu cầu booking"
-                    : disableSave
-                    ? "Tổng các đợt ≠ Giá trị hợp đồng — vui lòng điều chỉnh"
-                    : "Tạo yêu cầu booking từ campaign này"
-                }
               >
-                Tạo yêu cầu booking
+                {mode === "edit"
+                  ? "Cập nhật booking request"
+                  : "Tạo yêu cầu booking"}
               </Button>
               <Button onClick={() => navigate(-1)}>Hủy</Button>
             </div>

@@ -24,6 +24,7 @@ import {
   Search,
   Pencil,
   Plus,
+  FileDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -35,24 +36,22 @@ const { RangePicker } = DatePicker;
 
 /* ====== STATUS mapping cho Campaign ====== */
 const CAMPAIGN_STATUS_LABEL = {
-  DRAFT: "Hủy bỏ",
   REQUESTED: "Đang yêu cầu",
   NEGOTIATING: "Đang thương lượng",
-  APPROVED: "Đã phê duyệt",
-  ACCEPTED: "Đã phê duyệt", // hoặc "Đã chấp nhận"
-  IN_PROGRESS: "Đang triển khai",
+  ACCEPTED: "Đã chấp nhận",
   REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  IN_PROGRESS: "Đang triển khai",
   COMPLETED: "Hoàn tất",
 };
 
 const CAMPAIGN_STATUS_COLOR = {
-  DRAFT: "default",
   REQUESTED: "gold",
   NEGOTIATING: "purple",
-  APPROVED: "green",
   ACCEPTED: "green",
-  IN_PROGRESS: "geekblue",
   REJECTED: "red",
+  CANCELLED: "default",
+  IN_PROGRESS: "geekblue",
   COMPLETED: "blue",
 };
 
@@ -75,9 +74,11 @@ const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
   const startA = dayjs(aStart || aEnd);
   const endA = dayjs(aEnd || aStart);
   if (!startA.isValid() || !endA.isValid()) return false;
+
   const startB = dayjs(bStart);
   const endB = dayjs(bEnd);
   if (!startB.isValid() || !endB.isValid()) return true;
+
   return (
     startA.valueOf() <= endB.valueOf() && endA.valueOf() >= startB.valueOf()
   );
@@ -91,16 +92,30 @@ export default function ManagementBookingCampaigns() {
   const [size, setSize] = useState(20);
   const [isExporting, setIsExporting] = useState(false);
 
+  // ✅ server-side sort mặc định theo createdAt desc
+  const [sorter, setSorter] = useState({
+    field: "createdAt",
+    order: "descend",
+  });
+
   const [filters, setFilters] = useState({
     search: undefined,
-    status: undefined, // campaignStatus
+    status: undefined,
     packageType: undefined,
     executionRange: undefined,
   });
 
+  const sortParam =
+    sorter?.field && sorter?.order
+      ? `${sorter.field},${sorter.order === "ascend" ? "asc" : "desc"}`
+      : "createdAt,desc";
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["admin-campaign-bookings", { page, size }],
-    queryFn: () => adminGetCampaignBookings({ params: { page, size } }),
+    queryKey: ["admin-campaign-bookings", { page, size, sortParam }],
+    queryFn: () =>
+      adminGetCampaignBookings({
+        params: { page, size, sort: sortParam },
+      }),
     keepPreviousData: true,
     retry: false,
     refetchOnWindowFocus: false,
@@ -113,14 +128,19 @@ export default function ManagementBookingCampaigns() {
     : data?.number ?? 0;
   const serverSize = Number.isFinite(data?.size) ? data.size : size;
 
+  // ✅ Select gói: NORMAL -> "Thường"
   const packageTypeOptions = useMemo(() => {
     const set = new Set(
       serverContent
         .map((r) => r?.packageType)
         .filter((x) => x !== undefined && x !== null && String(x).trim() !== "")
-        .map((x) => String(x))
+        .map((x) => String(x).toUpperCase())
     );
-    return [...set].map((v) => ({ value: v, label: String(v).toUpperCase() }));
+
+    return [...set].map((v) => ({
+      value: v,
+      label: v === "NORMAL" ? "Thường" : v,
+    }));
   }, [serverContent]);
 
   const filtered = useMemo(() => {
@@ -149,15 +169,16 @@ export default function ManagementBookingCampaigns() {
       if (s) {
         const bucket = [
           r?.campaignName,
-          r?.objective,
           r?.packageName,
           r?.packageType,
           r?.buyerEmail,
           r?.id,
           r?.requestNumber,
+          r?.createdAt,
         ]
           .filter(Boolean)
           .map((x) => String(x).toLowerCase());
+
         if (!bucket.some((x) => x.includes(s))) return false;
       }
 
@@ -179,6 +200,7 @@ export default function ManagementBookingCampaigns() {
       packageType: packageType || undefined,
       executionRange: executionRange?.length === 2 ? executionRange : undefined,
     });
+    setPage(0);
   };
 
   const handleReset = () => {
@@ -189,6 +211,7 @@ export default function ManagementBookingCampaigns() {
       packageType: undefined,
       executionRange: undefined,
     });
+    setPage(0);
   };
 
   const goCreate = useCallback(() => {
@@ -199,7 +222,6 @@ export default function ManagementBookingCampaigns() {
     (r) => {
       const campaignId = r?.campaignId || r?.id || r?.code;
       if (!campaignId) return;
-
       navigate(
         `/admin/management-booking-campaigns/${encodeURIComponent(campaignId)}`
       );
@@ -215,17 +237,13 @@ export default function ManagementBookingCampaigns() {
       navigate(
         `/admin/bookings/create?campaignId=${encodeURIComponent(campaignId)}`,
         {
-          state: {
-            ...r,
-            campaignId,
-          },
+          state: { ...r, campaignId },
         }
       );
     },
     [navigate]
   );
 
-  // Nút chỉnh sửa Campaign / lịch
   const goEditSchedule = useCallback(
     (r) => {
       const campaignId = r?.campaignId || r?.id || r?.code;
@@ -236,10 +254,7 @@ export default function ManagementBookingCampaigns() {
           campaignId
         )}/schedule`,
         {
-          state: {
-            campaignId,
-            campaignName: r?.campaignName,
-          },
+          state: { campaignId, campaignName: r?.campaignName },
         }
       );
     },
@@ -279,11 +294,14 @@ export default function ManagementBookingCampaigns() {
         render: (v) => v || "--",
       },
       {
-        title: "Mục tiêu",
-        dataIndex: "objective",
-        key: "objective",
-        width: 300,
-        render: (v) => v || "--",
+        title: "Thời gian tạo",
+        dataIndex: "createdAt",
+        key: "createdAt",
+        width: 190,
+        render: (v) => fmt(v, "DD/MM/YYYY HH:mm"),
+        sorter: true,
+        sortOrder: sorter?.field === "createdAt" ? sorter?.order : null,
+        sortDirections: ["descend", "ascend"],
       },
       {
         title: "Bắt đầu",
@@ -304,8 +322,11 @@ export default function ManagementBookingCampaigns() {
         dataIndex: "packageType",
         key: "packageType",
         width: 130,
-        render: (v, r) =>
-          v ? String(v).toUpperCase() : r?.packageName || "--",
+        render: (v, r) => {
+          const type = String(v ?? "").toUpperCase();
+          if (type === "NORMAL") return "Thường";
+          return type ? type : r?.packageName || "--";
+        },
       },
       {
         title: "Trạng thái Campaign",
@@ -330,45 +351,63 @@ export default function ManagementBookingCampaigns() {
         title: "Thao tác",
         key: "actions",
         fixed: "right",
-        width: 230,
+        width: 360,
         render: (_, r) => {
+          const st = String(r?.campaignStatus || "").toUpperCase();
+
+          const hideSchedule = [
+            "REQUESTED",
+            "NEGOTIATING",
+            "REJECTED",
+            "CANCELLED",
+          ].includes(st);
+
+          const hideCreateBooking = [
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "ACCEPTED",
+            "REJECTED",
+          ].includes(st);
+
           return (
-            <Space>
+            <Space wrap>
               <Button
-                type="link"
                 onClick={() => goDetail(r)}
-                className="!h-10 !w-10 !p-0 !rounded-xl !bg-blue-600 !text-white !border-none hover:!bg-blue-700 flex items-center justify-center"
-                title="Xem"
+                icon={<Eye size={16} />}
+                className="!h-9 !px-3 !rounded-xl !bg-blue-600 !text-white !border-none hover:!bg-blue-700 flex items-center"
+                title="Xem Chi Tiết"
               >
-                <Eye size={18} />
+                Xem Chi Tiết
               </Button>
 
-              {/* Luôn hiện nút lịch làm việc */}
-              <Button
-                type="link"
-                onClick={() => goEditSchedule(r)}
-                className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-                style={{ backgroundColor: "#6366F1" }}
-                title="Chỉnh sửa Campaign / lịch"
-              >
-                <CalendarRange size={18} />
-              </Button>
+              {!hideSchedule && (
+                <Button
+                  onClick={() => goEditSchedule(r)}
+                  icon={<CalendarRange size={16} />}
+                  className="!h-9 !px-3 !rounded-xl !bg-indigo-500 !text-white !border-none hover:!bg-indigo-600 flex items-center"
+                  title="Chỉnh sửa lịch làm"
+                >
+                  Lịch Làm Việc
+                </Button>
+              )}
 
-              <Button
-                type="link"
-                onClick={() => goEdit(r)}
-                className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-                style={{ backgroundColor: "#10B981" }}
-                title="Tạo booking từ campaign"
-              >
-                <Pencil size={18} />
-              </Button>
+              {!hideCreateBooking && (
+                <Button
+                  onClick={() => goEdit(r)}
+                  icon={<Pencil size={16} />}
+                  className="!h-9 !px-3 !rounded-xl !bg-emerald-500 !text-white !border-none hover:!bg-emerald-600 flex items-center"
+                  title="Tạo booking từ campaign"
+                >
+                  Tạo Booking
+                </Button>
+              )}
             </Space>
           );
         },
       },
     ],
-    [goDetail, goEdit, goEditSchedule]
+    [goDetail, goEdit, goEditSchedule, sorter]
   );
 
   return (
@@ -389,16 +428,6 @@ export default function ManagementBookingCampaigns() {
               </p>
             </div>
           </div>
-
-          <Button
-            type="link"
-            onClick={goCreate}
-            className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-            style={{ backgroundColor: "#10B981" }}
-            title="Thêm campaign"
-          >
-            <Plus size={18} />
-          </Button>
         </div>
 
         {/* Bộ lọc */}
@@ -434,7 +463,7 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            <Form.Item label="Gói (packageType)" name="packageType">
+            <Form.Item label="Gói" name="packageType">
               <Select
                 allowClear
                 placeholder="Chọn gói"
@@ -442,34 +471,41 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            <div>
-              <Space size="middle">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  icon={<Search size={16} />}
-                >
-                  Tìm kiếm
-                </Button>
-                <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
-                  Đặt lại
-                </Button>
-                <Button
-                  icon={<RefreshCcw size={16} />}
-                  onClick={() => refetch()}
-                  loading={isFetching}
-                >
-                  Làm mới
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={handleExportExcel}
-                  loading={isExporting}
-                >
-                  Xuất dữ liệu booking Campaign
-                </Button>
-              </Space>
-            </div>
+            {/* ✅ Nút Xuất dữ liệu nằm ngang hàng với Tìm kiếm/Đặt lại/Làm mới */}
+            <Form.Item className="lg:col-span-4 md:col-span-2 !mb-0" label=" ">
+              <div className="flex justify-start">
+                <Space size="middle" wrap={false}>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    icon={<Search size={16} />}
+                  >
+                    Tìm kiếm
+                  </Button>
+
+                  <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
+                    Đặt lại
+                  </Button>
+
+                  <Button
+                    icon={<RefreshCcw size={16} />}
+                    onClick={() => refetch()}
+                    loading={isFetching}
+                  >
+                    Làm mới
+                  </Button>
+
+                  <Button
+                    onClick={handleExportExcel}
+                    loading={isExporting}
+                    icon={<FileDown size={16} />}
+                    className="!bg-blue-600 !text-white !border-none hover:!bg-blue-700"
+                  >
+                    Xuất dữ liệu
+                  </Button>
+                </Space>
+              </div>
+            </Form.Item>
           </Form>
         </Card>
 
@@ -482,6 +518,13 @@ export default function ManagementBookingCampaigns() {
             pagination={false}
             rowKey={rowKey}
             scroll={{ x: "auto" }}
+            onChange={(_, __, s) => {
+              const ss = Array.isArray(s) ? s[0] : s;
+              const field = ss?.field || ss?.columnKey || "createdAt";
+              const order = ss?.order || "descend";
+              setSorter({ field, order });
+              setPage(0);
+            }}
           />
 
           <div className="mt-4 flex justify-end">

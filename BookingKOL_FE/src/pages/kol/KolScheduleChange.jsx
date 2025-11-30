@@ -29,7 +29,7 @@ export default function KolScheduleChange() {
   const [resolvingKolId, setResolvingKolId] = useState(!kolIdParam);
 
   // Tháng đang xem lịch rảnh
-  const [monthAnchor, setMonthAnchor] = useState(dayjs());
+  const [monthAnchor, setMonthAnchor] = useState(dayjs().startOf("month"));
   const [freeList, setFreeList] = useState([]);
   const [loadingFree, setLoadingFree] = useState(false);
 
@@ -38,6 +38,13 @@ export default function KolScheduleChange() {
   const [startRemove, setStartRemove] = useState(null);
   const [endRemove, setEndRemove] = useState(null);
   const [removing, setRemoving] = useState(false);
+
+  /** === Mốc hôm nay (lọc hiển thị từ hôm nay trở đi) === */
+  const todayStart = useMemo(() => dayjs().startOf("day"), []);
+  const currentMonthStart = useMemo(
+    () => todayStart.startOf("month"),
+    [todayStart]
+  );
 
   /** ==== Resolve kolId giống KolSchedule ==== */
   useEffect(() => {
@@ -116,9 +123,41 @@ export default function KolScheduleChange() {
     }
   }, [kolId, monthAnchor, loadFreeTime]);
 
+  /** ==== Lọc chỉ hiển thị từ hôm nay trở đi ==== */
+  const visibleFreeList = useMemo(() => {
+    return (freeList || []).filter((slot) => {
+      const slotStart = dayjs(slot?.startAt);
+      if (!slotStart.isValid()) return false;
+      return !slotStart.isBefore(todayStart); // startAt >= hôm nay 00:00
+    });
+  }, [freeList, todayStart]);
+
+  /** Nếu đang chọn slot nhưng slot đó bị lọc mất (quá khứ) thì reset lựa chọn */
+  useEffect(() => {
+    if (!selectedSlotKey) return;
+    const stillExists = visibleFreeList.some(
+      (s) => `${s.availabilityId || ""}_${s.startAt}` === selectedSlotKey
+    );
+    if (!stillExists) {
+      setSelectedSlotKey(null);
+      setStartRemove(null);
+      setEndRemove(null);
+    }
+  }, [visibleFreeList, selectedSlotKey]);
+
   /** ==== Điều hướng tháng ==== */
-  const handlePrevMonth = () =>
+  const isPrevDisabled = useMemo(
+    () =>
+      monthAnchor.isSame(currentMonthStart, "month") ||
+      monthAnchor.isBefore(currentMonthStart, "month"),
+    [monthAnchor, currentMonthStart]
+  );
+
+  const handlePrevMonth = () => {
+    if (isPrevDisabled) return; // không cho xem tháng quá khứ
     setMonthAnchor((d) => d.subtract(1, "month").startOf("month"));
+  };
+
   const handleNextMonth = () =>
     setMonthAnchor((d) => d.add(1, "month").startOf("month"));
 
@@ -147,6 +186,7 @@ export default function KolScheduleChange() {
       return;
     }
 
+    // tìm trong freeList (data gốc theo tháng), nhưng selectedSlotKey chỉ đến từ visibleFreeList
     const slot = freeList.find(
       (s) => `${s.availabilityId || ""}_${s.startAt}` === selectedSlotKey
     );
@@ -227,13 +267,29 @@ export default function KolScheduleChange() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handlePrevMonth}
-                  className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
+                  disabled={isPrevDisabled}
+                  className={`p-1 rounded-full border-2 transition-colors ${
+                    isPrevDisabled
+                      ? "border-gray-200 cursor-not-allowed opacity-50"
+                      : "border-[#7bb4fb] hover:bg-gray-100 cursor-pointer"
+                  }`}
+                  title={
+                    isPrevDisabled
+                      ? "Không thể xem tháng quá khứ"
+                      : "Tháng trước"
+                  }
                 >
-                  <IoIosArrowBack className="text-[#7bb4fb]" />
+                  <IoIosArrowBack
+                    className={
+                      isPrevDisabled ? "text-gray-300" : "text-[#7bb4fb]"
+                    }
+                  />
                 </button>
+
                 <button
                   onClick={handleNextMonth}
                   className="p-1 rounded-full border-2 border-[#7bb4fb] hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Tháng sau"
                 >
                   <IoIosArrowForward className="text-[#7bb4fb]" />
                 </button>
@@ -246,12 +302,14 @@ export default function KolScheduleChange() {
               )}
             </div>
 
-            {/* ==== LIST CA RẢNH ==== */}
-            {freeList.length === 0 ? (
-              <Text type="secondary">Chưa có ca rảnh nào trong tháng này.</Text>
+            {/* ==== LIST CA RẢNH (TỪ HÔM NAY TRỞ ĐI) ==== */}
+            {visibleFreeList.length === 0 ? (
+              <Text type="secondary">
+                Chưa có ca rảnh nào từ hôm nay trở đi trong tháng này.
+              </Text>
             ) : (
               <Space direction="vertical" size={8} style={{ width: "100%" }}>
-                {freeList.map((slot) => {
+                {visibleFreeList.map((slot) => {
                   const slotStart = dayjs(slot.startAt);
                   const slotEnd = dayjs(slot.endAt);
                   if (!slotStart.isValid() || !slotEnd.isValid()) return null;
@@ -325,21 +383,22 @@ export default function KolScheduleChange() {
                               slotStartMinute
                             )}
                             disabledHours={() => {
-                              // không cho chọn trước giờ bắt đầu ca
-                              // và không cho lùi giờ nhỏ hơn lần chọn trước
                               const prev =
                                 startRemove && startRemove.isValid()
                                   ? startRemove
                                   : slotStart;
+
                               let minHour = Math.max(
                                 slotStart.hour(),
                                 prev.hour()
                               );
-                              // nếu đã có endRemove thì start không vượt quá end
+
                               let maxHour = endRemove
                                 ? Math.min(slotEnd.hour(), endRemove.hour())
                                 : slotEnd.hour();
+
                               if (maxHour < minHour) maxHour = minHour;
+
                               const disabled = [];
                               for (let h = 0; h < 24; h++) {
                                 if (h < minHour || h > maxHour)
@@ -356,6 +415,7 @@ export default function KolScheduleChange() {
                                 startRemove && startRemove.isValid()
                                   ? startRemove
                                   : slotStart;
+
                               let newHour = val.hour();
 
                               let minHour = Math.max(
@@ -393,9 +453,11 @@ export default function KolScheduleChange() {
                                 startRemove && startRemove.isValid()
                                   ? startRemove
                                   : slotStart;
-                              let minHour = baseStart.hour(); // luôn >= start
+
+                              let minHour = baseStart.hour();
                               let maxHour = slotEnd.hour();
                               if (maxHour < minHour) maxHour = minHour;
+
                               const disabled = [];
                               for (let h = 0; h < 24; h++) {
                                 if (h < minHour || h > maxHour)
@@ -412,6 +474,7 @@ export default function KolScheduleChange() {
                                 startRemove && startRemove.isValid()
                                   ? startRemove
                                   : slotStart;
+
                               let newHour = val.hour();
 
                               let minHour = baseStart.hour();

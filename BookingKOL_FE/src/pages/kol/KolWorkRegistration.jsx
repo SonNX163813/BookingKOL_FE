@@ -31,7 +31,7 @@ dayjs.locale("vi");
 
 const MIN_GAP_MINUTES = 60;
 const MIN_DURATION_MINUTES = 60;
-const MIN_DATE = dayjs().add(14, "day").startOf("day");
+const MIN_DATE = dayjs().add(7, "day").startOf("day");
 
 // ===== Helpers auth =====
 function readJSON(raw) {
@@ -177,6 +177,9 @@ export default function KolWorkRegistrationMui({
 
   const [pickedDate, setPickedDate] = React.useState(null);
   const [shifts, setShifts] = React.useState([]);
+
+  // ✅ flow: chọn start trước -> tự mở end
+  const [openEndIdx, setOpenEndIdx] = React.useState(null);
 
   const [snack, setSnack] = React.useState({
     open: false,
@@ -405,20 +408,56 @@ export default function KolWorkRegistrationMui({
     setShifts((s) => [...s, { start, end }]);
   };
 
-  // ✅ Chỉ giữ đúng giờ, không phút
+  // ✅ flow: chọn giờ bắt đầu trước -> tự mở giờ kết thúc
+  const normalizeAtPickedDate = (val) => {
+    if (!pickedDate || !val) return null;
+    return pickedDate.hour(val.hour()).minute(0).second(0).millisecond(0);
+  };
+
   const updateShift = (idx, field, val) => {
     setShifts((arr) =>
-      arr.map((s, i) =>
-        i === idx
-          ? {
-              ...s,
-              [field]: val
-                ? pickedDate.hour(val.hour()).minute(0).second(0).millisecond(0)
-                : null,
-            }
-          : s
-      )
+      arr.map((s, i) => {
+        if (i !== idx) return s;
+
+        // clear
+        if (!val) {
+          if (field === "start") return { ...s, start: null, end: null };
+          return { ...s, end: null };
+        }
+
+        const nextTime = normalizeAtPickedDate(val);
+        if (!nextTime) return s;
+
+        // chọn START trước
+        if (field === "start") {
+          const minEnd = nextTime.add(MIN_DURATION_MINUTES, "minute");
+          let nextEnd = s.end && dayjs(s.end).isValid() ? dayjs(s.end) : null;
+
+          // nếu chưa có end hoặc end <= start => ép end = minEnd
+          if (!nextEnd || !nextEnd.isAfter(nextTime)) nextEnd = minEnd;
+          if (nextEnd.isBefore(minEnd)) nextEnd = minEnd;
+
+          // chặn end vượt quá 23:00 (do chọn theo giờ)
+          const dayEnd = pickedDate.hour(23).minute(0).second(0).millisecond(0);
+          if (nextEnd.isAfter(dayEnd)) nextEnd = dayEnd;
+
+          return { ...s, start: nextTime, end: nextEnd };
+        }
+
+        // chọn END sau (chỉ cho chọn khi đã có start)
+        if (!s.start) return { ...s, end: null };
+
+        const start = dayjs(s.start);
+        const minEnd = start.add(MIN_DURATION_MINUTES, "minute");
+        let end = nextTime;
+
+        if (end.isBefore(minEnd)) end = minEnd;
+
+        return { ...s, end };
+      })
     );
+
+    if (field === "start") setOpenEndIdx(idx);
   };
 
   const removeShift = (idx) =>
@@ -426,7 +465,7 @@ export default function KolWorkRegistrationMui({
 
   /* -------- Validate -------- */
   const validate = () => {
-    if (!pickedDate) return "Vui lòng chọn ngày đăng ký (≥ 14 ngày).";
+    if (!pickedDate) return "Vui lòng chọn ngày đăng ký (≥ 7 ngày).";
     if (!shifts.length) return "Vui lòng thêm ít nhất 1 ca.";
 
     const sorted = [...shifts].sort((a, b) =>
@@ -562,6 +601,17 @@ export default function KolWorkRegistrationMui({
 
   const loadingUI = resolving || (!isAdmin && !resolvedUserId);
 
+  // latest start = 23:00 - duration (vì chọn theo giờ)
+  const latestStartTime = React.useMemo(() => {
+    if (!pickedDate) return null;
+    return pickedDate
+      .hour(23)
+      .minute(0)
+      .second(0)
+      .millisecond(0)
+      .subtract(MIN_DURATION_MINUTES, "minute");
+  }, [pickedDate]);
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
       <Box sx={{ p: 2, maxWidth: 1200, mx: "auto" }}>
@@ -600,6 +650,7 @@ export default function KolWorkRegistrationMui({
                     const d = val && val.isValid() ? val.startOf("day") : null;
                     setPickedDate(d);
                     setShifts([]);
+                    setOpenEndIdx(null);
                     if (d) setMonthAnchor(d.startOf("month"));
                   }}
                   onMonthChange={(month) => {
@@ -628,7 +679,7 @@ export default function KolWorkRegistrationMui({
                   <Typography fontWeight={600}>
                     {pickedDate
                       ? `Ngày: ${pickedDate.format("dddd, DD/MM/YYYY")}`
-                      : "Chọn ngày (≥ 14 ngày từ hôm nay) để đăng ký ca"}
+                      : "Chọn ngày (≥ 7 ngày từ hôm nay) để đăng ký ca"}
                   </Typography>
                   <Button
                     variant="contained"
@@ -641,34 +692,15 @@ export default function KolWorkRegistrationMui({
 
                 <Divider sx={{ my: 1.5 }} />
 
-                {pickedDate && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 1 }}
-                  >
-                    {loadingBlocked
-                      ? "Đang kiểm tra lịch đã đặt..."
-                      : blocked.length
-                      ? `Khoảng KHÔNG khả dụng (đã gồm đệm ±${MIN_GAP_MINUTES}’): ` +
-                        blocked
-                          .map(
-                            (b) =>
-                              `${dayjs(b.startISO).format("HH:mm")}–${dayjs(
-                                b.endISO
-                              ).format("HH:mm")}`
-                          )
-                          .join("  •  ")
-                      : "Không có khoảng chặn nào trong ngày này."}
-                  </Typography>
-                )}
-
                 <Stack spacing={1.5}>
                   {shifts.map((sh, idx) => {
-                    const minEndTime =
-                      sh.start?.add(MIN_DURATION_MINUTES, "minute") || null;
-                    const maxStartTime =
-                      sh.end?.add(-MIN_DURATION_MINUTES, "minute") || null;
+                    const minEndTime = sh.start
+                      ? sh.start.add(MIN_DURATION_MINUTES, "minute")
+                      : null;
+
+                    const maxStartTime = sh.end
+                      ? sh.end.add(-MIN_DURATION_MINUTES, "minute")
+                      : null;
 
                     return (
                       <Stack
@@ -692,20 +724,26 @@ export default function KolWorkRegistrationMui({
                           onChange={(v) => updateShift(idx, "start", v)}
                           ampm={false}
                           views={["hours"]} // chỉ chọn giờ
-                          format="HH" // hiển thị giờ, phút = 00
-                          maxTime={maxStartTime || undefined}
+                          format="HH:mm" // hiển thị HH:00
+                          maxTime={maxStartTime || latestStartTime || undefined}
                           disabled={saving}
                         />
 
                         <Typography>đến</Typography>
                         <TimePicker
                           value={sh.end}
-                          onChange={(v) => updateShift(idx, "end", v)}
+                          onChange={(v) => {
+                            updateShift(idx, "end", v);
+                            setOpenEndIdx(null);
+                          }}
                           ampm={false}
                           views={["hours"]} // chỉ chọn giờ
-                          format="HH"
+                          format="HH:mm"
                           minTime={minEndTime || undefined}
-                          disabled={saving || !sh.start}
+                          disabled={saving || !sh.start} // ✅ khóa tới khi chọn start
+                          open={openEndIdx === idx} // ✅ auto-open sau khi chọn start
+                          onOpen={() => setOpenEndIdx(idx)}
+                          onClose={() => setOpenEndIdx(null)}
                         />
 
                         <Box flex={1} />
@@ -727,7 +765,7 @@ export default function KolWorkRegistrationMui({
                   )}
                   {pickedDate && !shifts.length && (
                     <Typography color="text.secondary">
-                      Ngày này chưa có ca mới. Bấm <b>Thêm ca</b> để đăng ký.
+                      Bấm <b>Thêm ca</b> để đăng ký.
                     </Typography>
                   )}
                 </Stack>
