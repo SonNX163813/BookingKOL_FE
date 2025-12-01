@@ -29,8 +29,10 @@ import {
 } from "../../../constants/bookingFlowTextStyles";
 import { useCreateBooking as useCreateSingleBooking } from "../../../hook/booking_single/useCreateBooking";
 import { useHoldBookingSlot } from "../../../hook/booking_single/useHoldBookingSlot";
+import { useReleaseBookingSlot } from "../../../hook/booking_single/useReleaseBookingSlot";
 import { BOOKING_SINGLE_REVIEW_STORAGE_KEY } from "../../../constants/storageKeys";
 import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
+import { loadAuth } from "../../../utils/auth";
 
 /* ------------------------- HẰNG SỐ & HÀM HỖ TRỢ ------------------------- */
 
@@ -95,6 +97,7 @@ const BookingFlow = ({
     });
   const { isHoldingBookingSlot: holdingSlot, handleHoldBookingSlot } =
     useHoldBookingSlot();
+  const { handleReleaseBookingSlot } = useReleaseBookingSlot();
   const {
     platforms,
     isLoadingPlatforms,
@@ -152,6 +155,17 @@ const BookingFlow = ({
   }, [platforms]);
 
   const platformLoading = isLoadingPlatforms || isFetchingPlatforms;
+  const currentUserId = useMemo(() => {
+    const fromProfile =
+      userProfile?.id ||
+      userProfile?.userId ||
+      userProfile?.user_id ||
+      userProfile?.userID;
+    if (fromProfile) return fromProfile;
+
+    const { user } = loadAuth();
+    return user?.id || user?.userId || user?.user_id || user?.userID || "";
+  }, [userProfile]);
 
   useEffect(() => {
     if (!open) return;
@@ -229,9 +243,23 @@ const BookingFlow = ({
   };
 
   /* ---------------------- Chuyển bước ---------------------- */
-  const handleBack = () => {
-    if (activeStep === 0) onClose?.();
-    else setActiveStep((prev) => Math.max(prev - 1, 0));
+  const handleBack = async () => {
+    if (activeStep === 0) {
+      onClose?.();
+      return;
+    }
+
+    const slot = heldSlot;
+    if (slot?.kolId && slot?.startTimeIso && slot?.endTimeIso) {
+      try {
+        await handleReleaseBookingSlot(slot);
+        setHeldSlot(null);
+      } catch (error) {
+        toast.error("Không thể hoàn tác khung giờ. Vui lòng thử lại.");
+      }
+    }
+
+    setActiveStep((prev) => Math.max(prev - 1, 0));
   };
 
   const handleHoldSlotClick = async () => {
@@ -265,7 +293,7 @@ const BookingFlow = ({
     } catch (err) {
       const errorMsg =
         err?.response?.message ?? "Không thể giữ chỗ. Vui lòng thử lại.";
-      toast.error(errorMsg);
+      // toast.error(errorMsg);
     }
   };
 
@@ -326,6 +354,11 @@ const BookingFlow = ({
 
   const handleAttachmentRemove = (id) => {
     setAttachments((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const handleModalClose = (_, reason) => {
+    if (reason === "backdropClick" || reason === "escapeKeyDown") return;
+    onClose?.();
   };
 
   /* ---------------------- Gửi yêu cầu ---------------------- */
@@ -465,6 +498,8 @@ const BookingFlow = ({
         kolId={kolId}
         STYLE={STYLE}
         TEXT={TEXT}
+        currentUserId={currentUserId}
+        isOpen={open}
         onSelectSchedule={(start, end) => {
           setStartDateTime(start);
           setEndDateTime(end);
@@ -595,7 +630,8 @@ const BookingFlow = ({
         <Drawer
           anchor="bottom"
           open={open}
-          onClose={onClose}
+          onClose={handleModalClose}
+          ModalProps={{ disableEscapeKeyDown: true }}
           PaperProps={{
             sx: {
               height: "100vh",
@@ -611,9 +647,10 @@ const BookingFlow = ({
       ) : (
         <Dialog
           open={open}
-          onClose={onClose}
+          onClose={handleModalClose}
           fullWidth
           maxWidth="md"
+          disableEscapeKeyDown
           PaperProps={{
             sx: {
               borderRadius: "28px",

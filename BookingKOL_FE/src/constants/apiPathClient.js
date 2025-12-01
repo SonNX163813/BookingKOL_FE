@@ -40,6 +40,9 @@ export const CLIENT_API_PATHS = {
   BOOKING: {
     createSingle: "/v1/user/booking/request/single",
     holdSlot: "/v1/user/booking/hold-slot",
+    releaseSlot: "/v1/user/booking/release-slot",
+    listHoldSlot: (kolId) =>
+      `/v1/user/booking/list-hold-slot/${encodeURIComponent(kolId)}`,
     getMySingleRequests: "/v1/user/booking/single-requests/all",
     getMySingleRequestDetail: "/v1/user/booking/single-requests/detail",
     updateMySingleRequest: "/v1/user/booking/single-requests/update",

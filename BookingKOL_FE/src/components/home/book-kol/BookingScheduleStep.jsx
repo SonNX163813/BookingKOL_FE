@@ -14,13 +14,27 @@ import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
 import { PickersDay } from "@mui/x-date-pickers/PickersDay";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
-import { getKolFreeTimeSlots } from "../../../services/booking/BookingAPI";
-import "dayjs/locale/vi"; // import ngôn ngữ tiếng Việt cho dayjs
+import {
+  getHeldBookingSlots,
+  getKolFreeTimeSlots,
+} from "../../../services/booking/BookingAPI";
+import "dayjs/locale/vi";
 
-const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
+dayjs.locale("vi");
+
+const BookingScheduleStep = ({
+  kolId,
+  onSelectSchedule,
+  STYLE,
+  TEXT,
+  currentUserId,
+  isOpen,
+}) => {
   const [selectedDate, setSelectedDate] = useState(dayjs().startOf("day"));
   const [freeTimeSlots, setFreeTimeSlots] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [heldSlots, setHeldSlots] = useState([]);
+  const [holdLoading, setHoldLoading] = useState(false);
   const [startHour, setStartHour] = useState(null);
   const [endHour, setEndHour] = useState(null);
   const [activeSlotId, setActiveSlotId] = useState(null);
@@ -48,6 +62,29 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     fetchSlots();
     return () => controller.abort();
   }, [kolId]);
+
+  useEffect(() => {
+    if (!kolId || isOpen === false) return;
+
+    const controller = new AbortController();
+    const fetchHeldSlots = async () => {
+      setHoldLoading(true);
+      try {
+        const slots = await getHeldBookingSlots({
+          kolId,
+          signal: controller.signal,
+        });
+        setHeldSlots(slots || []);
+      } catch (error) {
+        if (!controller.signal.aborted) setHeldSlots([]);
+      } finally {
+        if (!controller.signal.aborted) setHoldLoading(false);
+      }
+    };
+
+    fetchHeldSlots();
+    return () => controller.abort();
+  }, [kolId, isOpen]);
 
   /* -------------------- Gom nhóm slot theo ngày -------------------- */
   const slotsByDate = useMemo(() => {
@@ -113,6 +150,51 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     () => slotsByDate[selectedDateKey] || [],
     [slotsByDate, selectedDateKey]
   );
+
+  /* -------------------- Tính các giờ bị block -------------------- */
+  const heldSlotsToBlock = useMemo(() => {
+    const list = Array.isArray(heldSlots) ? heldSlots : [];
+    const normalizedUserId =
+      typeof currentUserId === "string" ? currentUserId.trim() : "";
+
+    if (!normalizedUserId) return list;
+
+    return list.filter((slot) => {
+      const uid =
+        typeof slot?.userId === "string" ? slot.userId.trim() : slot?.userId;
+      if (!uid) return true;
+      return uid !== normalizedUserId;
+    });
+  }, [heldSlots, currentUserId]);
+
+  const blockedHoursByDate = useMemo(() => {
+    const map = {};
+    const addHour = (dt) => {
+      const dateKey = dt.format("YYYY-MM-DD");
+      if (!map[dateKey]) map[dateKey] = new Set();
+      map[dateKey].add(dt.hour());
+    };
+
+    heldSlotsToBlock.forEach(({ startAt, endAt }) => {
+      const start = dayjs(startAt);
+      const end = dayjs(endAt);
+      if (!start.isValid() || !end.isValid() || !end.isAfter(start)) return;
+
+      // Block all held hours (include end hour) + 1 rest hour right after endAt
+      let cursor = start.clone();
+      while (cursor.isSame(end, "hour") || cursor.isBefore(end)) {
+        addHour(cursor);
+        cursor = cursor.add(1, "hour");
+      }
+
+      addHour(end.add(1, "hour"));
+    });
+
+    return map;
+  }, [heldSlotsToBlock]);
+
+  const blockedHoursForSelectedDate = blockedHoursByDate[selectedDateKey];
+
   useEffect(() => {
     if (!activeSlotId) return;
     if (!dailySlots.some((slot) => slot.id === activeSlotId)) {
@@ -121,6 +203,26 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
       setEndHour(null);
     }
   }, [dailySlots, activeSlotId]);
+
+  const isHourBlocked = useCallback(
+    (hour) => {
+      if (!blockedHoursForSelectedDate) return false;
+      return blockedHoursForSelectedDate.has(hour);
+    },
+    [blockedHoursForSelectedDate]
+  );
+
+  const hasBlockedBetween = useCallback(
+    (min, max) => {
+      const blocked = blockedHoursForSelectedDate;
+      if (!blocked) return false;
+      for (const hour of blocked) {
+        if (hour >= min && hour <= max) return true;
+      }
+      return false;
+    },
+    [blockedHoursForSelectedDate]
+  );
 
   const resolveSlotForHour = useCallback(
     (hour) => {
@@ -178,6 +280,11 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
   /* -------------------- Xử lý chọn giờ -------------------- */
   const handleSelectHour = (hour) => {
+    if (isHourBlocked(hour)) {
+      toast.warn("Khung giờ này đang được giữ chỗ. Vui lòng chọn giờ khác.");
+      return;
+    }
+
     const currentSlot =
       activeSlotId && dailySlots
         ? dailySlots.find((slot) => slot.id === activeSlotId)
@@ -230,6 +337,11 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
 
       const duration = max - min;
 
+      if (hasBlockedBetween(min, max)) {
+        toast.warn("Khung giờ này đã được giữ chỗ. Vui lòng chọn giờ khác.");
+        return;
+      }
+
       if (duration < 1) {
         toast.warn("Thời lượng tối thiểu là 1 tiếng!");
         return;
@@ -267,6 +379,24 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
     setActiveSlotId(null);
   }, []);
 
+  useEffect(() => {
+    if (!blockedHoursForSelectedDate) return;
+
+    if (startHour !== null && blockedHoursForSelectedDate.has(startHour)) {
+      handleResetSelection();
+      return;
+    }
+
+    if (startHour !== null && endHour !== null) {
+      for (const hour of blockedHoursForSelectedDate) {
+        if (hour >= startHour && hour <= endHour) {
+          handleResetSelection();
+          break;
+        }
+      }
+    }
+  }, [blockedHoursForSelectedDate, startHour, endHour, handleResetSelection]);
+
   /* -------------------- Gửi dữ liệu ra ngoài -------------------- */
   useEffect(() => {
     if (typeof onSelectSchedule !== "function") return;
@@ -282,6 +412,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
   /* -------------------- Render -------------------- */
   const hasSelection = startHour !== null;
   const hasCompletedSelection = startHour !== null && endHour !== null;
+  const isLoadingSlots = loading || holdLoading;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
@@ -319,6 +450,27 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
             value={selectedDate}
             slots={{
               day: HighlightedDay,
+            }}
+            dayOfWeekFormatter={(day) => {
+              const d = day.day(); // 0 = CN, 1 = T2, ...
+              switch (d) {
+                case 0:
+                  return "CN";
+                case 1:
+                  return "T2";
+                case 2:
+                  return "T3";
+                case 3:
+                  return "T4";
+                case 4:
+                  return "T5";
+                case 5:
+                  return "T6";
+                case 6:
+                  return "T7";
+                default:
+                  return "";
+              }
             }}
             onChange={(date) => {
               if (!date) return;
@@ -383,7 +535,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
           </Button>
         </Box>
 
-        {loading ? (
+        {isLoadingSlots ? (
           <Stack direction="row" spacing={1} alignItems="center">
             <CircularProgress size={20} />
             <Typography sx={{ color: STYLE.textSecondary }}>
@@ -401,6 +553,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
                 !!activeSlotId &&
                 activeSlotId !== slot.id &&
                 startHour !== null;
+              const blockedSetForDate = blockedHoursForSelectedDate;
               return (
                 <Box key={`${slot.id}-${index}`}>
                   <Typography
@@ -441,8 +594,11 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
                         hour < endHour;
                       const active = isStart || isEnd || isInRange;
                       const key = `${slot.id}-${hour}-${position}-${idx}`;
-                      const baseBg = slotDisabled
-                        ? "#f2f2f2"
+                      const isBlocked =
+                        blockedSetForDate?.has(hour) === true && !active;
+                      const disabled = slotDisabled || isBlocked;
+                      const baseBg = disabled
+                        ? "#f0f0f0"
                         : active
                         ? STYLE.accent
                         : "#fff";
@@ -452,7 +608,7 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
                           key={key}
                           onClick={() => handleSelectHour(hour)}
                           variant={active ? "contained" : "outlined"}
-                          disabled={slotDisabled}
+                          disabled={disabled}
                           sx={{
                             borderRadius:
                               !belongsToActiveSlot || !active
@@ -467,20 +623,17 @@ const BookingScheduleStep = ({ kolId, onSelectSchedule, STYLE, TEXT }) => {
                             height: 48,
                             fontWeight: 600,
                             fontSize: "0.9rem",
-                            color: slotDisabled
+                            color: disabled
                               ? STYLE.textSecondary
                               : active
                               ? "#fff"
                               : STYLE.textPrimary,
-                            backgroundColor: baseBg,
-
+                            backgroundColor: disabled ? "#e8e8e8" : baseBg,
                             transition: "all 0.2s ease",
                             "&:hover": {
-                              transform: slotDisabled
-                                ? "none"
-                                : "translateY(-2px)",
-                              backgroundColor: slotDisabled
-                                ? "#e8e8e8"
+                              transform: disabled ? "none" : "translateY(-2px)",
+                              backgroundColor: disabled
+                                ? "#e0e0e0"
                                 : active
                                 ? STYLE.accentHover
                                 : alpha(STYLE.textSecondary, 0.12),
