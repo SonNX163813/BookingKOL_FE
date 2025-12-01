@@ -67,6 +67,9 @@ export const CLIENT_API_PATHS = {
       `/v1/kol/requests/worktime/create-livestream-metric/${encodeURIComponent(
         worktimeId
       )}`,
+    kolCancelBookingRequest: "/v1/requests/kol/request",
+    kolCancelRequestDetail: (workTimeId) =>
+      `/v1/requests/cancel/detail/${encodeURIComponent(workTimeId)}`,
   },
   BOOKINGPACKAGE: {
     createBookingPackage: "/v1/bookings/packages",

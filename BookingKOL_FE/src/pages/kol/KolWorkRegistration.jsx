@@ -178,7 +178,7 @@ export default function KolWorkRegistrationMui({
   const [pickedDate, setPickedDate] = React.useState(null);
   const [shifts, setShifts] = React.useState([]);
 
-  // ✅ flow: chọn start trước -> tự mở end
+  // ✅ flow: thêm ca => chỉ có start, end chọn sau; tự mở end picker
   const [openEndIdx, setOpenEndIdx] = React.useState(null);
 
   const [snack, setSnack] = React.useState({
@@ -195,7 +195,7 @@ export default function KolWorkRegistrationMui({
       try {
         setResolving(true);
 
-        // ✅ Mode ADMIN: dùng thẳng adminKolId / kolIdParam, không phụ thuộc auth_user
+        // ✅ Mode ADMIN
         if (isAdmin) {
           if (mounted) {
             setResolvedKolId(adminKolId || kolIdParam || null);
@@ -204,19 +204,18 @@ export default function KolWorkRegistrationMui({
           return;
         }
 
-        // ===== Mode KOL (user tự đăng ký) =====
+        // ===== Mode KOL =====
         const authUser = getAuthUserFromStorage();
 
-        // 1. Nếu URL có kolIdParam
+        // 1) URL có kolIdParam
         if (kolIdParam) {
           try {
             const prof = await getKolProfileById(kolIdParam);
             if (!mounted) return;
             if (prof?.id) setResolvedKolId(prof.id);
             else setResolvedKolId(kolIdParam);
-            if (prof?.userId) {
-              setResolvedUserId(prof.userId);
-            } else if (authUser) {
+            if (prof?.userId) setResolvedUserId(prof.userId);
+            else if (authUser) {
               const uId = extractUserId(authUser);
               if (uId) setResolvedUserId(uId);
             }
@@ -232,7 +231,7 @@ export default function KolWorkRegistrationMui({
           return;
         }
 
-        // 2. Không có kolIdParam -> lấy từ auth_user
+        // 2) Không có kolIdParam -> lấy từ auth_user
         if (!authUser) {
           if (mounted) {
             setResolvedUserId(null);
@@ -250,7 +249,7 @@ export default function KolWorkRegistrationMui({
           return;
         }
 
-        // 3. Có userId nhưng chưa có kolId -> hỏi BE
+        // 3) Có userId nhưng chưa có kolId -> hỏi BE
         if (uIdFromAuth) {
           const me = await getKolProfileByUserId(uIdFromAuth);
           if (!mounted) return;
@@ -392,28 +391,62 @@ export default function KolWorkRegistrationMui({
       }));
   }, [monthSchedule]);
 
-  /* -------- Quản lý ca đăng ký -------- */
-  const addShift = () => {
-    if (!pickedDate) return;
-
-    let start = pickedDate.hour(9).minute(0).second(0).millisecond(0);
-    let end = pickedDate.hour(10).minute(0).second(0).millisecond(0);
-
-    if (shifts.length) {
-      const last = shifts[shifts.length - 1];
-      start = last.end.add(MIN_GAP_MINUTES, "minute").minute(0).second(0);
-      end = start.add(1, "hour").minute(0).second(0);
-    }
-
-    setShifts((s) => [...s, { start, end }]);
-  };
-
-  // ✅ flow: chọn giờ bắt đầu trước -> tự mở giờ kết thúc
+  /* -------- Helpers thời gian -------- */
   const normalizeAtPickedDate = (val) => {
     if (!pickedDate || !val) return null;
     return pickedDate.hour(val.hour()).minute(0).second(0).millisecond(0);
   };
 
+  // latest start = 23:00 - duration (vì chọn theo giờ)
+  const latestStartTime = React.useMemo(() => {
+    if (!pickedDate) return null;
+    return pickedDate
+      .hour(23)
+      .minute(0)
+      .second(0)
+      .millisecond(0)
+      .subtract(MIN_DURATION_MINUTES, "minute");
+  }, [pickedDate]);
+
+  /* -------- Quản lý ca đăng ký -------- */
+  const addShift = () => {
+    if (!pickedDate) return;
+
+    // ✅ nếu ca trước chưa có end -> bắt chọn end trước khi thêm ca mới
+    if (shifts.length) {
+      const last = shifts[shifts.length - 1];
+      if (!last?.start || !last?.end) {
+        setSnack({
+          open: true,
+          type: "error",
+          message:
+            "Vui lòng chọn giờ kết thúc cho ca trước rồi mới thêm ca mới.",
+        });
+        setOpenEndIdx(shifts.length - 1);
+        return;
+      }
+    }
+
+    let start = pickedDate.hour(9).minute(0).second(0).millisecond(0);
+
+    if (shifts.length) {
+      const last = shifts[shifts.length - 1];
+      // last.end chắc chắn đã có theo check trên
+      start = last.end.add(MIN_GAP_MINUTES, "minute").minute(0).second(0);
+    }
+
+    // ✅ chỉ set start, end để null (user chọn sau)
+    const newShift = { start, end: null };
+
+    setShifts((s) => {
+      const next = [...s, newShift];
+      // ✅ tự mở end picker của ca mới
+      setOpenEndIdx(next.length - 1);
+      return next;
+    });
+  };
+
+  // ✅ flow: chọn start trước -> end phải chọn sau (không auto-fill end)
   const updateShift = (idx, field, val) => {
     setShifts((arr) =>
       arr.map((s, i) => {
@@ -428,20 +461,9 @@ export default function KolWorkRegistrationMui({
         const nextTime = normalizeAtPickedDate(val);
         if (!nextTime) return s;
 
-        // chọn START trước
         if (field === "start") {
-          const minEnd = nextTime.add(MIN_DURATION_MINUTES, "minute");
-          let nextEnd = s.end && dayjs(s.end).isValid() ? dayjs(s.end) : null;
-
-          // nếu chưa có end hoặc end <= start => ép end = minEnd
-          if (!nextEnd || !nextEnd.isAfter(nextTime)) nextEnd = minEnd;
-          if (nextEnd.isBefore(minEnd)) nextEnd = minEnd;
-
-          // chặn end vượt quá 23:00 (do chọn theo giờ)
-          const dayEnd = pickedDate.hour(23).minute(0).second(0).millisecond(0);
-          if (nextEnd.isAfter(dayEnd)) nextEnd = dayEnd;
-
-          return { ...s, start: nextTime, end: nextEnd };
+          // đổi start => reset end (để user chọn lại theo start mới)
+          return { ...s, start: nextTime, end: null };
         }
 
         // chọn END sau (chỉ cho chọn khi đã có start)
@@ -460,8 +482,15 @@ export default function KolWorkRegistrationMui({
     if (field === "start") setOpenEndIdx(idx);
   };
 
-  const removeShift = (idx) =>
+  const removeShift = (idx) => {
     setShifts((arr) => arr.filter((_, i) => i !== idx));
+    setOpenEndIdx((cur) => {
+      if (cur == null) return null;
+      if (cur === idx) return null;
+      if (cur > idx) return cur - 1;
+      return cur;
+    });
+  };
 
   /* -------- Validate -------- */
   const validate = () => {
@@ -474,7 +503,8 @@ export default function KolWorkRegistrationMui({
 
     for (let i = 0; i < sorted.length; i++) {
       const s = sorted[i];
-      if (!s.start || !s.end) return "Thiếu thời gian cho một ca.";
+      if (!s.start || !s.end)
+        return "Vui lòng chọn đủ giờ bắt đầu và giờ kết thúc cho từng ca.";
 
       const duration = s.end.diff(s.start, "minute");
       if (duration < MIN_DURATION_MINUTES)
@@ -516,20 +546,12 @@ export default function KolWorkRegistrationMui({
       setSaving(true);
 
       if (isAdmin) {
-        // ✅ ADMIN: dùng API /v1/availabilities/admin/schedule với kolId
-        if (!resolvedKolId) {
+        if (!resolvedKolId)
           throw new Error("Không xác định được KOL ID để tạo lịch.");
-        }
-
-        await adminRegisterKolSchedule({
-          kolId: resolvedKolId,
-          shifts,
-        });
+        await adminRegisterKolSchedule({ kolId: resolvedKolId, shifts });
       } else {
-        // ✅ KOL: giữ nguyên API cũ – /availabilities/schedule/{userId}
-        if (!resolvedUserId) {
+        if (!resolvedUserId)
           throw new Error("Không xác định được User ID của KOL.");
-        }
 
         const result = await registerKolAvailabilities({
           kolId: resolvedUserId, // backend: /schedule/{userId}
@@ -562,11 +584,9 @@ export default function KolWorkRegistrationMui({
           : "Đăng ký ca làm thành công!",
       });
       setShifts([]);
+      setOpenEndIdx(null);
 
-      if (resolvedKolId) {
-        await reloadMonthSchedule();
-      }
-
+      if (resolvedKolId) await reloadMonthSchedule();
       if (onSuccess) onSuccess();
     } catch (e) {
       const httpStatus = e?.response?.status;
@@ -601,16 +621,12 @@ export default function KolWorkRegistrationMui({
 
   const loadingUI = resolving || (!isAdmin && !resolvedUserId);
 
-  // latest start = 23:00 - duration (vì chọn theo giờ)
-  const latestStartTime = React.useMemo(() => {
-    if (!pickedDate) return null;
-    return pickedDate
-      .hour(23)
-      .minute(0)
-      .second(0)
-      .millisecond(0)
-      .subtract(MIN_DURATION_MINUTES, "minute");
-  }, [pickedDate]);
+  const canAddShift = React.useMemo(() => {
+    if (!pickedDate || saving) return false;
+    if (!shifts.length) return true;
+    const last = shifts[shifts.length - 1];
+    return !!(last?.start && last?.end);
+  }, [pickedDate, saving, shifts]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
@@ -681,10 +697,16 @@ export default function KolWorkRegistrationMui({
                       ? `Ngày: ${pickedDate.format("dddd, DD/MM/YYYY")}`
                       : "Chọn ngày (≥ 7 ngày từ hôm nay) để đăng ký ca"}
                   </Typography>
+
                   <Button
                     variant="contained"
                     onClick={addShift}
-                    disabled={!pickedDate || saving}
+                    disabled={!pickedDate || saving || !canAddShift}
+                    title={
+                      !canAddShift
+                        ? "Hãy chọn giờ kết thúc cho ca trước trước khi thêm ca mới"
+                        : ""
+                    }
                   >
                     Thêm ca
                   </Button>
@@ -723,8 +745,8 @@ export default function KolWorkRegistrationMui({
                           value={sh.start}
                           onChange={(v) => updateShift(idx, "start", v)}
                           ampm={false}
-                          views={["hours"]} // chỉ chọn giờ
-                          format="HH:mm" // hiển thị HH:00
+                          views={["hours"]}
+                          format="HH:mm"
                           maxTime={maxStartTime || latestStartTime || undefined}
                           disabled={saving}
                         />
@@ -737,11 +759,11 @@ export default function KolWorkRegistrationMui({
                             setOpenEndIdx(null);
                           }}
                           ampm={false}
-                          views={["hours"]} // chỉ chọn giờ
+                          views={["hours"]}
                           format="HH:mm"
                           minTime={minEndTime || undefined}
-                          disabled={saving || !sh.start} // ✅ khóa tới khi chọn start
-                          open={openEndIdx === idx} // ✅ auto-open sau khi chọn start
+                          disabled={saving || !sh.start}
+                          open={openEndIdx === idx}
                           onOpen={() => setOpenEndIdx(idx)}
                           onClose={() => setOpenEndIdx(null)}
                         />
@@ -766,6 +788,12 @@ export default function KolWorkRegistrationMui({
                   {pickedDate && !shifts.length && (
                     <Typography color="text.secondary">
                       Bấm <b>Thêm ca</b> để đăng ký.
+                    </Typography>
+                  )}
+                  {pickedDate && shifts.length > 0 && !canAddShift && (
+                    <Typography color="text.secondary">
+                      Hãy chọn <b>giờ kết thúc</b> cho ca hiện tại để có thể
+                      thêm ca mới.
                     </Typography>
                   )}
                 </Stack>

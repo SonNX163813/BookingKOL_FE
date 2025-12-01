@@ -4,22 +4,8 @@ import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import localeData from "dayjs/plugin/localeData";
 import updateLocale from "dayjs/plugin/updateLocale";
-import {
-  Button,
-  Card,
-  Pagination,
-  Table,
-  Tag,
-  Popconfirm,
-  message,
-} from "antd";
-import {
-  CalendarRange,
-  RefreshCcw,
-  BarChart3,
-  FileText,
-  XCircle,
-} from "lucide-react";
+import { Button, Card, Pagination, Table, Tag } from "antd";
+import { CalendarRange, RefreshCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
@@ -43,17 +29,17 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hoàn thành", value: "COMPLETED" },
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã thanh toán", value: "PAID" },
+  { label: "Đang chờ thực hiện", value: "PAID" },
   { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
-  REQUESTED: "processing",
+  REQUESTED: "default",
   IN_PROGRESS: "processing",
   COMPLETED: "success",
   EXPIRED: "volcano",
   CANCELLED: "error",
-  PAID: "success",
+  PAID: "processing",
   REFUNDED: "purple",
 };
 
@@ -63,7 +49,7 @@ const BOOKING_TYPE_LABEL = {
   CAMPAIGN: "Book theo chiến dịch",
 };
 const BOOKING_TYPE_COLOR = {
-  SINGLE: "geekblue",
+  SINGLE: "orange",
   CAMPAIGN: "purple",
 };
 
@@ -101,12 +87,10 @@ const composeExecutionTime = (rec) => {
   const e = formatDateTime(end);
   if (!start) return e;
   if (!end) return s;
-
   const sameDay =
     dayjs(start).isValid() &&
     dayjs(end).isValid() &&
     dayjs(start).isSame(dayjs(end), "day");
-
   return sameDay
     ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} -> ${dayjs(end).format(
         "HH:mm"
@@ -131,7 +115,6 @@ export default function KolSingleRequest() {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
 
-  // ❗ Không gửi status: BE không hỗ trợ nhiều status → sẽ rỗng
   const buildParams = useCallback(() => ({ page, size }), [page, size]);
 
   const {
@@ -156,7 +139,6 @@ export default function KolSingleRequest() {
     if (token && !authLoading) refetch();
   }, [token, authLoading, refetch]);
 
-  // Chuẩn hoá data
   const raw = resp?.data ?? resp ?? {};
   const serverList = Array.isArray(raw?.content)
     ? raw.content
@@ -179,10 +161,6 @@ export default function KolSingleRequest() {
       ),
     [serverList]
   );
-
-  // ✅ nhỏ hơn + sát nhau hơn
-  const BTN_BASE =
-    "!h-8 !px-3 !text-sm !font-semibold !shadow-sm !rounded-full !w-[160px] flex items-center justify-center gap-2";
 
   const columns = useMemo(
     () => [
@@ -250,72 +228,39 @@ export default function KolSingleRequest() {
           const status = getStatus(record);
           const isInProgress = status === "IN_PROGRESS";
 
-          // ✅ theo yêu cầu: chỉ hiện nút hủy khi PAID
-          const canCancel = status === "PAID";
-
           const goDetail = () => {
             if (!requestId) return;
             navigate(`/kol/booking/single-requests/detail/${requestId}`);
           };
 
-          const goCancel = () => {
-            if (!requestId) return;
-            navigate(
-              `/kol/booking/single-requests/detail/${requestId}?cancel=1`
-            );
-          };
-
           return (
-            <div className="w-full flex flex-col items-center gap-1">
-              <Button
-                type="primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goDetail();
-                }}
-                className={`${BTN_BASE} !border-none !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-700 hover:!to-indigo-700`}
-              >
-                <FileText size={16} />
-                Xem chi tiết
-              </Button>
-
-              {isInProgress && requestId && (
+            <div className="w-full flex justify-center">
+              {/* Xếp dọc: Xem chi tiết (trên) - Metrics (dưới) */}
+              <div className="flex flex-col items-center gap-2">
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(
-                      `/kol/booking/single-requests/detail/${requestId}?metrics=1`
-                    );
+                    goDetail();
                   }}
-                  className={`${BTN_BASE} !border-none !text-white !bg-gradient-to-r !from-emerald-600 !to-teal-600 hover:!from-emerald-700 hover:!to-teal-700`}
+                  className="!h-9 !px-3 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
                 >
-                  <BarChart3 size={16} />
-                  Metrics
+                  Xem chi tiết
                 </Button>
-              )}
 
-              {canCancel && requestId && (
-                <Popconfirm
-                  title="Bạn chắc chắn muốn hủy đơn booking này?"
-                  okText="Hủy đơn"
-                  cancelText="Không"
-                  onConfirm={(e) => {
-                    e?.stopPropagation?.();
-                    message.success("Mở màn hình hủy đơn...");
-                    goCancel();
-                  }}
-                  onCancel={(e) => e?.stopPropagation?.()}
-                >
+                {isInProgress && requestId && (
                   <Button
-                    danger
-                    onClick={(e) => e.stopPropagation()}
-                    className={`${BTN_BASE} !bg-white hover:!bg-red-50 !border !border-red-300 hover:!border-red-500 !text-red-600 hover:!text-red-700`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(
+                        `/kol/booking/single-requests/detail/${requestId}?metrics=1`
+                      );
+                    }}
+                    className="!h-9 !px-3 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
                   >
-                    <XCircle size={16} />
-                    Hủy đơn booking
+                    Báo Cáo Livestream
                   </Button>
-                </Popconfirm>
-              )}
+                )}
+              </div>
             </div>
           );
         },
@@ -330,7 +275,6 @@ export default function KolSingleRequest() {
         <div className="border-2 border-gray-300 p-2 rounded-md w-fit">
           <CalendarRange className="text-gray-500" size={20} />
         </div>
-
         <section>
           <h1 className="text-[18px] font-bold uppercase">
             Tất cả yêu cầu Booking
@@ -339,7 +283,6 @@ export default function KolSingleRequest() {
             Danh sách yêu cầu booking.
           </p>
         </section>
-
         <div className="ml-auto">
           <Button
             icon={<RefreshCcw size={16} />}

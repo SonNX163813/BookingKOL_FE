@@ -112,4 +112,7 @@ export const API_PATHS = {
     show: (feedbackId) =>
       `/v1/admin/feedbacks/show/${encodeURIComponent(feedbackId)}`,
   },
+  AUTH: {
+    changePassword: "/auth/change-password",
+  },
 };

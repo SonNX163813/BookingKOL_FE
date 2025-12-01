@@ -24,9 +24,12 @@ import AdminKolBookingById from "../pages/admin/management-user/management-kol/A
 import AdminUserBookingById from "../pages/admin/management-user/management-customer/AdminUserBookingById";
 import AdminViewKolSchedule from "../pages/admin/management-user/management-kol/AdminViewKolSchedule";
 
+// ✅ NEW: trang quản lý lịch làm việc (list KOL + xem lịch)
+import ManagementKolWorkSchedule from "../pages/admin/management-user/management-worktime/ManagementKolWorkSchedule";
+
 // Campaign pages
 import ManagementBookingCampaigns from "../pages/admin/booking-campaign/ManagementBookingCampaigns";
-import EditBookingCampaign from "../pages/admin/booking-campaign/EditBookingCampain"; // 👈 mới
+import EditBookingCampaign from "../pages/admin/booking-campaign/EditBookingCampain";
 import BookingCampaignDetail from "../pages/admin/booking-campaign/BookingCampaignDetail";
 import ManagementBlog from "../pages/admin/blog/ManagementBlog";
 import AdminBlogDetail from "../pages/admin/blog/AdminBlogDetail";
@@ -34,7 +37,6 @@ import CreateBlog from "../pages/admin/blog/CreateBlog";
 
 import BookingCampaignSchedule from "../pages/admin/booking-campaign/BookingCampaignSchedule";
 import AdminKolLivestreamMetrics from "../pages/admin/management-user/management-kol/AdminKolLivestreamMetrics";
-
 import AdminKolFeedbackList from "../pages/admin/management-user/management-kol/AdminKolFeedbackList";
 
 export const routerAdmin = [
@@ -50,6 +52,13 @@ export const routerAdmin = [
       { path: "management-customer/:id", element: <UserDetailPage /> },
 
       { path: "management-kol", element: <ManagementKOL /> },
+
+      // ✅ NEW: Menu “Quản lý lịch làm việc của KOL” sẽ trỏ vào đây
+      {
+        path: "management-kol-work-schedule",
+        element: <ManagementKolWorkSchedule />,
+      },
+
       { path: "kols/:kolId/schedule", element: <AdminViewKolSchedule /> },
 
       { path: "kols/create", element: <CreateKOL /> },
@@ -72,10 +81,8 @@ export const routerAdmin = [
         path: "management-booking-campaigns/:campaignId/schedule",
         element: <BookingCampaignSchedule />,
       },
-      {
-        path: "feedbacks/kol/:kolId",
-        element: <AdminKolFeedbackList />,
-      },
+      { path: "feedbacks/kol/:kolId", element: <AdminKolFeedbackList /> },
+
       { path: "management-course", element: <ManagementCourse /> },
       {
         path: "management-course-history",
@@ -92,11 +99,10 @@ export const routerAdmin = [
         element: <ManagementBookingCampaigns />,
       },
       {
-        path: "management-booking-campaigns/:campaignId", // 👈 mới
+        path: "management-booking-campaigns/:campaignId",
         element: <BookingCampaignDetail />,
       },
-
-      { path: "bookings/create", element: <EditBookingCampaign /> }, // 👈 mới
+      { path: "bookings/create", element: <EditBookingCampaign /> },
 
       { path: "management-blogs", element: <ManagementBlog /> },
       { path: "management-blogs/create", element: <CreateBlog /> },

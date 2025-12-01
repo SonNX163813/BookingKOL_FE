@@ -25,6 +25,8 @@ import {
   Tag,
   Typography,
   message,
+  Modal,
+  Input,
 } from "antd";
 import {
   ArrowLeft,
@@ -32,6 +34,7 @@ import {
   FileText,
   UserCircle2,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
@@ -39,6 +42,9 @@ import { getKolMySingleRequestDetail } from "../../services/kol/KolAPI";
 import { createKolLivestreamMetric } from "../../services/kol/LiveMetricAPI";
 import { getKolLivestreamMetrics } from "../../services/kol/LiveMetricQueryAPI";
 import LivestreamMetricModal from "../../components/kol/kol-metric/LivestreamMetricModal";
+import { createKolCancelBookingRequest } from "../../services/kol/KolCancelBookingRequestAPI";
+import { get } from "../../config/axios-config";
+import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
 const { Title, Text, Link } = Typography;
 const { useBreakpoint } = Grid;
@@ -76,6 +82,7 @@ const BOOKING_STATUS_MAP = BOOKING_STATUS_OPTIONS.reduce(
   (a, s) => ((a[s.value] = s.label), a),
   {}
 );
+
 const formatDateTime = (v, p = "DD/MM/YYYY HH:mm") =>
   v ? dayjs(v).format(p) : "--";
 const normalizeStatus = (s) =>
@@ -110,6 +117,7 @@ const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
     </Link>
   );
 };
+
 const renderImageField = (url, label) =>
   !url ? (
     "--"
@@ -149,7 +157,6 @@ const fmtVnd = (v) =>
 const fmtPct = (v) =>
   Number.isFinite(+v) ? `${(+v).toFixed(2).replace(/\.00$/, "")}%` : "--";
 
-/* Hiển thị avgViewDuration theo GIÂY */
 const METRIC_FIELDS = [
   { key: "revenue", label: "Tổng doanh thu", fmt: fmtVnd },
   { key: "gpm", label: "GPM", fmt: fmtVnd },
@@ -172,6 +179,38 @@ const METRIC_FIELDS = [
 const getHttpStatus = (e) =>
   e?.appStatus || e?.response?.status || e?.status || 0;
 const isBadRequest = (e) => getHttpStatus(e) === 400;
+
+const pickErrorMessage = (e) =>
+  e?.response?.data?.message || e?.data?.message || e?.message || "";
+const isAlreadyRequestedMsg = (txt) => /đã gửi yêu cầu hủy/i.test(txt || "");
+
+/**
+ * ✅ GET /v1/requests/cancel/detail/{workTimeId}
+ * NOTE: validateStatus cho phép 404 -> không bị reject -> không bắn toast "Không tìm thấy..." từ interceptor
+ */
+async function getKolCancelRequestDetail(workTimeId, { signal } = {}) {
+  if (!workTimeId) throw new Error("workTimeId is required");
+
+  const builder =
+    CLIENT_API_PATHS?.BOOKING?.kolCancelRequestDetail ??
+    ((id) => `/v1/requests/cancel/detail/${encodeURIComponent(id)}`);
+
+  const url = typeof builder === "function" ? builder(workTimeId) : builder;
+
+  const res = await get({
+    url,
+    config: {
+      ...(signal ? { signal } : {}),
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 404,
+    },
+  });
+
+  // ✅ 404 => coi như "chưa có yêu cầu hủy" -> return null và không hiển thị card
+  if (res?.status === 404) return null;
+
+  return res?.data ?? null;
+}
 
 export default function KolSingleRequestDetail() {
   const { requestId } = useParams();
@@ -204,6 +243,9 @@ export default function KolSingleRequestDetail() {
   const normalizedStatus = normalizeStatus(detail?.status);
   const canInputMetrics = normalizedStatus === "IN_PROGRESS";
   const requestNo = detail?.requestNumber ?? detail?.id ?? requestId ?? "--";
+
+  // kolId lấy từ detail (không hiển thị)
+  const kolId = detail?.kol?.id ?? "";
 
   const worktimes = extractWorktimes(detail);
   const endedWorktime = worktimes.find(
@@ -241,9 +283,25 @@ export default function KolSingleRequestDetail() {
     queryKey: ["kol-livestream-metrics", token, selectedWorktimeId],
     queryFn: () => getKolLivestreamMetrics(selectedWorktimeId),
     enabled: !!token && !!selectedWorktimeId,
-    // ⬇ KHÔNG retry nếu 400 (coi như "chưa có số liệu")
     retry: (count, err) => (isBadRequest(err) ? false : count < 1),
   });
+
+  /* GET cancel detail theo workTimeId (404 => null, không error, không toast) */
+  const {
+    data: cancelDetail,
+    isLoading: isCancelDetailLoading,
+    isFetching: isCancelDetailFetching,
+    error: cancelDetailError,
+    refetch: refetchCancelDetail,
+  } = useQuery({
+    queryKey: ["kol-cancel-detail", token, selectedWorktimeId],
+    queryFn: () => getKolCancelRequestDetail(selectedWorktimeId),
+    enabled: !!token && !!selectedWorktimeId,
+    retry: (count) => count < 1,
+  });
+
+  // ✅ Hiện card cancel khi có data hoặc có lỗi thật (không phải 404)
+  const showCancelCard = !!cancelDetail || !!cancelDetailError;
 
   /* POST metrics */
   const { mutateAsync: submitMetricsAsync, isLoading: isSubmitting } =
@@ -269,6 +327,7 @@ export default function KolSingleRequestDetail() {
     setSelectedWorktimeId(wid);
     refetch();
     refetchMetrics();
+    refetchCancelDetail();
   };
 
   /* Back button */
@@ -323,6 +382,72 @@ export default function KolSingleRequestDetail() {
     [worktimes, selectedWorktimeId]
   );
 
+  /* =================== CANCEL REQUEST UI/LOGIC =================== */
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const { mutateAsync: cancelRequestAsync, isLoading: isCancelling } =
+    useMutation({
+      mutationFn: async ({ kolId, workTimeId, reason }) =>
+        createKolCancelBookingRequest({ kolId, workTimeId, reason }),
+    });
+
+  const openCancelModal = () => {
+    if (!kolId) return message.error("Không tìm thấy thông tin KOL (kolId).");
+    if (!worktimes?.length)
+      return message.error("Không tìm thấy ca livestream (workTimeId).");
+    setCancelOpen(true);
+  };
+
+  const submitCancelRequest = async () => {
+    try {
+      if (!kolId) return message.error("Thiếu kolId.");
+      if (!worktimes?.length) return message.error("Thiếu workTimeId.");
+
+      const workTimeId =
+        selectedWorktimeId || endedWorktime?.id || worktimes?.[0]?.id || "";
+
+      if (!workTimeId) return message.error("Không xác định được workTimeId.");
+
+      await cancelRequestAsync({
+        kolId,
+        workTimeId,
+        reason: cancelReason,
+      });
+
+      // ✅ ghi đè toast BE
+      message.destroy();
+      message.success("Gửi yêu cầu hủy lịch đặt chỗ thành công");
+
+      setCancelOpen(false);
+      setCancelReason("");
+
+      // đảm bảo query cancel detail chạy đúng workTimeId vừa gửi
+      setSelectedWorktimeId(workTimeId);
+
+      refetch();
+      refetchCancelDetail();
+    } catch (e) {
+      const backendMsg = pickErrorMessage(e);
+
+      if (isAlreadyRequestedMsg(backendMsg)) {
+        message.destroy();
+        message.success("Gửi yêu cầu hủy lịch đặt chỗ thành công");
+        setCancelOpen(false);
+        setCancelReason("");
+        refetch();
+        refetchCancelDetail();
+        return;
+      }
+
+      message.error(backendMsg || "Gửi yêu cầu hủy thất bại.");
+    }
+  };
+  /* =================== END CANCEL =================== */
+
+  // ✅ Ẩn nút yêu cầu hủy khi đã có cancelDetail (tức là gọi được API detail và có data)
+  const canShowCancelButton = !cancelDetail;
+
   return (
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -330,6 +455,7 @@ export default function KolSingleRequestDetail() {
           <Button icon={<ArrowLeft size={16} />} onClick={goBackList}>
             Quay lại danh sách
           </Button>
+
           <Button
             icon={<CalendarRange size={16} />}
             onClick={() => refetch()}
@@ -337,6 +463,14 @@ export default function KolSingleRequestDetail() {
           >
             Làm mới
           </Button>
+
+          {/* ✅ Ẩn khi đã có cancel detail */}
+          {canShowCancelButton && (
+            <Button danger onClick={openCancelModal} loading={isCancelling}>
+              Yêu cầu hủy đơn đặt chỗ
+            </Button>
+          )}
+
           {canInputMetrics && (
             <Button
               type="primary"
@@ -357,6 +491,36 @@ export default function KolSingleRequestDetail() {
           </Text>
         </div>
       </div>
+
+      {/* ===== Modal yêu cầu hủy đặt chỗ ===== */}
+      <Modal
+        open={cancelOpen}
+        title="Yêu cầu hủy đơn đặt chỗ"
+        okText="Gửi yêu cầu"
+        cancelText="Đóng"
+        okButtonProps={{ danger: true, loading: isCancelling }}
+        onOk={submitCancelRequest}
+        onCancel={() => {
+          if (isCancelling) return;
+          setCancelOpen(false);
+        }}
+        destroyOnClose
+      >
+        <Space direction="vertical" size={10} className="w-full">
+          <Text type="secondary">
+            Bạn có thể nhập lý do (tuỳ chọn) để Admin xử lý nhanh hơn.
+          </Text>
+
+          <Input.TextArea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Ví dụ: trùng lịch / có việc đột xuất..."
+            autoSize={{ minRows: 3, maxRows: 6 }}
+            maxLength={500}
+            showCount
+          />
+        </Space>
+      </Modal>
 
       {error ? (
         <Card>
@@ -402,8 +566,78 @@ export default function KolSingleRequestDetail() {
             />
           )}
 
+          {/* ✅ ĐƯA CARD THÔNG TIN HỦY LÊN ĐẦU */}
+          {showCancelCard && (
+            <Card
+              className="shadow-sm"
+              bordered={false}
+              title={<span>Chi tiết yêu cầu hủy</span>}
+              extra={
+                <Button
+                  onClick={() => refetchCancelDetail()}
+                  loading={isCancelDetailFetching}
+                  disabled={!selectedWorktimeId}
+                >
+                  Làm mới
+                </Button>
+              }
+            >
+              {cancelDetailError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  message="Không tải được chi tiết yêu cầu hủy."
+                  description={String(cancelDetailError?.message || "")}
+                />
+              ) : (
+                <Skeleton
+                  loading={isCancelDetailLoading}
+                  active
+                  paragraph={{ rows: 3 }}
+                >
+                  <Descriptions
+                    bordered
+                    size="middle"
+                    column={screens.lg ? 3 : screens.md ? 2 : 1}
+                    labelStyle={{ width: 220 }}
+                  >
+                    <Descriptions.Item label="Trạng thái">
+                      {cancelDetail?.status ?? "--"}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Lý do">
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {cancelDetail?.reason ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Tạo lúc">
+                      {formatDateTime(cancelDetail?.createdAt)}
+                    </Descriptions.Item>
+
+                    {/* ✅ approvedAt null thì ẩn */}
+                    {cancelDetail?.approvedAt ? (
+                      <Descriptions.Item label="Duyệt lúc">
+                        {formatDateTime(cancelDetail.approvedAt)}
+                      </Descriptions.Item>
+                    ) : null}
+                  </Descriptions>
+                </Skeleton>
+              )}
+            </Card>
+          )}
+
           {/* --- Thông tin yêu cầu --- */}
-          <Card className="shadow-sm" bordered={false}>
+          <Card
+            className="shadow-sm"
+            bordered={false}
+            title={
+              <Space>
+                <ClipboardList size={18} />
+                <span>Thông tin đơn Booking</span>
+              </Space>
+            }
+          >
             <Space size="middle" wrap className="justify-between w-full">
               <Space size="middle" wrap>
                 <Tag color={STATUS_TAG_COLOR[normalizedStatus] ?? "default"}>
@@ -571,7 +805,6 @@ export default function KolSingleRequestDetail() {
                 message="Chưa có ca livestream được chọn."
               />
             ) : isBadRequest(metricsError) ? (
-              // ⬅️ Nếu 400 Bad Request → coi như chưa có metric → hiển thị Empty
               <Empty description="Chưa có số liệu. Hãy nhấn 'Nhập số liệu' để lưu trước." />
             ) : metricsError ? (
               <Alert

@@ -294,18 +294,18 @@ export default function KolScheduleChange() {
                   <IoIosArrowForward className="text-[#7bb4fb]" />
                 </button>
 
-                <Text strong>Lịch rảnh trong tháng {headerLabel}</Text>
+                <Text strong>Lịch đã đăng ký trong tháng {headerLabel}</Text>
               </div>
 
               {loadingFree && (
-                <Text type="secondary">Đang tải lịch rảnh...</Text>
+                <Text type="secondary">Đang tải lịch đã đăng ký...</Text>
               )}
             </div>
 
             {/* ==== LIST CA RẢNH (TỪ HÔM NAY TRỞ ĐI) ==== */}
             {visibleFreeList.length === 0 ? (
               <Text type="secondary">
-                Chưa có ca rảnh nào từ hôm nay trở đi trong tháng này.
+                Chưa có lịch đã đăng ký nào từ hôm nay trở đi trong tháng này.
               </Text>
             ) : (
               <Space direction="vertical" size={8} style={{ width: "100%" }}>

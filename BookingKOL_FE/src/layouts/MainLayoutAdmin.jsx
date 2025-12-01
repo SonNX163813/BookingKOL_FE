@@ -111,6 +111,18 @@ const MainLayoutAdmin = () => {
           icon: <VerifiedUserOutlined />,
           label: <Link to="management-kol">Quản lý KOL</Link>,
         },
+
+        // ✅ NEW: dưới Quản lý KOL
+        {
+          key: "management-kol-work-schedule",
+          icon: <CalendarMonthOutlined />,
+          label: (
+            <Link to="management-kol-work-schedule">
+              Quản lý lịch làm việc của KOL
+            </Link>
+          ),
+        },
+
         {
           key: "management-customer",
           icon: <AccountCircleOutlined />,

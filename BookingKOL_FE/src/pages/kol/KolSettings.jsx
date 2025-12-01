@@ -25,12 +25,19 @@ import { toast } from "react-toastify";
 import {
   updateMyKolProfile,
   getKolProfileByUserId,
-  resetPasswordWithOtp,
   resolveAvatarUrl,
   changeKolAvatarNew, // ✅ /v1/kol/avatar/change/new-image
 } from "../../services/kol/KolAPI";
 
+import { changePassword } from "../../services/kol/ChangePasswordAPI"; // ✅ NEW
+
 const { Title, Text } = Typography;
+
+// ✅ same rule as RegisterPage
+const STRONG_PASSWORD =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
+
+const MAX_PASSWORD_LEN = 64;
 
 export default function KolSettings() {
   const auth = useAuth?.() || {};
@@ -48,10 +55,25 @@ export default function KolSettings() {
   const objectUrlRef = useRef(null);
   const [uploadPct, setUploadPct] = useState(0);
 
-  // ====== Password reset (OTP) ======
+  // ====== Change password ======
   const [editingPwd, setEditingPwd] = useState(false);
   const [changingPwd, setChangingPwd] = useState(false);
   const [formPwd] = Form.useForm();
+
+  // ✅ toast khi chạm max (không spam)
+  const [hitMaxOld, setHitMaxOld] = useState(false);
+  const [hitMaxNew, setHitMaxNew] = useState(false);
+  const [hitMaxConfirm, setHitMaxConfirm] = useState(false);
+
+  const toastMaxOnce = (len, hit, setHit, label) => {
+    if (len >= MAX_PASSWORD_LEN && !hit) {
+      toast.info(`${label} tối đa ${MAX_PASSWORD_LEN} ký tự.`);
+      setHit(true);
+    }
+    if (len < MAX_PASSWORD_LEN && hit) {
+      setHit(false);
+    }
+  };
 
   // cleanup object URL khi unmount
   useEffect(() => {
@@ -74,7 +96,6 @@ export default function KolSettings() {
         const kol = await getKolProfileByUserId(userId);
         if (kol) {
           fullName = kol.fullName || fullName;
-          // dùng resolver để hiện đúng ảnh dù avatarUrl là URL/usageId/fileId
           const resolved = resolveAvatarUrl(kol);
           avatarUrl = resolved || avatarUrl;
         }
@@ -181,26 +202,36 @@ export default function KolSettings() {
 
   const onSavePassword = async () => {
     try {
-      const { email, otp, newPassword, confirmPassword } =
+      const { oldPassword, newPassword, confirmPassword } =
         await formPwd.validateFields();
+
       if (newPassword !== confirmPassword) {
         toast.error("Mật khẩu xác nhận không khớp.");
         return;
       }
+
       setChangingPwd(true);
-      await resetPasswordWithOtp({
-        email,
-        otp,
+
+      await changePassword({
+        oldPassword,
         newPassword,
         confirmPassword,
       });
+
       toast.success("Đổi mật khẩu thành công.");
       setEditingPwd(false);
       formPwd.resetFields();
+
+      // reset cờ toast-max
+      setHitMaxOld(false);
+      setHitMaxNew(false);
+      setHitMaxConfirm(false);
     } catch (e) {
       if (!e?.errorFields) {
         console.error(e);
-        toast.error(e?.response?.data?.message || "Đổi mật khẩu thất bại.");
+        toast.error(
+          e?.response?.data?.message || e?.message || "Đổi mật khẩu thất bại."
+        );
       }
     } finally {
       setChangingPwd(false);
@@ -212,7 +243,6 @@ export default function KolSettings() {
       className="px-4 md:px-6 py-6"
       style={{ maxWidth: 960, margin: "0 auto" }}
     >
-      {/* === TÁCH CARD GIỐNG KolProfile: dùng Space vertical size=24 === */}
       <Space
         direction="vertical"
         size={24}
@@ -260,7 +290,7 @@ export default function KolSettings() {
           }
           className="shadow-sm rounded-2xl"
           headStyle={{ padding: "16px 24px" }}
-          bodyStyle={{ padding: 24 }} // padding trong card để không bị “dính”
+          bodyStyle={{ padding: 24 }}
         >
           {/* Avatar giữa trên cùng */}
           <div className="w-full flex flex-col items-center mb-4">
@@ -298,16 +328,9 @@ export default function KolSettings() {
             )}
           </div>
 
-          {/* Họ & Tên + Email: cân đối, padding trái/phải đều nhau */}
-          <Form
-            form={formInfo}
-            layout="vertical"
-            disabled={!editingInfo}
-            className="w-full" // ❌ bỏ max-w-3xl, mx-auto, px-*
-          >
+          {/* Họ & Tên + Email */}
+          <Form form={formInfo} layout="vertical" disabled={!editingInfo}>
             <Row gutter={24}>
-              {" "}
-              {/* ❌ bỏ justify / style marginLeft=0 */}
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Họ và tên"
@@ -329,7 +352,7 @@ export default function KolSettings() {
           </Form>
         </Card>
 
-        {/* ===== Đổi mật khẩu (OTP) ===== */}
+        {/* ===== Đổi mật khẩu ===== */}
         <Card
           title={
             <Title level={4} className="!mb-0 font-bold">
@@ -341,9 +364,10 @@ export default function KolSettings() {
                       icon={<LockOutlined />}
                       onClick={() => {
                         setEditingPwd(true);
-                        formPwd.setFieldsValue({
-                          email: formInfo.getFieldValue("email"),
-                        });
+                        formPwd.resetFields();
+                        setHitMaxOld(false);
+                        setHitMaxNew(false);
+                        setHitMaxConfirm(false);
                       }}
                       className="rounded-xl !h-10"
                     >
@@ -356,6 +380,9 @@ export default function KolSettings() {
                         onClick={() => {
                           setEditingPwd(false);
                           formPwd.resetFields();
+                          setHitMaxOld(false);
+                          setHitMaxNew(false);
+                          setHitMaxConfirm(false);
                         }}
                         className="rounded-xl !h-10"
                       >
@@ -378,35 +405,78 @@ export default function KolSettings() {
           }
           className="shadow-sm rounded-2xl"
           headStyle={{ padding: "16px 24px" }}
-          bodyStyle={{ padding: 24 }} // đồng bộ padding với card trên
+          bodyStyle={{ padding: 24 }}
         >
           {!editingPwd ? (
             <div className="text-gray-500">**********</div>
           ) : (
-            <Form
-              form={formPwd}
-              layout="vertical"
-              className="w-full" // ❌ bỏ max-w-2xl, mx-auto, px-*
-            >
+            <Form form={formPwd} layout="vertical">
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item
-                    label="Email"
-                    name="email"
-                    rules={[{ required: true, message: "Nhập email" }]}
+                    label="Mật khẩu hiện tại"
+                    name="oldPassword"
+                    rules={[
+                      { required: true, message: "Nhập mật khẩu hiện tại" },
+                      {
+                        max: MAX_PASSWORD_LEN,
+                        message: `Tối đa ${MAX_PASSWORD_LEN} ký tự`,
+                      },
+                    ]}
                   >
-                    <Input className="!h-12" disabled />
+                    <Input.Password
+                      className="!h-12"
+                      placeholder="Mật khẩu hiện tại"
+                      maxLength={MAX_PASSWORD_LEN}
+                      onChange={(e) =>
+                        toastMaxOnce(
+                          e.target.value.length,
+                          hitMaxOld,
+                          setHitMaxOld,
+                          "Mật khẩu hiện tại"
+                        )
+                      }
+                    />
                   </Form.Item>
                 </Col>
+
                 <Col xs={24} md={12}>
                   <Form.Item
-                    label="Mã OTP"
-                    name="otp"
-                    rules={[{ required: true, message: "Nhập mã OTP" }]}
+                    label="Mật khẩu mới"
+                    name="newPassword"
+                    rules={[
+                      { required: true, message: "Nhập mật khẩu mới" },
+                      {
+                        max: MAX_PASSWORD_LEN,
+                        message: `Tối đa ${MAX_PASSWORD_LEN} ký tự`,
+                      },
+                      {
+                        validator(_, value) {
+                          if (!value) return Promise.resolve();
+                          if (!STRONG_PASSWORD.test(value)) {
+                            return Promise.reject(
+                              new Error(
+                                "Mật khẩu ≥ 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
+                              )
+                            );
+                          }
+                          return Promise.resolve();
+                        },
+                      },
+                    ]}
                   >
-                    <Input
+                    <Input.Password
                       className="!h-12"
-                      placeholder="Nhập mã OTP đã nhận"
+                      placeholder="Mật khẩu mới"
+                      maxLength={MAX_PASSWORD_LEN}
+                      onChange={(e) =>
+                        toastMaxOnce(
+                          e.target.value.length,
+                          hitMaxNew,
+                          setHitMaxNew,
+                          "Mật khẩu mới"
+                        )
+                      }
                     />
                   </Form.Item>
                 </Col>
@@ -415,26 +485,15 @@ export default function KolSettings() {
               <Row gutter={24}>
                 <Col xs={24} md={12}>
                   <Form.Item
-                    label="Mật khẩu mới"
-                    name="newPassword"
-                    rules={[
-                      { required: true, message: "Nhập mật khẩu mới" },
-                      { min: 8, message: "Tối thiểu 8 ký tự" },
-                    ]}
-                  >
-                    <Input.Password
-                      className="!h-12"
-                      placeholder="Mật khẩu mới"
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    label="Xác nhận mật khẩu"
+                    label="Xác nhận mật khẩu mới"
                     name="confirmPassword"
                     dependencies={["newPassword"]}
                     rules={[
-                      { required: true, message: "Nhập lại mật khẩu" },
+                      { required: true, message: "Nhập lại mật khẩu mới" },
+                      {
+                        max: MAX_PASSWORD_LEN,
+                        message: `Tối đa ${MAX_PASSWORD_LEN} ký tự`,
+                      },
                       ({ getFieldValue }) => ({
                         validator(_, v) {
                           if (!v || getFieldValue("newPassword") === v)
@@ -448,7 +507,16 @@ export default function KolSettings() {
                   >
                     <Input.Password
                       className="!h-12"
-                      placeholder="Nhập lại mật khẩu"
+                      placeholder="Nhập lại mật khẩu mới"
+                      maxLength={MAX_PASSWORD_LEN}
+                      onChange={(e) =>
+                        toastMaxOnce(
+                          e.target.value.length,
+                          hitMaxConfirm,
+                          setHitMaxConfirm,
+                          "Xác nhận mật khẩu"
+                        )
+                      }
                     />
                   </Form.Item>
                 </Col>
@@ -458,7 +526,6 @@ export default function KolSettings() {
         </Card>
       </Space>
 
-      {/* Ngăn cách nhẹ cuối trang (tuỳ chọn) */}
       <Divider style={{ margin: 0 }} />
     </div>
   );
