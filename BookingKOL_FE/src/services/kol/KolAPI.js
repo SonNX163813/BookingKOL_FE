@@ -19,6 +19,8 @@ const KOL_LIST_ALLOWED_PARAMS = new Set([
   "minRating",
   "categoryId",
   "minPrice",
+  "nameKeyword",
+  "role",
   "page",
   "size",
 ]);

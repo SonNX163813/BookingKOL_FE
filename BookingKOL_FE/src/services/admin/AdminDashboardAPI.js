@@ -6,6 +6,11 @@ const ensureNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const ensureNumberOrNull = (value) => {
+  if (value === null || value === undefined) return null;
+  return ensureNumber(value);
+};
+
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
 const normalizeStats = (stats) => {
@@ -32,6 +37,72 @@ const normalizeStats = (stats) => {
 
 const normalizeList = (list, mapper) => ensureArray(list).map(mapper);
 
+const normalizeDashboardAnalysis = (analysis) => {
+  const buildSection = (section, fields) => {
+    const safeSection =
+      section && typeof section === "object" ? section : Object.create(null);
+    return fields.reduce(
+      (acc, key) => ({ ...acc, [key]: ensureNumberOrNull(safeSection[key]) }),
+      Object.create(null)
+    );
+  };
+
+  const charts =
+    analysis?.charts && typeof analysis.charts === "object"
+      ? analysis.charts
+      : {};
+
+  return {
+    financialOverview: buildSection(analysis?.financialOverview, [
+      "totalRevenue",
+      "totalOrders",
+      "avgOrderValue",
+      "totalGpm",
+      "totalProductsSold",
+    ]),
+    engagementOverview: buildSection(analysis?.engagementOverview, [
+      "totalViews",
+      "pcuPeak",
+      "totalComments",
+      "avgViewDurationSeconds",
+    ]),
+    conversionFunnel: buildSection(analysis?.conversionFunnel, [
+      "totalViews",
+      "clickRate",
+      "addToCartShortTerm",
+      "buyers",
+      "viewerToBuyerRate",
+    ]),
+    qualityScore: buildSection(analysis?.qualityScore, [
+      "retentionRate",
+      "earlyEngagementRate",
+      "revenuePerView",
+    ]),
+    charts: {
+      revenueByPlatform: normalizeList(
+        charts.revenueByPlatform,
+        (item = {}) => ({
+          platform: item.platform ?? "",
+          value: ensureNumber(item.value),
+          percentage: ensureNumber(item.percentage),
+        })
+      ),
+      durationByPlatform: normalizeList(
+        charts.durationByPlatform,
+        (item = {}) => ({
+          platform: item.platform ?? "",
+          value: ensureNumber(item.value),
+          percentage: ensureNumber(item.percentage),
+        })
+      ),
+      revenueOverTime: normalizeList(charts.revenueOverTime, (item = {}) => ({
+        timePoint: item.timePoint ?? "",
+        value: ensureNumber(item.value),
+      })),
+    },
+  };
+};
+
 const normalizeSummary = (rawData) => {
   const summary = rawData && typeof rawData === "object" ? rawData : {};
 
@@ -52,11 +123,14 @@ const normalizeSummary = (rawData) => {
     ),
     upcomingBookingRequests: ensureArray(summary.upcomingBookingRequests),
     recentBookingRequests: ensureArray(summary.recentBookingRequests),
-    topKolsByBookings: normalizeList(summary.topKolsByBookings, (item = {}) => ({
-      bookingCount: ensureNumber(item.bookingCount),
-      kolName: item.kolName ?? "",
-      kolId: item.kolId ?? "",
-    })),
+    topKolsByBookings: normalizeList(
+      summary.topKolsByBookings,
+      (item = {}) => ({
+        bookingCount: ensureNumber(item.bookingCount),
+        kolName: item.kolName ?? "",
+        kolId: item.kolId ?? "",
+      })
+    ),
     topKolsByRevenue: normalizeList(summary.topKolsByRevenue, (item = {}) => ({
       totalRevenue: ensureNumber(item.totalRevenue),
       kolName: item.kolName ?? "",
@@ -73,7 +147,9 @@ const normalizeSummary = (rawData) => {
       summary.revenueOverview && typeof summary.revenueOverview === "object"
         ? {
             totalRevenue: ensureNumber(summary.revenueOverview.totalRevenue),
-            totalPurchases: ensureNumber(summary.revenueOverview.totalPurchases),
+            totalPurchases: ensureNumber(
+              summary.revenueOverview.totalPurchases
+            ),
             uniqueUsers: ensureNumber(summary.revenueOverview.uniqueUsers),
             notAssignedPurchase: ensureNumber(
               summary.revenueOverview.notAssignedPurchase
@@ -94,12 +170,37 @@ const normalizeSummary = (rawData) => {
       totalRevenue: ensureNumber(item.totalRevenue),
       date: item.date ?? "",
     })),
+    dashboardAnalysis: normalizeDashboardAnalysis(summary.dashboardAnalysis),
+    timestamp: summary.timestamp ?? summary.timeStamp ?? null,
   };
 };
 
-export const getAdminDashboardSummary = async ({ signal } = {}) => {
+// export const getAdminDashboardSummary = async ({ signal } = {}) => {
+//   const payload = await get({
+//     url: API_PATHS.DASHBOARD.adminSummary,
+//     config: signal ? { signal } : undefined,
+//   });
+
+//   const dataContainer = payload?.data ?? payload ?? {};
+//   const summaryPayload =
+//     dataContainer && typeof dataContainer === "object" && dataContainer.data
+//       ? dataContainer.data
+//       : dataContainer;
+
+//   return normalizeSummary(summaryPayload);
+// };
+export const getAdminDashboardSummary = async ({
+  signal,
+  startDate,
+  endDate,
+} = {}) => {
+  const params = Object.create(null);
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+
   const payload = await get({
     url: API_PATHS.DASHBOARD.adminSummary,
+    params,
     config: signal ? { signal } : undefined,
   });
 

@@ -263,7 +263,7 @@ const Introduction = ({ profile, livestreamVideos, feedback }) => {
       </Grid>
 
       <Stack spacing={2.5}>
-        <Stack spacing={1.5}>
+        {/* <Stack spacing={1.5}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start">
             <BoltRoundedIcon sx={{ color: "#582baf", mt: 0.5 }} />
             <Box>
@@ -311,7 +311,7 @@ const Introduction = ({ profile, livestreamVideos, feedback }) => {
               </Stack>
             </Box>
           </Stack>
-        </Stack>
+        </Stack> */}
 
         <Stack spacing={1.5}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start">

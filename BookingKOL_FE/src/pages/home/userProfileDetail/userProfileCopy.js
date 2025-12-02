@@ -57,6 +57,7 @@ export const USER_PROFILE_SECTIONS = [
         fullWidthRow: true,
         minRows: 2,
         icon: HomeRoundedIcon,
+        helperText: "Toi da 100 ky tu.",
       },
     ],
   },
@@ -107,7 +108,7 @@ export const USER_PROFILE_SECTIONS = [
         minRows: 5,
         icon: DescriptionRoundedIcon,
         helperText:
-          "Bạn có thể viết tối đa 500 ký tự để mô tả nguyện vọng và kinh nghiệm.",
+          "Gioi thieu toi da 100 ky tu de thong tin gon gang va de doc.",
       },
     ],
   },

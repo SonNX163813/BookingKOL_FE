@@ -1,4 +1,4 @@
-import { get, patch, post } from "../../config/axios-config";
+import { get, patch, post, remove2 } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
 const extractFileList = (files) => {
@@ -104,6 +104,81 @@ export const holdBookingSlot = async ({
       endTimeIso,
     },
   });
+};
+
+export const releaseBookingSlot = async ({
+  kolId,
+  startTimeIso,
+  endTimeIso,
+} = {}) => {
+  if (!kolId || !startTimeIso || !endTimeIso) {
+    throw new Error("kolId, startTimeIso and endTimeIso are required");
+  }
+
+  return remove2({
+    url: CLIENT_API_PATHS.BOOKING.releaseSlot,
+    data: {
+      kolId,
+      startTimeIso,
+      endTimeIso,
+    },
+  });
+};
+
+export const getHeldBookingSlots = async ({ kolId, signal } = {}) => {
+  if (!kolId) {
+    throw new Error("kolId is required to fetch held booking slots");
+  }
+
+  const payload = await get({
+    url: CLIENT_API_PATHS.BOOKING.listHoldSlot(kolId),
+    config: signal ? { signal } : undefined,
+  });
+
+  const extractList = (data) => {
+    const candidates = [
+      data?.data?.data,
+      data?.data?.content,
+      data?.data?.items,
+      data?.data?.records,
+      data?.data,
+      data,
+    ];
+    return candidates.find((item) => Array.isArray(item)) || [];
+  };
+
+  const toIso = (value) => {
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return new Date(value).toISOString();
+    }
+    return null;
+  };
+
+  const normalizeUserId = (value) =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+
+  const rawData = extractList(payload);
+
+  return rawData
+    .map((item) => ({
+      userId:
+        normalizeUserId(item?.userId) ??
+        normalizeUserId(item?.user_id) ??
+        normalizeUserId(item?.userID) ??
+        null,
+      startAt:
+        toIso(item?.startAt) ??
+        toIso(item?.start_at) ??
+        toIso(item?.start_time) ??
+        null,
+      endAt:
+        toIso(item?.endAt) ??
+        toIso(item?.end_at) ??
+        toIso(item?.end_time) ??
+        null,
+    }))
+    .filter((slot) => slot.startAt && slot.endAt);
 };
 
 export const updateSingleBookingRequest = async ({

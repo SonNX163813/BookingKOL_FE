@@ -453,7 +453,7 @@ const CourseBookingHistory = () => {
                               {booking?.courseName ?? "--"}
                             </h3>
                             <p className="text-xs text-slate-500">
-                              Mua lúc {createdAtLabel}
+                              Mua lúc {startLabel}
                             </p>
                           </div>
                           <div className="flex flex-col items-end gap-3 text-right sm:flex-row sm:text-left lg:flex-col lg:text-right">
@@ -538,7 +538,7 @@ const CourseBookingHistory = () => {
                               {updatedAtLabel}
                             </span>
                           </div> */}
-                          <div className="flex flex-wrap gap-4">
+                          {/* <div className="flex flex-wrap gap-4">
                             <span>
                               Bắt đầu:{" "}
                               <span className="font-medium text-slate-700">
@@ -551,7 +551,7 @@ const CourseBookingHistory = () => {
                                 {endLabel}
                               </span>
                             </span>
-                          </div>
+                          </div> */}
                         </div>
                       </article>
                     );

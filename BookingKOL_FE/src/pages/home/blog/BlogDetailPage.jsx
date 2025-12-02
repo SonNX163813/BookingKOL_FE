@@ -166,8 +166,9 @@ const BlogDetailPage = () => {
             sx={{
               fontWeight: 800,
               color: "#0f172a",
-              lineHeight: 1.15,
-              textTransform: "uppercase",
+              lineHeight: "42px",
+              // textTransform: "uppercase",
+              // fontSize: "32px",
             }}
           >
             {blog?.title || "Bài viết không có tiêu đề"}

@@ -58,6 +58,8 @@ export const fetchNotifications = async () => {
     url: `/v1/notification/${encodeURIComponent(role)}/${encodeURIComponent(
       userId
     )}`,
+    // Avoid showing global error toast on 401/null data from this endpoint
+    config: { skipErrorToast: true },
   });
   return response?.data ?? response ?? [];
 };

@@ -1,6 +1,21 @@
 import { get, post, update } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
+const extractFileList = (files) => {
+  if (!files) return [];
+  if (files instanceof FileList) return Array.from(files);
+  if (Array.isArray(files)) {
+    return files.flatMap((item) => {
+      if (item instanceof File || item instanceof Blob) return item;
+      if (item?.file instanceof File || item?.file instanceof Blob) return item.file;
+      if (item?.originFileObj) return item.originFileObj;
+      return [];
+    });
+  }
+  if (files instanceof File || files instanceof Blob) return [files];
+  return [];
+};
+
 export const createBookingPackage = async (value) => {
   const data = {
     packageId: value.packageId,
@@ -12,7 +27,7 @@ export const createBookingPackage = async (value) => {
     recurrencePattern: value.recurrencePattern,
     liveIds: value?.liveIds ?? undefined,
     kolIds: value?.kolIds ?? undefined,
-    attachment: value?.attachment ?? undefined,
+    attachments: value?.attachment ?? value?.attachments ?? undefined,
   };
 
   const formData = new FormData();
@@ -30,9 +45,10 @@ export const createBookingPackage = async (value) => {
   if (value?.kolIds) {
     formData.append("kolIds", value.kolIds);
   }
-  if (value?.attachment) {
-    formData.append("attachment", value.attachment);
-  }
+  const filesToAppend = value?.attachment ?? value?.attachments;
+  extractFileList(filesToAppend).forEach((file) => {
+    formData.append("attachment", file);
+  });
 
   return await post({
     url: CLIENT_API_PATHS.BOOKINGPACKAGE.createBookingPackage,

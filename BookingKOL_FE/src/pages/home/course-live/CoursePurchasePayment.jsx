@@ -170,15 +170,15 @@ const CoursePurchasePayment = () => {
             ? result.status.toLowerCase() === "paid"
             : false;
 
-          if (isPaid) {
-            isActive = false;
-            if (intervalId) clearInterval(intervalId);
-            hasRedirectedRef.current = true;
-            navigate("/khoa-hoc/thanh-toan/thanh-cong", {
-              replace: true,
-              state: { course, purchase, payment },
-            });
-          }
+        if (isPaid) {
+          isActive = false;
+          if (intervalId) clearInterval(intervalId);
+          hasRedirectedRef.current = true;
+          navigate("/khoa-hoc/thanh-toan/thanh-cong", {
+            replace: true,
+            state: { course, purchase, payment },
+          });
+        }
       } catch (error) {
         if (!isActive) return;
         console.error("Lỗi kiểm tra trạng thái thanh toán:", error);
@@ -192,7 +192,7 @@ const CoursePurchasePayment = () => {
       isActive = false;
       if (intervalId) clearInterval(intervalId);
     };
-    }, [course, hasRedirectedRef, navigate, payment, purchase, purchaseId]);
+  }, [course, hasRedirectedRef, navigate, payment, purchase, purchaseId]);
 
   useEffect(() => {
     if (
@@ -460,8 +460,8 @@ const CoursePurchasePayment = () => {
                       <Typography
                         sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
                       >
-                        • Vui lòng sử dụng đúng nội dung chuyển khoản để hệ
-                        thống tự động ghi nhận.
+                        • Vui lòng không thay đổi nội dung giao dịch để hệ thống
+                        tự động ghi nhận.
                       </Typography>
                       <Typography
                         sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}
