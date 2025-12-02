@@ -56,6 +56,16 @@ const sectionCardStyles = {
   py: { xs: 2.25, md: 2.75 },
 };
 
+const FIELD_MAX_LENGTHS = {
+  fullName: 100,
+  brandName: 100,
+  address: 100,
+  introduction: 100,
+  country: 100,
+};
+
+const PHONE_REGEX = /^\+?[0-9]{8,15}$/;
+
 const PASSWORD_RULE_TEXT =
   "Mật khẩu phải có chữ hoa, chữ thường, số và ký tự đặc biệt, tối thiểu là 8 ký tự";
 const PASSWORD_REGEX =
@@ -188,6 +198,65 @@ const formatDateDisplay = (value) => {
 
 const isSignalAborted = (signal) => Boolean(signal && signal.aborted);
 
+const validateProfileField = (name, rawValue) => {
+  const value = sanitizeString(rawValue || "");
+  const maxLength = FIELD_MAX_LENGTHS[name];
+  if (maxLength && value.length > maxLength) {
+    return `Toi da ${maxLength} ky tu`;
+  }
+
+  switch (name) {
+    case "fullName":
+      if (!value) {
+        return "Vui long nhap ho va ten";
+      }
+      break;
+    case "phoneNumber":
+      if (!value) {
+        return "Vui long nhap so dien thoai";
+      }
+      if (!PHONE_REGEX.test(value)) {
+        return "So dien thoai khong hop le";
+      }
+      break;
+    case "dateOfBirth":
+      if (value) {
+        const parsed = dayjs(value);
+        if (!parsed.isValid()) {
+          return "Ngay sinh khong hop le";
+        }
+        if (parsed.isAfter(dayjs())) {
+          return "Ngay sinh khong duoc vuot qua hien tai";
+        }
+      }
+      break;
+    default:
+      break;
+  }
+
+  return "";
+};
+
+const validateProfileForm = (values) => {
+  const fieldsToValidate = [
+    "fullName",
+    "brandName",
+    "phoneNumber",
+    "address",
+    "introduction",
+    "country",
+    "dateOfBirth",
+  ];
+
+  return fieldsToValidate.reduce((acc, field) => {
+    const message = validateProfileField(field, values[field]);
+    if (message) {
+      acc[field] = message;
+    }
+    return acc;
+  }, {});
+};
+
 // Hàm tạo lỗi cho form mật khẩu (dùng cho realtime & submit)
 const computePasswordErrors = (values) => {
   const errors = {};
@@ -206,6 +275,7 @@ const computePasswordErrors = (values) => {
 export default function UserProfile() {
   const [profile, setProfile] = useState(null);
   const [formValues, setFormValues] = useState(deriveFormValues(null));
+  const [formErrors, setFormErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -288,6 +358,15 @@ export default function UserProfile() {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormValues((prev) => ({ ...prev, [name]: value }));
+    setFormErrors((prev) => {
+      const message = validateProfileField(name, value);
+      if (message) {
+        return { ...prev, [name]: message };
+      }
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const handleToggleEdit = () => {
@@ -295,6 +374,7 @@ export default function UserProfile() {
     if (editing) {
       handleCancelEdit();
     } else {
+      setFormErrors({});
       setEditing(true);
     }
   };
@@ -302,12 +382,18 @@ export default function UserProfile() {
   const handleCancelEdit = () => {
     if (saving) return;
     setFormValues(deriveFormValues(profile));
+    setFormErrors({});
     setEditing(false);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!editing || saving) return;
+    const errors = validateProfileForm(formValues);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
     setSaving(true);
     try {
       const payload = buildUserProfileUpdatePayload(formValues);
@@ -319,6 +405,7 @@ export default function UserProfile() {
       );
       setProfile(nextProfile);
       setFormValues(deriveFormValues(nextProfile));
+      setFormErrors({});
       setEditing(false);
       setError(null);
       setShowErrorSnackbar(false);
@@ -455,10 +542,17 @@ export default function UserProfile() {
     const StartIcon = fieldConfig.icon;
     const disabled =
       loading || saving || !editing || Boolean(fieldConfig.readOnly);
+    const errorText = formErrors[fieldConfig.name];
     const helperText =
-      !editing && !rawValue
+      errorText ??
+      (!editing && !rawValue
         ? fallbackText
-        : fieldConfig.helperText ?? undefined;
+        : fieldConfig.helperText ?? undefined);
+    const maxLength = FIELD_MAX_LENGTHS[fieldConfig.name];
+    const inputProps =
+      maxLength || fieldConfig.inputProps
+        ? { maxLength, ...(fieldConfig.inputProps || {}) }
+        : undefined;
     const gridDefaults = {
       xs: 12,
       md: fieldConfig.fullWidthRow || fieldConfig.multiline ? 12 : 6,
@@ -490,6 +584,7 @@ export default function UserProfile() {
           InputLabelProps={
             fieldConfig.type === "date" ? { shrink: true } : undefined
           }
+          inputProps={inputProps}
           InputProps={{
             startAdornment: StartIcon ? (
               <InputAdornment position="start">
@@ -512,11 +607,12 @@ export default function UserProfile() {
           helperText={helperText}
           FormHelperTextProps={{
             sx: {
-              color: textSecondary,
+              color: errorText ? "#d32f2f" : textSecondary,
               fontWeight: 500,
               mt: 1,
             },
           }}
+          error={Boolean(errorText)}
           sx={{
             width: "100%",
             maxWidth: "100%",
@@ -898,6 +994,12 @@ export default function UserProfile() {
         onClose={() => setOpenPasswordDialog(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "30px",
+            padding: "10px 0",
+          },
+        }}
       >
         <Box component="form" noValidate onSubmit={handleChangePasswordSubmit}>
           <DialogTitle sx={{ fontWeight: 700 }}>Đổi mật khẩu</DialogTitle>
@@ -1089,13 +1191,13 @@ export default function UserProfile() {
             <Button
               type="submit"
               variant="contained"
-              startIcon={
-                changingPassword ? (
-                  <CircularProgress size={18} thickness={4} />
-                ) : (
-                  <SaveRoundedIcon />
-                )
-              }
+              // startIcon={
+              //   changingPassword ? (
+              //     <CircularProgress size={18} thickness={4} />
+              //   ) : (
+              //     <SaveRoundedIcon />
+              //   )
+              // }
               disabled={changingPassword}
               sx={{
                 textTransform: "none",
@@ -1104,7 +1206,7 @@ export default function UserProfile() {
                 px: 3,
               }}
             >
-              Lưu mật khẩu
+              Đổi mật khẩu
             </Button>
           </DialogActions>
         </Box>
