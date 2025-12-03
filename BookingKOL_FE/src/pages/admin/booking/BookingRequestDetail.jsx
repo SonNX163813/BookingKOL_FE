@@ -1,5 +1,5 @@
 ﻿// src/pages/admin/booking/BookingRequestDetail.jsx
-import { useMemo } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -17,6 +17,10 @@ import {
   Tag,
   Typography,
   Tooltip,
+  Modal,
+  Select,
+  Popconfirm,
+  message,
 } from "antd";
 import {
   ArrowLeft,
@@ -24,7 +28,16 @@ import {
   FileText,
   Layers,
   UserCircle2,
+  Eye,
+  Check,
+  RefreshCcw,
+  Users,
 } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
+
+import { get, patch, post } from "../../../config/axios-config";
+import { API_PATHS } from "../../../constants/apiPath";
+
 import { useGetBookingRequestDetail } from "../../../hook/admin/booking/useGetBookingRequestDetail";
 import {
   BOOKING_STATUS_LABEL,
@@ -34,8 +47,17 @@ import {
 } from "../../../constants/mySingleBookingStatuses";
 import { useGetWorktimeLivestreamMetrics } from "../../../hook/admin/booking/useGetWorktimeLivestreamMetrics";
 
-const { Title, Text, Paragraph } = Typography;
+// ✅ update status booking request
+import { adminUpdateSingleBookingRequestStatus } from "../../../services/admin/AdminUpdateSingleBookingRequestStatusAPI";
+
+const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
+
+/** ✅ 2 option fix cứng (bắt buộc chọn) */
+const ADMIN_NOTE_OPTIONS = [
+  { value: "Đơn hàng đã thay đổi KOL", label: "Đơn hàng đã thay đổi KOL" },
+  { value: "Đơn hàng của bạn đã bị hủy", label: "Đơn hàng của bạn đã bị hủy" },
+];
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
@@ -50,10 +72,8 @@ const formatBoolean = (value) => {
 
 const formatCurrency = (value, currency = "VND") => {
   if (value === null || value === undefined || value === "") return "--";
-
   const numeric = typeof value === "number" ? value : Number.parseFloat(value);
   if (Number.isNaN(numeric)) return "--";
-
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency,
@@ -70,22 +90,17 @@ const formatArrayOrValue = (value) => {
   return String(value);
 };
 
-const renderMessage = (message) => {
-  if (!message) return null;
-
-  if (Array.isArray(message)) {
-    return message.map((item, index) => (
-      <Paragraph key={index} className="mb-1">
-        - {String(item)}
-      </Paragraph>
-    ));
-  }
-
-  return <Paragraph>{String(message)}</Paragraph>;
-};
-
 const normalizeFileType = (fileType) =>
   fileType && typeof fileType === "string" ? fileType.toUpperCase() : "";
+
+const renderDateTimeCell = (value) => {
+  if (!value) return "--";
+  return (
+    <div className="min-w-[170px] whitespace-nowrap text-[14px] font-medium leading-6">
+      {formatDateTime(value, "DD/MM/YYYY HH:mm")}
+    </div>
+  );
+};
 
 /** Cắt chuỗi + tooltip */
 const renderEllipsisText = (text, maxLength = 42) => {
@@ -104,10 +119,7 @@ const renderEllipsisText = (text, maxLength = 42) => {
 
 const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
   if (!fileUrl) return "--";
-
   const normalizedType = normalizeFileType(fileType);
-
-  // ưu tiên tên file để hiển thị
   const displayText = fileName || fileUrl;
 
   if (normalizedType === "IMAGE") {
@@ -154,7 +166,6 @@ const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
 
 const renderImageField = (fileUrl, label) => {
   if (!fileUrl) return "--";
-
   return (
     <Space direction="vertical" size={8}>
       <Image
@@ -191,9 +202,6 @@ const formatLivestreamMetricValue = (key, value) => {
   if (value === null || value === undefined || value === "") return "--";
   if (key === "revenue" || key === "avgOrderValue")
     return formatCurrency(value);
-  if (key === "isConfirmed") return formatBoolean(value);
-  if (key === "createdAt" || key === "confirmedAt")
-    return formatDateTime(value);
   return value;
 };
 
@@ -224,10 +232,185 @@ const hasMeaningfulValue = (v) => {
   return true;
 };
 
+/** ✅ Cancel status -> VI + màu */
+const CANCEL_STATUS_META = {
+  PENDING: { label: "Chờ duyệt", color: "gold" },
+  APPROVED: { label: "Đã duyệt", color: "green" },
+  REJECT: { label: "Từ chối", color: "red" },
+  REJECTED: { label: "Từ chối", color: "red" },
+};
+
+/** ✅ Helper: lấy message BE dễ đọc */
+function extractErrorMessage(err) {
+  const raw =
+    err?.response?.data?.message || err?.response?.data?.error || err?.message;
+  if (!raw) return "Có lỗi xảy ra.";
+  return Array.isArray(raw) ? raw.join(" | ") : String(raw);
+}
+
+/** ✅ GET /v1/requests/cancel/detail/{workTimeId}
+ *  - không có yêu cầu hủy -> return null (để ẩn UI, không toast)
+ */
+async function fetchCancelDetailByWorkTimeId(workTimeId, { signal } = {}) {
+  if (!workTimeId) return null;
+
+  try {
+    const res = await get({
+      url: `/v1/requests/cancel/detail/${encodeURIComponent(workTimeId)}`,
+      config: signal ? { signal } : undefined,
+      skipToast: true,
+    });
+
+    return res?.data?.data ?? res?.data ?? null;
+  } catch (err) {
+    const status = err?.response?.status;
+    const rawMessage =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      err?.message;
+
+    const msg = Array.isArray(rawMessage)
+      ? rawMessage.join(" | ")
+      : String(rawMessage || "");
+
+    const isNoCancel =
+      status === 404 ||
+      (status === 400 &&
+        /không\s*tìm\s*thấy\s+yêu\s*cầu\s+hủy|không\s*tìm\s*thấy\s+yêu\s*cầu\s*hủy\s*ca/i.test(
+          msg.toLowerCase()
+        ));
+
+    if (isNoCancel) return null;
+    throw err;
+  }
+}
+
+/** ✅ POST /v1/requests/admin/approve/{requestId}?adminNote=...
+ *  requestId = cancelRequest.id (id trong cancel detail)
+ */
+async function adminApproveCancelRequest(
+  { requestId, adminNote },
+  { signal } = {}
+) {
+  if (!requestId) throw new Error("requestId is required");
+
+  const note = String(adminNote || "").trim();
+  const base = `/v1/requests/admin/approve/${encodeURIComponent(requestId)}`;
+  const url = `${base}?adminNote=${encodeURIComponent(note)}`;
+
+  const res = await post({
+    url,
+    data: null,
+    config: signal ? { signal, silent: true } : { silent: true },
+    skipToast: true,
+  });
+
+  return res?.data ?? null;
+}
+
+/** ✅ GET /v1/availabilities/time-line/kol/all?page=&size=&startDate=&endDate=
+ *  => query RỘNG (vì BE filter kiểu "slot nằm trọn trong range") rồi FE filter cover
+ */
+async function fetchKolTimelineAll(
+  { page = 0, size = 300, startDate, endDate },
+  { signal } = {}
+) {
+  const base =
+    API_PATHS?.SCHEDULER_ADMIN?.kolTimelineAll ||
+    "/v1/availabilities/time-line/kol/all";
+
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("size", String(size));
+  params.set("startDate", String(startDate));
+  params.set("endDate", String(endDate));
+
+  const url = `${base}?${params.toString()}`;
+
+  const res = await get({
+    url,
+    config: signal ? { signal, silent: true } : { silent: true },
+    skipToast: true,
+  });
+
+  const payload = res?.data ?? null;
+  const data = payload?.data ?? payload ?? null;
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  if (Array.isArray(payload?.content)) return payload.content;
+
+  return [];
+}
+
+/** ✅ FE filter: slot phải BAO TRÙM ca của đơn */
+function filterAvailabilityCoverWorktime(list, workStartISO, workEndISO) {
+  const wStart = dayjs(workStartISO).valueOf();
+  const wEnd = dayjs(workEndISO).valueOf();
+
+  return (list || []).filter((a) => {
+    const st = String(a?.status || "").toUpperCase();
+    if (st !== "AVAILABLE") return false;
+
+    const aStart = dayjs(a?.startAt).valueOf();
+    const aEnd = dayjs(a?.endAt).valueOf();
+    if (!Number.isFinite(aStart) || !Number.isFinite(aEnd)) return false;
+
+    return aStart <= wStart && aEnd >= wEnd;
+  });
+}
+
+/** ✅ PATCH /v1/admin/booking/single-requests/change-kol
+ *  Query: bookingRequestId, kolId, kolAvailabilityId
+ */
+async function adminChangeKolSingleRequest(
+  { bookingRequestId, kolId, kolAvailabilityId },
+  { signal } = {}
+) {
+  if (!bookingRequestId) throw new Error("bookingRequestId is required");
+  if (!kolId) throw new Error("kolId is required");
+  if (!kolAvailabilityId) throw new Error("kolAvailabilityId is required");
+
+  const base =
+    API_PATHS?.BOOKING_REQUEST?.changeKol ||
+    "/v1/admin/booking/single-requests/change-kol";
+
+  const url =
+    `${base}` +
+    `?bookingRequestId=${encodeURIComponent(bookingRequestId)}` +
+    `&kolId=${encodeURIComponent(kolId)}` +
+    `&kolAvailabilityId=${encodeURIComponent(kolAvailabilityId)}`;
+
+  const res = await patch({
+    url,
+    data: null,
+    config: signal ? { signal, silent: true } : { silent: true },
+    skipToast: true,
+  });
+
+  return res?.data ?? null;
+}
+
 const BookingRequestDetail = () => {
   const { requestId } = useParams();
   const navigate = useNavigate();
   const screens = useBreakpoint();
+
+  const [openCancelModal, setOpenCancelModal] = useState(false);
+  const [selectedCancelWorktimeId, setSelectedCancelWorktimeId] =
+    useState(null);
+
+  // ✅ dropdown note (bắt buộc)
+  const [adminNoteDraft, setAdminNoteDraft] = useState("");
+  const [noteError, setNoteError] = useState(false);
+
+  // ✅ đổi KOL theo availabilityId
+  const [openChangeKolModal, setOpenChangeKolModal] = useState(false);
+  const [kolOptions, setKolOptions] = useState([]);
+  const [loadingKols, setLoadingKols] = useState(false);
+  const [selectedAvailabilityId, setSelectedAvailabilityId] = useState(null);
+
+  const [actionLoading, setActionLoading] = useState(false);
 
   const {
     isLoadingBookingRequestDetail,
@@ -240,15 +423,13 @@ const BookingRequestDetail = () => {
   const detail = bookingRequestDetailResponse?.data ?? null;
   const responseTimestamp = bookingRequestDetailResponse?.timestamp ?? null;
 
-  const worktimeIds = useMemo(
-    () =>
-      Array.isArray(detail?.kolWorkTimes)
-        ? detail.kolWorkTimes
-            .map((worktime) => worktime?.id)
-            .filter((id) => id !== null && id !== undefined)
-        : [],
-    [detail?.kolWorkTimes]
-  );
+  const worktimeIds = useMemo(() => {
+    return Array.isArray(detail?.kolWorkTimes)
+      ? detail.kolWorkTimes
+          .map((worktime) => worktime?.id)
+          .filter((id) => id !== null && id !== undefined)
+      : [];
+  }, [detail?.kolWorkTimes]);
 
   const {
     worktimeLivestreamMetricsMap,
@@ -267,11 +448,156 @@ const BookingRequestDetail = () => {
     return queryMap;
   }, [resolvedWorktimeIds, worktimeLivestreamMetricQueries]);
 
+  /** ✅ Cancel detail queries */
+  const cancelDetailQueries = useQueries({
+    queries: worktimeIds.map((id) => ({
+      queryKey: ["admin-cancel-detail-by-worktime", id],
+      queryFn: ({ signal }) => fetchCancelDetailByWorkTimeId(id, { signal }),
+      enabled: !!id && worktimeIds.length > 0,
+      retry: false,
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+    })),
+  });
+
+  const cancelEntries = useMemo(() => {
+    return worktimeIds
+      .map((id, idx) => {
+        const q = cancelDetailQueries?.[idx];
+        return {
+          worktimeId: id,
+          cancel: q?.data ?? null,
+          isLoading: q?.isLoading || q?.isFetching,
+          refetch: q?.refetch,
+        };
+      })
+      .filter((x) => !!x.cancel);
+  }, [worktimeIds, cancelDetailQueries]);
+
+  const isCheckingCancel = useMemo(() => {
+    return (
+      cancelDetailQueries?.some((q) => q?.isLoading || q?.isFetching) ?? false
+    );
+  }, [cancelDetailQueries]);
+
+  const hasCancelRequest = cancelEntries.length > 0;
+
+  const isNoteValid = useMemo(() => {
+    const v = String(adminNoteDraft || "").trim();
+    return ADMIN_NOTE_OPTIONS.some((x) => x.value === v);
+  }, [adminNoteDraft]);
+
+  /** chọn cancel đầu tiên để hiển thị trong modal */
+  useEffect(() => {
+    if (!hasCancelRequest) return;
+    if (!selectedCancelWorktimeId) {
+      setSelectedCancelWorktimeId(cancelEntries[0].worktimeId);
+
+      const note = cancelEntries[0]?.cancel?.adminNote ?? "";
+      const ok = ADMIN_NOTE_OPTIONS.some((x) => x.value === note);
+      setAdminNoteDraft(ok ? note : "");
+    }
+  }, [hasCancelRequest, cancelEntries, selectedCancelWorktimeId]);
+
+  const selectedCancelEntry = useMemo(() => {
+    if (!selectedCancelWorktimeId) return null;
+    return (
+      cancelEntries.find((x) => x.worktimeId === selectedCancelWorktimeId) ||
+      null
+    );
+  }, [cancelEntries, selectedCancelWorktimeId]);
+
+  const selectedWorktime = useMemo(() => {
+    const wtId = selectedCancelEntry?.worktimeId;
+    if (!wtId) return null;
+    return detail?.kolWorkTimes?.find((w) => w?.id === wtId) || null;
+  }, [detail?.kolWorkTimes, selectedCancelEntry?.worktimeId]);
+
+  /** ✅ NEW: nếu cancel đã APPROVED thì disable/ẩn thao tác */
+  const selectedCancelStatus = useMemo(
+    () => normalizeStatus(selectedCancelEntry?.cancel?.status),
+    [selectedCancelEntry?.cancel?.status]
+  );
+  const isCancelApproved = selectedCancelStatus === "APPROVED";
+
+  /** ✅ Load danh sách availability phù hợp khi mở modal đổi KOL */
+  useEffect(() => {
+    let alive = true;
+
+    const run = async () => {
+      if (!openChangeKolModal) return;
+      if (isCancelApproved) return; // ✅ đã duyệt thì khỏi load
+
+      try {
+        setLoadingKols(true);
+
+        const wt = selectedWorktime;
+        if (!wt?.startAt || !wt?.endAt) {
+          setKolOptions([]);
+          return;
+        }
+
+        // ✅ query RỘNG để chắc chắn slot dài (15-17) vẫn ra khi ca (15-16)
+        const startDate = dayjs(wt.startAt).subtract(12, "hour").toISOString();
+        const endDate = dayjs(wt.endAt).add(12, "hour").toISOString();
+
+        const raw = await fetchKolTimelineAll(
+          { page: 0, size: 300, startDate, endDate },
+          {}
+        );
+
+        // ✅ filter cover đúng ca
+        let candidates = filterAvailabilityCoverWorktime(
+          raw,
+          wt.startAt,
+          wt.endAt
+        );
+
+        // ✅ (tuỳ chọn) loại KOL hiện tại
+        const currentKolId = detail?.kol?.id;
+        if (currentKolId) {
+          candidates = candidates.filter((a) => a?.kolId !== currentKolId);
+        }
+
+        const options = candidates.map((a) => ({
+          value: a.id, // ✅ kolAvailabilityId
+          label: `${a.kolName || a.kolId || "KOL"} • ${dayjs(a.startAt).format(
+            "HH:mm"
+          )}-${dayjs(a.endAt).format("HH:mm")}`,
+          kolId: a.kolId,
+          startAt: a.startAt,
+          endAt: a.endAt,
+        }));
+
+        if (!alive) return;
+        setKolOptions(options);
+      } catch (e) {
+        if (!alive) return;
+        message.error(`Không thể tải lịch KOL: ${extractErrorMessage(e)}`);
+        setKolOptions([]);
+      } finally {
+        if (alive) setLoadingKols(false);
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [
+    openChangeKolModal,
+    selectedWorktime?.startAt,
+    selectedWorktime?.endAt,
+    detail?.kol?.id,
+    isCancelApproved,
+  ]);
+
   const normalizedStatus = normalizeStatus(detail?.status);
   const statusLabel =
     BOOKING_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
 
-  // ✅ Tệp đính kèm: đổi ID -> STT + ellipsis cho tên/link
   const attachedFileColumns = useMemo(
     () => [
       {
@@ -286,7 +612,6 @@ const BookingRequestDetail = () => {
         key: "fileName",
         render: (_v, record) => {
           const name = record?.file?.fileName ?? record?.fileName;
-          // nếu không có name thì thử lấy từ url
           const url = record?.file?.fileUrl ?? record?.fileUrl;
           const fallback = url ? getFileNameFromUrl(url) : "";
           return renderEllipsisText(name || fallback || "--", 50);
@@ -320,6 +645,265 @@ const BookingRequestDetail = () => {
     []
   );
 
+  const openCancelPopup = useCallback(() => {
+    if (!hasCancelRequest) return;
+    setOpenCancelModal(true);
+    setNoteError(false);
+    setSelectedAvailabilityId(null); // reset selection đổi KOL
+
+    const first =
+      selectedCancelEntry?.cancel || cancelEntries?.[0]?.cancel || null;
+
+    const note = first?.adminNote ?? "";
+    const ok = ADMIN_NOTE_OPTIONS.some((x) => x.value === note);
+    setAdminNoteDraft(ok ? note : "");
+  }, [hasCancelRequest, selectedCancelEntry?.cancel, cancelEntries]);
+
+  /** ✅ Approve cancel -> notify + update booking status CANCELLED */
+  const handleApproveCancel = useCallback(async () => {
+    const entry = selectedCancelEntry;
+    if (!entry?.cancel) return;
+
+    if (normalizeStatus(entry?.cancel?.status) === "APPROVED") {
+      message.info("Yêu cầu đã được duyệt trước đó.");
+      return;
+    }
+
+    if (!isNoteValid) {
+      setNoteError(true);
+      message.warning("Vui lòng chọn ghi chú (bắt buộc).");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // 1) notify KOL (approve + note)
+      await adminApproveCancelRequest({
+        requestId: entry.cancel.id,
+        adminNote: adminNoteDraft,
+      });
+
+      // 2) update booking status => CANCELLED
+      await adminUpdateSingleBookingRequestStatus({
+        bookingRequestId: detail?.id ?? requestId,
+        status: "CANCELLED",
+      });
+
+      message.success(
+        "Đã chấp nhận yêu cầu hủy và cập nhật trạng thái đơn hàng."
+      );
+
+      await Promise.allSettled([
+        refetchBookingRequestDetail?.(),
+        entry?.refetch?.(),
+      ]);
+      setOpenCancelModal(false);
+    } catch (e) {
+      message.error(`Không thể chấp nhận huỷ: ${extractErrorMessage(e)}`);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    selectedCancelEntry,
+    isNoteValid,
+    adminNoteDraft,
+    detail?.id,
+    requestId,
+    refetchBookingRequestDetail,
+  ]);
+
+  const handleOpenChangeKol = useCallback(() => {
+    if (isCancelApproved) {
+      message.info("Yêu cầu đã duyệt, không thể đổi KOL.");
+      return;
+    }
+    if (!isNoteValid) {
+      setNoteError(true);
+      message.warning("Vui lòng chọn ghi chú (bắt buộc) trước khi đổi KOL.");
+      return;
+    }
+    setSelectedAvailabilityId(null);
+    setOpenChangeKolModal(true);
+  }, [isNoteValid, isCancelApproved]);
+
+  /** ✅ Submit đổi KOL: notify (approve + note) + PATCH change-kol */
+  const handleSubmitChangeKol = useCallback(async () => {
+    const entry = selectedCancelEntry;
+    if (!entry?.cancel) return;
+
+    if (normalizeStatus(entry?.cancel?.status) === "APPROVED") {
+      message.info("Yêu cầu đã duyệt, không thể đổi KOL.");
+      return;
+    }
+
+    if (!isNoteValid) {
+      setNoteError(true);
+      message.warning("Vui lòng chọn ghi chú (bắt buộc).");
+      return;
+    }
+
+    if (!selectedAvailabilityId) {
+      message.warning("Vui lòng chọn KOL có lịch phù hợp.");
+      return;
+    }
+
+    const picked = kolOptions.find((o) => o.value === selectedAvailabilityId);
+    if (!picked?.kolId) {
+      message.error("Không xác định được kolId từ availability đã chọn.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // 1) notify KOL (approve + note) để KOL biết admin đã xử lý
+      await adminApproveCancelRequest({
+        requestId: entry.cancel.id,
+        adminNote: adminNoteDraft,
+      });
+
+      // 2) đổi KOL theo API mới
+      await adminChangeKolSingleRequest({
+        bookingRequestId: detail?.id ?? requestId,
+        kolId: picked.kolId,
+        kolAvailabilityId: selectedAvailabilityId,
+      });
+
+      message.success("Đã đổi KOL cho đơn hàng.");
+
+      await Promise.allSettled([
+        refetchBookingRequestDetail?.(),
+        entry?.refetch?.(),
+      ]);
+      setOpenChangeKolModal(false);
+      setOpenCancelModal(false);
+    } catch (e) {
+      message.error(`Không thể đổi KOL: ${extractErrorMessage(e)}`);
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    selectedCancelEntry,
+    isNoteValid,
+    adminNoteDraft,
+    selectedAvailabilityId,
+    kolOptions,
+    detail?.id,
+    requestId,
+    refetchBookingRequestDetail,
+  ]);
+
+  // ✅ NEW: nếu có >= 2 ca thì ẩn ca có status CANCELLED (chỉ áp dụng ở phần livestream)
+  const worktimesForMetrics = useMemo(() => {
+    const list = Array.isArray(detail?.kolWorkTimes) ? detail.kolWorkTimes : [];
+    if (list.length <= 1) return list;
+    return list.filter((wt) => normalizeStatus(wt?.status) !== "CANCELLED");
+  }, [detail?.kolWorkTimes]);
+
+  // ✅ NEW: build card list metrics; nếu ca không có data => return null; nếu tất cả null => hide cả block metrics
+  const livestreamWorktimeCards = useMemo(() => {
+    const list = worktimesForMetrics || [];
+    if (!Array.isArray(list) || list.length === 0) return [];
+
+    return list
+      .map((worktime, index) => {
+        const worktimeId = worktime?.id;
+        if (!worktimeId) return null;
+
+        const metrics = worktimeLivestreamMetricsMap.get(worktimeId) ?? null;
+        const queryState = worktimeMetricsQueryMap.get(worktimeId) ?? null;
+
+        const isMetricsLoading =
+          queryState?.isPending ||
+          queryState?.isFetching ||
+          queryState?.isLoading;
+
+        if (isMetricsLoading) {
+          return (
+            <Card
+              key={worktimeId}
+              className="mb-4 last:mb-0"
+              type="inner"
+              title={`Ca làm việc ${index + 1}`}
+            >
+              <Skeleton active paragraph={{ rows: 6 }} />
+            </Card>
+          );
+        }
+
+        const metricsError = queryState?.error;
+
+        if (metricsError) {
+          const rawMessage = metricsError?.response?.data?.message;
+          const statusCode = metricsError?.response?.status;
+
+          const messageText = Array.isArray(rawMessage)
+            ? rawMessage.filter(Boolean).join(" | ")
+            : rawMessage ?? metricsError?.message ?? "";
+
+          const isNoMetricsError =
+            !!metricsError &&
+            statusCode === 400 &&
+            /không tìm thấy\s+livestream\s+metric/i.test(String(messageText));
+
+          // ✅ không có data => ẩn luôn card
+          if (isNoMetricsError) return null;
+
+          return (
+            <Card
+              key={worktimeId}
+              className="mb-4 last:mb-0"
+              type="inner"
+              title={`Ca làm việc ${index + 1}`}
+            >
+              <Alert
+                type="error"
+                showIcon
+                message="Không thể tải thống kê livestream."
+                description={messageText ? String(messageText) : undefined}
+              />
+            </Card>
+          );
+        }
+
+        // ✅ metrics null/empty => ẩn luôn card
+        if (!metrics || !hasAnyLivestreamMetricValue(metrics)) return null;
+
+        return (
+          <Card
+            key={worktimeId}
+            className="mb-4 last:mb-0"
+            type="inner"
+            title={`Ca làm việc ${index + 1}`}
+          >
+            <Divider />
+            <Title level={5} className="!mb-2">
+              Thống kê chi tiết
+            </Title>
+
+            <Descriptions
+              bordered
+              size="middle"
+              column={screens.lg ? 3 : screens.md ? 2 : 1}
+              labelStyle={{ width: 200 }}
+            >
+              {LIVESTREAM_METRIC_LABELS.map(({ key, label }) => (
+                <Descriptions.Item key={key} label={label}>
+                  {formatLivestreamMetricValue(key, metrics?.[key])}
+                </Descriptions.Item>
+              ))}
+            </Descriptions>
+          </Card>
+        );
+      })
+      .filter(Boolean);
+  }, [
+    worktimesForMetrics,
+    worktimeLivestreamMetricsMap,
+    worktimeMetricsQueryMap,
+    screens.lg,
+    screens.md,
+  ]);
+
   return (
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -330,6 +914,7 @@ const BookingRequestDetail = () => {
           >
             Quay lại danh sách
           </Button>
+
           <Button
             icon={<CalendarRange size={16} />}
             onClick={() => refetchBookingRequestDetail()}
@@ -337,6 +922,17 @@ const BookingRequestDetail = () => {
           >
             Làm mới
           </Button>
+
+          {hasCancelRequest && (
+            <Button
+              icon={<Eye size={16} />}
+              onClick={openCancelPopup}
+              className="!bg-amber-600 !text-white !border-none hover:!bg-amber-700"
+              loading={isCheckingCancel}
+            >
+              Xem yêu cầu hủy đơn hàng
+            </Button>
+          )}
         </Space>
 
         <div className="text-right">
@@ -514,11 +1110,9 @@ const BookingRequestDetail = () => {
                   {detail?.kol?.experience ?? "--"}
                 </Text>
               </Descriptions.Item>
-
               <Descriptions.Item label="Thành phố">
                 {detail?.kol?.city ?? "--"}
               </Descriptions.Item>
-
               <Descriptions.Item label="Giá đặt tối thiểu">
                 {formatCurrency(detail?.kol?.minBookingPrice)}
               </Descriptions.Item>
@@ -534,7 +1128,7 @@ const BookingRequestDetail = () => {
             </Descriptions>
           </Card>
 
-          {/* ✅ Hợp đồng & Thanh toán (ẩn các field nếu null) */}
+          {/* --- Hợp đồng & Thanh toán --- */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -633,7 +1227,6 @@ const BookingRequestDetail = () => {
                       <Descriptions.Item label="Tổng tiền">
                         {formatCurrency(contract?.paymentDTO?.totalAmount)}
                       </Descriptions.Item>
-
                       <Descriptions.Item label="Đã thanh toán">
                         {formatCurrency(contract?.paymentDTO?.paidAmount)}
                       </Descriptions.Item>
@@ -688,99 +1281,21 @@ const BookingRequestDetail = () => {
           </Card>
 
           {/* --- Livestream Metrics --- */}
-          <Card
-            className="shadow-sm"
-            bordered={false}
-            title={
-              <Space>
-                <Layers size={18} />
-                <span>Thống kê Livestream</span>
-              </Space>
-            }
-          >
-            {detail?.kolWorkTimes && detail.kolWorkTimes.length > 0 ? (
-              detail.kolWorkTimes.map((worktime, index) => {
-                const worktimeId = worktime?.id;
-
-                const metrics = worktimeId
-                  ? worktimeLivestreamMetricsMap.get(worktimeId)
-                  : null;
-
-                const queryState = worktimeId
-                  ? worktimeMetricsQueryMap.get(worktimeId)
-                  : null;
-
-                const isMetricsLoading =
-                  queryState?.isPending || queryState?.isFetching;
-
-                const metricsError = queryState?.error;
-
-                const rawMessage = metricsError?.response?.data?.message;
-                const statusCode = metricsError?.response?.status;
-
-                const messageText = Array.isArray(rawMessage)
-                  ? rawMessage.filter(Boolean).join(" | ")
-                  : rawMessage ?? metricsError?.message ?? "";
-
-                const isNoMetricsError =
-                  !!metricsError &&
-                  statusCode === 400 &&
-                  /không tìm thấy\s+livestream\s+metric/i.test(
-                    String(messageText)
-                  );
-
-                const shouldShowEmptyForNoData =
-                  !metrics || !hasAnyLivestreamMetricValue(metrics);
-
-                return (
-                  <Card
-                    key={worktimeId ?? index}
-                    className="mb-4 last:mb-0"
-                    type="inner"
-                    title={`Ca làm việc ${index + 1}`}
-                  >
-                    <Divider />
-                    <Title level={5} className="!mb-2">
-                      Thống kê chi tiết
-                    </Title>
-
-                    {isMetricsLoading ? (
-                      <Skeleton active paragraph={{ rows: 6 }} />
-                    ) : metricsError && !isNoMetricsError ? (
-                      <Alert
-                        type="error"
-                        showIcon
-                        message="Không thể tải thống kê livestream."
-                        description={
-                          messageText ? String(messageText) : undefined
-                        }
-                      />
-                    ) : isNoMetricsError || shouldShowEmptyForNoData ? (
-                      <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description="Không có dữ liệu"
-                      />
-                    ) : (
-                      <Descriptions
-                        bordered
-                        size="middle"
-                        column={screens.lg ? 3 : screens.md ? 2 : 1}
-                        labelStyle={{ width: 200 }}
-                      >
-                        {LIVESTREAM_METRIC_LABELS.map(({ key, label }) => (
-                          <Descriptions.Item key={key} label={label}>
-                            {formatLivestreamMetricValue(key, metrics?.[key])}
-                          </Descriptions.Item>
-                        ))}
-                      </Descriptions>
-                    )}
-                  </Card>
-                );
-              })
-            ) : (
-              <Empty description="Không có phiên làm việc" />
-            )}
-          </Card>
+          {/* ✅ Nếu không có card nào có data -> render null luôn (không hiện Ca làm việc 1 + không hiện Empty) */}
+          {livestreamWorktimeCards.length > 0 ? (
+            <Card
+              className="shadow-sm"
+              bordered={false}
+              title={
+                <Space>
+                  <Layers size={18} />
+                  <span>Thống kê Livestream</span>
+                </Space>
+              }
+            >
+              {livestreamWorktimeCards}
+            </Card>
+          ) : null}
 
           {/* --- Tệp đính kèm --- */}
           <Card
@@ -797,7 +1312,6 @@ const BookingRequestDetail = () => {
               <Table
                 columns={attachedFileColumns}
                 dataSource={detail.attachedFiles}
-                // ✅ rowKey vẫn dùng id (ẩn khỏi UI), fallback tránh lỗi nếu thiếu id
                 rowKey={(record, idx) => record?.id ?? `file-${idx}`}
                 pagination={false}
                 scroll={{ x: 720 }}
@@ -808,6 +1322,292 @@ const BookingRequestDetail = () => {
           </Card>
         </Skeleton>
       )}
+
+      {/* ✅ Modal xem yêu cầu hủy */}
+      <Modal
+        open={openCancelModal}
+        onCancel={() => setOpenCancelModal(false)}
+        title="Yêu cầu hủy đơn hàng"
+        footer={null}
+        width={900}
+        destroyOnClose
+      >
+        {!selectedCancelEntry?.cancel ? (
+          <Empty description="Không có dữ liệu yêu cầu hủy" />
+        ) : (
+          <>
+            {cancelEntries.length > 1 && (
+              <div className="mb-3">
+                <Text strong>Chọn yêu cầu:</Text>
+                <Select
+                  className="w-full mt-2"
+                  value={selectedCancelWorktimeId}
+                  onChange={(v) => {
+                    setSelectedCancelWorktimeId(v);
+                    setSelectedAvailabilityId(null);
+                    setNoteError(false);
+
+                    const found = cancelEntries.find((x) => x.worktimeId === v);
+                    const note = found?.cancel?.adminNote ?? "";
+                    const ok = ADMIN_NOTE_OPTIONS.some((x) => x.value === note);
+                    setAdminNoteDraft(ok ? note : "");
+                  }}
+                  options={cancelEntries.map((x, idx) => ({
+                    value: x.worktimeId,
+                    label: `Yêu cầu #${idx + 1} - ${
+                      x?.cancel?.kolFullName || "KOL"
+                    }`,
+                  }))}
+                />
+              </div>
+            )}
+
+            <Card
+              bordered={false}
+              className="shadow-sm"
+              title={
+                <Space>
+                  {selectedCancelEntry?.cancel?.kolAvatar ? (
+                    <Image
+                      src={selectedCancelEntry.cancel.kolAvatar}
+                      width={40}
+                      height={40}
+                      style={{ borderRadius: 999, objectFit: "cover" }}
+                      preview={false}
+                    />
+                  ) : null}
+                  <div className="flex flex-col">
+                    <Text strong>
+                      {selectedCancelEntry?.cancel?.kolFullName || "KOL"}
+                    </Text>
+                    {(() => {
+                      const st = normalizeStatus(
+                        selectedCancelEntry?.cancel?.status
+                      );
+                      const meta = CANCEL_STATUS_META[st] || {
+                        label: st ?? "--",
+                        color: "default",
+                      };
+                      return (
+                        <Tag color={meta.color} style={{ marginRight: 0 }}>
+                          {meta.label}
+                        </Tag>
+                      );
+                    })()}
+                  </div>
+                </Space>
+              }
+              extra={
+                <Space>
+                  <Button
+                    icon={<RefreshCcw size={16} />}
+                    onClick={() => selectedCancelEntry?.refetch?.()}
+                    loading={selectedCancelEntry?.isLoading}
+                  >
+                    Làm mới
+                  </Button>
+                </Space>
+              }
+            >
+              {/* ✅ Block 1: reason + created/approved */}
+              <Descriptions
+                bordered
+                size="middle"
+                column={screens.lg ? 3 : screens.md ? 2 : 1}
+                labelStyle={{ width: 180 }}
+              >
+                <Descriptions.Item
+                  label="Lý do"
+                  span={screens.lg ? 3 : screens.md ? 2 : 1}
+                >
+                  <div className="whitespace-pre-wrap break-words">
+                    {selectedCancelEntry?.cancel?.reason || "--"}
+                  </div>
+                </Descriptions.Item>
+
+                <Descriptions.Item label="Tạo lúc">
+                  {renderDateTimeCell(selectedCancelEntry?.cancel?.createdAt)}
+                </Descriptions.Item>
+
+                {hasMeaningfulValue(
+                  selectedCancelEntry?.cancel?.approvedAt
+                ) && (
+                  <Descriptions.Item label="Duyệt lúc">
+                    {renderDateTimeCell(
+                      selectedCancelEntry?.cancel?.approvedAt
+                    )}
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+
+              {/* ✅ Block 2: adminNote luôn là "riêng 1 hàng" (column=1) */}
+              {hasMeaningfulValue(selectedCancelEntry?.cancel?.adminNote) && (
+                <div className="mt-3">
+                  <Descriptions
+                    bordered
+                    size="middle"
+                    column={1}
+                    labelStyle={{ width: 180 }}
+                  >
+                    <Descriptions.Item label="Ghi chú admin">
+                      <div className="whitespace-pre-wrap break-words">
+                        {String(selectedCancelEntry?.cancel?.adminNote)}
+                      </div>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </div>
+              )}
+
+              {/* ✅ Nếu APPROVED: không cho chọn ghi chú nữa */}
+              {!isCancelApproved && (
+                <>
+                  <Divider />
+
+                  {/* ✅ Ghi chú bắt buộc */}
+                  <div>
+                    <Text strong>
+                      Ghi chú admin <Text type="danger">*</Text>
+                    </Text>
+                    <Select
+                      className="w-full mt-2"
+                      value={adminNoteDraft || undefined}
+                      onChange={(v) => {
+                        setAdminNoteDraft(v);
+                        setNoteError(false);
+                      }}
+                      placeholder="Chọn ghi chú (bắt buộc)"
+                      options={ADMIN_NOTE_OPTIONS}
+                      status={noteError ? "error" : undefined}
+                    />
+                    {noteError && (
+                      <div className="mt-1">
+                        <Text type="danger">
+                          Vui lòng chọn ghi chú trước khi thực hiện thao tác.
+                        </Text>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <Divider />
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button onClick={() => setOpenCancelModal(false)}>Đóng</Button>
+
+                {/* ✅ Nếu APPROVED: ẩn 2 nút thao tác */}
+                {!isCancelApproved && (
+                  <>
+                    <Button
+                      icon={<Users size={16} />}
+                      className="!bg-amber-600 !text-white !border-none hover:!bg-amber-700"
+                      onClick={handleOpenChangeKol}
+                      disabled={actionLoading}
+                    >
+                      Đổi KOL cho đơn hàng
+                    </Button>
+
+                    <Popconfirm
+                      title="Bạn chắc chắn muốn chấp nhận hủy đơn hàng?"
+                      okText="Đồng ý"
+                      cancelText="Hủy"
+                      onConfirm={handleApproveCancel}
+                      okButtonProps={{
+                        loading: actionLoading,
+                        disabled: !isNoteValid,
+                      }}
+                    >
+                      <Button
+                        icon={<Check size={16} />}
+                        danger
+                        type="primary"
+                        loading={actionLoading}
+                        disabled={!isNoteValid}
+                        onClick={() => {
+                          if (!isNoteValid) setNoteError(true);
+                        }}
+                      >
+                        Chấp nhận hủy đơn hàng
+                      </Button>
+                    </Popconfirm>
+                  </>
+                )}
+              </div>
+
+              {/* ✅ Badge trạng thái nếu APPROVED */}
+              {isCancelApproved && (
+                <div className="mt-3">
+                  <Alert
+                    type="success"
+                    showIcon
+                    message="Yêu cầu đã được duyệt"
+                    description="Yêu cầu ở trạng thái APPROVED nên không thể chọn ghi chú hoặc thực hiện thao tác nữa."
+                  />
+                </div>
+              )}
+            </Card>
+          </>
+        )}
+      </Modal>
+
+      {/* ✅ Modal đổi KOL */}
+      <Modal
+        open={openChangeKolModal}
+        onCancel={() => setOpenChangeKolModal(false)}
+        title="Đổi KOL cho đơn hàng"
+        okText="Xác nhận đổi KOL"
+        cancelText="Hủy"
+        onOk={handleSubmitChangeKol}
+        okButtonProps={{
+          loading: actionLoading,
+          disabled: !selectedAvailabilityId || !isNoteValid,
+        }}
+        destroyOnClose
+      >
+        <div className="mb-2">
+          <Text type="secondary">
+            Chỉ hiển thị KOL có lịch <b>AVAILABLE</b> và <b>bao trùm</b> đúng ca
+            của đơn.
+          </Text>
+        </div>
+
+        {selectedWorktime?.startAt && selectedWorktime?.endAt && (
+          <div className="mb-3 text-sm">
+            <Text type="secondary">
+              Ca cần thay thế:{" "}
+              <b>
+                {dayjs(selectedWorktime.startAt).format("HH:mm")} -{" "}
+                {dayjs(selectedWorktime.endAt).format("HH:mm")} (
+                {dayjs(selectedWorktime.startAt).format("DD/MM/YYYY")})
+              </b>
+            </Text>
+          </div>
+        )}
+
+        <Select
+          showSearch
+          loading={loadingKols}
+          placeholder="Chọn KOL có lịch phù hợp"
+          className="w-full"
+          value={selectedAvailabilityId}
+          onChange={setSelectedAvailabilityId}
+          optionFilterProp="label"
+          options={kolOptions}
+          notFoundContent={
+            loadingKols ? "Đang tải..." : "Không có KOL nào phù hợp với ca này"
+          }
+          filterOption={(input, option) =>
+            String(option?.label || "")
+              .toLowerCase()
+              .includes(String(input).toLowerCase())
+          }
+        />
+
+        <div className="mt-3 text-xs text-gray-500">
+          API đổi KOL: <b>PATCH /v1/admin/booking/single-requests/change-kol</b>{" "}
+          (bookingRequestId, kolId, kolAvailabilityId)
+        </div>
+      </Modal>
     </div>
   );
 };
