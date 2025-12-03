@@ -60,6 +60,9 @@ export const API_PATHS = {
       `/v1/admin/requests/worktime/livestream-metrics/kol/${encodeURIComponent(
         kolId
       )}`,
+    getDetailByWorkTime: (workTimeId) =>
+      `/v1/requests/booking/detail/${encodeURIComponent(workTimeId)}`,
+    updateStatus: "/v1/admin/booking/single-requests/update-status",
   },
 
   CONTRACT_PAYMENT: {
@@ -114,5 +117,12 @@ export const API_PATHS = {
   },
   AUTH: {
     changePassword: "/auth/change-password",
+  },
+  CANCEL_ADMIN: {
+    // ✅ GET danh sách yêu cầu hủy
+    getAll: "/v1/requests/admin/cancel/all",
+    // (nếu sau này có detail)
+    detailByWorkTime: (workTimeId) =>
+      `/v1/requests/cancel/detail/${encodeURIComponent(workTimeId)}`,
   },
 };

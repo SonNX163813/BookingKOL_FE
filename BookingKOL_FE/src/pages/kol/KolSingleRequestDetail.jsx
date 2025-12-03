@@ -67,7 +67,7 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hoàn thành", value: "COMPLETED" },
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã thanh toán", value: "PAID" },
+  { label: "Đã chờ thực hiện", value: "PAID" },
 ];
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
@@ -82,6 +82,14 @@ const BOOKING_STATUS_MAP = BOOKING_STATUS_OPTIONS.reduce(
   (a, s) => ((a[s.value] = s.label), a),
   {}
 );
+
+/* ===== CANCEL STATUS META ===== */
+const CANCEL_STATUS_META = {
+  PENDING: { label: "Chờ duyệt", color: "gold" },
+  APPROVED: { label: "Đã duyệt", color: "green" },
+  REJECT: { label: "Từ chối", color: "red" },
+  REJECTED: { label: "Từ chối", color: "red" },
+};
 
 const formatDateTime = (v, p = "DD/MM/YYYY HH:mm") =>
   v ? dayjs(v).format(p) : "--";
@@ -206,9 +214,7 @@ async function getKolCancelRequestDetail(workTimeId, { signal } = {}) {
     },
   });
 
-  // ✅ 404 => coi như "chưa có yêu cầu hủy" -> return null và không hiển thị card
   if (res?.status === 404) return null;
-
   return res?.data ?? null;
 }
 
@@ -241,6 +247,10 @@ export default function KolSingleRequestDetail() {
   });
 
   const normalizedStatus = normalizeStatus(detail?.status);
+
+  // ✅ NEW: chỉ PAID mới được hiện button yêu cầu hủy
+  const canRequestCancel = normalizedStatus === "PAID";
+
   const canInputMetrics = normalizedStatus === "IN_PROGRESS";
   const requestNo = detail?.requestNumber ?? detail?.id ?? requestId ?? "--";
 
@@ -248,6 +258,10 @@ export default function KolSingleRequestDetail() {
   const kolId = detail?.kol?.id ?? "";
 
   const worktimes = extractWorktimes(detail);
+
+  // ✅ NEW: nếu có >= 2 worktime => ẩn nút yêu cầu hủy
+  const hasMultipleWorktimes = (worktimes?.length ?? 0) >= 2;
+
   const endedWorktime = worktimes.find(
     (w) =>
       normalizeStatus(w?.status) === "IN_PROGRESS" &&
@@ -286,7 +300,7 @@ export default function KolSingleRequestDetail() {
     retry: (count, err) => (isBadRequest(err) ? false : count < 1),
   });
 
-  /* GET cancel detail theo workTimeId (404 => null, không error, không toast) */
+  /* GET cancel detail theo workTimeId */
   const {
     data: cancelDetail,
     isLoading: isCancelDetailLoading,
@@ -300,7 +314,6 @@ export default function KolSingleRequestDetail() {
     retry: (count) => count < 1,
   });
 
-  // ✅ Hiện card cancel khi có data hoặc có lỗi thật (không phải 404)
   const showCancelCard = !!cancelDetail || !!cancelDetailError;
 
   /* POST metrics */
@@ -393,6 +406,9 @@ export default function KolSingleRequestDetail() {
     });
 
   const openCancelModal = () => {
+    if (!canRequestCancel) return; // ✅ chỉ PAID mới cho mở
+    if ((worktimes?.length ?? 0) >= 2) return; // ✅ có 2 id thì không cho mở
+
     if (!kolId) return message.error("Không tìm thấy thông tin KOL (kolId).");
     if (!worktimes?.length)
       return message.error("Không tìm thấy ca livestream (workTimeId).");
@@ -400,6 +416,8 @@ export default function KolSingleRequestDetail() {
   };
 
   const submitCancelRequest = async () => {
+    if (isCancelling) return; // ✅ chặn double-click
+
     try {
       if (!kolId) return message.error("Thiếu kolId.");
       if (!worktimes?.length) return message.error("Thiếu workTimeId.");
@@ -415,14 +433,11 @@ export default function KolSingleRequestDetail() {
         reason: cancelReason,
       });
 
-      // ✅ ghi đè toast BE
       message.destroy();
       message.success("Gửi yêu cầu hủy lịch đặt chỗ thành công");
 
       setCancelOpen(false);
       setCancelReason("");
-
-      // đảm bảo query cancel detail chạy đúng workTimeId vừa gửi
       setSelectedWorktimeId(workTimeId);
 
       refetch();
@@ -445,8 +460,19 @@ export default function KolSingleRequestDetail() {
   };
   /* =================== END CANCEL =================== */
 
-  // ✅ Ẩn nút yêu cầu hủy khi đã có cancelDetail (tức là gọi được API detail và có data)
-  const canShowCancelButton = !cancelDetail;
+  // ✅ NEW: chỉ PAID + chưa có cancelDetail + không có >=2 worktimes
+  const canShowCancelButton =
+    canRequestCancel && !cancelDetail && !hasMultipleWorktimes;
+
+  // ✅ chống cắt chữ
+  const descContentStyle = useMemo(
+    () => ({
+      whiteSpace: "normal",
+      wordBreak: "keep-all",
+      overflowWrap: "break-word",
+    }),
+    []
+  );
 
   return (
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
@@ -464,7 +490,6 @@ export default function KolSingleRequestDetail() {
             Làm mới
           </Button>
 
-          {/* ✅ Ẩn khi đã có cancel detail */}
           {canShowCancelButton && (
             <Button danger onClick={openCancelModal} loading={isCancelling}>
               Yêu cầu hủy đơn đặt chỗ
@@ -498,12 +523,21 @@ export default function KolSingleRequestDetail() {
         title="Yêu cầu hủy đơn đặt chỗ"
         okText="Gửi yêu cầu"
         cancelText="Đóng"
-        okButtonProps={{ danger: true, loading: isCancelling }}
         onOk={submitCancelRequest}
         onCancel={() => {
           if (isCancelling) return;
           setCancelOpen(false);
         }}
+        confirmLoading={isCancelling}
+        okButtonProps={{
+          danger: true,
+          loading: isCancelling, // ✅ spinner trên button OK
+          disabled: isCancelling,
+        }}
+        cancelButtonProps={{ disabled: isCancelling }}
+        closable={!isCancelling}
+        maskClosable={!isCancelling}
+        keyboard={!isCancelling}
         destroyOnClose
       >
         <Space direction="vertical" size={10} className="w-full">
@@ -518,6 +552,7 @@ export default function KolSingleRequestDetail() {
             autoSize={{ minRows: 3, maxRows: 6 }}
             maxLength={500}
             showCount
+            disabled={isCancelling}
           />
         </Space>
       </Modal>
@@ -566,7 +601,7 @@ export default function KolSingleRequestDetail() {
             />
           )}
 
-          {/* ✅ ĐƯA CARD THÔNG TIN HỦY LÊN ĐẦU */}
+          {/* ✅ Card chi tiết yêu cầu hủy */}
           {showCancelCard && (
             <Card
               className="shadow-sm"
@@ -595,33 +630,48 @@ export default function KolSingleRequestDetail() {
                   active
                   paragraph={{ rows: 3 }}
                 >
-                  <Descriptions
-                    bordered
-                    size="middle"
-                    column={screens.lg ? 3 : screens.md ? 2 : 1}
-                    labelStyle={{ width: 220 }}
-                  >
-                    <Descriptions.Item label="Trạng thái">
-                      {cancelDetail?.status ?? "--"}
-                    </Descriptions.Item>
+                  {(() => {
+                    const cancelKey = normalizeStatus(cancelDetail?.status);
+                    const meta = cancelKey
+                      ? CANCEL_STATUS_META[cancelKey]
+                      : null;
 
-                    <Descriptions.Item label="Lý do">
-                      <Text style={{ whiteSpace: "pre-wrap" }}>
-                        {cancelDetail?.reason ?? "--"}
-                      </Text>
-                    </Descriptions.Item>
+                    return (
+                      <Descriptions
+                        bordered
+                        size="middle"
+                        column={screens.lg ? 3 : screens.md ? 2 : 1}
+                        labelStyle={{ width: 220 }}
+                        contentStyle={descContentStyle}
+                      >
+                        <Descriptions.Item label="Trạng thái">
+                          {cancelDetail?.status ? (
+                            <Tag color={meta?.color ?? "default"}>
+                              {meta?.label ?? cancelKey}
+                            </Tag>
+                          ) : (
+                            "--"
+                          )}
+                        </Descriptions.Item>
 
-                    <Descriptions.Item label="Tạo lúc">
-                      {formatDateTime(cancelDetail?.createdAt)}
-                    </Descriptions.Item>
+                        <Descriptions.Item label="Lý do">
+                          <Text style={{ whiteSpace: "pre-wrap" }}>
+                            {cancelDetail?.reason ?? "--"}
+                          </Text>
+                        </Descriptions.Item>
 
-                    {/* ✅ approvedAt null thì ẩn */}
-                    {cancelDetail?.approvedAt ? (
-                      <Descriptions.Item label="Duyệt lúc">
-                        {formatDateTime(cancelDetail.approvedAt)}
-                      </Descriptions.Item>
-                    ) : null}
-                  </Descriptions>
+                        <Descriptions.Item label="Tạo lúc">
+                          {formatDateTime(cancelDetail?.createdAt)}
+                        </Descriptions.Item>
+
+                        {cancelDetail?.approvedAt ? (
+                          <Descriptions.Item label="Duyệt lúc">
+                            {formatDateTime(cancelDetail.approvedAt)}
+                          </Descriptions.Item>
+                        ) : null}
+                      </Descriptions>
+                    );
+                  })()}
                 </Skeleton>
               )}
             </Card>
@@ -658,6 +708,7 @@ export default function KolSingleRequestDetail() {
               size="middle"
               column={screens.lg ? 3 : screens.md ? 2 : 1}
               labelStyle={{ width: 180 }}
+              contentStyle={descContentStyle}
             >
               <Descriptions.Item label="Mã yêu cầu">
                 {requestNo}
@@ -707,8 +758,9 @@ export default function KolSingleRequestDetail() {
             <Descriptions
               bordered
               size="middle"
-              column={screens.lg ? 3 : screens.md ? 2 : 1}
-              labelStyle={{ width: 180 }}
+              column={screens.lg ? 2 : 1}
+              labelStyle={{ width: 150 }}
+              contentStyle={descContentStyle}
             >
               <Descriptions.Item label="Họ tên đầy đủ">
                 {detail?.kol?.fullName ?? "--"}
@@ -725,20 +777,20 @@ export default function KolSingleRequestDetail() {
               <Descriptions.Item label="Thành phố">
                 {detail?.kol?.city ?? "--"}
               </Descriptions.Item>
-              <Descriptions.Item label="Tiểu sử" span={screens.lg ? 3 : 1}>
+
+              <Descriptions.Item label="Tiểu sử" span={screens.lg ? 2 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.bio ?? "--"}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 3 : 1}>
+
+              <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 2 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.experience ?? "--"}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item
-                label="Ảnh đại diện"
-                span={screens.lg ? 3 : screens.md ? 2 : 1}
-              >
+
+              <Descriptions.Item label="Ảnh đại diện" span={screens.lg ? 2 : 1}>
                 {renderImageField(
                   detail?.kol?.avatarUrl,
                   detail?.kol?.displayName ?? detail?.kol?.fullName
@@ -840,6 +892,7 @@ export default function KolSingleRequestDetail() {
                       size="middle"
                       column={screens.lg ? 3 : screens.md ? 2 : 1}
                       labelStyle={{ width: 220 }}
+                      contentStyle={descContentStyle}
                     >
                       {METRIC_FIELDS.map(({ key, label, fmt }) => (
                         <Descriptions.Item key={key} label={label}>
@@ -855,7 +908,6 @@ export default function KolSingleRequestDetail() {
             )}
           </Card>
 
-          {/* ===== Modal nhập số liệu (reusable) ===== */}
           <LivestreamMetricModal
             open={metricsOpen}
             onClose={() => setMetricsOpen(false)}
