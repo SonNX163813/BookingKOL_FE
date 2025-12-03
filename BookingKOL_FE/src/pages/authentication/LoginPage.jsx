@@ -27,6 +27,49 @@ export default function LoginPage() {
   const location = useLocation();
   const backTo = location.state?.from?.pathname || "/";
 
+  // Handle OAuth redirect from Google (access_token + user_data in query)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    const rawUserData = params.get("user_data");
+
+    if (!accessToken || !rawUserData) return;
+
+    let parsedUser = null;
+    try {
+      const decodedUserData = decodeURIComponent(rawUserData);
+      parsedUser = JSON.parse(decodedUserData);
+    } catch (err) {
+      parsedUser = null;
+    }
+
+    const user = {
+      id: parsedUser?.id ?? null,
+      email: parsedUser?.email ?? "",
+      roles: parsedUser?.roles ?? [],
+    };
+
+    try {
+      sessionStorage.setItem("auth_token", accessToken);
+      sessionStorage.setItem("auth_user", JSON.stringify(user));
+    } catch (err) {
+      // ignore storage errors
+    }
+
+    dispatch({
+      type: "LOGIN_SUCCESS",
+      payload: {
+        user,
+        token: accessToken,
+        roles: user.roles,
+        remember: false,
+      },
+    });
+
+    const cleanedUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, "", cleanedUrl);
+    navigate("/", { replace: true });
+  }, [dispatch, navigate]);
   // Nếu đã đăng nhập thì điều hướng
   useEffect(() => {
     if (token) navigate(backTo, { replace: true });
@@ -198,6 +241,10 @@ export default function LoginPage() {
         type: "LOGIN_SUCCESS",
         payload: { user, token: accessToken, roles: user.roles, remember },
       });
+
+      // Clear query params on current URL after login
+      const cleanedCurrent = `${window.location.origin}${window.location.pathname}${window.location.hash || ""}`;
+      window.history.replaceState({}, "", cleanedCurrent);
 
       // Giữ nguyên navigate; nút đã bị disable + có spinner nên không gây cảm giác "reload"
       navigate(backTo, { replace: true });
@@ -440,3 +487,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
