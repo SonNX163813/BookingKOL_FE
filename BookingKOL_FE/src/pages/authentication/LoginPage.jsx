@@ -29,6 +29,7 @@ export default function LoginPage() {
 
   // Handle OAuth redirect from Google (access_token + user_data in query)
   useEffect(() => {
+    if (token) return; // avoid re-processing when token already set
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get("access_token");
     const rawUserData = params.get("user_data");
@@ -69,7 +70,7 @@ export default function LoginPage() {
     const cleanedUrl = `${window.location.origin}${window.location.pathname}`;
     window.history.replaceState({}, "", cleanedUrl);
     navigate("/", { replace: true });
-  }, [dispatch, navigate]);
+  }, [dispatch, navigate, token]);
   // Nếu đã đăng nhập thì điều hướng
   useEffect(() => {
     if (token) navigate(backTo, { replace: true });
@@ -243,7 +244,9 @@ export default function LoginPage() {
       });
 
       // Clear query params on current URL after login
-      const cleanedCurrent = `${window.location.origin}${window.location.pathname}${window.location.hash || ""}`;
+      const cleanedCurrent = `${window.location.origin}${
+        window.location.pathname
+      }${window.location.hash || ""}`;
       window.history.replaceState({}, "", cleanedCurrent);
 
       // Giữ nguyên navigate; nút đã bị disable + có spinner nên không gây cảm giác "reload"
@@ -487,4 +490,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
