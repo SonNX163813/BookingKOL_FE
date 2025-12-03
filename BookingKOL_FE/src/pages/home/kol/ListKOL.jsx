@@ -168,7 +168,8 @@ const mapKolProfileToCard = (kol) => {
   if (rateNote) {
     tooltipPieces.push(rateNote);
   }
-  const fieldFull = tooltipPieces.filter(Boolean).join(" | ");
+  // const fieldFull = tooltipPieces.filter(Boolean).join(" | ");
+  const fieldFull = categoriesLabel;
   let field = fieldFull || rateNote;
   if (!field) {
     field = "Sẵn sàng hợp tác";
@@ -713,7 +714,7 @@ const ListKOL = () => {
       <Container
         maxWidth={false}
         sx={{
-          maxWidth: "1600px",
+          maxWidth: "1750px",
           position: "relative",
           zIndex: 1,
           color: "#0f172a",

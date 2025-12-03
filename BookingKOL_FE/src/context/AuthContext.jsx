@@ -86,7 +86,7 @@ export function AuthProvider({ children }) {
 
   // Đồng bộ state <-> storage theo remember
   useEffect(() => {
-    const store = state.remember ? localStorage : sessionStorage;
+    // const store = state.remember ? localStorage : sessionStorage;
     const other = state.remember ? sessionStorage : localStorage;
 
     try {
@@ -95,8 +95,8 @@ export function AuthProvider({ children }) {
       other.removeItem("auth_user");
 
       if (state.token && state.user) {
-        store.setItem("auth_token", state.token);
-        store.setItem("auth_user", JSON.stringify(state.user));
+        other.setItem("auth_token", state.token);
+        other.setItem("auth_user", JSON.stringify(state.user));
       } else {
         // nếu chưa có token/user (chưa đăng nhập) thì xoá ở cả hai nơi
         clearStorage();
