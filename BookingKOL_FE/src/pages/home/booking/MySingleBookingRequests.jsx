@@ -547,9 +547,8 @@ const MySingleBookingRequests = () => {
       const normalizedContractStatus = contractStatusSource
         ? contractStatusSource.toString().toUpperCase()
         : null;
-      const isRefundable =
-        normalizedPaymentStatus === "PAID" &&
-        normalizedContractStatus !== "WAIT_FOR_REFUND";
+      const isRefundable = normalizedPaymentStatus === "PAID";
+      // &&        normalizedContractStatus !== "WAIT_FOR_REFUND";
       const isPaymentPending = normalizedPaymentStatus === "PENDING";
       const isProcessingPaymentCancelThisRow =
         isCancellingMySingleBookingPayment &&
