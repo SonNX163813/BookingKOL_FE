@@ -10,6 +10,7 @@ export const useReleaseBookingSlot = (options = {}) => {
   } = useMutation({
     mutationKey: ["booking_single", "releaseBookingSlot"],
     mutationFn: releaseBookingSlot,
+    retry: false,
     onSuccess: (data) => {
       onSuccess?.(data);
     },

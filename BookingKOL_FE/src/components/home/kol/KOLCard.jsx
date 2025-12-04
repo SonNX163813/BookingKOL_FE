@@ -381,7 +381,7 @@ const KOLCard = ({
 
           <Box sx={{ flexGrow: 1, minHeight: 8 }} />
 
-          {onClick && (
+          {/* {onClick && (
             <Box
               sx={{
                 // mt: { xs: 1, sm: 1.4 },
@@ -414,7 +414,7 @@ const KOLCard = ({
                 Xem chi tiết
               </Button>
             </Box>
-          )}
+          )} */}
 
           {/* Nếu muốn show price trở lại, block giá cũ vẫn có thể bật lại ở đây */}
         </CardContent>
