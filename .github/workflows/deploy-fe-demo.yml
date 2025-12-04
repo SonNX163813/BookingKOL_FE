@@ -4,10 +4,12 @@ on:
   push:
     branches: ["DEMO_BookingKOL"]
     paths:
+      - ".github/workflows/deploy-fe-demo.yml"
       - "BookingKOL_FE/**"
       - "nginx/**"
       - "docker-compose.yml"
-      - ".github/workflows/**"
+      - "Dockerfile"
+      - "README.md"
   workflow_dispatch:
 
 concurrency:
@@ -28,15 +30,24 @@ jobs:
           script_stop: true
           script: |
             set -euxo pipefail
-            cd "${{ secrets.WORKDIR || vars.WORKDIR }}"
 
-            # pull đúng nhánh DEMO_BookingKOL
-            if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            ROOT="${{ secrets.WORKDIR || vars.WORKDIR }}"   # /home/ubuntu/bookingkol/bookingkol-deploy
+            FE_REPO="$ROOT/BookingKOL_FE"
+
+            # ✅ Pull đúng repo FE (có .git)
+            if [ -d "$FE_REPO/.git" ]; then
+              cd "$FE_REPO"
               git fetch --all --prune
               git checkout DEMO_BookingKOL
               git pull --ff-only
+              git log -1 --oneline
+            else
+              echo "ERROR: FE repo not found or not a git repo: $FE_REPO"
+              exit 1
             fi
 
+            # ✅ Rebuild + restart chỉ nginx (FE) theo docker-compose ở ROOT
+            cd "$ROOT"
             docker compose build --pull nginx
             docker compose up -d --no-deps --force-recreate nginx
             docker compose ps nginx
