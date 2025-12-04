@@ -1,0 +1,48 @@
+name: Deploy FE (test)
+
+on:
+  push:
+    branches: ["test"]
+    # Chỉ chạy khi có thay đổi liên quan FE/nginx/compose
+    paths:
+      - "BookingKOL_FE/**"
+      - "nginx/**"
+      - "docker-compose.yml"
+      - ".github/workflows/deploy-fe-test.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-fe-test
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH & deploy FE (rebuild nginx only)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST || vars.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || vars.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || vars.SSH_PORT }}
+          script_stop: true
+          script: |
+            set -euxo pipefail
+
+            # Root deploy dir (bạn nói phải là /home/ubuntu/bookingkol/bookingkol-deploy)
+            cd "${{ secrets.WORKDIR || vars.WORKDIR }}"
+
+            # Nếu thư mục này là git repo thì pull code mới (an toàn, không fail nếu không phải repo)
+            if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+              git fetch --all --prune
+              git checkout test
+              git pull --ff-only
+            fi
+
+            # Build + restart mỗi nginx (FE) thôi
+            docker compose build --pull nginx
+            docker compose up -d --no-deps --force-recreate nginx
+
+            # Optional: xem trạng thái
+            docker compose ps nginx
