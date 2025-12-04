@@ -12,7 +12,7 @@ export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 function loadAuthFromStorage() {
-  const { token, user } = loadAuth(); // đọc từ local/session (cùng key "auth_token"/"auth_user")
+  const { token, user } = loadAuth(); // read from local/session with keys auth_token/auth_user
   return { token, user };
 }
 
@@ -22,7 +22,7 @@ const initialState = {
   user: boot.user,
   token: boot.token,
   roles: boot.user?.roles || [],
-  remember: !!localStorage.getItem("auth_token"), // có token ở local => "remember"
+  remember: !!localStorage.getItem("auth_token"), // token in localStorage means "remember me"
   loading: false,
   error: null,
 };
@@ -46,7 +46,7 @@ function authReducer(state, action) {
     }
 
     case "LOGIN_FAILURE":
-      // ❗ KHÔNG xoá user/token ở đây, chỉ set error
+      // Do not clear token/user here, only set error
       return {
         ...state,
         loading: false,
@@ -72,39 +72,88 @@ function authReducer(state, action) {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // helper xoá sạch cả hai nơi
   const clearStorage = () => {
     try {
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
       sessionStorage.removeItem("auth_token");
       sessionStorage.removeItem("auth_user");
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
 
-  // Đồng bộ state <-> storage theo remember
+  // Sync state <-> storage depending on remember flag
   useEffect(() => {
-    // const store = state.remember ? localStorage : sessionStorage;
+    const store = state.remember ? localStorage : sessionStorage;
     const other = state.remember ? sessionStorage : localStorage;
 
     try {
-      // dọn nơi còn lại
+      // wipe the other storage to avoid mismatch
       other.removeItem("auth_token");
       other.removeItem("auth_user");
 
       if (state.token && state.user) {
-        other.setItem("auth_token", state.token);
-        other.setItem("auth_user", JSON.stringify(state.user));
+        store.setItem("auth_token", state.token);
+        store.setItem("auth_user", JSON.stringify(state.user));
       } else {
-        // nếu chưa có token/user (chưa đăng nhập) thì xoá ở cả hai nơi
         clearStorage();
       }
-    } catch (e) {
-      // nếu lỗi (vd: storage đầy), xoá sạch cả hai nơi
+    } catch {
+      // ignore storage quota errors
     }
   }, [state.token, state.user, state.remember]);
+
+  // Handle OAuth redirect tokens (runs on every page, not only /login)
+  useEffect(() => {
+    if (state.token) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    const rawUserData = params.get("user_data");
+    if (!accessToken || !rawUserData) return;
+
+    let parsedUser = null;
+    try {
+      parsedUser = JSON.parse(decodeURIComponent(rawUserData));
+    } catch {
+      try {
+        parsedUser = JSON.parse(rawUserData);
+      } catch {
+        parsedUser = null;
+      }
+    }
+
+    const user = {
+      id: parsedUser?.id ?? null,
+      email: parsedUser?.email ?? "",
+      roles: parsedUser?.roles ?? [],
+    };
+
+    try {
+      // Google login always saves to session storage to avoid unwanted "remember"
+      sessionStorage.setItem("auth_token", accessToken);
+      sessionStorage.setItem("auth_user", JSON.stringify(user));
+    } catch {
+      // ignore storage errors
+    }
+
+    dispatch({
+      type: "LOGIN_SUCCESS",
+      payload: {
+        user,
+        token: accessToken,
+        roles: user.roles,
+        remember: false,
+      },
+    });
+
+    // Remove query params after processing
+    const cleanedUrl = `${window.location.origin}${window.location.pathname}${
+      window.location.hash || ""
+    }`;
+    window.history.replaceState({}, "", cleanedUrl);
+  }, [dispatch, state.token]);
 
   const value = useMemo(
     () => ({
@@ -112,15 +161,15 @@ export function AuthProvider({ children }) {
       dispatch,
       logout: async (api) => {
         try {
-          // Nếu BE có /v1/auth/logout thì có thể gọi, không bắt buộc
+          // Call BE logout if available; ignore failures
           await api
             ?.post?.("/v1/auth/logout", null, { withCredentials: true })
             .catch(() => {});
         } finally {
-          clearAuth(); // xoá local + session
-          dispatch({ type: "LOGOUT" }); // reset context
+          clearAuth();
+          dispatch({ type: "LOGOUT" });
           if (api?.defaults?.headers?.common?.Authorization) {
-            delete api.defaults.headers.common.Authorization; // bỏ header mặc định nếu có
+            delete api.defaults.headers.common.Authorization;
           }
         }
       },
