@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
 
   // Sync state <-> storage depending on remember flag
   useEffect(() => {
-    const store = state.remember ? localStorage : sessionStorage;
+    const store = state.remember ? sessionStorage : localStorage;
     const other = state.remember ? sessionStorage : localStorage;
 
     try {

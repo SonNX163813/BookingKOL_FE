@@ -2,7 +2,7 @@
 // Helpers cho lưu/đọc/xoá auth vào đúng storage theo "remember"
 
 export function saveAuth({ token, user, remember }) {
-  const store = remember ? localStorage : sessionStorage;
+  const store = remember ? sessionStorage : localStorage;
   const other = remember ? sessionStorage : localStorage;
 
   store.setItem("auth_token", token);

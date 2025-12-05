@@ -638,7 +638,7 @@ const MySingleBookingRequests = () => {
 
       const refundButton = isRefundable ? (
         <Button
-          type="primary"
+          danger
           ghost
           disabled={disableAction}
           loading={isProcessingRequestThisRow && isRefundable}
@@ -649,7 +649,7 @@ const MySingleBookingRequests = () => {
           }}
           onClick={() => handleOpenRefundModal(record)}
         >
-          Hoàn tiền
+          Hủy đơn
         </Button>
       ) : null;
 
