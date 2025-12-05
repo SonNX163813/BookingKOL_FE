@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import { Alert, Button, Card, Empty, Skeleton, Tag, Typography } from "antd";
@@ -21,7 +21,11 @@ import {
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_COLOR,
 } from "../../constants/mySingleBookingStatuses";
-import { initiateCampaignPayment } from "../../services/booking/BookingServices";
+import {
+  completeUserWorkTime,
+  getUserBookingStatus,
+  initiateCampaignPayment,
+} from "../../services/booking/BookingServices";
 
 const { Title, Text } = Typography;
 
@@ -78,14 +82,53 @@ const extractUrlsFromText = (text) => {
   return Array.from(new Set(normalized));
 };
 
+const resolveBookingRequestId = (request) => {
+  if (!request) return null;
+  const candidates = [
+    request?.bookingRequestId,
+    request?.id,
+    request?.bookingRequest?.id,
+    request?.bookingNumber,
+    request?.bookingId,
+  ];
+  const firstValue = candidates.find(
+    (value) => typeof value === "string" && value.trim().length > 0
+  );
+  return firstValue ?? null;
+};
+
+const composeWorktimeDuration = (workTime) => {
+  const start = workTime?.startAt ?? workTime?.startTime;
+  const end = workTime?.endAt ?? workTime?.endTime;
+  if (!start && !end) return "--";
+  const startLabel = formatDateTime(start);
+  const endLabel = formatDateTime(end);
+  if (startLabel === "--") return endLabel;
+  if (endLabel === "--") return startLabel;
+  const sameDay =
+    dayjs(start).isValid() &&
+    dayjs(end).isValid() &&
+    dayjs(start).isSame(end, "day");
+  return sameDay
+    ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} → ${dayjs(end).format(
+        "HH:mm"
+      )}`
+    : `${startLabel} → ${endLabel}`;
+};
+
 const CampaignBookingDetailPage = () => {
   const { campaignId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [contractPreview, setContractPreview] = useState(null);
   const [initiatingScheduleId, setInitiatingScheduleId] = useState(null);
+  const [completingWorkTimeId, setCompletingWorkTimeId] = useState(null);
   const initiatePaymentMutation = useMutation({
     mutationFn: ({ paymentScheduleId }) =>
       initiateCampaignPayment(paymentScheduleId),
+  });
+  const completeWorkTimeMutation = useMutation({
+    mutationFn: ({ workTimeId }) => completeUserWorkTime(workTimeId),
   });
 
   const {
@@ -118,11 +161,49 @@ const CampaignBookingDetailPage = () => {
     [detail?.bookingRequests]
   );
 
+  const bookingStatusQueries = useQueries({
+    queries: bookingRequests.map((request) => {
+      const requestId = resolveBookingRequestId(request);
+      return {
+        queryKey: ["booking-request-status", requestId],
+        queryFn: () => getUserBookingStatus(requestId),
+        enabled: Boolean(requestId),
+        retry: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      };
+    }),
+  });
+
+  const bookingStatusMap = useMemo(() => {
+    const map = new Map();
+    bookingRequests.forEach((request, index) => {
+      const requestId = resolveBookingRequestId(request);
+      if (!requestId) return;
+      const query = bookingStatusQueries[index];
+      if (!query) return;
+      map.set(requestId, {
+        ...query,
+        statusData: query?.data?.data ?? query?.data ?? null,
+      });
+    });
+    return map;
+  }, [bookingRequests, bookingStatusQueries]);
+
   const isInitialLoading = isGettingCampaignDetail && !detail;
 
   const handleBack = useCallback(() => {
     navigate("/don-booking-chien-dich");
   }, [navigate]);
+
+  const handleRefreshAll = useCallback(() => {
+    refetchCampaignDetail();
+    bookingStatusQueries.forEach((query) => {
+      if (typeof query?.refetch === "function") {
+        query.refetch();
+      }
+    });
+  }, [bookingStatusQueries, refetchCampaignDetail]);
 
   const handleOpenContractPreview = useCallback((request) => {
     if (!request) return;
@@ -225,6 +306,31 @@ const CampaignBookingDetailPage = () => {
       }
     },
     [detail, initiatePaymentMutation, navigate]
+  );
+
+  const handleCompleteWorkTime = useCallback(
+    async ({ workTimeId, bookingRequestId }) => {
+      if (!workTimeId) {
+        toast.error("Không tìm thấy ca công việc hợp lệ.");
+        return;
+      }
+
+      try {
+        setCompletingWorkTimeId(workTimeId);
+        await completeWorkTimeMutation.mutateAsync({ workTimeId });
+        if (bookingRequestId) {
+          queryClient.invalidateQueries({
+            queryKey: ["booking-request-status", bookingRequestId],
+          });
+        }
+        refetchCampaignDetail();
+      } catch (error) {
+        //
+      } finally {
+        setCompletingWorkTimeId(null);
+      }
+    },
+    [completeWorkTimeMutation, queryClient, refetchCampaignDetail]
   );
 
   const renderNameList = (names, emptyLabel) =>
@@ -388,6 +494,153 @@ const CampaignBookingDetailPage = () => {
     );
   };
 
+  const renderWorkTimes = (request) => {
+    const bookingRequestId = resolveBookingRequestId(request);
+    if (!bookingRequestId) return null;
+
+    const statusEntry = bookingStatusMap.get(bookingRequestId);
+    const isStatusLoading =
+      statusEntry?.isPending || statusEntry?.isLoading || false;
+    const isStatusFetching = statusEntry?.isFetching || false;
+    const statusError = statusEntry?.error;
+    const statusData = statusEntry?.statusData;
+    const workTimes = Array.isArray(statusData?.workTimes)
+      ? statusData.workTimes
+      : [];
+
+    const resolveWorkTimeId = (workTime) =>
+      workTime?.id ??
+      workTime?.workTimeId ??
+      workTime?.work_time_id ??
+      workTime?.availabilityId ??
+      null;
+
+    const renderContent = () => {
+      // Lỗi lấy trạng thái công việc
+      if (statusError) {
+        return (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải trạng thái công việc"
+            description={statusError?.message}
+            className="rounded-xl border border-red-200/60 bg-white/90"
+          />
+        );
+      }
+
+      // Đang tải lần đầu, chưa có dữ liệu
+      if (isStatusLoading && !workTimes.length) {
+        return <Skeleton active paragraph={{ rows: 3 }} />;
+      }
+
+      // Không có ca công việc
+      if (!workTimes.length) {
+        return (
+          <p className="text-sm text-slate-500">
+            Chưa có ca công việc nào cho booking này.
+          </p>
+        );
+      }
+
+      return (
+        <div className="space-y-3">
+          {workTimes.map((workTime) => {
+            const workTimeId = resolveWorkTimeId(workTime);
+            const workTimeStatus =
+              typeof workTime?.status === "string"
+                ? workTime.status.toUpperCase()
+                : workTime?.status;
+            const statusMeta = resolveStatusMeta(workTimeStatus);
+            const canComplete =
+              workTimeId &&
+              workTimeStatus &&
+              !["COMPLETED", "CANCELLED"].includes(workTimeStatus);
+            const isCompleting =
+              completingWorkTimeId === workTimeId &&
+              completeWorkTimeMutation?.isPending;
+
+            return (
+              <div
+                key={workTimeId ?? workTime?.startAt ?? workTime?.startTime}
+                className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-900">
+                    Ca công việc
+                  </span>
+                  <Tag
+                    color={statusMeta.color}
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                  >
+                    {statusMeta.label}
+                  </Tag>
+                  {workTime?.kolName ? (
+                    <span className="text-xs text-slate-500">
+                      Host: {workTime.kolName}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Thời gian
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-900">
+                      {composeWorktimeDuration(workTime)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Ghi chú
+                    </p>
+                    <p className="mt-1 text-slate-900">
+                      {workTime?.note ?? "--"}
+                    </p>
+                  </div>
+                </div>
+
+                {canComplete ? (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="primary"
+                      loading={isCompleting}
+                      className="!h-9 !rounded-lg !px-4 text-sm font-semibold"
+                      onClick={() =>
+                        handleCompleteWorkTime({
+                          workTimeId,
+                          bookingRequestId,
+                        })
+                      }
+                    >
+                      Hoàn tất công việc
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <CalendarRange size={16} />
+          <span>Tiến trình công việc</span>
+          {isStatusFetching ? (
+            <Tag color="processing" className="rounded-full px-3 py-1 text-xs">
+              Đang cập nhật
+            </Tag>
+          ) : null}
+        </div>
+        {renderContent()}
+      </div>
+    );
+  };
+
   const renderBookingRequestCard = (request) => {
     const requestStatus = resolveStatusMeta(request?.status);
     const contractStatus =
@@ -492,6 +745,8 @@ const CampaignBookingDetailPage = () => {
           {renderPaymentSchedules(request?.paymentSchedules, request)}
         </div>
 
+        <div className="mt-6">{renderWorkTimes(request)}</div>
+
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <Button
             icon={<FileText size={16} />}
@@ -525,7 +780,7 @@ const CampaignBookingDetailPage = () => {
             </Button>
             <Button
               icon={<RefreshCcw size={16} />}
-              onClick={() => refetchCampaignDetail()}
+              onClick={handleRefreshAll}
               loading={isFetchingCampaignDetail}
               className="ml-auto !h-11 !rounded-xl !border-slate-200 !bg-white hover:!border-indigo-500/60 hover:!text-indigo-600"
             >
