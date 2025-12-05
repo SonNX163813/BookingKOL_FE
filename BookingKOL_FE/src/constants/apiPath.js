@@ -17,6 +17,7 @@ export const API_PATHS = {
     adminKolMediaDelete: "/v1/admin/kol/medias/delete", // + /{fileId}
     adminKolCoverChange: "/v1/admin/kol/cover-image", // + /{kolId}?fileId=...
     adminKolCreate: "/v1/admin/kol/create-new-kol",
+    adminKolExportExcel: "/v1/admin/kol/export/excel",
   },
   COURSE: {
     getAllCourse: "/v1/admin/course/all",
@@ -27,6 +28,8 @@ export const API_PATHS = {
     adminCourseMediasRemove: "/v1/admin/course/medias/remove", // + /{courseId}
     adminCourseCoverImageSet: "/v1/admin/course/cover-image/set", // + /{courseId}?fileId=...
     adminCourseMediasUpload: "/v1/admin/course/medias/upload", // + /{courseId}
+    adminCourseHistory: "/v1/admin/course/history/all",
+    adminCourseConfirm: "/v1/admin/course/confirm", // + /{purchasedCourseId}
   },
   CATEGORY: {
     getAllCategory: "/v1/categories",
@@ -35,27 +38,31 @@ export const API_PATHS = {
     deleteCategory: "/v1/categories",
     patchCategory: "/v1/categories",
   },
-  BOOKINGPACKAGE: {
-    createBookingPackage: "/v1/bookings/packages",
-    getHistoryBookingPackage: "/v1/user/bookings",
-  },
   BOOKING_CAMPAIGN: {
     list: "/v1/admin/bookings", // nếu Swagger của bạn KHÔNG có /v1 thì đổi thành "/admin/bookings"
     create: "/v1/admin/bookings/create",
+    detail: "/v1/admin/bookings/admin", // + /{campaignId}
+  },
+  CAMPAIGN: {
+    detail: "/v1/campaigns", // + /{campaignId}
   },
   BOOKING_REQUEST: {
     getAll: "/v1/admin/booking/single-requests/all",
     getDetail: "/v1/admin/booking/single-requests/detail",
     getAllByKol: "/v1/admin/booking/single-requests/all/by-kol",
     getAllByUser: "/v1/admin/booking/single-requests/all/by-user",
+    exportExcel: "/v1/admin/booking/single-requests/export/excel",
     getWorktimeLivestreamMetrics: (worktimeId) =>
-      `v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
+      `/v1/admin/requests/worktime/livestream-metrics/${encodeURIComponent(
         worktimeId
       )}`,
     getLivestreamMetricsByKol: (kolId) =>
-      `v1/admin/requests/worktime/livestream-metrics/kol/${encodeURIComponent(
+      `/v1/admin/requests/worktime/livestream-metrics/kol/${encodeURIComponent(
         kolId
       )}`,
+    getDetailByWorkTime: (workTimeId) =>
+      `/v1/requests/booking/detail/${encodeURIComponent(workTimeId)}`,
+    updateStatus: "/v1/admin/booking/single-requests/update-status",
   },
 
   CONTRACT_PAYMENT: {
@@ -66,6 +73,13 @@ export const API_PATHS = {
     kolFreeTime: "/v1/availabilities/free-time", // + /{kolId}
     // Admin xem timeline (booking) của KOL
     kolTimeline: "/v1/availabilities/time-line/kol", // + /{kolId}
+    kolTimelineAll: "/v1/availabilities/time-line/kol/all", // list lịch rảnh của tất cả KOL (do dev đặt tên sai)
+    adminSchedule: "/v1/availabilities/admin/schedule",
+  },
+  WORKTIME_ADMIN: {
+    create: "/v1/availabilities/admin/worktime/create",
+
+    getByBooking: "/v1/availabilities/admin/booking", // + /{bookingRequestId}
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",
@@ -81,5 +95,34 @@ export const API_PATHS = {
       `v1/admin/blogs/update/${encodeURIComponent(blogId)}`,
     adminDelete: (blogId) =>
       `v1/admin/blogs/delete/${encodeURIComponent(blogId)}`,
+    adminThumbnailUpload: (blogId) =>
+      `v1/admin/blogs/thumbnail/upload/${encodeURIComponent(blogId)}`,
+    adminThumbnailDelete: (blogId) =>
+      `v1/admin/blogs/thumbnail/delete/${encodeURIComponent(blogId)}`,
+  },
+
+  DASHBOARD: {
+    adminSummary: "/v1/admin/dashboard/summary",
+  },
+  FEEDBACK_ADMIN: {
+    // GET /v1/admin/feedbacks/kol/{kolId}?page=&size=&minRating=&fromDate=&toDate=
+    getByKol: "/v1/admin/feedbacks/kol", // + /{kolId}
+    // PATCH /v1/admin/feedbacks/hide/{feedbackId}
+    hide: (feedbackId) =>
+      `/v1/admin/feedbacks/hide/${encodeURIComponent(feedbackId)}`,
+
+    // PATCH /v1/admin/feedbacks/show/{feedbackId}
+    show: (feedbackId) =>
+      `/v1/admin/feedbacks/show/${encodeURIComponent(feedbackId)}`,
+  },
+  AUTH: {
+    changePassword: "/auth/change-password",
+  },
+  CANCEL_ADMIN: {
+    // ✅ GET danh sách yêu cầu hủy
+    getAll: "/v1/requests/admin/cancel/all",
+    // (nếu sau này có detail)
+    detailByWorkTime: (workTimeId) =>
+      `/v1/requests/cancel/detail/${encodeURIComponent(workTimeId)}`,
   },
 };

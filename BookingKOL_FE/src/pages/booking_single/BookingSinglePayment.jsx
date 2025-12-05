@@ -222,7 +222,9 @@ const BookingSinglePayment = () => {
             ...(contractNumberValue
               ? { contractNumber: contractNumberValue }
               : {}),
-            ...(mergedContracts.length > 0 ? { contracts: mergedContracts } : {}),
+            ...(mergedContracts.length > 0
+              ? { contracts: mergedContracts }
+              : {}),
           };
           navigate("/thanh-toan-kol-le/thanh-cong", {
             replace: true,
@@ -404,9 +406,9 @@ const BookingSinglePayment = () => {
                     }}
                   />
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                {/* <Typography variant="body2" color="text.secondary">
                   Mã sẽ hết hạn sau {demNguocLabel}
-                </Typography>
+                </Typography> */}
               </Stack>
             </Stack>
 

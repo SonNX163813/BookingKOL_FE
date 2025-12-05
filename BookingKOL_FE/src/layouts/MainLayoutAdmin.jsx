@@ -111,6 +111,18 @@ const MainLayoutAdmin = () => {
           icon: <VerifiedUserOutlined />,
           label: <Link to="management-kol">Quản lý KOL</Link>,
         },
+
+        // ✅ NEW: dưới Quản lý KOL
+        {
+          key: "management-kol-work-schedule",
+          icon: <CalendarMonthOutlined />,
+          label: (
+            <Link to="management-kol-work-schedule">
+              Quản lý lịch làm việc của KOL
+            </Link>
+          ),
+        },
+
         {
           key: "management-customer",
           icon: <AccountCircleOutlined />,
@@ -118,56 +130,12 @@ const MainLayoutAdmin = () => {
         },
       ],
     },
-    {
-      key: "management-cate",
-      icon: <LocalOfferOutlined />,
-      label: "Quản lý danh mục",
-      children: [
-        {
-          key: "management-category",
-          icon: <CategoryOutlined />,
-          label: <Link to="management-category">Quản lý lĩnh vực</Link>,
-        },
-        {
-          key: "management-abc",
-          icon: <AppsOutlined />,
-          // label: <Link to="/management-category">Quản lý nền tảng</Link>,
-          label: "Quản lý nền tảng",
-        },
-      ],
-    },
-    {
-      key: "management-cou",
-      icon: <SchoolOutlined />,
-      label: "Quản lý khóa học",
-      children: [
-        {
-          key: "management-course",
-          icon: <PlayCircleOutline />,
-          label: <Link to="management-course">Khóa học</Link>,
-        },
-        {
-          key: "management-his",
-          icon: <BarChartOutlined />,
-          label: "Quản lý lịch sử mua khóa học",
-        },
-      ],
-    },
-    {
-      key: "management-blogs",
-      icon: <ArticleOutlined />,
-      label: <Link to="management-blogs">Quản lý blog</Link>,
-    },
+
     {
       key: "management-booking",
       icon: <EventNoteOutlined />,
       label: "Quản lý booking",
       children: [
-        {
-          key: "management-refunds",
-          icon: <MonetizationOnOutlined />,
-          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
-        },
         {
           key: "management-booking-requests",
           icon: <CalendarMonthOutlined />,
@@ -185,8 +153,58 @@ const MainLayoutAdmin = () => {
             </Link>
           ),
         },
+        {
+          key: "management-refunds",
+          icon: <MonetizationOnOutlined />,
+          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
+        },
       ],
     },
+    {
+      key: "management-cate",
+      icon: <LocalOfferOutlined />,
+      label: "Quản lý danh mục",
+      children: [
+        {
+          key: "management-category",
+          icon: <CategoryOutlined />,
+          label: <Link to="management-category">Quản lý lĩnh vực</Link>,
+        },
+        // {
+        //   key: "management-abc",
+        //   icon: <AppsOutlined />,
+        //   // label: <Link to="/management-category">Quản lý nền tảng</Link>,
+        //   label: "Quản lý nền tảng",
+        // },
+      ],
+    },
+    {
+      key: "management-cou",
+      icon: <SchoolOutlined />,
+      label: "Quản lý khóa học",
+      children: [
+        {
+          key: "management-course",
+          icon: <PlayCircleOutline />,
+          label: <Link to="management-course">Khóa học</Link>,
+        },
+        {
+          key: "management-course-history",
+          icon: <BarChartOutlined />,
+          label: (
+            <Link to="management-course-history">
+              Quản lý lịch sử mua khóa học
+            </Link>
+          ),
+        },
+      ],
+    },
+    {
+      key: "management-blogs",
+      icon: <ArticleOutlined />,
+      label: <Link to="management-blogs">Quản lý blog</Link>,
+    },
+
     // {
     //   key: "management-refund",
     //   icon: <MonetizationOnOutlined />,

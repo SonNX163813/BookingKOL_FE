@@ -7,6 +7,8 @@ export const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hủy", value: "CANCELLED" },
   { label: "Đã thanh toán", value: "PAID" },
   { label: "Đợi hoàn tiền", value: "WAIT_FOR_REFUND" },
+  { label: "Đang đàm phán", value: "NEGOTIATING" },
+  { label: "Đã chấp nhận", value: "ACCEPTED" },
 ];
 
 export const BOOKING_STATUS_LABEL = {
@@ -14,6 +16,7 @@ export const BOOKING_STATUS_LABEL = {
   REQUESTED: "Đã yêu cầu",
   PENDING: "Chờ xử lý",
   NEGOTIATING: "Đang đàm phán",
+  APPROVED: "Đã phê duyệt",
   ACCEPTED: "Đã chấp nhận",
   CONFIRMED: "Đã xác nhận",
   IN_PROGRESS: "Đang thực hiện",
@@ -28,6 +31,7 @@ export const BOOKING_STATUS_LABEL = {
   WAIT_FOR_REFUND: "Đợi hoàn tiền",
   REFUNDED: "Đã hoàn tiền",
   OVERPAID: "Thanh toán thừa",
+  SIGNED: "Đã ký",
 };
 
 export const STATUS_TAG_COLOR = {
@@ -35,6 +39,7 @@ export const STATUS_TAG_COLOR = {
   REQUESTED: "processing",
   PENDING: "processing",
   NEGOTIATING: "cyan",
+  APPROVED: "success",
   ACCEPTED: "success",
   CONFIRMED: "blue",
   IN_PROGRESS: "processing",
@@ -48,10 +53,12 @@ export const STATUS_TAG_COLOR = {
   PAID: "success",
   WAIT_FOR_REFUND: "cyan",
   REFUNDED: "purple",
+  SIGNED: "magenta",
 };
 
 export const PAYMENT_STATUS_OPTIONS = [
   { label: "Đợi hoàn tiền", value: "WAIT_FOR_REFUND" },
+  { label: "Nháp", value: "DRAFT" },
   { label: "Đợi thanh toán", value: "PENDING" },
   { label: "Thanh toán chưa đủ", value: "UNDERPAID" },
   { label: "Đã thanh toán", value: "PAID" },
@@ -72,6 +79,7 @@ export const PAYMENT_STATUS_LABEL = {
   REFUNDED: "Đã hoàn tiền",
   WAIT_FOR_REFUND: "Đợi hoàn tiền",
   OVERPAID: "Thanh toán thừa",
+  DRAFT: "Nháp",
 };
 
 export const PAYMENT_STATUS_COLOR = {
@@ -83,6 +91,7 @@ export const PAYMENT_STATUS_COLOR = {
   CANCELLED: "error",
   WAIT_FOR_REFUND: "cyan",
   REFUNDED: "purple",
+  DRAFT: "default",
 };
 
 export const REFUND_REQUEST_STATUS_OPTIONS = [

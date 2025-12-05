@@ -6,12 +6,13 @@ import isoWeek from "dayjs/plugin/isoWeek";
 import localeData from "dayjs/plugin/localeData";
 import updateLocale from "dayjs/plugin/updateLocale";
 import "dayjs/locale/vi";
-import { ConfigProvider, DatePicker, message } from "antd";
+import { ConfigProvider, DatePicker, message, Modal } from "antd";
 import viVN from "antd/locale/vi_VN";
 import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
 
 import SchedulerGrid from "../../../../components/kol/kol-schedule/SchedulerGrid";
 import { adminFetchKolDayDuties } from "../../../../services/admin/AdminScheduleAPI";
+import KolWorkRegistrationMui from "../../../kol/KolWorkRegistration";
 
 /* ===== Việt hoá dayjs: T2..T7, CN và tuần bắt đầu từ Thứ Hai ===== */
 dayjs.extend(isoWeek);
@@ -37,6 +38,8 @@ export default function AdminViewKolSchedule() {
   const [anchorDate, setAnchorDate] = useState(dayjs());
   const [loading, setLoading] = useState(false);
   const [dayDuties, setDayDuties] = useState({ goalList: [] });
+
+  const [openWorkReg, setOpenWorkReg] = useState(false);
 
   // from/to + nhãn header theo range
   const { fromDate, toDate, headerLabel } = useMemo(() => {
@@ -109,6 +112,10 @@ export default function AdminViewKolSchedule() {
   const handleRangeChange = (val) => setRange(val);
   const handleDateChange = (d) => d && setAnchorDate(d);
 
+  const handleAddSchedule = () => {
+    setOpenWorkReg(true);
+  };
+
   return (
     <ConfigProvider locale={viVN}>
       <div className="w-full">
@@ -136,35 +143,44 @@ export default function AdminViewKolSchedule() {
             />
           </div>
 
-          <p className="text-[#0050ab] text-xl md:text-2xl lg:text-3xl font-bold capitalize">
+          <p className="text-[#0050ab] text-xl md:text-2xl lg:text-3xl font-bold capitalize text-center">
             {headerLabel}
           </p>
 
-          <div className="rounded-full border flex overflow-hidden">
+          <div className="flex items-center gap-3">
             <button
-              className={`px-4 py-1 ${
-                range === "day" ? "bg-[#0050ab] text-white" : ""
-              }`}
-              onClick={() => handleRangeChange("day")}
+              onClick={handleAddSchedule}
+              className="h-8 px-4 rounded-md bg-[#0050ab] text-white text-sm md:text-base font-semibold hover:opacity-90 transition-colors flex items-center justify-center border-2 border-[#0050ab]"
             >
-              Ngày
+              + Thêm lịch làm việc
             </button>
-            <button
-              className={`px-4 py-1 ${
-                range === "week" ? "bg-[#0050ab] text-white" : ""
-              }`}
-              onClick={() => handleRangeChange("week")}
-            >
-              Tuần
-            </button>
-            <button
-              className={`px-4 py-1 ${
-                range === "month" ? "bg-[#0050ab] text-white" : ""
-              }`}
-              onClick={() => handleRangeChange("month")}
-            >
-              Tháng
-            </button>
+
+            <div className="rounded-full border flex overflow-hidden">
+              <button
+                className={`px-4 py-1 ${
+                  range === "day" ? "bg-[#0050ab] text-white" : ""
+                }`}
+                onClick={() => handleRangeChange("day")}
+              >
+                Ngày
+              </button>
+              <button
+                className={`px-4 py-1 ${
+                  range === "week" ? "bg-[#0050ab] text-white" : ""
+                }`}
+                onClick={() => handleRangeChange("week")}
+              >
+                Tuần
+              </button>
+              <button
+                className={`px-4 py-1 ${
+                  range === "month" ? "bg-[#0050ab] text-white" : ""
+                }`}
+                onClick={() => handleRangeChange("month")}
+              >
+                Tháng
+              </button>
+            </div>
           </div>
         </div>
 
@@ -179,6 +195,25 @@ export default function AdminViewKolSchedule() {
         {loading && (
           <div className="mt-2 text-sm text-gray-500">Đang tải lịch…</div>
         )}
+
+        {/* Popup đăng ký lịch làm việc */}
+        <Modal
+          title="Đăng ký lịch làm việc cho KOL"
+          open={openWorkReg}
+          onCancel={() => setOpenWorkReg(false)}
+          footer={null}
+          width={1100}
+          destroyOnClose
+        >
+          <KolWorkRegistrationMui
+            isAdmin
+            adminKolId={kolId}
+            onSuccess={() => {
+              setOpenWorkReg(false);
+              load();
+            }}
+          />
+        </Modal>
       </div>
     </ConfigProvider>
   );

@@ -85,12 +85,20 @@ const BookingContactStep = ({
       {/* 🧾 Thông tin liên hệ */}
       <Stack spacing={2}>
         <TextField
-          label="Họ và tên"
+          label="Họ và tên "
           value={contact.fullName}
           onChange={(e) => onContactChange("fullName", e.target.value)}
           error={Boolean(errors.fullName)}
           helperText={errors.fullName}
           required
+          InputLabelProps={{
+            required: true,
+            sx: {
+              "& .MuiFormLabel-asterisk": {
+                color: "error.main",
+              },
+            },
+          }}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -100,12 +108,20 @@ const BookingContactStep = ({
         />
 
         <TextField
-          label="Email liên hệ"
+          label="Email liên hệ "
           value={contact.email}
           onChange={(e) => onContactChange("email", e.target.value)}
           error={Boolean(errors.email)}
           helperText={errors.email}
           required
+          InputLabelProps={{
+            required: true,
+            sx: {
+              "& .MuiFormLabel-asterisk": {
+                color: "error.main",
+              },
+            },
+          }}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -115,13 +131,21 @@ const BookingContactStep = ({
         />
 
         <TextField
-          label="Số điện thoại"
+          label="Số điện thoại "
           value={contact.phone}
           onChange={(e) => onContactChange("phone", e.target.value)}
           error={Boolean(errors.phone)}
           helperText={errors.phone}
           required
           inputProps={{ inputMode: "tel" }}
+          InputLabelProps={{
+            required: true,
+            sx: {
+              "& .MuiFormLabel-asterisk": {
+                color: "error.main",
+              },
+            },
+          }}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -131,7 +155,7 @@ const BookingContactStep = ({
         />
 
         <TextField
-          label="Nền tảng livestream"
+          label="Nền tảng livestream "
           value={contact.platform}
           onChange={(e) => handlePlatformChange(e.target.value)}
           error={Boolean(errors.platform) || Boolean(platformError)}
@@ -141,6 +165,14 @@ const BookingContactStep = ({
           disabled={platformLoading && platformOptions.length === 0}
           SelectProps={{
             displayEmpty: true,
+          }}
+          InputLabelProps={{
+            required: true,
+            sx: {
+              "& .MuiFormLabel-asterisk": {
+                color: "error.main",
+              },
+            },
           }}
           sx={{
             "& .MuiOutlinedInput-root": {
@@ -158,6 +190,7 @@ const BookingContactStep = ({
             </MenuItem>
           ))}
         </TextField>
+
         {platformError && onReloadPlatforms ? (
           <Button
             variant="text"
@@ -168,14 +201,23 @@ const BookingContactStep = ({
             Thử tải lại danh sách nền tảng
           </Button>
         ) : null}
+
         {isOtherSelected ? (
           <TextField
-            label="Nền tảng cụ thể"
+            label="Nền tảng cụ thể "
             value={contact.platformCustom}
             onChange={(e) => onContactChange("platformCustom", e.target.value)}
             error={Boolean(errors.platformCustom)}
             helperText={errors.platformCustom}
             required
+            InputLabelProps={{
+              required: true,
+              sx: {
+                "& .MuiFormLabel-asterisk": {
+                  color: "error.main",
+                },
+              },
+            }}
             sx={{
               "& .MuiOutlinedInput-root": {
                 borderRadius: "16px",
@@ -184,8 +226,9 @@ const BookingContactStep = ({
             }}
           />
         ) : null}
+
         <TextField
-          label="Địa chỉ / Khu vực"
+          label="Địa chỉ / Khu vực "
           value={contact.location}
           onChange={(e) => onContactChange("location", e.target.value)}
           error={Boolean(errors.location)}
@@ -193,6 +236,14 @@ const BookingContactStep = ({
           multiline
           minRows={3}
           required
+          InputLabelProps={{
+            required: true,
+            sx: {
+              "& .MuiFormLabel-asterisk": {
+                color: "error.main",
+              },
+            },
+          }}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "16px",
@@ -224,7 +275,10 @@ const BookingContactStep = ({
             variant="subtitle2"
             sx={{ color: STYLE.textPrimary, fontWeight: 600 }}
           >
-            Tệp đính kèm
+            Tệp đính kèm{" "}
+            <Typography component="span" sx={{ color: "error.main", ml: 0.25 }}>
+              *
+            </Typography>
           </Typography>
 
           <Stack direction="row" spacing={1.5} alignItems="center">

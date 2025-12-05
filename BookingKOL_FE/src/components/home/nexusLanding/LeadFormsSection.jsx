@@ -1,6 +1,5 @@
 ﻿import React, { useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -13,14 +12,19 @@ import {
   InputLabel,
   MenuItem,
   Select,
-  Snackbar,
   Stack,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from "@mui/material";
+import { toast } from "react-toastify";
 import { useSubmitLead } from "./useSubmitLead";
+import {
+  emailRule,
+  phoneRule,
+  requiredRule,
+} from "../../../utils/formValidators";
 
 const serviceOptions = [
   "Booking KOL/KOC",
@@ -41,16 +45,16 @@ const initialLeadState = {
   email: "",
   phone: "",
   service: "",
-  message: "",
+  note: "",
   agree: false,
 };
 
 const initialKolState = {
-  fullName: "",
-  vertical: "",
-  socialLink: "",
+  name: "",
+  major: "",
+  platform: "",
   experience: "",
-  followerSize: "",
+  followerCount: "",
 };
 
 const sectionSx = {
@@ -179,39 +183,136 @@ const LeadFormsSection = () => {
   const [leadForm, setLeadForm] = useState(initialLeadState);
   const [kolForm, setKolForm] = useState(initialKolState);
   const [leadErrors, setLeadErrors] = useState({ agree: false });
-  const [snackbar, setSnackbar] = useState({ open: false, message: "" });
+  const [kolErrors, setKolErrors] = useState({ agree: false });
+  const [leadFieldErrors, setLeadFieldErrors] = useState({});
+  const [kolFieldErrors, setKolFieldErrors] = useState({});
   const [activeForm, setActiveForm] = useState("lead");
 
   const handleLeadChange = (field) => (event) => {
     const value = field === "agree" ? event.target.checked : event.target.value;
     setLeadForm((prev) => ({ ...prev, [field]: value }));
+    if (field === "agree" && value) {
+      setLeadErrors((prev) => ({ ...prev, agree: false }));
+    }
+    if (leadFieldErrors[field]) {
+      setLeadFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    }
   };
 
   const handleKolChange = (field) => (event) => {
+    const value = field === "agree" ? event.target.checked : event.target.value;
     setKolForm((prev) => ({ ...prev, [field]: event.target.value }));
+    if (field === "agree" && value) {
+      setKolErrors((prev) => ({ ...prev, agree: false }));
+    }
+    if (kolFieldErrors[field]) {
+      setKolFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    }
   };
 
   const handleTabChange = (event, newValue) => {
     setActiveForm(newValue);
   };
 
-  const handleLeadSubmit = (event) => {
+  const validateLeadForm = async () => {
+    const errors = {};
+
+    const requiredFields = [
+      { key: "name", label: "Tên" },
+      { key: "email", label: "Email" },
+      { key: "phone", label: "Số điện thoại" },
+      { key: "service", label: "Dịch vụ quan tâm" },
+    ];
+
+    requiredFields.forEach(({ key, label }) => {
+      if (!leadForm[key]?.toString().trim()) {
+        errors[key] = requiredRule(label).message;
+      }
+    });
+
+    if (leadForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadForm.email)) {
+      errors.email = emailRule.message;
+    }
+
+    try {
+      await phoneRule.validator(null, leadForm.phone);
+    } catch (error) {
+      errors.phone = error?.message || "Số điện thoại không hợp lệ";
+    }
+
+    return errors;
+  };
+
+  const validateKolForm = () => {
+    const errors = {};
+
+    const requiredFields = [
+      { key: "name", label: "Họ tên" },
+      { key: "major", label: "Lĩnh vực" },
+      { key: "platform", label: "Nền tảng" },
+      { key: "experience", label: "Kinh nghiệm" },
+      { key: "followerCount", label: "Quy mô follower" },
+    ];
+
+    requiredFields.forEach(({ key, label }) => {
+      if (!kolForm[key]?.toString().trim()) {
+        errors[key] = requiredRule(label).message;
+      }
+    });
+
+    if (
+      kolForm.followerCount?.toString().trim() &&
+      Number.isNaN(Number(kolForm.followerCount))
+    ) {
+      errors.followerCount = "Quy mô follower phải là số";
+    }
+
+    return errors;
+  };
+
+  const handleLeadSubmit = async (event) => {
     event.preventDefault();
+
+    const fieldErrors = await validateLeadForm();
+    setLeadFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
+      return;
+    }
+
     if (!leadForm.agree) {
       setLeadErrors({ agree: true });
       return;
     }
-    submitLead({ type: "client", payload: leadForm });
-    setLeadForm(initialLeadState);
-    setLeadErrors({ agree: false });
-    setSnackbar({ open: true, message: "Gửi yêu cầu tư vấn thành công!" });
+    try {
+      await submitLead({ type: "client", payload: leadForm });
+      setLeadForm(initialLeadState);
+      setLeadErrors({ agree: false });
+      toast.success("Gửi yêu cầu tư vấn thành công!");
+    } catch (error) {
+      console.error("Failed to submit lead form", error);
+    }
   };
 
-  const handleKolSubmit = (event) => {
+  const handleKolSubmit = async (event) => {
     event.preventDefault();
-    submitLead({ type: "kol", payload: kolForm });
-    setKolForm(initialKolState);
-    setSnackbar({ open: true, message: "Gửi thông tin KOL/KOC thành công!" });
+
+    const fieldErrors = validateKolForm();
+    setKolFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
+      return;
+    }
+    if (!leadForm.agree) {
+      setKolErrors({ agree: true });
+      return;
+    }
+    try {
+      await submitLead({ type: "kol", payload: kolForm });
+      setKolForm(initialKolState);
+      setKolErrors({ agree: false });
+      toast.success("Gửi thông tin KOL/KOC thành công!");
+    } catch (error) {
+      console.error("Failed to submit KOL/KOC form", error);
+    }
   };
 
   return (
@@ -370,6 +471,8 @@ const LeadFormsSection = () => {
                     value={leadForm.name}
                     onChange={handleLeadChange("name")}
                     required
+                    error={!!leadFieldErrors.name}
+                    helperText={leadFieldErrors.name}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
@@ -381,6 +484,8 @@ const LeadFormsSection = () => {
                     onChange={handleLeadChange("email")}
                     type="email"
                     required
+                    error={!!leadFieldErrors.email}
+                    helperText={leadFieldErrors.email}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
@@ -391,6 +496,8 @@ const LeadFormsSection = () => {
                     value={leadForm.phone}
                     onChange={handleLeadChange("phone")}
                     required
+                    error={!!leadFieldErrors.phone}
+                    helperText={leadFieldErrors.phone}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
@@ -402,6 +509,7 @@ const LeadFormsSection = () => {
                       value={leadForm.service}
                       onChange={handleLeadChange("service")}
                       label="Dịch vụ quan tâm"
+                      error={!!leadFieldErrors.service}
                     >
                       {serviceOptions.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -409,11 +517,16 @@ const LeadFormsSection = () => {
                         </MenuItem>
                       ))}
                     </Select>
+                    {leadFieldErrors.service && (
+                      <FormHelperText error>
+                        {leadFieldErrors.service}
+                      </FormHelperText>
+                    )}
                   </FormControl>
                   <TextField
                     label="Ghi chú"
-                    value={leadForm.message}
-                    onChange={handleLeadChange("message")}
+                    value={leadForm.note}
+                    onChange={handleLeadChange("note")}
                     multiline
                     minRows={3}
                     variant="outlined"
@@ -462,9 +575,11 @@ const LeadFormsSection = () => {
                 >
                   <TextField
                     label="Họ tên"
-                    value={kolForm.fullName}
-                    onChange={handleKolChange("fullName")}
+                    value={kolForm.name}
+                    onChange={handleKolChange("name")}
                     required
+                    error={!!kolFieldErrors.name}
+                    helperText={kolFieldErrors.name}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
@@ -472,19 +587,23 @@ const LeadFormsSection = () => {
                   />
                   <TextField
                     label="Lĩnh vực"
-                    value={kolForm.vertical}
-                    onChange={handleKolChange("vertical")}
+                    value={kolForm.major}
+                    onChange={handleKolChange("major")}
                     required
+                    error={!!kolFieldErrors.major}
+                    helperText={kolFieldErrors.major}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
                     sx={inputFieldSx}
                   />
                   <TextField
-                    label="Liên kết mạng xã hội"
-                    value={kolForm.socialLink}
-                    onChange={handleKolChange("socialLink")}
+                    label="Nền tảng"
+                    value={kolForm.platform}
+                    onChange={handleKolChange("platform")}
                     required
+                    error={!!kolFieldErrors.platform}
+                    helperText={kolFieldErrors.platform}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
@@ -495,6 +614,8 @@ const LeadFormsSection = () => {
                     value={kolForm.experience}
                     onChange={handleKolChange("experience")}
                     required
+                    error={!!kolFieldErrors.experience}
+                    helperText={kolFieldErrors.experience}
                     multiline
                     minRows={3}
                     variant="outlined"
@@ -504,14 +625,40 @@ const LeadFormsSection = () => {
                   />
                   <TextField
                     label="Quy mô follower"
-                    value={kolForm.followerSize}
-                    onChange={handleKolChange("followerSize")}
+                    value={kolForm.followerCount}
+                    onChange={handleKolChange("followerCount")}
+                    type="number"
                     required
+                    error={!!kolFieldErrors.followerCount}
+                    helperText={kolFieldErrors.followerCount}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
                     sx={inputFieldSx}
                   />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={leadForm.agree}
+                        onChange={handleLeadChange("agree")}
+                        sx={checkboxSx}
+                      />
+                    }
+                    label={
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "rgba(15, 23, 42, 0.7)" }}
+                      >
+                        Tôi đã đọc đồng ý điều khoản & chính sách quyền riêng
+                        tư, đồng ý nhận thông tin từ Nexus.
+                      </Typography>
+                    }
+                  />
+                  {kolErrors.agree && (
+                    <FormHelperText sx={{ color: "#d32f2f" }}>
+                      Vui lòng đồng ý điều khoản.
+                    </FormHelperText>
+                  )}
                   <Button
                     type="submit"
                     variant="contained"
@@ -524,20 +671,6 @@ const LeadFormsSection = () => {
             </Box>
           </Grid>
         </Grid>
-
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        >
-          <Alert
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-            severity="success"
-            sx={{ width: "100%" }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </Container>
     </Box>
   );

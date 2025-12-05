@@ -16,6 +16,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { CheckCircle } from "lucide-react";
 import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
 import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
 import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
@@ -330,9 +331,9 @@ const ServicePackageCard = ({ data, onSelect }) => {
 
         <Stack spacing={1}>
           <Typography variant="h5" sx={{ fontWeight: 700, color: "#0f172a" }}>
-            {data?.name}
+            Gói {data?.name}
           </Typography>
-          <Typography
+          {/* <Typography
             variant="body1"
             sx={{
               color: "rgba(15, 23, 42, 0.75)",
@@ -341,7 +342,54 @@ const ServicePackageCard = ({ data, onSelect }) => {
             }}
           >
             {data?.description}
-          </Typography>
+          </Typography> */}
+          <ul
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              lineHeight: 1.6,
+              fontSize: "1rem",
+              // color: "#374151", // gray-200 : gray-700
+            }}
+          >
+            {(isVip
+              ? [
+                  "Chiến Lược Host Chính Cao Cấp",
+                  "Tự Chọn Host Cá Tính",
+                  "Trợ Lý Livestream Chuyên Nghiệp",
+                  "Ưu Đãi & Hỗ Trợ 24/7",
+                  "Báo Cáo Chuyên Sâu A-Z",
+                ]
+              : [
+                  "Chiến Dịch Host Cơ Bản",
+                  "Phân Tích & Lựa Chọn Host Tự Động",
+                  "Báo Cáo Hiệu Quả",
+                  "Cộng Tác Tự Booking Host",
+                ]
+            ).map((item, i) => (
+              <li
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "12px",
+                }}
+              >
+                <CheckCircle
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    flexShrink: 0,
+                    marginTop: "2px",
+                    color: isVip ? "#facc15" : "#2563eb", // yellow-400 / blue-600
+                  }}
+                />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </Stack>
 
         <Box sx={{ mt: "auto" }}>
@@ -480,7 +528,7 @@ const ServicePackagePage = () => {
     <Box
       sx={{
         bgcolor: "#f8fafc",
-        minHeight: "100vh",
+        // minHeight: "100vh",
         py: { xs: 8, md: 12 },
       }}
     >
@@ -498,7 +546,7 @@ const ServicePackagePage = () => {
               variant="overline"
               sx={{ letterSpacing: 2, color: "#4a74da", fontWeight: 700 }}
             >
-              danh sách gói chiến dịch
+              Danh sách gói chiến dịch
             </Typography>
             <Typography
               variant="h3"
@@ -526,26 +574,22 @@ const ServicePackagePage = () => {
 
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                md: "minmax(260px, 320px) minmax(0, 1fr)",
-                lg: "minmax(280px, 340px) minmax(0, 1fr)",
-              },
+              display: "flex",
+              flexDirection: "column",
               gap: { xs: 4, md: 6 },
-              alignItems: "start",
+              alignItems: "stretch",
             }}
           >
-            <PackageFilterPanel
+            {/* <PackageFilterPanel
               filters={filters}
               onSearchChange={handleSearchChange}
               onAllowKolChange={handleAllowKolChange}
               onReset={handleResetFilters}
               disabled={loading}
               hasActiveFilters={hasActiveFilters}
-            />
+            /> */}
 
-            <Box>
+            <Box sx={{ width: "100%" }}>
               {loading ? (
                 <PackageListLoading />
               ) : error ? (
@@ -555,25 +599,34 @@ const ServicePackagePage = () => {
               ) : (
                 <Grid
                   container
-                  spacing={{ xs: 2, md: 3 }}
-                  columns={{ xs: 12, sm: 12, md: 24, lg: 24 }}
+                  spacing={{ xs: 3, md: 4 }}
+                  justifyContent="center" // căn giữa cụm thẻ
+                  alignItems="stretch" // kéo giãn cho cao bằng nhau
                 >
-                  {filteredPackages.map((pkg) => (
-                    <Grid
-                      item
-                      xs={12}
-                      sm={12}
-                      md={12}
-                      lg={12}
-                      key={pkg.id}
-                      width={"100%"}
-                    >
-                      <ServicePackageCard
-                        data={pkg}
-                        onSelect={handleSelectPackage}
-                      />
-                    </Grid>
-                  ))}
+                  {filteredPackages.map((pkg) => {
+                    const isVip = pkg?.packageType?.toLowerCase() === "vip";
+                    return (
+                      <Grid
+                        item
+                        key={pkg.id}
+                        xs={12}
+                        md={6} // 2 cột ở >= md
+                        sx={{
+                          display: "flex", // để con fill chiều cao
+                          maxWidth: 460, // độ rộng thẻ giống ảnh
+                          minHeight: { xs: "auto", md: 400 }, // chiều cao tối thiểu để thẻ đồng đều
+                        }}
+                        order={{ xs: 0, md: isVip ? 2 : 1 }} // VIP ở cột phải
+                      >
+                        <Box sx={{ flex: 1, display: "flex" }}>
+                          <ServicePackageCard
+                            data={pkg}
+                            onSelect={handleSelectPackage}
+                          />
+                        </Box>
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               )}
             </Box>

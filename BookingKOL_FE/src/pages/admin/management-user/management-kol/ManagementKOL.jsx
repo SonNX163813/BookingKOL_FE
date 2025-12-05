@@ -1,3 +1,5 @@
+// src/pages/admin/management-user/management-kol/ManagementKOL.jsx
+
 import {
   Search,
   Trash2,
@@ -7,10 +9,9 @@ import {
   CalendarRange,
   CalendarDays,
   CheckCircle2,
-  BarChart3, // ✅ Icon thống kê
+  BarChart3, // Icon thống kê
+  Star, // Icon xem đánh giá
 } from "lucide-react";
-
-// src/pages/admin/management-user/management-kol/ManagementKOL.jsx
 
 import {
   Button,
@@ -20,7 +21,6 @@ import {
   Pagination,
   Table,
   Tag,
-  Rate,
   Tooltip,
   Image,
   Select,
@@ -29,7 +29,10 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetAllKol } from "../../../../hook/admin/management-user/useGetAllKol";
-import { adminGetKolsByCategory } from "../../../../services/admin/AdminAPI";
+import {
+  adminExportKolExcel,
+  adminGetKolsByCategory,
+} from "../../../../services/admin/AdminAPI";
 import { getAllCategory } from "../../../../services/CategoryServices";
 import imgdef from "../../../../assets/default.png";
 import { VerifiedUserOutlined } from "@mui/icons-material";
@@ -51,6 +54,7 @@ const ManagementKOL = () => {
   const [searchValue, setSearchValue] = useState();
   const [searchMinBookingPrice, setSearchMinBookingPrice] = useState();
   const [minRating, setMinRating] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Category
   const [categoryId, setCategoryId] = useState(null);
@@ -67,7 +71,6 @@ const ManagementKOL = () => {
       searchValue // -> BE param 'search' (displayName)
     );
 
-  const dataResponse = ResponseGetAllKol?.data?.content;
   const totalElements = ResponseGetAllKol?.data?.totalElements ?? 0;
 
   useEffect(() => {
@@ -159,6 +162,29 @@ const ManagementKOL = () => {
     navigate("/admin/kols/create");
   };
 
+  const handleExportKol = async () => {
+    try {
+      setIsExporting(true);
+      const blob = await adminExportKolExcel();
+      if (!blob) return;
+
+      const downloadUrl = URL.createObjectURL(
+        blob instanceof Blob ? blob : new Blob([blob])
+      );
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", "kols.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Failed to export KOL excel", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // 👉 Nút lịch: Admin xem lịch KOL (mặc định view=month)
   const handleOpenSchedule = (record) => {
     navigate(`/admin/kols/${record?.id}/schedule?view=month`);
@@ -172,6 +198,16 @@ const ManagementKOL = () => {
   // 👉 Nút xem metric / thống kê hiệu suất KOL
   const handleOpenMetrics = (record) => {
     navigate(`/admin/kols/${record?.id}/metrics`);
+  };
+
+  // 👉 Nút xem đánh giá / feedback của KOL
+  const handleOpenReviews = (record) => {
+    if (!record?.id) return;
+    navigate(`/admin/feedbacks/kol/${record.id}`, {
+      state: {
+        kolName: record.displayName, // 👈 truyền displayName sang
+      },
+    });
   };
 
   const handleSearch = (values) => {
@@ -241,19 +277,23 @@ const ManagementKOL = () => {
       },
     },
     { title: "Tên KOL", key: "displayName", dataIndex: "displayName" },
-    { title: "Quốc gia", key: "country", dataIndex: "country" },
+
     {
       title: "Chuyên mục",
       key: "categories",
       dataIndex: "categories",
       render: (categories = []) => (
-        <>
+        <div className="flex flex-wrap gap-2">
           {categories.map((cat) => (
-            <Tag color="blue" key={cat.id}>
-              <div className="!h-10 !flex !items-center">{cat.name}</div>
+            <Tag
+              color="blue"
+              key={cat.id}
+              className="!h-8 !flex !items-center !mb-1"
+            >
+              {cat.name}
             </Tag>
           ))}
-        </>
+        </div>
       ),
     },
     {
@@ -266,21 +306,10 @@ const ManagementKOL = () => {
           : "N/A",
     },
     {
-      title: "Đánh giá",
-      key: "overallRating",
-      dataIndex: "overallRating",
-      render: (rating, record) => (
-        <span>
-          <Rate disabled value={Number(rating) || 0} /> (
-          {record?.feedbackCount ?? 0})
-        </span>
-      ),
-    },
-    {
       title: "Thao tác",
       key: "action",
       align: "center",
-      width: 400,
+      width: 480,
       render: (record) => (
         <div className="w-full flex justify-center gap-2">
           {/* Xem portfolio */}
@@ -327,6 +356,16 @@ const ManagementKOL = () => {
               className="!h-10 !bg-cyan-600 !text-white !border-none hover:!bg-cyan-700 transition-all"
             >
               <BarChart3 size={18} className="font-semibold" />
+            </Button>
+          </Tooltip>
+
+          {/* Xem đánh giá */}
+          <Tooltip title="Xem đánh giá / phản hồi">
+            <Button
+              onClick={() => handleOpenReviews(record)}
+              className="!h-10 !bg-rose-600 !text-white !border-none hover:!bg-rose-700 transition-all"
+            >
+              <Star size={18} className="font-semibold" />
             </Button>
           </Tooltip>
 
@@ -470,6 +509,15 @@ const ManagementKOL = () => {
             >
               <Plus size={18} />
               Tạo KOL
+            </Button>
+          </Form.Item>
+          <Form.Item>
+            <Button
+              onClick={handleExportKol}
+              loading={isExporting}
+              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+            >
+              Xuất dữ liệu KOL
             </Button>
           </Form.Item>
         </Form>

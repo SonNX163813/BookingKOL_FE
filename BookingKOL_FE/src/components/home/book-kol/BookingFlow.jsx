@@ -1,4 +1,10 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
 import dayjs from "dayjs";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +21,7 @@ import {
   Stepper,
   Typography,
   useMediaQuery,
+  Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -29,14 +36,17 @@ import {
 } from "../../../constants/bookingFlowTextStyles";
 import { useCreateBooking as useCreateSingleBooking } from "../../../hook/booking_single/useCreateBooking";
 import { useHoldBookingSlot } from "../../../hook/booking_single/useHoldBookingSlot";
+import { useReleaseBookingSlot } from "../../../hook/booking_single/useReleaseBookingSlot";
 import { BOOKING_SINGLE_REVIEW_STORAGE_KEY } from "../../../constants/storageKeys";
 import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
+import { loadAuth } from "../../../utils/auth";
 
 /* ------------------------- HẰNG SỐ & HÀM HỖ TRỢ ------------------------- */
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_SIZE_MB = 10;
 const MAX_ATTACHMENT_SIZE_BYTES = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
+const HOLD_DURATION_SECONDS = 15 * 60;
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
@@ -44,6 +54,17 @@ const formatCurrency = (value) =>
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
+
+const formatCountdown = (totalSeconds) => {
+  const safeSeconds = Math.max(Number(totalSeconds) || 0, 0);
+  const minutes = Math.floor(safeSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = Math.floor(safeSeconds % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${minutes}:${seconds}`;
+};
 
 const getScheduleLabel = (start, end) => {
   if (!start) return "Chưa chọn";
@@ -87,6 +108,8 @@ const BookingFlow = ({
   const [attachments, setAttachments] = useState([]);
   const [errors, setErrors] = useState({});
   const [heldSlot, setHeldSlot] = useState(null);
+  const [holdExpiresAt, setHoldExpiresAt] = useState(null);
+  const [holdCountdown, setHoldCountdown] = useState(null);
 
   const { isLoadingCreateBooking: submitting, handleCreateBooking } =
     useCreateSingleBooking(null, {
@@ -95,6 +118,7 @@ const BookingFlow = ({
     });
   const { isHoldingBookingSlot: holdingSlot, handleHoldBookingSlot } =
     useHoldBookingSlot();
+  const { handleReleaseBookingSlot } = useReleaseBookingSlot();
   const {
     platforms,
     isLoadingPlatforms,
@@ -102,6 +126,10 @@ const BookingFlow = ({
     refetchPlatforms,
     platformsError,
   } = useGetPlatforms();
+
+  // Guard để tránh release nhiều lần và tránh toast hết hạn nhiều lần
+  const hasReleasedSlotRef = useRef(false);
+  const hasHoldExpiredRef = useRef(false);
 
   /* ---------------------- Reset khi mở ---------------------- */
   useEffect(() => {
@@ -125,6 +153,10 @@ const BookingFlow = ({
     setAttachments([]);
     setErrors({});
     setHeldSlot(null);
+    setHoldExpiresAt(null);
+    setHoldCountdown(null);
+    hasReleasedSlotRef.current = false;
+    hasHoldExpiredRef.current = false;
   }, [open, userProfile]);
 
   const platformOptions = useMemo(() => {
@@ -152,6 +184,17 @@ const BookingFlow = ({
   }, [platforms]);
 
   const platformLoading = isLoadingPlatforms || isFetchingPlatforms;
+  const currentUserId = useMemo(() => {
+    const fromProfile =
+      userProfile?.id ||
+      userProfile?.userId ||
+      userProfile?.user_id ||
+      userProfile?.userID;
+    if (fromProfile) return fromProfile;
+
+    const { user } = loadAuth();
+    return user?.id || user?.userId || user?.user_id || user?.userID || "";
+  }, [userProfile]);
 
   useEffect(() => {
     if (!open) return;
@@ -228,11 +271,93 @@ const BookingFlow = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  /* ---------------------- Guard release slot ---------------------- */
+
+  // reset guard mỗi lần giữ slot mới
+  useEffect(() => {
+    if (heldSlot) {
+      hasReleasedSlotRef.current = false;
+      hasHoldExpiredRef.current = false;
+    }
+  }, [heldSlot]);
+
+  const safeReleaseSlot = useCallback(
+    async (slot) => {
+      if (!slot) return;
+      if (hasReleasedSlotRef.current) return; // đã release rồi
+      hasReleasedSlotRef.current = true;
+      return handleReleaseBookingSlot(slot);
+    },
+    [handleReleaseBookingSlot]
+  );
+
   /* ---------------------- Chuyển bước ---------------------- */
-  const handleBack = () => {
-    if (activeStep === 0) onClose?.();
-    else setActiveStep((prev) => Math.max(prev - 1, 0));
+
+  const handleBack = async () => {
+    if (activeStep === 0) {
+      onClose?.();
+      return;
+    }
+
+    const slot = heldSlot;
+    if (slot?.kolId && slot?.startTimeIso && slot?.endTimeIso) {
+      try {
+        await safeReleaseSlot(slot);
+        setHeldSlot(null);
+        setHoldExpiresAt(null);
+        setHoldCountdown(null);
+      } catch (error) {
+        toast.error("Không thể hoàn tác khung giờ. Vui lòng thử lại.");
+      }
+    }
+
+    setActiveStep((prev) => Math.max(prev - 1, 0));
   };
+
+  const handleHoldExpiration = useCallback(async () => {
+    // tránh xử lý hết hạn nhiều lần (và toast nhiều lần)
+    if (hasHoldExpiredRef.current) return;
+    hasHoldExpiredRef.current = true;
+
+    const slot = heldSlot;
+    if (!slot) return;
+
+    try {
+      await safeReleaseSlot(slot);
+    } catch (error) {
+      // ignore
+    } finally {
+      setHeldSlot(null);
+      setHoldExpiresAt(null);
+      setHoldCountdown(null);
+      setStartDateTime(null);
+      setEndDateTime(null);
+      setActiveStep(0);
+      toast.warn("Khung giờ giữ đã hết hạn. Vui lòng chọn lại khung giờ.");
+    }
+  }, [heldSlot, safeReleaseSlot]);
+
+  useEffect(() => {
+    if (!heldSlot || !holdExpiresAt) {
+      setHoldCountdown(null);
+      return;
+    }
+
+    let handled = false;
+    const tick = () => {
+      const remainingMs = holdExpiresAt - Date.now();
+      const next = Math.max(Math.floor(remainingMs / 1000), 0);
+      setHoldCountdown(next);
+      if (next <= 0 && !handled) {
+        handled = true;
+        handleHoldExpiration();
+      }
+    };
+
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [heldSlot, holdExpiresAt, handleHoldExpiration]);
 
   const handleHoldSlotClick = async () => {
     if (!validateStep(activeStep, true)) return;
@@ -258,14 +383,14 @@ const BookingFlow = ({
         startTimeIso: data?.startTimeIso ?? startIso,
         endTimeIso: data?.endTimeIso ?? endIso,
       };
-
       setHeldSlot(nextSlot);
-      // toast.success("Đã giữ chỗ thành công!");
+      setHoldExpiresAt(Date.now() + HOLD_DURATION_SECONDS * 1000);
+      setHoldCountdown(HOLD_DURATION_SECONDS);
       setActiveStep((prev) => Math.min(prev + 1, TEXT.steps.length - 1));
     } catch (err) {
       const errorMsg =
         err?.response?.message ?? "Không thể giữ chỗ. Vui lòng thử lại.";
-      toast.error(errorMsg);
+      // toast.error(errorMsg);
     }
   };
 
@@ -326,6 +451,11 @@ const BookingFlow = ({
 
   const handleAttachmentRemove = (id) => {
     setAttachments((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const handleModalClose = (_, reason) => {
+    if (reason === "backdropClick" || reason === "escapeKeyDown") return;
+    onClose?.();
   };
 
   /* ---------------------- Gửi yêu cầu ---------------------- */
@@ -397,6 +527,10 @@ const BookingFlow = ({
         attachments,
       });
 
+      setHeldSlot(null);
+      setHoldExpiresAt(null);
+      setHoldCountdown(null);
+
       onClose?.();
       navigate("/xac-nhan-dat-lich-kol-le", {
         state: {
@@ -459,37 +593,107 @@ const BookingFlow = ({
   }, [kolName, startDateTime, endDateTime, kolMinPrice]);
 
   /* ---------------------- Giao diện ---------------------- */
-  const renderStepContent = () =>
-    activeStep === 0 ? (
-      <BookingScheduleStep
-        kolId={kolId}
-        STYLE={STYLE}
-        TEXT={TEXT}
-        onSelectSchedule={(start, end) => {
-          setStartDateTime(start);
-          setEndDateTime(end);
-        }}
-      />
-    ) : (
-      <BookingContactStep
-        contact={contact}
-        errors={errors}
-        onContactChange={handleContactChange}
-        summary={summary}
-        attachments={attachments}
-        onAddAttachments={handleAttachmentAdd}
-        onRemoveAttachment={handleAttachmentRemove}
-        attachmentLimit={MAX_ATTACHMENTS}
-        maxAttachmentSizeMb={MAX_ATTACHMENT_SIZE_MB}
-        STYLE={STYLE}
-        TEXT={TEXT}
-        formatCurrency={formatCurrency}
-        platformOptions={platformOptions}
-        platformLoading={platformLoading}
-        platformError={platformsError}
-        onReloadPlatforms={refetchPlatforms}
-      />
+  const renderStepContent = () => {
+    if (activeStep === 0) {
+      return (
+        <BookingScheduleStep
+          kolId={kolId}
+          STYLE={STYLE}
+          TEXT={TEXT}
+          currentUserId={currentUserId}
+          isOpen={open}
+          onSelectSchedule={(start, end) => {
+            setStartDateTime(start);
+            setEndDateTime(end);
+          }}
+        />
+      );
+    }
+
+    return (
+      <Stack spacing={2}>
+        {heldSlot && holdCountdown !== null && (
+          <Alert
+            severity="warning"
+            sx={{
+              borderRadius: "14px",
+              backgroundColor: STYLE.subtleSurface,
+              border: `1px solid ${STYLE.border}`,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              sx={{ width: "100%" }}
+              spacing={1.5}
+            >
+              <Box>
+                <Typography
+                  sx={{
+                    fontWeight: 700,
+                    mb: 0.5,
+                    color: STYLE.textPrimary,
+                  }}
+                >
+                  Bạn đang giữ khung giờ này
+                </Typography>
+                <Typography sx={{ color: STYLE.textSecondary, fontSize: 14 }}>
+                  Sau 15 phút, hệ thống sẽ tự động quay về bước chọn khung giờ
+                  và giải phóng slot nếu bạn chưa hoàn tất đặt lịch.
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  minWidth: 150,
+                  p: 3,
+                  borderRadius: "999px",
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                  boxShadow: "0 0 0 1px rgba(255,193,7,0.3)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {formatCountdown(holdCountdown)}
+                </Typography>
+              </Box>
+            </Stack>
+          </Alert>
+        )}
+
+        <BookingContactStep
+          contact={contact}
+          errors={errors}
+          onContactChange={handleContactChange}
+          summary={summary}
+          attachments={attachments}
+          onAddAttachments={handleAttachmentAdd}
+          onRemoveAttachment={handleAttachmentRemove}
+          attachmentLimit={MAX_ATTACHMENTS}
+          maxAttachmentSizeMb={MAX_ATTACHMENT_SIZE_MB}
+          STYLE={STYLE}
+          TEXT={TEXT}
+          formatCurrency={formatCurrency}
+          platformOptions={platformOptions}
+          platformLoading={platformLoading}
+          platformError={platformsError}
+          onReloadPlatforms={refetchPlatforms}
+        />
+      </Stack>
     );
+  };
 
   const renderFooter = () => (
     <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
@@ -595,7 +799,8 @@ const BookingFlow = ({
         <Drawer
           anchor="bottom"
           open={open}
-          onClose={onClose}
+          onClose={handleModalClose}
+          ModalProps={{ disableEscapeKeyDown: true }}
           PaperProps={{
             sx: {
               height: "100vh",
@@ -611,9 +816,10 @@ const BookingFlow = ({
       ) : (
         <Dialog
           open={open}
-          onClose={onClose}
+          onClose={handleModalClose}
           fullWidth
           maxWidth="md"
+          disableEscapeKeyDown
           PaperProps={{
             sx: {
               borderRadius: "28px",

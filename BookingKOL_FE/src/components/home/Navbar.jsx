@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -23,10 +23,11 @@ import MenuIcon from "@mui/icons-material/Menu";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import logoweb from "../../assets/logocty.png";
 import { useAuth } from "../../context/AuthContext";
+import NotificationBell from "../common/NotificationBell";
 
 const navItems = [
   { label: "Trang chủ", to: "/" },
-  { label: "Về chúng tôi", to: "/ve-chung-toi" },
+  // { label: "Về chúng tôi", to: "/ve-chung-toi" },
   {
     label: "Các gói dịch vụ",
     hasDropdown: true,
@@ -37,7 +38,7 @@ const navItems = [
     ],
   },
   { label: "Blog", to: "/blog" },
-  { label: "Quy trình hoàn thiện", to: "/quy-trinh" },
+  // { label: "Quy trình hoàn thiện", to: "/quy-trinh" },
   { label: "Trợ lý ảo AI", to: "/chat-AI" },
 ];
 
@@ -298,6 +299,7 @@ const Navbar = () => {
                   </>
                 ) : (
                   <>
+                    <NotificationBell loggedIn={loggedIn} />
                     {/* Nút tài khoản: hover mở tạm, click ghim */}
                     <Button
                       onMouseEnter={handleAccountHover}
@@ -349,6 +351,7 @@ const Navbar = () => {
                   </>
                 ) : (
                   <>
+                    <NotificationBell loggedIn={loggedIn} />
                     {/* Mobile: click mở (không hover) */}
                     <Button
                       onClick={handleAccountClick}
@@ -382,12 +385,6 @@ const Navbar = () => {
               </Box>
             )}
           </Box>
-
-          {!trigger && (
-            <Divider
-              sx={{ mt: 1.25, opacity: 0.6, borderColor: "rgba(2,6,23,0.06)" }}
-            />
-          )}
         </Box>
       </Toolbar>
 
@@ -530,7 +527,15 @@ const Navbar = () => {
         </MenuItem>
         <MenuItem
           component={Link}
-          to="/don-mua"
+          to="/don-dat-khoa-hoc"
+          onClick={closeAccount}
+          sx={{ fontWeight: 700, py: 1.25 }}
+        >
+          Đơn đặt khóa học
+        </MenuItem>
+        <MenuItem
+          component={Link}
+          to="/don-booking-chien-dich"
           onClick={closeAccount}
           sx={{ fontWeight: 700, py: 1.25 }}
         >

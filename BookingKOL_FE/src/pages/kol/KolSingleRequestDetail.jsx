@@ -25,6 +25,8 @@ import {
   Tag,
   Typography,
   message,
+  Modal,
+  Input,
 } from "antd";
 import {
   ArrowLeft,
@@ -32,6 +34,7 @@ import {
   FileText,
   UserCircle2,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
@@ -39,6 +42,9 @@ import { getKolMySingleRequestDetail } from "../../services/kol/KolAPI";
 import { createKolLivestreamMetric } from "../../services/kol/LiveMetricAPI";
 import { getKolLivestreamMetrics } from "../../services/kol/LiveMetricQueryAPI";
 import LivestreamMetricModal from "../../components/kol/kol-metric/LivestreamMetricModal";
+import { createKolCancelBookingRequest } from "../../services/kol/KolCancelBookingRequestAPI";
+import { get } from "../../config/axios-config";
+import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
 const { Title, Text, Link } = Typography;
 const { useBreakpoint } = Grid;
@@ -61,7 +67,7 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hoàn thành", value: "COMPLETED" },
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã thanh toán", value: "PAID" },
+  { label: "Đã chờ thực hiện", value: "PAID" },
 ];
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
@@ -76,6 +82,15 @@ const BOOKING_STATUS_MAP = BOOKING_STATUS_OPTIONS.reduce(
   (a, s) => ((a[s.value] = s.label), a),
   {}
 );
+
+/* ===== CANCEL STATUS META ===== */
+const CANCEL_STATUS_META = {
+  PENDING: { label: "Chờ duyệt", color: "gold" },
+  APPROVED: { label: "Đã duyệt", color: "green" },
+  REJECT: { label: "Từ chối", color: "red" },
+  REJECTED: { label: "Từ chối", color: "red" },
+};
+
 const formatDateTime = (v, p = "DD/MM/YYYY HH:mm") =>
   v ? dayjs(v).format(p) : "--";
 const normalizeStatus = (s) =>
@@ -110,6 +125,7 @@ const renderFilePreviewCell = ({ fileType, fileUrl, fileName }) => {
     </Link>
   );
 };
+
 const renderImageField = (url, label) =>
   !url ? (
     "--"
@@ -149,7 +165,6 @@ const fmtVnd = (v) =>
 const fmtPct = (v) =>
   Number.isFinite(+v) ? `${(+v).toFixed(2).replace(/\.00$/, "")}%` : "--";
 
-/* Hiển thị avgViewDuration theo GIÂY */
 const METRIC_FIELDS = [
   { key: "revenue", label: "Tổng doanh thu", fmt: fmtVnd },
   { key: "gpm", label: "GPM", fmt: fmtVnd },
@@ -172,6 +187,36 @@ const METRIC_FIELDS = [
 const getHttpStatus = (e) =>
   e?.appStatus || e?.response?.status || e?.status || 0;
 const isBadRequest = (e) => getHttpStatus(e) === 400;
+
+const pickErrorMessage = (e) =>
+  e?.response?.data?.message || e?.data?.message || e?.message || "";
+const isAlreadyRequestedMsg = (txt) => /đã gửi yêu cầu hủy/i.test(txt || "");
+
+/**
+ * ✅ GET /v1/requests/cancel/detail/{workTimeId}
+ * NOTE: validateStatus cho phép 404 -> không bị reject -> không bắn toast "Không tìm thấy..." từ interceptor
+ */
+async function getKolCancelRequestDetail(workTimeId, { signal } = {}) {
+  if (!workTimeId) throw new Error("workTimeId is required");
+
+  const builder =
+    CLIENT_API_PATHS?.BOOKING?.kolCancelRequestDetail ??
+    ((id) => `/v1/requests/cancel/detail/${encodeURIComponent(id)}`);
+
+  const url = typeof builder === "function" ? builder(workTimeId) : builder;
+
+  const res = await get({
+    url,
+    config: {
+      ...(signal ? { signal } : {}),
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 404,
+    },
+  });
+
+  if (res?.status === 404) return null;
+  return res?.data ?? null;
+}
 
 export default function KolSingleRequestDetail() {
   const { requestId } = useParams();
@@ -202,10 +247,21 @@ export default function KolSingleRequestDetail() {
   });
 
   const normalizedStatus = normalizeStatus(detail?.status);
+
+  // ✅ NEW: chỉ PAID mới được hiện button yêu cầu hủy
+  const canRequestCancel = normalizedStatus === "PAID";
+
   const canInputMetrics = normalizedStatus === "IN_PROGRESS";
   const requestNo = detail?.requestNumber ?? detail?.id ?? requestId ?? "--";
 
+  // kolId lấy từ detail (không hiển thị)
+  const kolId = detail?.kol?.id ?? "";
+
   const worktimes = extractWorktimes(detail);
+
+  // ✅ NEW: nếu có >= 2 worktime => ẩn nút yêu cầu hủy
+  const hasMultipleWorktimes = (worktimes?.length ?? 0) >= 2;
+
   const endedWorktime = worktimes.find(
     (w) =>
       normalizeStatus(w?.status) === "IN_PROGRESS" &&
@@ -241,9 +297,24 @@ export default function KolSingleRequestDetail() {
     queryKey: ["kol-livestream-metrics", token, selectedWorktimeId],
     queryFn: () => getKolLivestreamMetrics(selectedWorktimeId),
     enabled: !!token && !!selectedWorktimeId,
-    // ⬇ KHÔNG retry nếu 400 (coi như "chưa có số liệu")
     retry: (count, err) => (isBadRequest(err) ? false : count < 1),
   });
+
+  /* GET cancel detail theo workTimeId */
+  const {
+    data: cancelDetail,
+    isLoading: isCancelDetailLoading,
+    isFetching: isCancelDetailFetching,
+    error: cancelDetailError,
+    refetch: refetchCancelDetail,
+  } = useQuery({
+    queryKey: ["kol-cancel-detail", token, selectedWorktimeId],
+    queryFn: () => getKolCancelRequestDetail(selectedWorktimeId),
+    enabled: !!token && !!selectedWorktimeId,
+    retry: (count) => count < 1,
+  });
+
+  const showCancelCard = !!cancelDetail || !!cancelDetailError;
 
   /* POST metrics */
   const { mutateAsync: submitMetricsAsync, isLoading: isSubmitting } =
@@ -269,6 +340,7 @@ export default function KolSingleRequestDetail() {
     setSelectedWorktimeId(wid);
     refetch();
     refetchMetrics();
+    refetchCancelDetail();
   };
 
   /* Back button */
@@ -323,6 +395,85 @@ export default function KolSingleRequestDetail() {
     [worktimes, selectedWorktimeId]
   );
 
+  /* =================== CANCEL REQUEST UI/LOGIC =================== */
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const { mutateAsync: cancelRequestAsync, isLoading: isCancelling } =
+    useMutation({
+      mutationFn: async ({ kolId, workTimeId, reason }) =>
+        createKolCancelBookingRequest({ kolId, workTimeId, reason }),
+    });
+
+  const openCancelModal = () => {
+    if (!canRequestCancel) return; // ✅ chỉ PAID mới cho mở
+    if ((worktimes?.length ?? 0) >= 2) return; // ✅ có 2 id thì không cho mở
+
+    if (!kolId) return message.error("Không tìm thấy thông tin KOL (kolId).");
+    if (!worktimes?.length)
+      return message.error("Không tìm thấy ca livestream (workTimeId).");
+    setCancelOpen(true);
+  };
+
+  const submitCancelRequest = async () => {
+    if (isCancelling) return; // ✅ chặn double-click
+
+    try {
+      if (!kolId) return message.error("Thiếu kolId.");
+      if (!worktimes?.length) return message.error("Thiếu workTimeId.");
+
+      const workTimeId =
+        selectedWorktimeId || endedWorktime?.id || worktimes?.[0]?.id || "";
+
+      if (!workTimeId) return message.error("Không xác định được workTimeId.");
+
+      await cancelRequestAsync({
+        kolId,
+        workTimeId,
+        reason: cancelReason,
+      });
+
+      message.destroy();
+      message.success("Gửi yêu cầu hủy lịch đặt chỗ thành công");
+
+      setCancelOpen(false);
+      setCancelReason("");
+      setSelectedWorktimeId(workTimeId);
+
+      refetch();
+      refetchCancelDetail();
+    } catch (e) {
+      const backendMsg = pickErrorMessage(e);
+
+      if (isAlreadyRequestedMsg(backendMsg)) {
+        message.destroy();
+        message.success("Gửi yêu cầu hủy lịch đặt chỗ thành công");
+        setCancelOpen(false);
+        setCancelReason("");
+        refetch();
+        refetchCancelDetail();
+        return;
+      }
+
+      message.error(backendMsg || "Gửi yêu cầu hủy thất bại.");
+    }
+  };
+  /* =================== END CANCEL =================== */
+
+  // ✅ NEW: chỉ PAID + chưa có cancelDetail + không có >=2 worktimes
+  const canShowCancelButton =
+    canRequestCancel && !cancelDetail && !hasMultipleWorktimes;
+
+  // ✅ chống cắt chữ
+  const descContentStyle = useMemo(
+    () => ({
+      whiteSpace: "normal",
+      wordBreak: "keep-all",
+      overflowWrap: "break-word",
+    }),
+    []
+  );
+
   return (
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -330,6 +481,7 @@ export default function KolSingleRequestDetail() {
           <Button icon={<ArrowLeft size={16} />} onClick={goBackList}>
             Quay lại danh sách
           </Button>
+
           <Button
             icon={<CalendarRange size={16} />}
             onClick={() => refetch()}
@@ -337,6 +489,13 @@ export default function KolSingleRequestDetail() {
           >
             Làm mới
           </Button>
+
+          {canShowCancelButton && (
+            <Button danger onClick={openCancelModal} loading={isCancelling}>
+              Yêu cầu hủy đơn đặt chỗ
+            </Button>
+          )}
+
           {canInputMetrics && (
             <Button
               type="primary"
@@ -357,6 +516,46 @@ export default function KolSingleRequestDetail() {
           </Text>
         </div>
       </div>
+
+      {/* ===== Modal yêu cầu hủy đặt chỗ ===== */}
+      <Modal
+        open={cancelOpen}
+        title="Yêu cầu hủy đơn đặt chỗ"
+        okText="Gửi yêu cầu"
+        cancelText="Đóng"
+        onOk={submitCancelRequest}
+        onCancel={() => {
+          if (isCancelling) return;
+          setCancelOpen(false);
+        }}
+        confirmLoading={isCancelling}
+        okButtonProps={{
+          danger: true,
+          loading: isCancelling, // ✅ spinner trên button OK
+          disabled: isCancelling,
+        }}
+        cancelButtonProps={{ disabled: isCancelling }}
+        closable={!isCancelling}
+        maskClosable={!isCancelling}
+        keyboard={!isCancelling}
+        destroyOnClose
+      >
+        <Space direction="vertical" size={10} className="w-full">
+          <Text type="secondary">
+            Bạn có thể nhập lý do (tuỳ chọn) để Admin xử lý nhanh hơn.
+          </Text>
+
+          <Input.TextArea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Ví dụ: trùng lịch / có việc đột xuất..."
+            autoSize={{ minRows: 3, maxRows: 6 }}
+            maxLength={500}
+            showCount
+            disabled={isCancelling}
+          />
+        </Space>
+      </Modal>
 
       {error ? (
         <Card>
@@ -399,12 +598,96 @@ export default function KolSingleRequestDetail() {
               showIcon
               className="mb-3"
               message="Không tìm thấy ca livestream trong chi tiết yêu cầu."
-              description="API có thể trả key 'kolWorkTimes' thay vì 'workTimes'. Component đã hỗ trợ cả hai."
             />
           )}
 
+          {/* ✅ Card chi tiết yêu cầu hủy */}
+          {showCancelCard && (
+            <Card
+              className="shadow-sm"
+              bordered={false}
+              title={<span>Chi tiết yêu cầu hủy</span>}
+              extra={
+                <Button
+                  onClick={() => refetchCancelDetail()}
+                  loading={isCancelDetailFetching}
+                  disabled={!selectedWorktimeId}
+                >
+                  Làm mới
+                </Button>
+              }
+            >
+              {cancelDetailError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  message="Không tải được chi tiết yêu cầu hủy."
+                  description={String(cancelDetailError?.message || "")}
+                />
+              ) : (
+                <Skeleton
+                  loading={isCancelDetailLoading}
+                  active
+                  paragraph={{ rows: 3 }}
+                >
+                  {(() => {
+                    const cancelKey = normalizeStatus(cancelDetail?.status);
+                    const meta = cancelKey
+                      ? CANCEL_STATUS_META[cancelKey]
+                      : null;
+
+                    return (
+                      <Descriptions
+                        bordered
+                        size="middle"
+                        column={screens.lg ? 3 : screens.md ? 2 : 1}
+                        labelStyle={{ width: 220 }}
+                        contentStyle={descContentStyle}
+                      >
+                        <Descriptions.Item label="Trạng thái">
+                          {cancelDetail?.status ? (
+                            <Tag color={meta?.color ?? "default"}>
+                              {meta?.label ?? cancelKey}
+                            </Tag>
+                          ) : (
+                            "--"
+                          )}
+                        </Descriptions.Item>
+
+                        <Descriptions.Item label="Lý do">
+                          <Text style={{ whiteSpace: "pre-wrap" }}>
+                            {cancelDetail?.reason ?? "--"}
+                          </Text>
+                        </Descriptions.Item>
+
+                        <Descriptions.Item label="Tạo lúc">
+                          {formatDateTime(cancelDetail?.createdAt)}
+                        </Descriptions.Item>
+
+                        {cancelDetail?.approvedAt ? (
+                          <Descriptions.Item label="Duyệt lúc">
+                            {formatDateTime(cancelDetail.approvedAt)}
+                          </Descriptions.Item>
+                        ) : null}
+                      </Descriptions>
+                    );
+                  })()}
+                </Skeleton>
+              )}
+            </Card>
+          )}
+
           {/* --- Thông tin yêu cầu --- */}
-          <Card className="shadow-sm" bordered={false}>
+          <Card
+            className="shadow-sm"
+            bordered={false}
+            title={
+              <Space>
+                <ClipboardList size={18} />
+                <span>Thông tin đơn Booking</span>
+              </Space>
+            }
+          >
             <Space size="middle" wrap className="justify-between w-full">
               <Space size="middle" wrap>
                 <Tag color={STATUS_TAG_COLOR[normalizedStatus] ?? "default"}>
@@ -425,6 +708,7 @@ export default function KolSingleRequestDetail() {
               size="middle"
               column={screens.lg ? 3 : screens.md ? 2 : 1}
               labelStyle={{ width: 180 }}
+              contentStyle={descContentStyle}
             >
               <Descriptions.Item label="Mã yêu cầu">
                 {requestNo}
@@ -474,8 +758,9 @@ export default function KolSingleRequestDetail() {
             <Descriptions
               bordered
               size="middle"
-              column={screens.lg ? 3 : screens.md ? 2 : 1}
-              labelStyle={{ width: 180 }}
+              column={screens.lg ? 2 : 1}
+              labelStyle={{ width: 150 }}
+              contentStyle={descContentStyle}
             >
               <Descriptions.Item label="Họ tên đầy đủ">
                 {detail?.kol?.fullName ?? "--"}
@@ -492,20 +777,20 @@ export default function KolSingleRequestDetail() {
               <Descriptions.Item label="Thành phố">
                 {detail?.kol?.city ?? "--"}
               </Descriptions.Item>
-              <Descriptions.Item label="Tiểu sử" span={screens.lg ? 3 : 1}>
+
+              <Descriptions.Item label="Tiểu sử" span={screens.lg ? 2 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.bio ?? "--"}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 3 : 1}>
+
+              <Descriptions.Item label="Kinh nghiệm" span={screens.lg ? 2 : 1}>
                 <Text style={{ whiteSpace: "pre-wrap" }}>
                   {detail?.kol?.experience ?? "--"}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item
-                label="Ảnh đại diện"
-                span={screens.lg ? 3 : screens.md ? 2 : 1}
-              >
+
+              <Descriptions.Item label="Ảnh đại diện" span={screens.lg ? 2 : 1}>
                 {renderImageField(
                   detail?.kol?.avatarUrl,
                   detail?.kol?.displayName ?? detail?.kol?.fullName
@@ -570,10 +855,8 @@ export default function KolSingleRequestDetail() {
                 type="info"
                 showIcon
                 message="Chưa có ca livestream được chọn."
-                description="Hãy chọn 'ca livestream' trong hộp thoại nhập số liệu khi có nhiều worktime."
               />
             ) : isBadRequest(metricsError) ? (
-              // ⬅️ Nếu 400 Bad Request → coi như chưa có metric → hiển thị Empty
               <Empty description="Chưa có số liệu. Hãy nhấn 'Nhập số liệu' để lưu trước." />
             ) : metricsError ? (
               <Alert
@@ -609,6 +892,7 @@ export default function KolSingleRequestDetail() {
                       size="middle"
                       column={screens.lg ? 3 : screens.md ? 2 : 1}
                       labelStyle={{ width: 220 }}
+                      contentStyle={descContentStyle}
                     >
                       {METRIC_FIELDS.map(({ key, label, fmt }) => (
                         <Descriptions.Item key={key} label={label}>
@@ -624,7 +908,6 @@ export default function KolSingleRequestDetail() {
             )}
           </Card>
 
-          {/* ===== Modal nhập số liệu (reusable) ===== */}
           <LivestreamMetricModal
             open={metricsOpen}
             onClose={() => setMetricsOpen(false)}

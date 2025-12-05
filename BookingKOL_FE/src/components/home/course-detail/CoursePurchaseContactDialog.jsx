@@ -15,6 +15,10 @@ const fieldStyle = {
     borderRadius: "16px",
     backgroundColor: "rgba(248, 250, 255, 0.9)",
   },
+  // Màu đỏ cho dấu *
+  "& .MuiFormLabel-asterisk": {
+    color: "#ef4444",
+  },
 };
 
 const CoursePurchaseContactDialog = ({
@@ -60,18 +64,34 @@ const CoursePurchaseContactDialog = ({
       </DialogTitle>
       <DialogContent sx={{ pt: 1 }}>
         <Typography
-          sx={{ color: "rgba(15,23,42,0.72)", mb: 3, lineHeight: 1.6 }}
+          sx={{ color: "rgba(15,23,42,0.72)", mb: 1.5, lineHeight: 1.6 }}
         >
           Vui lòng cung cấp thông tin để chúng tôi gửi hướng dẫn thanh toán và
           chăm sóc bạn tốt hơn.
         </Typography>
+        <Typography
+          sx={{
+            color: "rgba(15,23,42,0.8)",
+            mb: 3,
+            fontSize: "0.9rem",
+            lineHeight: 1.6,
+          }}
+        >
+          Email sẽ được dùng làm tài khoản trên nền tảng học (YouTube), vì vậy
+          hãy nhập đúng email tài khoản YouTube của bạn. Sau khi thanh toán,
+          admin sẽ thêm bạn vào lớp trong thời gian sớm nhất.
+        </Typography>
+
         <Stack spacing={2.5}>
           <TextField
             label="Email liên hệ"
             value={contact.email}
             onChange={(event) => onFieldChange?.("email", event.target.value)}
             error={Boolean(errors.email)}
-            helperText={errors.email || "Ví dụ: user@example.com"}
+            helperText={
+              errors.email ||
+              "Email dùng để cấp quyền vào lớp học trên YouTube. Ví dụ: user@gmail.com"
+            }
             required
             sx={fieldStyle}
             inputProps={{ inputMode: "email" }}

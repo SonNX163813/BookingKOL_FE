@@ -40,13 +40,20 @@ const BASE_QUERY_PARAMS = {
 const PAGE_SIZE_OPTIONS = Object.freeze([10, 20, 30]);
 
 const DEFAULT_FILTER_VALUES = Object.freeze({
+  nameKeyword: "",
   minPrice: "",
   minRating: "",
   categoryId: "",
   role: "",
 });
 
-const FILTER_FIELDS = ["minPrice", "minRating", "categoryId", "role"];
+const FILTER_FIELDS = [
+  "nameKeyword",
+  "minPrice",
+  "minRating",
+  "categoryId",
+  "role",
+];
 
 const createDefaultFilters = () => ({
   ...DEFAULT_FILTER_VALUES,
@@ -84,6 +91,14 @@ const sanitizeFilters = (rawFilters, pagination) => {
     params.minPrice = minPrice;
   }
 
+  const nameKeyword =
+    typeof filters.nameKeyword === "string"
+      ? filters.nameKeyword.trim()
+      : undefined;
+  if (nameKeyword) {
+    params.nameKeyword = nameKeyword;
+  }
+
   const minRating = parseNumericInput(filters.minRating);
   if (minRating !== undefined && minRating >= 0) {
     params.minRating = Math.min(Math.max(minRating, 0), 5);
@@ -91,7 +106,7 @@ const sanitizeFilters = (rawFilters, pagination) => {
 
   const role =
     typeof filters.role === "string" ? filters.role.trim().toUpperCase() : "";
-  if (role) {
+  if (role === "KOL" || role === "LIVE") {
     params.role = role;
   }
 
@@ -138,7 +153,9 @@ const mapKolProfileToCard = (kol) => {
   if (!kol?.id) {
     return null;
   }
-
+  const rawRole =
+    typeof kol?.role === "string" ? kol.role.trim().toUpperCase() : "";
+  const role = rawRole === "LIVE" || rawRole === "KOL" ? rawRole : "";
   const categoryNames = Array.isArray(kol.categories)
     ? kol.categories.map((category) => category?.name).filter(Boolean)
     : [];
@@ -151,7 +168,8 @@ const mapKolProfileToCard = (kol) => {
   if (rateNote) {
     tooltipPieces.push(rateNote);
   }
-  const fieldFull = tooltipPieces.filter(Boolean).join(" | ");
+  // const fieldFull = tooltipPieces.filter(Boolean).join(" | ");
+  const fieldFull = categoriesLabel;
   let field = fieldFull || rateNote;
   if (!field) {
     field = "Sẵn sàng hợp tác";
@@ -199,6 +217,7 @@ const mapKolProfileToCard = (kol) => {
     reviewCount,
     image,
     slug,
+    role,
   };
 };
 
@@ -457,9 +476,7 @@ const ListKOL = () => {
 
   const hasActiveFilters = useMemo(() => {
     const params = sanitizeFilters(filters);
-    return ["minPrice", "minRating", "categoryId", "role"].some(
-      (key) => params[key] !== undefined
-    );
+    return FILTER_FIELDS.some((key) => params[key] !== undefined);
   }, [filters]);
 
   const queryParams = useMemo(
@@ -507,8 +524,11 @@ const ListKOL = () => {
 
   const handleRoleChange = useCallback(
     (_event, value) => {
-      const normalized = value === "LIVE" ? "LIVE" : "";
-      handleFilterFieldChange("role", normalized);
+      const normalized =
+        typeof value === "string" ? value.trim().toUpperCase() : "";
+      const allowed = normalized === "LIVE" || normalized === "KOL";
+      const nextValue = allowed ? normalized : "";
+      handleFilterFieldChange("role", nextValue);
     },
     [handleFilterFieldChange]
   );
@@ -694,7 +714,7 @@ const ListKOL = () => {
       <Container
         maxWidth={false}
         sx={{
-          maxWidth: "1600px",
+          maxWidth: "1750px",
           position: "relative",
           zIndex: 1,
           color: "#0f172a",

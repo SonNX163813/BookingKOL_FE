@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import AdminHeader from "../components/admin/layout/AdminHeader";
+import SuperAdminHeader from "../components/admin/layout/SuperAdminHeader";
 import { Menu } from "antd";
 import {
   StackedBarChartOutlined,
@@ -35,51 +35,63 @@ const MainLayoutSuperAdmin = () => {
 
   // Ánh xạ path → key
   const pathKeyMap = [
-    { pattern: /^\/admin(\/)?$/, key: "admin" },
+    { pattern: /^\/superadmin(\/)?$/, key: "admin" },
     {
-      pattern: /^\/admin\/management-log-chat-ai(\/)?$/,
+      pattern: /^\/superadmin\/management-log-chat-ai(\/)?$/,
       key: "management-log-chat-ai",
     },
     {
-      pattern: /^\/admin\/management-kol(\/)?$/,
+      pattern: /^\/superadmin\/management-all-user(\/)?$/,
+      key: "management-all-user",
+    },
+    {
+      pattern: /^\/superadmin\/management-kol(\/)?$/,
       key: "management-kol",
     },
     {
-      pattern: /^\/admin\/management-customer(\/|$)/,
+      pattern: /^\/superadmin\/management-customer(\/|$)/,
       key: "management-customer",
     },
     {
-      pattern: /^\/admin\/management-category(\/)?$/,
+      pattern: /^\/superadmin\/management-category(\/)?$/,
       key: "management-category",
     },
     {
-      pattern: /^\/admin\/management-course(\/)?$/,
+      pattern: /^\/superadmin\/management-course(\/)?$/,
       key: "management-course",
     },
     {
-      pattern: /^\/admin\/create-course(\/)?$/,
+      pattern: /^\/superadmin\/create-course(\/)?$/,
       key: "management-course",
     },
     {
-      pattern: /^\/admin\/view-detail-course(\/)?$/,
+      pattern: /^\/superadmin\/view-detail-course(\/)?$/,
       key: "management-course",
     },
     {
-      pattern: /^\/admin\/management-booking-requests(\/)?$/,
+      pattern: /^\/superadmin\/management-booking-requests(\/)?$/,
       key: "management-booking-requests",
     },
     {
-      pattern: /^\/admin\/management-blogs(\/)?$/,
+      pattern: /^\/superadmin\/management-blogs(\/)?$/,
       key: "management-blogs",
     },
     // NEW: highlight cho trang Campaign (kể cả các route con sau này)
     {
-      pattern: /^\/admin\/management-booking-campaigns(\/|$)/,
+      pattern: /^\/superadmin\/management-booking-campaigns(\/|$)/,
       key: "management-booking-campaigns",
     },
     {
-      pattern: /^\/admin\/management-refunds(\/)?$/,
+      pattern: /^\/superadmin\/management-refunds(\/)?$/,
       key: "management-refunds",
+    },
+    {
+      pattern: /^\/superadmin\/management-merchants(\/)?$/,
+      key: "management-merchants",
+    },
+    {
+      pattern: /^\/superadmin\/management-transactions(\/)?$/,
+      key: "management-transactions",
     },
   ];
 
@@ -99,23 +111,23 @@ const MainLayoutSuperAdmin = () => {
     {
       key: "admin",
       icon: <StackedBarChartOutlined />,
-      label: <Link to="/admin">Dashboard</Link>,
+      label: <Link to="/superadmin">Dashboard</Link>,
     },
     {
       key: "management-user",
       icon: <PersonOutlined />,
-      label: "Quản lý người dùng",
+      label: "Quản lý tài khoản",
       children: [
         {
-          key: "management-kol",
+          key: "management-all-user",
           icon: <VerifiedUserOutlined />,
-          label: <Link to="management-kol">Quản lý KOL</Link>,
+          label: <Link to="management-all-user">Quản lý người dùng</Link>,
         },
-        {
-          key: "management-customer",
-          icon: <AccountCircleOutlined />,
-          label: <Link to="management-customer">Quản lý Khách hàng</Link>,
-        },
+        // {
+        //   key: "management-kol",
+        //   icon: <VerifiedUserOutlined />,
+        //   label: <Link to="management-kol">Quản lý KOL</Link>,
+        // },
       ],
     },
     {
@@ -128,65 +140,65 @@ const MainLayoutSuperAdmin = () => {
           icon: <CategoryOutlined />,
           label: <Link to="management-category">Quản lý lĩnh vực</Link>,
         },
-        {
-          key: "management-abc",
-          icon: <AppsOutlined />,
-          // label: <Link to="/management-category">Quản lý nền tảng</Link>,
-          label: "Quản lý nền tảng",
-        },
+        // {
+        //   key: "management-abc",
+        //   icon: <AppsOutlined />,
+        //   // label: <Link to="/management-category">Quản lý nền tảng</Link>,
+        //   label: "Quản lý nền tảng",
+        // },
       ],
     },
-    {
-      key: "management-cou",
-      icon: <SchoolOutlined />,
-      label: "Quản lý khóa học",
-      children: [
-        {
-          key: "management-course",
-          icon: <PlayCircleOutline />,
-          label: <Link to="management-course">Khóa học</Link>,
-        },
-        {
-          key: "management-his",
-          icon: <BarChartOutlined />,
-          label: "Quản lý lịch sử mua khóa học",
-        },
-      ],
-    },
+    // {
+    //   key: "management-cou",
+    //   icon: <SchoolOutlined />,
+    //   label: "Quản lý khóa học",
+    //   children: [
+    //     {
+    //       key: "management-course",
+    //       icon: <PlayCircleOutline />,
+    //       label: <Link to="management-course">Khóa học</Link>,
+    //     },
+    //     {
+    //       key: "management-his",
+    //       icon: <BarChartOutlined />,
+    //       label: "Quản lý lịch sử mua khóa học",
+    //     },
+    //   ],
+    // },
     // {
     //   key: "management-blogs",
     //   icon: <ArticleOutlined />,
     //   label: <Link to="management-blogs">Quản lý blog</Link>,
     // },
-    {
-      key: "management-booking",
-      icon: <EventNoteOutlined />,
-      label: "Quản lý booking",
-      children: [
-        {
-          key: "management-refunds",
-          icon: <MonetizationOnOutlined />,
-          label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
-        },
-        {
-          key: "management-booking-requests",
-          icon: <CalendarMonthOutlined />,
-          label: (
-            <Link to="management-booking-requests">Quản lý booking lẻ</Link>
-          ),
-        },
-        // NEW: nút vào trang Campaign
-        {
-          key: "management-booking-campaigns",
-          icon: <BarChartOutlined />,
-          label: (
-            <Link to="management-booking-campaigns">
-              Quản lý booking Campaign
-            </Link>
-          ),
-        },
-      ],
-    },
+    // {
+    //   key: "management-booking",
+    //   icon: <EventNoteOutlined />,
+    //   label: "Quản lý booking",
+    //   children: [
+    //     {
+    //       key: "management-refunds",
+    //       icon: <MonetizationOnOutlined />,
+    //       label: <Link to="management-refunds">Quản lý hoàn tiền</Link>,
+    //     },
+    //     {
+    //       key: "management-booking-requests",
+    //       icon: <CalendarMonthOutlined />,
+    //       label: (
+    //         <Link to="management-booking-requests">Quản lý booking lẻ</Link>
+    //       ),
+    //     },
+    //     // NEW: nút vào trang Campaign
+    //     {
+    //       key: "management-booking-campaigns",
+    //       icon: <BarChartOutlined />,
+    //       label: (
+    //         <Link to="management-booking-campaigns">
+    //           Quản lý booking Campaign
+    //         </Link>
+    //       ),
+    //     },
+    //   ],
+    // },
     // {
     //   key: "management-refund",
     //   icon: <MonetizationOnOutlined />,
@@ -209,6 +221,24 @@ const MainLayoutSuperAdmin = () => {
           icon: <BarChartOutlined />,
           label: <Link to="management-log-chat-ai">Quản lý Log Chat AI</Link>,
         },
+        {
+          key: "management-merchants",
+          icon: <MonetizationOnOutlined />,
+          label: (
+            <Link to="management-merchants">
+              Quản lý phương thức thanh toán
+            </Link>
+          ),
+        },
+        {
+          key: "management-transactions",
+          icon: <BarChartOutlined />,
+          label: (
+            <Link to="management-transactions">
+              Quản lý giao dịch ngân hàng
+            </Link>
+          ),
+        },
       ],
     },
 
@@ -222,7 +252,7 @@ const MainLayoutSuperAdmin = () => {
 
   return (
     <>
-      <AdminHeader />
+      <SuperAdminHeader />
       <div className="flex h-[calc(100vh-80px)]">
         <aside
           className={`bg-white transition-all duration-300 ${

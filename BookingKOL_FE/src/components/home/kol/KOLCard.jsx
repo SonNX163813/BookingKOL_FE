@@ -8,7 +8,10 @@ import {
   Rating,
   Chip,
   Tooltip,
+  Button,
 } from "@mui/material";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import { motion } from "framer-motion";
 
 const clampRating = (v) => (Number.isNaN(v) ? 0 : Math.min(Math.max(v, 0), 5));
@@ -24,8 +27,6 @@ const cardGradient =
   "radial-gradient(55% 55% at 90% 0%, rgba(147, 206, 246, 0.35) 0%, rgba(147, 206, 246, 0) 70%),radial-gradient(60% 60% at 0% 100%, rgba(255, 161, 218, 0.28) 0%, rgba(88, 43, 175, 0) 70%)";
 const cardGlow =
   "radial-gradient(68% 68% at 50% 8%, rgba(147,206,246,0.5) 0%, rgba(147,206,246,0) 100%)";
-// const cardShadow =
-//   "0 6px 16px rgba(141, 226, 237, 0.28),  0 12px 28px rgba(147, 206, 246, 0.25),  0 20px 50px rgba(74, 116, 218, 0.18),  0 2px 6px rgba(255, 255, 255, 0.12)";
 const cardShadow = "0 20px 50px rgba(74, 116, 218, 0.18)";
 const cardHoverShadow = "0 20px 80px rgba(88,43,175,0.28)";
 const borderColor = "rgba(74,116,218,0.22)";
@@ -52,6 +53,7 @@ const KOLCard = ({
   mediaContainerSx,
   mediaSx,
   onClick,
+  role,
 }) => {
   const ratingValue = clampRating(Number.parseFloat(rating));
   const formattedRating = ratingValue.toFixed(2);
@@ -68,6 +70,24 @@ const KOLCard = ({
     if (!onClick) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      onClick(e);
+    }
+  };
+
+  const normalizedRole =
+    typeof role === "string" ? role.trim().toUpperCase() : "";
+  const isLiveRole = normalizedRole === "LIVE";
+  const roleLabel =
+    normalizedRole === "LIVE"
+      ? "Trợ Live"
+      : normalizedRole === "KOL"
+      ? "Host Chính"
+      : null;
+
+  const handleViewDetailClick = (e) => {
+    // Tránh trigger onClick ở wrapper bên ngoài 2 lần
+    e.stopPropagation();
+    if (onClick) {
       onClick(e);
     }
   };
@@ -102,10 +122,9 @@ const KOLCard = ({
           },
           border: `1px solid ${borderColor}`,
           overflow: "hidden",
-          // background: cardGradient,
           display: "flex",
           flexDirection: "column",
-          width: "100%",
+          width: { xl: 300, lg: 280, md: 260, sm: 250, xs: 250 },
           height: "100%",
           minHeight: 420,
           backdropFilter: "blur(14px)",
@@ -139,7 +158,6 @@ const KOLCard = ({
             {
               position: "relative",
               width: "100%",
-              // aspectRatio: { xs: "1 / 1", sm: "2 / 3", md: "2 / 3" },
               minHeight: { xs: 230, sm: 270, md: 290, lg: 310 },
               overflow: "hidden",
               flexShrink: 0,
@@ -234,16 +252,39 @@ const KOLCard = ({
               fontSize: { xs: "1rem", sm: "1.05rem", md: "1.1rem" },
               lineHeight: 1.32,
               display: "-webkit-box",
-              WebkitLineClamp: 2,
+              WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              minHeight: "2.64em",
+              wordBreak: "break-word",
             }}
             title={name}
           >
             {name}
           </Typography>
-
+          <Box
+            sx={{
+              minHeight: 28,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {roleLabel && (
+              <Chip
+                icon={<BadgeRoundedIcon sx={{ fontSize: 18 }} />}
+                label={roleLabel}
+                size="small"
+                sx={{
+                  background: isLiveRole
+                    ? "rgba(255, 161, 218, 0.25)" // LIVE = Trợ Live
+                    : "rgba(147, 206, 246, 0.18)", // KOL = Host Chính
+                  color: primaryText,
+                  borderRadius: "999px",
+                  fontWeight: 600,
+                  border: "1px solid rgba(74, 116, 218, 0.24)",
+                }}
+              />
+            )}
+          </Box>
           <Box
             sx={{
               minHeight: 28,
@@ -340,51 +381,42 @@ const KOLCard = ({
 
           <Box sx={{ flexGrow: 1, minHeight: 8 }} />
 
-          {/* <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 0.35,
-              borderRadius: "18px",
-              background: priceSurface,
-              border: "1px solid rgba(255,255,255,0.55)",
-              boxShadow: "0 24px 48px rgba(88,43,175,0.2)",
-              px: { xs: 1.8, sm: 2 },
-              py: { xs: 1.4, sm: 1.6 },
-            }}
-          >
-            <Typography
-              variant="body2"
+          {/* {onClick && (
+            <Box
               sx={{
-                color: subtleText,
-                textDecoration: "line-through",
-                fontWeight: 500,
-                fontSize: { xs: "0.76rem", sm: "0.8rem" },
-                lineHeight: 1.2,
-                opacity: originalPrice ? 1 : 0,
-                visibility: originalPrice ? "visible" : "hidden",
+                // mt: { xs: 1, sm: 1.4 },
+                display: "flex",
+                justifyContent: "flex-end",
               }}
-              title={originalPrice || undefined}
-              aria-hidden={!originalPrice}
             >
-              {originalPrice || price}
-            </Typography>
-            <Typography
-              variant="h5"
-              sx={{
-                color: "#e11d48",
-                fontWeight: 700,
-                fontSize: { xs: "1.16rem", sm: "1.3rem", md: "1.38rem" },
-                lineHeight: 1.2,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-              title={price}
-            >
-              {price}
-            </Typography>
-          </Box> */}
+              <Button
+                variant="contained"
+                size="small"
+                endIcon={<ArrowForwardRoundedIcon />}
+                onClick={handleViewDetailClick}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "9999px",
+                  fontWeight: 600,
+                  fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                  px: { xs: 2.2, sm: 2.6 },
+                  py: 0.7,
+                  boxShadow: "0 12px 28px rgba(74,116,218,0.28)",
+                  background:
+                    "linear-gradient(135deg, #4a74da 0%, #8dcef1 100%)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(135deg, #3b5ec8 0%, #7bc0e8 100%)",
+                    boxShadow: "0 16px 32px rgba(59,94,200,0.32)",
+                  },
+                }}
+              >
+                Xem chi tiết
+              </Button>
+            </Box>
+          )} */}
+
+          {/* Nếu muốn show price trở lại, block giá cũ vẫn có thể bật lại ở đây */}
         </CardContent>
       </MotionCard>
     </motion.div>

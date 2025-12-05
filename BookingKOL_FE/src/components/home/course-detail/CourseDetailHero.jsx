@@ -155,7 +155,7 @@ const CourseDetailHero = ({
                 },
               }}
             >
-              {purchaseLoading ? "Đang xử lý..." : "Đăng ký tư vấn"}
+              {purchaseLoading ? "Đang xử lý..." : "Mua gói"}
             </Button>
             <Button
               variant="outlined"
@@ -185,4 +185,3 @@ const CourseDetailHero = ({
 );
 
 export default CourseDetailHero;
-

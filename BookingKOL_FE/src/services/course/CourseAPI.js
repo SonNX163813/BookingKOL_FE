@@ -82,10 +82,7 @@ export const createCoursePurchase = async (
   return payload?.data ?? null;
 };
 
-export const confirmCoursePurchase = async (
-  purchaseId,
-  { signal } = {}
-) => {
+export const confirmCoursePurchase = async (purchaseId, { signal } = {}) => {
   if (!purchaseId) {
     throw new Error("purchaseId is required");
   }
@@ -98,10 +95,7 @@ export const confirmCoursePurchase = async (
   return payload?.data ?? null;
 };
 
-export const cancelCoursePurchase = async (
-  purchaseId,
-  { signal } = {}
-) => {
+export const cancelCoursePurchase = async (purchaseId, { signal } = {}) => {
   if (!purchaseId) {
     throw new Error("purchaseId is required");
   }
@@ -114,14 +108,41 @@ export const cancelCoursePurchase = async (
   return payload?.data ?? null;
 };
 
+const normalizeHistoryParams = ({
+  page = 0,
+  size = 10,
+  search,
+  startDate,
+  endDate,
+} = {}) => {
+  const params = { page, size };
+  if (search) {
+    params.search = search;
+  }
+  if (startDate) {
+    params.startDate = startDate;
+  }
+  if (endDate) {
+    params.endDate = endDate;
+  }
+  return params;
+};
+
+export const getCoursePurchaseHistory = async ({
+  signal,
+  ...restParams
+} = {}) => {
+  const config = signal ? { signal } : undefined;
+  return await get({
+    url: CLIENT_API_PATHS.COURSE.history,
+    params: normalizeHistoryParams(restParams),
+    config,
+  });
+};
+
 const normalizeMediaType = (usage) => {
   const file = usage?.file ?? {};
-  const rawType = (
-    file?.fileType ||
-    usage?.fileType ||
-    usage?.type ||
-    ""
-  )
+  const rawType = (file?.fileType || usage?.fileType || usage?.type || "")
     .toString()
     .toUpperCase();
 
@@ -178,10 +199,7 @@ export const adaptCourseMedia = (course) => {
   const gallery = [...imageItems, ...videoItems];
 
   const coverItem =
-    gallery.find((item) => item.isCover) ??
-    imageItems[0] ??
-    gallery[0] ??
-    null;
+    gallery.find((item) => item.isCover) ?? imageItems[0] ?? gallery[0] ?? null;
   const cover = coverItem ? coverItem.url : null;
 
   return { cover, gallery };
@@ -193,4 +211,5 @@ export default {
   createCoursePurchase,
   confirmCoursePurchase,
   cancelCoursePurchase,
+  getCoursePurchaseHistory,
 };

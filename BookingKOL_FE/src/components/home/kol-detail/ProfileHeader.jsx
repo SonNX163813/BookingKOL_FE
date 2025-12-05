@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -11,6 +12,7 @@ import {
   DialogContent,
   IconButton,
 } from "@mui/material";
+import { toast } from "react-toastify";
 import FemaleRoundedIcon from "@mui/icons-material/FemaleRounded";
 import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
 import CircleIcon from "@mui/icons-material/Circle";
@@ -25,6 +27,7 @@ import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PricingPanel from "./PricingPanel";
+import { useAuth } from "../../../context/AuthContext";
 
 const statsConfig = [
   { key: "followers", label: "Người theo dõi", icon: PeopleAltRoundedIcon },
@@ -50,6 +53,10 @@ const fadeUpProps = (delay = 0) => ({
 });
 
 const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
+  const auth = useAuth?.() || {};
+  const { token } = auth;
+  const navigate = useNavigate();
+  const location = useLocation();
   const isMale = kol.gender?.toLowerCase() === "male";
   const genderLabel = kol.gender ? (isMale ? "Nam" : "Nữ") : null;
   const GenderIcon = isMale ? MaleRoundedIcon : FemaleRoundedIcon;
@@ -143,6 +150,18 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
   const handleCloseVideo = useCallback(() => {
     setVideoModal(null);
   }, []);
+
+  const handleBookClick = useCallback(() => {
+    if (!token) {
+      toast.info("Vui lòng đăng nhập để tiếp tục đặt lịch.");
+      navigate("/login", {
+        replace: false,
+        state: { from: location?.pathname || "/" },
+      });
+      return;
+    }
+    onBook?.();
+  }, [location?.pathname, navigate, onBook, token]);
 
   return (
     <motion.div
@@ -594,7 +613,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                 alignItems="stretch"
                 {...fadeUpProps(0.42)}
               >
-                <Button
+                {/* <Button
                   variant="outlined"
                   size="large"
                   sx={{
@@ -621,7 +640,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                 >
                   <ChatBubbleRoundedIcon sx={{ fontSize: 24 }} />
                   Tư vấn thêm
-                </Button>
+                </Button> */}
                 <Button
                   variant="contained"
                   size="large"
@@ -648,7 +667,7 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                       outlineOffset: 3,
                     },
                   }}
-                  onClick={onBook}
+                  onClick={handleBookClick}
                   aria-label="Thuê KOL này"
                 >
                   <PlayArrowRoundedIcon sx={{ fontSize: 24 }} />

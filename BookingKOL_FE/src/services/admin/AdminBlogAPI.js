@@ -142,6 +142,41 @@ export const adminCreateBlog = async (body, { signal } = {}) => {
   return payload?.data ?? payload ?? null;
 };
 
+export const adminUploadBlogThumbnail = async (
+  blogId,
+  thumbnail,
+  { signal, onUploadProgress } = {}
+) => {
+  const id = ensureBlogId(blogId);
+  if (!thumbnail) {
+    throw new Error("thumbnail is required");
+  }
+
+  const form = new FormData();
+  form.append("thumbnail", thumbnail, thumbnail.name || "thumbnail.jpg");
+
+  const payload = await post({
+    url: BLOG_PATHS.adminThumbnailUpload(id),
+    data: form,
+    config: {
+      headers: { "Content-Type": "multipart/form-data" },
+      ...(signal ? { signal } : {}),
+      ...(onUploadProgress ? { onUploadProgress } : {}),
+    },
+  });
+
+  return payload?.data ?? payload ?? null;
+};
+
+export const adminDeleteBlogThumbnail = async (blogId, { signal } = {}) => {
+  const id = ensureBlogId(blogId);
+  const payload = await remove2({
+    url: BLOG_PATHS.adminThumbnailDelete(id),
+    config: signal ? { signal } : undefined,
+  });
+  return payload?.data ?? payload ?? null;
+};
+
 export const adminDeleteBlog = async (blogId, { signal } = {}) => {
   const id = ensureBlogId(blogId);
   const payload = await remove2({
@@ -156,5 +191,7 @@ export default {
   adminFetchBlogDetail,
   adminUpdateBlog,
   adminCreateBlog,
+  adminUploadBlogThumbnail,
+  adminDeleteBlogThumbnail,
   adminDeleteBlog,
 };

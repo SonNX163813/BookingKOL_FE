@@ -4,6 +4,7 @@ import { Menu, MenuItem, IconButton, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
+import NotificationBell from "../../common/NotificationBell";
 
 const SuperAdminHeader = () => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -16,7 +17,7 @@ const SuperAdminHeader = () => {
 
   const handleLogout = async () => {
     handleClose();
-    await logout(); // ⬅️ không truyền tham số
+    await logout(); // không truyền tham số
     toast.success("Đăng xuất thành công.");
     navigate("/login", { replace: true }); // chặn Back quay lại trang cũ
     // Nếu vẫn còn cache từ Redux/React Query thì thêm:
@@ -33,27 +34,45 @@ const SuperAdminHeader = () => {
         </h1>
       </div>
 
-      <div>
-        <IconButton
-          onClick={handleClick}
-          className="!text-white flex items-center space-x-2"
-        >
-          <VerifiedUserOutlined className="w-6 h-6" />
-          <Typography className="font-medium">
-            {user?.fullName || user?.username || "Tài khoản"}
-          </Typography>
-        </IconButton>
-        <Menu
-          anchorEl={anchorEl}
-          open={open}
-          onClose={handleClose}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <MenuItem onClick={handleLogout}>
-            <LogoutOutlined className="mr-2" /> Logout
-          </MenuItem>
-        </Menu>
+      <div className="flex items-center gap-4">
+        {/* <NotificationBell
+          loggedIn={Boolean(user)}
+          iconButtonSx={{
+            color: "#fff",
+            "&:hover": { backgroundColor: "rgba(255,255,255,0.08)" },
+          }}
+          badgeProps={{
+            sx: {
+              "& .MuiBadge-badge": {
+                color: "#fff",
+              },
+            },
+          }}
+          menuPaperSx={{ mt: 1.5 }}
+        /> */}
+
+        <div>
+          <IconButton
+            onClick={handleClick}
+            className="!text-white flex items-center space-x-2"
+          >
+            <VerifiedUserOutlined className="w-6 h-6" />
+            <Typography className="font-medium">
+              {user?.fullName || user?.username || "Tài khoản"}
+            </Typography>
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <MenuItem onClick={handleLogout}>
+              <LogoutOutlined className="mr-2" /> Đăng xuất
+            </MenuItem>
+          </Menu>
+        </div>
       </div>
 
       <style>

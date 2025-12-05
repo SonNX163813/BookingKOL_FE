@@ -28,6 +28,7 @@ import BookingFlow from "../../../components/home/book-kol/BookingFlow";
 import { getKolProfileById } from "../../../services/kol/KolAPI";
 import hotkolimg from "../../../assets/hotkol.png";
 import ReviewsSection from "../../../components/home/kol-detail/ReviewsSection";
+import { buildKolReviewsData } from "../../../utils/kolFeedback";
 
 const ROLE_LABELS = {
   LIVE: "Trợ live",
@@ -333,26 +334,6 @@ const buildIntroductionData = (kol) => {
   };
 };
 
-const buildReviewsData = (kol) => {
-  const reviewCount = Number.isFinite(Number(kol?.feedbackCount))
-    ? Number(kol.feedbackCount)
-    : 0;
-  const rating = Number.isFinite(Number(kol?.overallRating))
-    ? Number(kol.overallRating)
-    : 0;
-  const ratingDistribution = [5, 4, 3, 2, 1].map((stars) => ({
-    stars,
-    count: 0,
-    percentage: 0,
-  }));
-  return {
-    reviews: [],
-    overallRating: rating,
-    ratingDistribution,
-    reviewCount,
-  };
-};
-
 const KOLDetail = () => {
   const { kolId } = useParams();
   const [kolData, setKolData] = useState(null);
@@ -437,7 +418,7 @@ const KOLDetail = () => {
     () => buildIntroductionData(kolData),
     [kolData]
   );
-  const reviewsData = useMemo(() => buildReviewsData(kolData), [kolData]);
+  const reviewsData = useMemo(() => buildKolReviewsData(kolData), [kolData]);
   const livestreamVideos = useMemo(
     () => buildLivestreamVideos(kolData),
     [kolData]
@@ -583,6 +564,7 @@ const KOLDetail = () => {
               reviews={reviewsData.reviews}
               overallRating={reviewsData.overallRating}
               ratingDistribution={reviewsData.ratingDistribution}
+              reviewCount={reviewsData.reviewCount}
             />
           </Box>
         )}

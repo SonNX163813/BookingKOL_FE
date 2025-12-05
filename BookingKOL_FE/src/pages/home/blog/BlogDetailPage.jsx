@@ -1,39 +1,42 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Chip,
   Button,
   Container,
   Skeleton,
   Stack,
   Typography,
 } from "@mui/material";
-import { Empty, Spin } from "antd";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchBlogDetail } from "../../../services/blog/BlogAPI";
-import { ArrowLeft } from "lucide-react";
+
 const PAGE_BACKGROUND = `
-  radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.24) 0%, rgba(147, 206, 246, 0.06) 60%, rgba(147, 206, 246, 0) 90%),
-  radial-gradient(90% 90% at 85% 20%, rgba(255, 161, 218, 0.18) 0%, rgba(255, 161, 218, 0) 65%)
+  radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.08) 0%, rgba(147, 206, 246, 0.03) 60%, rgba(147, 206, 246, 0) 90%),
+  radial-gradient(90% 90% at 85% 20%, rgba(255, 161, 218, 0.12) 0%, rgba(255, 161, 218, 0) 65%)
 `;
 
-const PRIMARY_BUTTON_SX = {
-  textTransform: "none",
-  borderRadius: 999,
-  px: 3,
-  py: 1.2,
-  fontWeight: 700,
-  color: "#ffffff",
-  backgroundImage: "linear-gradient(135deg, #4a74da 0%, #93cef6 100%)",
-  boxShadow: "0 18px 30px rgba(74, 116, 218, 0.28)",
-  "&:hover": {
-    boxShadow: "0 24px 35px rgba(74, 116, 218, 0.35)",
-    backgroundImage: "linear-gradient(135deg, #5c82e2 0%, #a6d9f9 100%)",
-  },
+const formatDateTime = (dateString) => {
+  if (!dateString) {
+    return "Chưa cập nhật";
+  }
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return "Chưa cập nhật";
+  }
+  const time = date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const day = date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `${time} ${day}`;
 };
 
-// Chuẩn hóa thông báo lỗi
 const normalizeMessage = (error) => {
   const rawMessage = error?.response?.data?.message;
   if (Array.isArray(rawMessage)) {
@@ -48,18 +51,18 @@ const normalizeMessage = (error) => {
   return "Không thể tải chi tiết blog. Vui lòng thử lại.";
 };
 
-// Định dạng ngày hiển thị
-const formatDate = (dateString) => {
-  if (!dateString) return "Chưa cập nhật";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleDateString("vi-VN", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+const getTopicLabel = (blog) => {
+  if (!blog) {
+    return "Chia sẻ";
+  }
+  if (Array.isArray(blog.tags) && blog.tags.length) {
+    return blog.tags[0];
+  }
+  return blog.category || blog.topic || blog.label || "Chia sẻ";
 };
+
+const getContentHtml = (blog) =>
+  blog?.content?.trim() ? blog.content : "Bài viết đang được cập nhật.";
 
 const BlogDetailPage = () => {
   const { blogId } = useParams();
@@ -68,49 +71,6 @@ const BlogDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Xử lý trạng thái bài viết
-  const statusInfo = useMemo(() => {
-    if (!blog) {
-      return {
-        label: "Đang cập nhật",
-        chipBg: "rgba(15,23,42,0.08)",
-        chipColor: "#0f172a",
-      };
-    }
-    if (blog.isPublish) {
-      return {
-        label: "Đã xuất bản",
-        chipBg: "rgba(74,116,218,0.15)",
-        chipColor: "#1d3ab6",
-      };
-    }
-    return {
-      label: "Bản nháp",
-      chipBg: "rgba(244,114,182,0.2)",
-      chipColor: "#be185d",
-    };
-  }, [blog]);
-
-  // Dữ liệu tóm tắt hiển thị nhanh
-  const heroMetadata = useMemo(
-    () => [
-      {
-        label: "Tác giả",
-        value: blog?.author || "Đang cập nhật",
-      },
-      {
-        label: "Ngày đăng",
-        value: formatDate(blog?.createdAt),
-      },
-      {
-        label: "Trạng thái",
-        value: statusInfo.label,
-      },
-    ],
-    [blog, statusInfo.label]
-  );
-
-  // Hàm tải chi tiết blog
   const loadBlogDetail = useCallback(async () => {
     if (!blogId) {
       setErrorMessage("Không tìm thấy blog.");
@@ -134,190 +94,216 @@ const BlogDetailPage = () => {
     loadBlogDetail();
   }, [loadBlogDetail]);
 
-  // Xử lý nút quay lại
-  const handleBack = useCallback(() => {
-    if (typeof window !== "undefined" && window.history.length <= 2) {
-      navigate("/blog");
-      return;
-    }
-    navigate(-1);
-  }, [navigate]);
+  const topicLabel = useMemo(() => getTopicLabel(blog), [blog]);
+  const formattedDateTime = useMemo(
+    () => formatDateTime(blog?.createdAt),
+    [blog?.createdAt]
+  );
 
-  // Phần tiêu đề + thông tin chính
-  const renderHeroContent = () => {
-    if (loading) {
-      return (
-        <Stack spacing={1.5}>
-          <Skeleton
-            variant="text"
-            height={32}
-            width="40%"
-            sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-          />
-          <Skeleton
-            variant="text"
-            height={56}
-            sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-          />
-          <Skeleton
-            variant="text"
-            height={24}
-            width="60%"
-            sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-          />
-        </Stack>
-      );
-    }
+  const contentHtml = useMemo(() => getContentHtml(blog), [blog]);
 
-    const title = blog?.title || "Bài viết không tiêu đề";
-    const author = blog?.author
-      ? `Tác giả: ${blog.author}`
-      : "Tác giả: Đang cập nhật";
-    const createdDate = formatDate(blog?.createdAt);
-    const statusLabel = statusInfo.label;
+  const handleBack = () => navigate(-1);
 
-    return (
+  const renderLoading = () => (
+    <Box
+      sx={{
+        borderRadius: 4,
+        p: { xs: 3, md: 5 },
+        backgroundColor: "#ffffff",
+        boxShadow: "0 20px 45px rgba(15,23,42,0.08)",
+      }}
+    >
       <Stack spacing={2}>
-        <Chip
-          label={statusLabel}
-          sx={{
-            alignSelf: "flex-start",
-            borderRadius: 999,
-            bgcolor: statusInfo.chipBg,
-            color: statusInfo.chipColor,
-            fontWeight: 600,
-          }}
-        />
-        <Typography
-          component="h1"
-          variant="h3"
-          sx={{ fontWeight: 800, letterSpacing: -0.5, color: "#0f172a" }}
-        >
-          {title}
-        </Typography>
-        <Stack spacing={0.5}>
-          <Typography variant="body1" sx={{ color: "rgba(15,23,42,0.8)" }}>
-            {author}
-          </Typography>
-          <Typography variant="body2" sx={{ color: "rgba(15,23,42,0.6)" }}>
-            Ngày đăng: {createdDate}
+        <Skeleton variant="text" width="20%" height={18} />
+        <Skeleton variant="text" width="80%" height={46} />
+        <Skeleton variant="rectangular" height={280} sx={{ borderRadius: 3 }} />
+        <Skeleton variant="text" width="100%" height={28} />
+        <Skeleton variant="text" width="90%" height={28} />
+        <Skeleton variant="text" width="95%" height={28} />
+      </Stack>
+    </Box>
+  );
+
+  const renderError = () => (
+    <Stack spacing={2} alignItems="center" sx={{ py: 6 }}>
+      <Typography variant="body1" color="error">
+        {errorMessage}
+      </Typography>
+      <Button
+        variant="contained"
+        onClick={loadBlogDetail}
+        sx={{ textTransform: "none" }}
+      >
+        Thử lại
+      </Button>
+    </Stack>
+  );
+
+  const renderContent = () => (
+    <Box
+      sx={{
+        borderRadius: 4,
+        p: { xs: 3, md: 5 },
+        backgroundColor: "#ffffff",
+        boxShadow: "0 30px 65px rgba(15,23,42,0.12)",
+      }}
+    >
+      <Stack spacing={3}>
+        {/* <Typography variant="body2" color="text.secondary">
+          Blog / {blog?.title || "Chi tiết"}
+        </Typography> */}
+
+        <Stack spacing={1}>
+          {/* <Typography
+            variant="overline"
+            sx={{ color: "#f97316", fontWeight: 700, letterSpacing: "0.08em" }}
+          >
+            {topicLabel}
+          </Typography> */}
+          <Typography
+            variant="h3"
+            component="h1"
+            sx={{
+              fontWeight: 800,
+              color: "#0f172a",
+              lineHeight: "42px",
+              // textTransform: "uppercase",
+              // fontSize: "32px",
+            }}
+          >
+            {blog?.title || "Bài viết không có tiêu đề"}
           </Typography>
         </Stack>
-      </Stack>
-    );
-  };
 
-  // Phần nội dung chính của blog
-  // const renderBodyContent = () => {
-  //   if (loading) {
-  //     return (
-  //       <Stack spacing={2}>
-  //         <Skeleton
-  //           variant="text"
-  //           height={32}
-  //           sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-  //         />
-  //         <Skeleton
-  //           variant="text"
-  //           height={24}
-  //           width="70%"
-  //           sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-  //         />
-  //         <Skeleton
-  //           variant="rectangular"
-  //           height={300}
-  //           sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-  //         />
-  //       </Stack>
-  //     );
-  //   }
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          spacing={1.5}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {blog?.author
+              ? `Người viết: ${blog.author}`
+              : "Tác giả đang cập nhật"}
+          </Typography>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {formattedDateTime}
+            </Typography>
+          </Stack>
+        </Stack>
 
-  //   if (errorMessage) {
-  //     return (
-  //       <Stack spacing={2} alignItems="center">
-  //         <Typography variant="body1" color="error">
-  //           {errorMessage}
-  //         </Typography>
-  //         <Button
-  //           variant="contained"
-  //           onClick={loadBlogDetail}
-  //           sx={PRIMARY_BUTTON_SX}
-  //         >
-  //           Thử lại
-  //         </Button>
-  //       </Stack>
-  //     );
-  //   }
+        {/* {blog?.thumbnail?.trim() && (
+          <Box
+            component="img"
+            src={blog.thumbnail}
+            alt={blog?.title || "Ảnh minh họa bài viết"}
+            sx={{
+              width: "100%",
+              // borderRadius: 4,
+              objectFit: "cover",
+              boxShadow: "0 25px 60px rgba(15,23,42,0.15)",
+              maxHeight: "100%",
+            }}
+          />
+        )} */}
 
-  //   if (!blog) {
-  //     return (
-  //       <Typography variant="body1" color="text.secondary" align="center">
-  //         Blog không tồn tại hoặc đã bị xóa.
-  //       </Typography>
-  //     );
-  //   }
+        <Box
+          // sx={{
+          //   mt: 1,
+          //   color: "#0f172a",
+          //   lineHeight: 1.8,
+          //   fontSize: 16,
+          //   "& h2": {
+          //     color: "#dc2626",
+          //     fontWeight: 700,
+          //     marginTop: 4,
+          //     marginBottom: 1.5,
+          //     textTransform: "uppercase",
+          //   },
+          //   "& h3": {
+          //     color: "#dc2626",
+          //     fontWeight: 700,
+          //     marginTop: 3,
+          //   },
+          //   "& p": {
+          //     marginBottom: 2,
+          //     color: "#0f172a",
+          //   },
+          //   "& strong": {
+          //     color: "#111827",
+          //   },
+          //   "& img": {
+          //     maxWidth: "100%",
+          //     borderRadius: 3,
+          //     margin: "20px auto",
+          //     display: "block",
+          //   },
+          //   "& ul": {
+          //     paddingLeft: "1.25rem",
+          //     marginBottom: 2,
+          //   },
+          //   "& li": {
+          //     marginBottom: 1,
+          //   },
+          // }}
+          component="article"
+          sx={{
+            mt: 1,
+            color: "#0f172a",
+            lineHeight: 1.8,
+            fontSize: 16,
 
-  //   return (
-  //     <Typography
-  //       component="div"
-  //       variant="body1"
-  //       sx={{ whiteSpace: "pre-line", color: "#0f172a", lineHeight: 1.8 }}
-  //     >
-  //       {blog?.content || "Bài viết chưa có nội dung."}
-  //     </Typography>
-  //   );
-  // };
-  const renderBodyContent = () => {
-    if (loading) {
-      return (
-        <div className="flex justify-center py-10">
-          <Spin />
-        </div>
-      );
-    }
-    if (!blog?.content) {
-      return (
-        <Empty
-          description="Chưa có nội dung bài viết"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
+            // Headings trong nội dung
+            "& h1, & h2, & h3, & h4, & h5, & h6": {
+              fontWeight: 800,
+              lineHeight: 1.25,
+              // mt: 4,
+              // mb: 1.5,
+              color: "#0f172a",
+              textTransform: "none",
+            },
+            "& h2": { fontSize: 24, color: "#dc2626" },
+            "& h3": { fontSize: 20, color: "#dc2626" },
+
+            // ĐOẠN QUAN TRỌNG – khôi phục hiển thị list
+            "& ul, & ol": {
+              pl: "1.5rem",
+              mb: 2,
+              listStylePosition: "outside",
+            },
+            "& ul": { listStyleType: "disc" },
+            "& ol": { listStyleType: "decimal" },
+            "& li": {
+              // một số reset đặt display khác -> đảm bảo block
+              display: "list-item",
+            },
+
+            // Đoạn văn & chữ đậm
+            "& strong": { color: "#111827" },
+
+            // Link
+            "& a": {
+              color: "#2563eb",
+              textDecoration: "underline",
+              "&:hover": { color: "#1d4ed8" },
+            },
+          }}
+          dangerouslySetInnerHTML={{ __html: contentHtml }}
         />
-      );
-    }
-    return (
-      <div
-        className="min-h-[220px] leading-relaxed text-base text-gray-800 blog-detail-content"
-        dangerouslySetInnerHTML={{ __html: blog.content }}
-      />
-    );
-  };
+      </Stack>
+    </Box>
+  );
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        position: "relative",
-        bgcolor: "#ffffff",
-        overflow: "hidden",
-        py: { xs: 8, md: 10 },
+        background: PAGE_BACKGROUND,
+        backgroundColor: "#f8fafc",
+        py: { xs: 5, md: 8 },
       }}
     >
-      <Box
-        aria-hidden
-        sx={{
-          position: "absolute",
-          inset: 0,
-          background: PAGE_BACKGROUND,
-          opacity: 0.65,
-        }}
-      />
-      <Container
-        maxWidth={false}
-        sx={{
-          position: "relative",
-          zIndex: 1,
-          maxWidth: "1500px",
-          color: "#0f172a",
-        }}
-      >
+      <Container maxWidth="lg">
         <Stack spacing={4}>
           <Button
             onClick={handleBack}
@@ -325,116 +311,35 @@ const BlogDetailPage = () => {
             sx={{
               alignSelf: "flex-start",
               textTransform: "none",
-              borderRadius: 2.5, // ~rounded-xl
-              border: "1px solid",
-              borderColor: "rgb(226 232 240)", // slate-200
+              borderRadius: 3,
+              border: "1px solid rgba(148,163,184,0.7)",
               backgroundColor: "#ffffff",
-              color: "#4f46e5", // indigo-600
+              color: "#4f46e5",
               fontWeight: 600,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              transition: "all 0.3s ease",
-              "&:hover": {
-                borderColor: "rgba(99, 102, 241, 0.6)", // indigo-500/60
-                color: "#3730a3", // indigo-700
-                backgroundColor: "#eef2ff", // indigo-50
-              },
               px: 2.5,
               py: 1,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+              "&:hover": {
+                backgroundColor: "#eef2ff",
+                borderColor: "#6366f1",
+              },
             }}
           >
             Trở về Blog
           </Button>
 
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                md: "minmax(260px, 320px) minmax(0, 1fr)",
-              },
-              gap: { xs: 3, md: 5 },
-              alignItems: "start",
-            }}
-          >
-            {/* Cột trái: thông tin tóm tắt */}
-            <Stack spacing={3}>
-              <Box
-                sx={{
-                  borderRadius: { xs: 3, md: 4 },
-                  background: "rgba(255,255,255,0.95)",
-                  px: { xs: 3, md: 4 },
-                  py: { xs: 3, md: 4 },
-                  boxShadow: "0 40px 80px rgba(15, 23, 42, 0.12)",
-                  backdropFilter: "blur(14px)",
-                }}
-              >
-                {renderHeroContent()}
-              </Box>
-
-              <Box
-                sx={{
-                  borderRadius: { xs: 3, md: 4 },
-                  background: "rgba(255,255,255,0.98)",
-                  px: { xs: 3, md: 3.5 },
-                  py: { xs: 2.5, md: 3 },
-                  boxShadow: "0 25px 55px rgba(15, 23, 42, 0.1)",
-                  border: "1px solid rgba(15,23,42,0.05)",
-                }}
-              >
-                <Typography
-                  variant="overline"
-                  sx={{ color: "rgba(15,23,42,0.65)", letterSpacing: 1 }}
-                >
-                  Thông tin nhanh
-                </Typography>
-                {loading ? (
-                  <Stack spacing={1.5} sx={{ mt: 2 }}>
-                    {[0, 1, 2].map((item) => (
-                      <Skeleton
-                        key={item}
-                        variant="text"
-                        height={24}
-                        sx={{ bgcolor: "rgba(15,23,42,0.08)" }}
-                      />
-                    ))}
-                  </Stack>
-                ) : (
-                  <Stack spacing={1.5} sx={{ mt: 2 }}>
-                    {heroMetadata.map((meta) => (
-                      <Stack key={meta.label} spacing={0.25}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "rgba(15,23,42,0.55)",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          {meta.label}
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {meta.value}
-                        </Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                )}
-              </Box>
-            </Stack>
-
-            {/* Cột phải: nội dung bài viết */}
-            <Box
-              sx={{
-                borderRadius: { xs: 3, md: 4 },
-                background: "rgba(255,255,255,0.99)",
-                px: { xs: 3, md: 4 },
-                py: { xs: 3, md: 4 },
-                boxShadow: "0 35px 70px rgba(15, 23, 42, 0.15)",
-                minHeight: "60vh",
-              }}
+          {loading && renderLoading()}
+          {!loading && errorMessage && renderError()}
+          {!loading && !errorMessage && blog && renderContent()}
+          {!loading && !errorMessage && !blog && (
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              textAlign="center"
             >
-              {renderBodyContent()}
-            </Box>
-          </Box>
+              Không tìm thấy nội dung bài viết này.
+            </Typography>
+          )}
         </Stack>
       </Container>
     </Box>

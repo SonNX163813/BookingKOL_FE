@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import "./login.css";
 import logo from "../../assets/logocty.png";
 import googleLogo from "../../assets/google_logo.svg.png";
-import { API_BASE } from "../../utils/config";
+import { API_BASE, BASE_URL } from "../../utils/config";
 import { useAuth } from "../../context/AuthContext";
 
 export default function LoginPage() {
@@ -27,6 +27,50 @@ export default function LoginPage() {
   const location = useLocation();
   const backTo = location.state?.from?.pathname || "/";
 
+  // Handle OAuth redirect from Google (access_token + user_data in query)
+  useEffect(() => {
+    if (token) return; // avoid re-processing when token already set
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    const rawUserData = params.get("user_data");
+
+    if (!accessToken || !rawUserData) return;
+
+    let parsedUser = null;
+    try {
+      const decodedUserData = decodeURIComponent(rawUserData);
+      parsedUser = JSON.parse(decodedUserData);
+    } catch (err) {
+      parsedUser = null;
+    }
+
+    const user = {
+      id: parsedUser?.id ?? null,
+      email: parsedUser?.email ?? "",
+      roles: parsedUser?.roles ?? [],
+    };
+
+    try {
+      sessionStorage.setItem("auth_token", accessToken);
+      sessionStorage.setItem("auth_user", JSON.stringify(user));
+    } catch (err) {
+      // ignore storage errors
+    }
+
+    dispatch({
+      type: "LOGIN_SUCCESS",
+      payload: {
+        user,
+        token: accessToken,
+        roles: user.roles,
+        remember: false,
+      },
+    });
+
+    const cleanedUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, "", cleanedUrl);
+    navigate("/", { replace: true });
+  }, [dispatch, navigate, token]);
   // Nếu đã đăng nhập thì điều hướng
   useEffect(() => {
     if (token) navigate(backTo, { replace: true });
@@ -199,6 +243,12 @@ export default function LoginPage() {
         payload: { user, token: accessToken, roles: user.roles, remember },
       });
 
+      // Clear query params on current URL after login
+      const cleanedCurrent = `${window.location.origin}${
+        window.location.pathname
+      }${window.location.hash || ""}`;
+      window.history.replaceState({}, "", cleanedCurrent);
+
       // Giữ nguyên navigate; nút đã bị disable + có spinner nên không gây cảm giác "reload"
       navigate(backTo, { replace: true });
     } catch (err) {
@@ -209,7 +259,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    alert("UI-only: Gắn đăng nhập Google sau.");
+    window.location.href = `${BASE_URL}/v1/oauth2/authorization/google`;
   };
 
   return (
@@ -217,7 +267,9 @@ export default function LoginPage() {
       {/* LEFT HERO giữ nguyên như bạn đang dùng */}
       <section className="left-hero">
         <div className="brand">
-          <img src={logo} alt="Logo" className="logo" />
+          <a href="/">
+            <img src={logo} alt="Logo" className="logo" />
+          </a>
         </div>
 
         <h1>
@@ -305,7 +357,9 @@ export default function LoginPage() {
       {/* RIGHT CARD */}
       <section className="right-card">
         <div className="login-header">
-          <img src={logo} alt="Logo" className="login-logo-top" />
+          <a href="/">
+            <img src={logo} alt="Logo" className="login-logo-top" />
+          </a>
           <h2 className="login-title">Đăng nhập</h2>
         </div>
 

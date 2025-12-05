@@ -483,6 +483,10 @@ const MySingleBookingRequests = () => {
         typeof values.bankName === "string" ? values.bankName.trim() : "";
       const bankNumber =
         typeof values.bankNumber === "string" ? values.bankNumber.trim() : "";
+      const ownerName =
+        typeof values.ownerName === "string" ? values.ownerName.trim() : "";
+      const reason =
+        typeof values.reason === "string" ? values.reason.trim() : "";
       const selectedBank = bankOptions.find(
         (option) => option.value === bankName
       );
@@ -495,6 +499,8 @@ const MySingleBookingRequests = () => {
       const requestPayload = {
         bankName,
         bankNumber,
+        ownerName,
+        reason,
       };
 
       if (bankShortName) {
@@ -541,9 +547,8 @@ const MySingleBookingRequests = () => {
       const normalizedContractStatus = contractStatusSource
         ? contractStatusSource.toString().toUpperCase()
         : null;
-      const isRefundable =
-        normalizedPaymentStatus === "PAID" &&
-        normalizedContractStatus !== "WAIT_FOR_REFUND";
+      const isRefundable = normalizedPaymentStatus === "PAID";
+      // &&        normalizedContractStatus !== "WAIT_FOR_REFUND";
       const isPaymentPending = normalizedPaymentStatus === "PENDING";
       const isProcessingPaymentCancelThisRow =
         isCancellingMySingleBookingPayment &&
@@ -633,7 +638,7 @@ const MySingleBookingRequests = () => {
 
       const refundButton = isRefundable ? (
         <Button
-          type="primary"
+          danger
           ghost
           disabled={disableAction}
           loading={isProcessingRequestThisRow && isRefundable}
@@ -644,7 +649,7 @@ const MySingleBookingRequests = () => {
           }}
           onClick={() => handleOpenRefundModal(record)}
         >
-          Hoàn tiền
+          Hủy đơn
         </Button>
       ) : null;
 
@@ -824,7 +829,7 @@ const MySingleBookingRequests = () => {
                   className="w-full"
                 />
               </Form.Item>
-              <Form.Item
+              {/* <Form.Item
                 label="Thời gian thực hiện"
                 name="executionRange"
                 className="lg:col-span-4"
@@ -834,7 +839,7 @@ const MySingleBookingRequests = () => {
                   className="w-full"
                   placeholder={["Bắt đầu", "Kết thúc"]}
                 />
-              </Form.Item>
+              </Form.Item> */}
               <Form.Item
                 label="Ngày tạo"
                 name="createdRange"
@@ -979,7 +984,7 @@ const MySingleBookingRequests = () => {
                               {locationLabel}
                             </span>
                           </div>
-                          <div className="flex items-start justify-between gap-3">
+                          {/* <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Thanh toán</span>
                             <Tag
                               color={paymentMeta.color}
@@ -987,7 +992,7 @@ const MySingleBookingRequests = () => {
                             >
                               {paymentMeta.label}
                             </Tag>
-                          </div>
+                          </div> */}
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Tổng tiền</span>
                             <span className="text-right font-semibold text-indigo-600">

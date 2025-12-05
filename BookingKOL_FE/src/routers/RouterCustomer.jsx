@@ -31,6 +31,10 @@ import ListKOL from "../pages/home/kol/ListKOL.jsx";
 import ServicePackagePage from "../pages/booking_package/ServicePackagePage.jsx";
 import ServicePackageBookingFormPage from "../pages/booking_package/ServicePackageBookingFormPage.jsx";
 import HistoryBookingPackagePage from "../pages/booking_package/HistoryBookingPackagePage.jsx";
+import CampaignBookingDetailPage from "../pages/booking_package/CampaignBookingDetailPage.jsx";
+import CampaignPaymentPage from "../pages/booking_package/CampaignPaymentPage.jsx";
+import CampaignPaymentSuccessPage from "../pages/booking_package/CampaignPaymentSuccessPage.jsx";
+import CampaignPaymentFailPage from "../pages/booking_package/CampaignPaymentFailPage.jsx";
 import BookingSinglePayment from "../pages/booking_single/BookingSinglePayment.jsx";
 import BookingSinglePaymentSuccess from "../pages/booking_single/BookingSinglePaymentSuccess.jsx";
 import BookingSinglePaymentFail from "../pages/booking_single/BookingSinglePaymentFail.jsx";
@@ -41,6 +45,7 @@ import CoursePurchaseReview from "../pages/home/course-live/CoursePurchaseReview
 import CoursePurchasePayment from "../pages/home/course-live/CoursePurchasePayment.jsx";
 import CoursePurchaseSuccess from "../pages/home/course-live/CoursePurchaseSuccess.jsx";
 import CoursePurchaseFail from "../pages/home/course-live/CoursePurchaseFail.jsx";
+import CourseBookingHistory from "../pages/home/course-live/CourseBookingHistory.jsx";
 
 const courseRoutes = [
   { path: "/danh-sach-khoa-hoc", element: <CourseLivesteam /> },
@@ -103,11 +108,34 @@ export const routerCustomer = [
         element: <MainLayout />,
         children: [
           { path: "/userprofile", element: <UserProfile /> },
-          { path: "/don-mua", element: <HistoryBookingPackagePage /> },
+          {
+            path: "/don-booking-chien-dich",
+            element: <HistoryBookingPackagePage />,
+          },
+          {
+            path: "/don-booking-chien-dich/:campaignId",
+            element: <CampaignBookingDetailPage />,
+          },
+          {
+            path: "/don-booking-chien-dich/thanh-toan",
+            element: <CampaignPaymentPage />,
+          },
+          {
+            path: "/don-booking-chien-dich/thanh-toan/thanh-cong",
+            element: <CampaignPaymentSuccessPage />,
+          },
+          {
+            path: "/don-booking-chien-dich/thanh-toan/that-bai",
+            element: <CampaignPaymentFailPage />,
+          },
           { path: "/don-booking-kol", element: <MySingleBookingRequests /> },
           {
             path: "/don-booking-kol/:requestId",
             element: <MySingleBookingRequestDetail />,
+          },
+          {
+            path: "/don-dat-khoa-hoc",
+            element: <CourseBookingHistory />,
           },
           {
             path: "/khoa-hoc/review/:coursePackageId",

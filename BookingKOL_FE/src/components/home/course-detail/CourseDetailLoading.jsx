@@ -14,7 +14,7 @@ const CourseDetailLoading = () => (
   >
     <CircularProgress sx={{ color: "#4a74da" }} />
     <Typography sx={{ mt: 2, color: "rgba(15, 23, 42, 0.7)" }}>
-      Dang tai chi tiet khoa hoc...
+      Đang tải chi tiết khóa học...
     </Typography>
   </Stack>
 );

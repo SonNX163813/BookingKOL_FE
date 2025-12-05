@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Steps,
   Form,
@@ -6,17 +12,42 @@ import {
   InputNumber,
   DatePicker,
   Button,
+  ConfigProvider,
   Select,
   message,
   Descriptions,
 } from "antd";
 import dayjs from "dayjs";
-import { Crown, Megaphone, CheckCircle } from "lucide-react";
+import "dayjs/locale/vi";
+import viVN from "antd/locale/vi_VN";
+import { Crown, Megaphone, CheckCircle, ArrowLeft } from "lucide-react";
 import { useCreateBooking } from "../../hook/booking_package/useCreateBooking";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getKolProfiles } from "../../services/kol/KolAPI";
+import { getKolProfiles, resolveAvatarUrl } from "../../services/kol/KolAPI";
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
+
+dayjs.locale("vi");
+
+// MUI imports cho form tải tệp
+import {
+  Stack,
+  Typography,
+  Button as MuiButton,
+  Alert,
+  IconButton,
+} from "@mui/material";
+import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
+import AttachmentRoundedIcon from "@mui/icons-material/AttachmentRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+
+const STYLE = {
+  textPrimary: "#0f172a",
+  textSecondary: "#6b7280",
+  border: "#e5e7eb",
+  accent: "#4f46e5",
+  subtleSurface: "#f9fafb",
+};
 
 const normalizePackageType = (type) => {
   if (!type) {
@@ -50,13 +81,48 @@ const HERO_STATS = [
   { value: "24/7", label: "Hỗ trợ vận hành" },
 ];
 
-const ASSISTANT_OPTIONS = [
-  { value: "Ngoc Anh", label: "Ngọc Anh" },
-  { value: "Bao Tram", label: "Bảo Trâm" },
-  { value: "Quang Minh", label: "Quang Minh" },
-];
-
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_ATTACHMENTS = 5;
+
+const attachmentHint = `Tối đa ${MAX_ATTACHMENTS} tệp, mỗi tệp ≤ 10MB`;
+
+const formatFileSize = (size) => {
+  if (!size && size !== 0) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+/** Tag render: avatar nhỏ + tên, không hiện id */
+const createTagRender = (options) => (tagProps) => {
+  const { value, closable, onClose } = tagProps;
+  const opt = options.find((o) => o.value === value);
+  if (!opt) return null;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-[2px] bg-gray-100 rounded-full mr-1 mb-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {opt.avatar && (
+        <img
+          src={opt.avatar}
+          alt={opt.name || "KOL"}
+          className="w-4 h-4 rounded-full object-cover"
+        />
+      )}
+      <span className="text-xs">{opt.name || "KOL"}</span>
+      {closable && (
+        <span
+          onClick={onClose}
+          className="cursor-pointer ml-1 text-gray-400 hover:text-red-400"
+        >
+          ×
+        </span>
+      )}
+    </span>
+  );
+};
 
 const PricingCard = ({
   title,
@@ -158,18 +224,19 @@ const ServicePackageBookingFormPage = () => {
     initialPackageType || null
   );
   const [form] = Form.useForm();
-  const [vipForm] = Form.useForm();
   const [campaignData, setCampaignData] = useState({});
   const [vipExtraData, setVipExtraData] = useState({});
-  const [attachmentFile, setAttachmentFile] = useState(null);
+
+  // attachments: [{ id, file, name, size }]
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState("");
+
   const stepsWrapperRef = useRef(null);
 
   const hasExternalPackageSelection = Boolean(initialPackageType);
   const shouldShowSelectionStep = !hasExternalPackageSelection;
   const campaignStepIndex = shouldShowSelectionStep ? 1 : 0;
-  const vipStepIndex = selectedPackage === "vip" ? campaignStepIndex + 1 : -1;
-  const confirmStepIndex =
-    selectedPackage === "vip" ? campaignStepIndex + 2 : campaignStepIndex + 1;
+  const confirmStepIndex = campaignStepIndex + 1;
 
   const handleScrollToForm = () => {
     stepsWrapperRef.current?.scrollIntoView({
@@ -189,10 +256,15 @@ const ServicePackageBookingFormPage = () => {
       return;
     }
     setSelectedPackage(initialPackageType);
-    vipForm.resetFields();
+    form.setFieldsValue({ kol: [], assistant: [] });
     setVipExtraData({});
     setCurrent(campaignStepIndex);
-  }, [initialPackageType, campaignStepIndex, vipForm]);
+  }, [initialPackageType, campaignStepIndex, form]);
+
+  useEffect(() => {
+    if (selectedPackage === "vip") return;
+    form.setFieldsValue({ kol: [], assistant: [] });
+  }, [selectedPackage, form]);
 
   const {
     data: servicePackages,
@@ -222,7 +294,7 @@ const ServicePackageBookingFormPage = () => {
   useEffect(() => {
     if (!isPackageFetchError) return;
     const fallbackMessage =
-      "Khong the tai danh sach goi dich vu. Vui long thu lai sau.";
+      "Không thể tải danh sách gói dịch vụ. Vui lòng thử lại sau.";
     message.error(packageFetchError?.message || fallbackMessage);
   }, [isPackageFetchError, packageFetchError]);
 
@@ -239,116 +311,202 @@ const ServicePackageBookingFormPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const kolOptions = useMemo(() => {
+  const { hostOptions, liveOptions } = useMemo(() => {
     const list = Array.isArray(kolResponse?.content) ? kolResponse.content : [];
+
+    const buildOption = (item) => {
+      const name =
+        item.displayName ||
+        item.fullName ||
+        item.name ||
+        item.username ||
+        item.email ||
+        item.phone ||
+        item.id;
+      const avatar = resolveAvatarUrl(item) || item.avatarUrl || "";
+
+      return {
+        label: (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {avatar && (
+                <img
+                  src={avatar}
+                  alt={name}
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              )}
+              <span>{name}</span>
+            </div>
+            {item.role && (
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                {item.role}
+              </span>
+            )}
+          </div>
+        ),
+        value: item.id,
+        name,
+        avatar,
+        role: item.role,
+        searchText: `${name ?? ""} ${item.id ?? ""} ${item.role ?? ""}`,
+      };
+    };
+
     return list
-      .filter((kol) => kol?.id)
-      .map((kol) => ({
-        value: kol.id,
-        label:
-          kol.displayName ||
-          kol.name ||
-          kol.fullName ||
-          `KOL ${String(kol.id).slice(0, 6)}`,
-      }));
+      .filter((i) => i?.id)
+      .reduce(
+        (acc, item) => {
+          const option = buildOption(item);
+          if (item.role === "LIVE") {
+            acc.liveOptions.push(option);
+          } else {
+            acc.hostOptions.push(option);
+          }
+          return acc;
+        },
+        { hostOptions: [], liveOptions: [] }
+      );
   }, [kolResponse]);
 
   useEffect(() => {
     if (!isKolFetchError) return;
     const fallbackMessage =
-      "Khong the tai danh sach KOL. Vui long thu lai sau.";
+      "Không thể tải danh sách KOL. Vui lòng thử lại sau.";
     message.error(kolFetchError?.message || fallbackMessage);
   }, [isKolFetchError, kolFetchError]);
 
   useEffect(() => {
     if (selectedPackage !== "vip") return;
-    if (!kolOptions.length) return;
-    const currentKol = vipForm.getFieldValue("kol");
-    if (!currentKol) {
-      vipForm.setFieldsValue({ kol: kolOptions[0].value });
+    if (!hostOptions.length) return;
+    const currentKol = form.getFieldValue("kol");
+    if (!Array.isArray(currentKol) || currentKol.length === 0) {
+      form.setFieldsValue({ kol: [hostOptions[0].value] });
     }
-  }, [selectedPackage, kolOptions, vipForm]);
+  }, [selectedPackage, hostOptions, form]);
 
   useEffect(() => {
     if (selectedPackage !== "vip") return;
-    if (!vipExtraData.kol && !vipExtraData.assistant) return;
-    if (
-      vipExtraData.kol &&
-      !kolOptions.some((option) => option.value === vipExtraData.kol)
-    )
-      return;
-    vipForm.setFieldsValue({
-      kol: vipExtraData.kol ?? vipForm.getFieldValue("kol"),
-      assistant:
-        vipExtraData.assistant ??
-        vipForm.getFieldValue("assistant") ??
-        "Ngoc Anh",
-    });
-  }, [selectedPackage, vipExtraData, kolOptions, vipForm]);
+    if (!liveOptions.length) return;
+    const currentAssistant = form.getFieldValue("assistant");
+    if (!Array.isArray(currentAssistant) || currentAssistant.length === 0) {
+      form.setFieldsValue({ assistant: [liveOptions[0].value] });
+    }
+  }, [selectedPackage, liveOptions, form]);
 
   const handleSelectPackage = (pkg) => {
     setSelectedPackage(pkg);
     if (pkg !== "vip") {
-      vipForm.resetFields();
+      form.setFieldsValue({ kol: [], assistant: [] });
       setVipExtraData({});
     }
     setCurrent(campaignStepIndex);
   };
 
   const handleCampaignFormFinish = (values) => {
+    const { kol, assistant, startDate, endDate, ...rest } = values;
+
+    // đảm bảo có file
+    if (!attachments.length) {
+      setAttachmentError("Vui lòng chọn tệp tải lên!");
+      return;
+    }
+
     const formatted = {
-      ...values,
-      startDate: values.startDate.format("YYYY-MM-DD"),
-      endDate: values.endDate.format("YYYY-MM-DD"),
+      ...rest,
+      startDate: startDate.format("YYYY-MM-DD"),
+      endDate: endDate.format("YYYY-MM-DD"),
     };
     setCampaignData(formatted);
 
     if (selectedPackage === "vip") {
-      setCurrent(vipStepIndex);
+      const selectedHostIds = Array.isArray(kol) ? kol : [];
+      const selectedAssistantIds = Array.isArray(assistant) ? assistant : [];
+      const selectedKols = hostOptions.filter((o) =>
+        selectedHostIds.includes(o.value)
+      );
+      const selectedAssistants = liveOptions.filter((o) =>
+        selectedAssistantIds.includes(o.value)
+      );
+      setVipExtraData({
+        kol: selectedHostIds,
+        assistant: selectedAssistantIds,
+        kolNames: selectedKols.map((k) => k.name).join(", "),
+        assistantNames: selectedAssistants.map((a) => a.name).join(", "),
+      });
     } else {
-      setCurrent(confirmStepIndex);
+      setVipExtraData({});
     }
-  };
 
-  const handleVipFormFinish = (values) => {
-    const selectedKols = kolOptions.filter((option) =>
-      values.kol.includes(option.value)
-    );
-    const selectedAssistants = ASSISTANT_OPTIONS.filter((option) =>
-      values.assistant.includes(option.value)
-    );
-
-    setVipExtraData({
-      ...values,
-      kolNames: selectedKols.map((k) => k.label).join(", "),
-      assistantNames: selectedAssistants.map((a) => a.label).join(", "),
-    });
     setCurrent(confirmStepIndex);
   };
 
   const onSuccess = () => {
     form.resetFields();
-    setAttachmentFile(null);
+    setAttachments([]);
+    setVipExtraData({});
     navigate("/");
   };
 
   const { isLoadingCreateBooking, handleCreateBooking } =
     useCreateBooking(onSuccess);
 
-  const handleAttachmentChange = (event) => {
-    const file = event.target.files?.[0];
-    if (file && file.size > MAX_ATTACHMENT_SIZE) {
-      message.error("Vui lòng chọn tệp nhỏ hơn 10MB.");
-      event.target.value = "";
-      return;
+  // Xử lý chọn file (MUI input)
+  const handleFileInputChange = (event) => {
+    const fileList = Array.from(event.target.files || []);
+    if (!fileList.length) return;
+
+    let merged = [...attachments];
+
+    for (const file of fileList) {
+      const size = typeof file.size === "number" ? file.size : 0;
+
+      if (size > MAX_ATTACHMENT_SIZE) {
+        message.error(
+          `"${file.name}" vượt quá 10MB, vui lòng chọn tệp nhỏ hơn.`
+        );
+        continue;
+      }
+
+      const key = `${file.name}-${size}-${file.lastModified || ""}`;
+      const exists = merged.some((item) => item.id === key);
+      if (exists) continue;
+
+      merged.push({
+        id: key,
+        file,
+        name: file.name,
+        size,
+      });
     }
-    setAttachmentFile(file || null);
+
+    if (merged.length > MAX_ATTACHMENTS) {
+      message.warning(`Chỉ hỗ trợ tối đa ${MAX_ATTACHMENTS} tệp đính kèm.`);
+      merged = merged.slice(0, MAX_ATTACHMENTS);
+    }
+
+    setAttachments(merged);
+    setAttachmentError("");
+    // cập nhật lỗi trong Form nếu có custom validator
+    form.validateFields(["attachment"]).catch(() => {});
+    // reset input để có thể chọn lại cùng file
     event.target.value = "";
+  };
+
+  const handleRemoveAttachment = (id) => {
+    const next = attachments.filter((item) => item.id !== id);
+    setAttachments(next);
+    if (!next.length) {
+      setAttachmentError("Vui lòng chọn tệp tải lên!");
+    } else {
+      setAttachmentError("");
+    }
+    form.validateFields(["attachment"]).catch(() => {});
   };
 
   const handleConfirm = () => {
     if (!selectedPackage) {
-      message.error("Vui long chon goi dich vu truoc khi tiep tuc.");
+      message.error("Vui lòng chọn gói dịch vụ trước khi tiếp tục.");
       return;
     }
 
@@ -356,7 +514,18 @@ const ServicePackageBookingFormPage = () => {
       routePackageId || packageTypeIdMap[selectedPackage];
 
     if (!resolvedPackageId) {
-      message.error("Khong tim thay thong tin goi dich vu.");
+      message.error("Không tìm thấy thông tin gói dịch vụ.");
+      return;
+    }
+
+    const finalAttachments = attachments
+      .map((item) => item.file)
+      .filter(Boolean);
+
+    if (!finalAttachments.length) {
+      message.error(
+        "Vui lòng chọn tệp đính kèm chiến dịch (tối đa 5 tệp, mỗi tệp ≤ 10MB)."
+      );
       return;
     }
 
@@ -364,15 +533,19 @@ const ServicePackageBookingFormPage = () => {
       packageId: resolvedPackageId,
       campaignName: campaignData.campaignName,
       objective: campaignData.objective,
-      budgetMin: campaignData.budgetMin,
-      budgetMax: campaignData.budgetMax,
+      targetPrice: campaignData.targetPrice,
       startDate: campaignData.startDate,
       endDate: campaignData.endDate,
       recurrencePattern: campaignData.recurrencePattern,
-      // liveIds:
-      //   selectedPackage === "vip" ? vipExtraData.assistant ?? [] : [],
-      kolIds: selectedPackage === "vip" ? vipExtraData.kol ?? [] : [],
-      attachment: attachmentFile || undefined,
+      liveIds:
+        selectedPackage === "vip" && Array.isArray(vipExtraData.assistant)
+          ? vipExtraData.assistant
+          : undefined,
+      kolIds:
+        selectedPackage === "vip" && Array.isArray(vipExtraData.kol)
+          ? vipExtraData.kol
+          : undefined,
+      attachment: finalAttachments,
     };
 
     handleCreateBooking(data);
@@ -382,20 +555,6 @@ const ServicePackageBookingFormPage = () => {
     title: "Chọn gói dịch vụ",
     content: (
       <div className="space-y-8">
-        {/* <div className="rounded-3xl border border-white/50 bg-gradient-to-r from-[#3117ff] via-[#6d37ff] to-[#a125ff] p-6 text-white shadow-2xl shadow-indigo-500/40">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-white/80">
-            Buoc 1
-          </p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-tight">
-            Chon cach dong hanh
-          </h3>
-          <p className="mt-3 text-sm text-white/85">
-            Hay cung chung toi xay dung mot chien dich livestream an tuong voi
-            doi ngu KOL va tro ly da kinh nghiem. Moi goi duoc chuan hoa nhu
-            giao dien CourseLivestream: sang trong, cap nhat ro rang, thao tac
-            nhanh.
-          </p>
-        </div> */}
         <div className="grid gap-8 lg:grid-cols-2">
           <PricingCard
             title="Gói Thường"
@@ -428,28 +587,17 @@ const ServicePackageBookingFormPage = () => {
     title: "Nhập thông tin chiến dịch",
     content: (
       <div className="space-y-8">
-        {/* <div className="rounded-3xl border border-slate-200/60 bg-white/70 p-6 shadow-lg shadow-slate-200/60 backdrop-blur">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-blue-600">
-            Buoc 2
-          </p>
-          <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            Mo ta chien dich
-          </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Dien cac thong tin tuong tu bo cuc CourseLivestream: ro rang, tinh
-            gon va tao cam hung.
-          </p>
-        </div> */}
         <Form
           form={form}
           layout="vertical"
           initialValues={{
             campaignName: "",
             objective: "",
-            budgetMin: 1000000,
-            budgetMax: 5000000,
+            targetPrice: 3000000,
             startDate: dayjs(),
             endDate: dayjs().add(7, "day"),
+            kol: [],
+            assistant: [],
           }}
           onFinish={handleCampaignFormFinish}
         >
@@ -475,48 +623,29 @@ const ServicePackageBookingFormPage = () => {
           >
             <Input
               className="!h-12"
-              placeholder="VD: Tăng nhận diện thương hiệu và thúc đẩy doanh số bán hàng"
+              placeholder="VD: Tăng nhận diện thương hiệu và thúc đẩy doanh số"
             />
           </Form.Item>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Form.Item
-              label="Ngân sách (VND)"
-              name="budgetMin"
-              rules={[
-                {
-                  required: true,
-                  message: "Vui long nhap ngan sach toi thieu!",
-                },
-              ]}
-              className="w-full"
-            >
-              <InputNumber
-                className="!w-full !h-12"
-                formatter={(value) =>
-                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                }
-                parser={(value) => value.replace(/\\$\\s?|(,*)/g, "")}
-                min={0}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Ngan sach toi da (VND)"
-              name="budgetMax"
-              rules={[
-                { required: true, message: "Vui long nhap ngan sach toi da!" },
-              ]}
-            >
-              <InputNumber
-                className="!w-full !h-12"
-                formatter={(value) =>
-                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                }
-                parser={(value) => value.replace(/\\$\\s?|(,*)/g, "")}
-                min={0}
-              />
-            </Form.Item>
-          </div>
+          <Form.Item
+            label="Ngân sách mục tiêu (VND)"
+            name="targetPrice"
+            rules={[
+              {
+                required: true,
+                message: "Vui lòng nhập ngân sách mục tiêu!",
+              },
+            ]}
+          >
+            <InputNumber
+              className="!w-full !h-12"
+              formatter={(value) =>
+                value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
+              }
+              parser={(value) => (value ? value.replace(/,/g, "") : "")}
+              min={0}
+            />
+          </Form.Item>
 
           <div className="grid gap-6 md:grid-cols-2">
             <Form.Item
@@ -542,36 +671,214 @@ const ServicePackageBookingFormPage = () => {
           <Form.Item label="Tần suất triển khai" name="recurrencePattern">
             <Input
               className="!h-12"
-              placeholder="VD: Hàng tuần, Hàng tháng, Không lặp lại"
+              placeholder="VD: Hàng tuần, Hàng tháng, hoặc Không lặp lại"
             />
           </Form.Item>
 
-          <Form.Item label="Tệp đính kèm chiến dịch">
-            <div className="space-y-2">
-              <input
-                type="file"
-                accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
-                onChange={handleAttachmentChange}
-                className="block w-full cursor-pointer rounded-xl border border-dashed border-indigo-200 bg-white px-4 py-3 text-sm text-slate-600 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-indigo-300"
-              />
-              <p className="text-xs text-slate-500">
-                Hỗ trợ PNG, JPG, PDF hoặc DOC, tối đa 10MB.
-              </p>
-              {attachmentFile && (
-                <p className="text-sm font-medium text-slate-700">
-                  Đã chọn: {attachmentFile.name}
-                </p>
+          {/* FORM TẢI TỆP MUI */}
+          <Form.Item
+            name="attachment"
+            // fake field chỉ để validator, UI tự quản attachments
+            rules={[
+              {
+                validator: () => {
+                  if (!attachments.length) {
+                    return Promise.reject(
+                      new Error("Vui lòng chọn tệp tải lên!")
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+            validateStatus={attachmentError ? "error" : ""}
+            help={attachmentError || undefined}
+          >
+            <Stack spacing={1.5}>
+              <Typography
+                variant="subtitle2"
+                sx={{ color: STYLE.textPrimary, fontWeight: 600 }}
+              >
+                Tệp đính kèm{" "}
+                <Typography
+                  component="span"
+                  sx={{ color: "error.main", ml: 0.25 }}
+                >
+                  *
+                </Typography>
+              </Typography>
+
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <MuiButton
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadRoundedIcon />}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: "14px",
+                    borderColor: STYLE.border,
+                    color: STYLE.textPrimary,
+                    "&:hover": { borderColor: STYLE.accent },
+                  }}
+                >
+                  Tải lên tệp
+                  <input
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={handleFileInputChange}
+                  />
+                </MuiButton>
+                <Typography variant="body2" sx={{ color: STYLE.textSecondary }}>
+                  {attachmentHint}
+                </Typography>
+              </Stack>
+
+              {attachmentError && (
+                <Alert severity="error" sx={{ borderRadius: "14px" }}>
+                  {attachmentError}
+                </Alert>
               )}
-            </div>
+
+              {attachments.length > 0 && (
+                <Stack spacing={1}>
+                  {attachments.map((item) => (
+                    <Stack
+                      key={item.id}
+                      direction="row"
+                      alignItems="center"
+                      spacing={1.25}
+                      sx={{
+                        borderRadius: "14px",
+                        backgroundColor: STYLE.subtleSurface,
+                        border: `1px solid ${STYLE.border}`,
+                        px: 1.5,
+                        py: 1,
+                      }}
+                    >
+                      <AttachmentRoundedIcon
+                        sx={{ color: STYLE.accent, fontSize: 20 }}
+                      />
+                      <Stack sx={{ flex: 1 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ color: STYLE.textPrimary, fontWeight: 500 }}
+                        >
+                          {item.name}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: STYLE.textSecondary }}
+                        >
+                          {formatFileSize(item.size)}
+                        </Typography>
+                      </Stack>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveAttachment(item.id)}
+                        sx={{
+                          color: STYLE.textSecondary,
+                          "&:hover": { color: STYLE.accent },
+                        }}
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Stack>
           </Form.Item>
 
-          <div className="flex flex-wrap justify-end gap-4">
+          {selectedPackage === "vip" && (
+            <div className="rounded-3xl border border-indigo-100 bg-white/90 p-4 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Chọn Host chính & Trợ lý LIVE
+              </h3>
+              <p className="mb-4 text-sm text-slate-600">
+                Lựa chọn đội ngũ đồng hành phù hợp cho gói VIP của bạn.
+              </p>
+              <Form.Item
+                label="Host chính"
+                name="kol"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn ít nhất một Host chính!",
+                  },
+                ]}
+              >
+                <Select
+                  mode="multiple"
+                  loading={isFetchingKols}
+                  options={hostOptions}
+                  placeholder="Chọn KOL phù hợp"
+                  allowClear
+                  showSearch
+                  optionFilterProp="searchText"
+                  filterOption={(input, option) =>
+                    (option?.searchText || "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  tagRender={createTagRender(hostOptions)}
+                  notFoundContent={
+                    isFetchingKols
+                      ? "Đang tải danh sách..."
+                      : "Không tìm thấy Host chính phù hợp."
+                  }
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Trợ lý LIVE"
+                name="assistant"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn ít nhất một Trợ lý LIVE!",
+                  },
+                ]}
+              >
+                <Select
+                  mode="multiple"
+                  loading={isFetchingKols}
+                  options={liveOptions}
+                  placeholder="Chọn Trợ lý LIVE hỗ trợ"
+                  allowClear
+                  showSearch
+                  optionFilterProp="searchText"
+                  filterOption={(input, option) =>
+                    (option?.searchText || "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  tagRender={createTagRender(liveOptions)}
+                  notFoundContent={
+                    isFetchingKols
+                      ? "Đang tải danh sách..."
+                      : "Không tìm thấy Trợ lý LIVE phù hợp."
+                  }
+                />
+              </Form.Item>
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-4 pt-4">
             {shouldShowSelectionStep && (
               <Button className="!h-12" onClick={() => setCurrent(0)}>
                 Quay lại
               </Button>
             )}
-            <Button className="!h-12 !px-10" type="primary" htmlType="submit">
+            <Button
+              className="!h-12 !px-10"
+              type="primary"
+              htmlType="submit"
+              disabled={
+                selectedPackage === "vip" &&
+                (!hostOptions.length || !liveOptions.length)
+              }
+            >
               Lưu và tiếp tục
             </Button>
           </div>
@@ -580,98 +887,10 @@ const ServicePackageBookingFormPage = () => {
     ),
   };
 
-  const vipStep =
-    selectedPackage === "vip"
-      ? {
-          title: "Chọn Host Chính và Trợ LIVE",
-          content: (
-            <Form
-              form={vipForm}
-              layout="vertical"
-              onFinish={handleVipFormFinish}
-              initialValues={{ assistant: "Ngoc Anh" }}
-              className="p-4"
-            >
-              <Form.Item
-                label="Chọn Host Chính"
-                name="kol"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn ít nhất một Host Chính!",
-                  },
-                ]}
-              >
-                <Select
-                  mode="multiple"
-                  loading={isFetchingKols}
-                  options={kolOptions}
-                  placeholder="Chọn KOL phù hợp"
-                  optionFilterProp="label"
-                  showSearch
-                  notFoundContent={
-                    isFetchingKols
-                      ? "Đang tải danh sách..."
-                      : "Không tìm thấy Host Chính phù hợp."
-                  }
-                />
-              </Form.Item>
-
-              <Form.Item
-                label="Trợ LIVE"
-                name="assistant"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn ít nhất một Trợ LIVE!",
-                  },
-                ]}
-              >
-                <Select
-                  mode="multiple"
-                  options={ASSISTANT_OPTIONS}
-                  placeholder="Chọn Trợ LIVE hỗ trợ"
-                />
-              </Form.Item>
-
-              <div className="flex flex-wrap justify-end gap-4 pt-4">
-                <Button
-                  className="!h-12"
-                  onClick={() => setCurrent(campaignStepIndex)}
-                >
-                  Quay lại
-                </Button>
-                <Button
-                  className="!h-12"
-                  type="primary"
-                  htmlType="submit"
-                  disabled={!kolOptions.length}
-                >
-                  Tiếp tục
-                </Button>
-              </div>
-            </Form>
-          ),
-        }
-      : null;
-
   const confirmStep = {
     title: "Xác nhận",
     content: (
       <div className="space-y-8">
-        {/* <div className="rounded-3xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 via-white to-white p-6 shadow-lg shadow-emerald-100/70">
-          <p className="text-[11px] uppercase tracking-[0.4em] text-emerald-500">
-            Buoc 4
-          </p>
-          <h3 className="mt-3 text-2xl font-semibold text-slate-900">
-            Kiem tra lan cuoi truoc khi gui
-          </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Tong ket thong tin chien dich giong cach CourseLivestream hien thi
-            chi tiet khoa hoc: ro rang, sang trong va de doi chieu.
-          </p>
-        </div> */}
-
         <div className="grid gap-6">
           <div>
             <Descriptions
@@ -686,11 +905,13 @@ const ServicePackageBookingFormPage = () => {
               <Descriptions.Item label="Mục tiêu chiến dịch">
                 {campaignData.objective}
               </Descriptions.Item>
-              <Descriptions.Item label="Ngân sách tối thiểu">
-                {campaignData.budgetMin?.toLocaleString()} VND
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngân sách tối đa">
-                {campaignData.budgetMax?.toLocaleString()} VND
+              <Descriptions.Item label="Ngân sách mục tiêu">
+                {campaignData.targetPrice !== undefined &&
+                campaignData.targetPrice !== null &&
+                campaignData.targetPrice !== "" &&
+                !Number.isNaN(Number(campaignData.targetPrice))
+                  ? `${Number(campaignData.targetPrice).toLocaleString()} VND`
+                  : "--"}
               </Descriptions.Item>
               <Descriptions.Item label="Ngày bắt đầu">
                 {campaignData.startDate}
@@ -701,9 +922,9 @@ const ServicePackageBookingFormPage = () => {
               <Descriptions.Item label="Tần suất triển khai">
                 {campaignData.recurrencePattern}
               </Descriptions.Item>
-              {attachmentFile && (
+              {attachments.length > 0 && (
                 <Descriptions.Item label="Tệp đính kèm">
-                  {attachmentFile.name}
+                  {attachments.map((f) => f.name).join(", ")}
                 </Descriptions.Item>
               )}
             </Descriptions>
@@ -718,10 +939,10 @@ const ServicePackageBookingFormPage = () => {
                   column={1}
                   labelStyle={{ fontWeight: "bold" }}
                 >
-                  <Descriptions.Item label="Host Chính">
+                  <Descriptions.Item label="Host chính">
                     {vipExtraData.kolNames || vipExtraData.kol?.join(", ")}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Trợ LIVE">
+                  <Descriptions.Item label="Trợ lý LIVE">
                     {vipExtraData.assistantNames ||
                       vipExtraData.assistant?.join(", ")}
                   </Descriptions.Item>
@@ -734,11 +955,7 @@ const ServicePackageBookingFormPage = () => {
           <Button
             className="!h-12"
             onClick={() => {
-              if (selectedPackage === "vip") {
-                setCurrent(vipStepIndex);
-              } else {
-                setCurrent(campaignStepIndex);
-              }
+              setCurrent(campaignStepIndex);
             }}
           >
             Quay lại
@@ -756,7 +973,6 @@ const ServicePackageBookingFormPage = () => {
   const steps = [
     ...(shouldShowSelectionStep ? [selectionStep] : []),
     campaignStep,
-    ...(vipStep ? [vipStep] : []),
     confirmStep,
   ];
 
@@ -766,109 +982,71 @@ const ServicePackageBookingFormPage = () => {
     }
   }, [current, steps.length]);
 
+  const handleBack = useCallback(() => {
+    navigate("/goi-chien-dich");
+  }, [navigate]);
+
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#eef2ff] text-slate-900">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(90%_90%_at_20%_20%,rgba(59,130,246,0.15),rgba(147,197,253,0)_60%),radial-gradient(80%_80%_at_80%_0%,rgba(244,114,182,0.18),rgba(244,114,182,0)_70%)]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white" />
-      </div>
-
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-16 pt-16 sm:px-6 lg:px-8">
-        {/* <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div>
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 shadow-sm">
-              Booking Package
-            </span>
-            <h1 className="mt-6 text-4xl font-extrabold leading-tight text-slate-900 sm:text-5xl">
-              Hay cung chung toi xay dung mot chien dich Livestream dinh cao
-            </h1>
-            <p className="mt-4 text-lg text-slate-600">
-              Lay tinh than thiet ke cua trang CourseLivestream va mang vao quy trinh dat goi: giao dien trong tre, thong tin minh bach, trai nghiem cap nhat lien tuc.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <button
-                type="button"
-                onClick={handleScrollToForm}
-                className="rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/40 transition hover:-translate-y-0.5"
-              >
-                Bat dau dat goi
-              </button>
-              <button
-                type="button"
-                onClick={handleScrollToForm}
-                className="rounded-full border border-slate-300/80 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5"
-              >
-                Xem quy trinh
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {HERO_HIGHLIGHTS.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-xl shadow-slate-200/70 backdrop-blur"
-              >
-                <p className="text-sm font-semibold text-slate-500">{item.title}</p>
-                <p className="mt-2 text-sm text-slate-600">{item.description}</p>
-              </div>
-            ))}
-          </div>
+    <ConfigProvider locale={viVN}>
+      <section className="relative min-h-screen overflow-hidden bg-[#eef2ff] text-slate-900">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(90%_90%_at_20%_20%,rgba(59,130,246,0.15),rgba(147,197,253,0)_60%),radial-gradient(80%_80%_at_80%_0%,rgba(244,114,182,0.18),rgba(244,114,182,0)_70%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white" />
         </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          {HERO_STATS.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-white/60 bg-white/90 px-5 py-4 shadow-lg shadow-slate-200/80 backdrop-blur"
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-16 sm:px-6 lg:px-8 py-6">
+          <div className="inline-flex">
+            <Button
+              icon={<ArrowLeft size={16} />}
+              onClick={handleBack}
+              className="!flex !items-center !gap-2 !h-11 !rounded-[32px] !border !border-white/70 !bg-white !text-indigo-600 !font-semibold !shadow-sm hover:!border-indigo-500/60 hover:!text-indigo-700 hover:!bg-indigo-50 transition-all duration-300"
             >
-              <p className="text-3xl font-semibold text-blue-600">{stat.value}</p>
-              <p className="mt-1 text-sm text-slate-500">{stat.label}</p>
-            </div>
-          ))}
-        </div> */}
-      </div>
-
-      <div
-        ref={stepsWrapperRef}
-        className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8"
-      >
-        <div className="rounded-[32px] border border-white/70 bg-white/80 shadow-[0_30px_160px_rgba(15,23,42,0.18)] backdrop-blur">
-          <div className="flex flex-col gap-6 px-6 pb-8 pt-8 sm:px-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-blue-600">
-                  Quy trình đặt gói
-                </p>
-
-                <p className="text-sm text-slate-500">
-                  Cập nhật rõ ràng từng giai đoạn, từ chọn gói, cung cấp thông
-                  tin đến xác nhận.
-                </p>
-              </div>
-              {routePackageName && (
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm">
-                  Đang đặt gói: {routePackageName}
-                </span>
-              )}
-            </div>
-
-            <Steps
-              current={current}
-              className="px-2"
-              items={steps.map((s, index) => ({
-                key: index,
-                title: s.title,
-              }))}
-            />
-          </div>
-
-          <div className="rounded-b-[32px] border-t border-slate-100 bg-white/90 px-4 py-6 sm:px-10 sm:py-10">
-            {steps[current]?.content}
+              Trở về gói chiến dịch
+            </Button>
           </div>
         </div>
-      </div>
-    </section>
+
+        <div
+          ref={stepsWrapperRef}
+          className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8"
+        >
+          <div className="rounded-[32px] border border-white/70 bg-white/80 shadow-[0_30px_160px_rgba(15,23,42,0.18)] backdrop-blur">
+            <div className="flex flex-col gap-6 px-6 pb-8 pt-8 sm:px-10">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.4em] text-blue-600">
+                    Quy trình đặt gói
+                  </p>
+
+                  <p className="text-sm text-slate-500">
+                    Cập nhật rõ ràng từng giai đoạn, từ chọn gói, cung cấp thông
+                    tin đến xác nhận.
+                  </p>
+                </div>
+                {routePackageName && (
+                  <span className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm">
+                    Đang đặt gói: {routePackageName}
+                  </span>
+                )}
+              </div>
+
+              <Steps
+                current={current}
+                className="px-2"
+                items={steps.map((s, index) => ({
+                  key: index,
+                  title: s.title,
+                }))}
+              />
+            </div>
+
+            <div className="rounded-b-[32px] border-t border-slate-100 bg-white/90 px-4 py-6 sm:px-10 sm:py-10">
+              {steps[current]?.content}
+            </div>
+          </div>
+        </div>
+      </section>
+    </ConfigProvider>
   );
 };
 

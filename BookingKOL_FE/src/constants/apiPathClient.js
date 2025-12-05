@@ -1,4 +1,11 @@
 export const CLIENT_API_PATHS = {
+  AUTH: {
+    changePassword: "/v1/auth/change-password",
+  },
+  CONTACT: {
+    lead: "/v1/public/contact/user",
+    kol: "/v1/public/contact/kol",
+  },
   KOL: {
     getAllAvailable: "/v1/kol-profiles/all-available",
     getDetailByKolId: "/v1/kol-profiles/kol-id",
@@ -33,6 +40,9 @@ export const CLIENT_API_PATHS = {
   BOOKING: {
     createSingle: "/v1/user/booking/request/single",
     holdSlot: "/v1/user/booking/hold-slot",
+    releaseSlot: "/v1/user/booking/release-slot",
+    listHoldSlot: (kolId) =>
+      `/v1/user/booking/list-hold-slot/${encodeURIComponent(kolId)}`,
     getMySingleRequests: "/v1/user/booking/single-requests/all",
     getMySingleRequestDetail: "/v1/user/booking/single-requests/detail",
     updateMySingleRequest: "/v1/user/booking/single-requests/update",
@@ -63,6 +73,28 @@ export const CLIENT_API_PATHS = {
       `/v1/kol/requests/worktime/create-livestream-metric/${encodeURIComponent(
         worktimeId
       )}`,
+    kolCancelBookingRequest: "/v1/requests/kol/request",
+    kolCancelRequestDetail: (workTimeId) =>
+      `/v1/requests/cancel/detail/${encodeURIComponent(workTimeId)}`,
+  },
+  BOOKINGPACKAGE: {
+    createBookingPackage: "/v1/bookings/packages",
+    getHistoryBookingPackage: "/v1/user/bookings",
+    signContract: "/v1/user/contracts/sign",
+    rejectContract: "/v1/user/contracts/reject",
+    cancelContract: "/v1/user/contracts/cancel",
+    cancelBookingRequest: (bookingRequestId) =>
+      `/v1/user/bookings/cancel/bookingrequest/${encodeURIComponent(
+        bookingRequestId
+      )}`,
+    getUserCampaignDetail: (campaignId) =>
+      `/v1/bookings/user/${encodeURIComponent(campaignId)}`,
+    initiateCampaignPayment: (paymentScheduleId) =>
+      `/v1/user/contracts/payment/${encodeURIComponent(paymentScheduleId)}`,
+    checkCampaignPaymentStatus: (contractPaymentScheduleId) =>
+      `/v1/payment/check/campaign/${encodeURIComponent(
+        contractPaymentScheduleId
+      )}`,
   },
   COURSE: {
     getAll: "/v1/courses/all",
@@ -73,10 +105,12 @@ export const CLIENT_API_PATHS = {
       `/v1/courses/purchase/confirm/${encodeURIComponent(purchaseId)}`,
     cancelPurchase: (purchaseId) =>
       `/v1/courses/purchase/cancel/${encodeURIComponent(purchaseId)}`,
+    history: "/v1/user/course/history/all",
   },
   BLOG: {
-    getAll: "/v1/blogs/all",
-    getDetail: (blogId) => `/v1/blogs/detail/${encodeURIComponent(blogId)}`,
+    getAll: "/v1/public/blogs/all",
+    getDetail: (blogId) =>
+      `/v1/public/blogs/detail/${encodeURIComponent(blogId)}`,
   },
 
   SERVICE_PACKAGES: {

@@ -1,4 +1,4 @@
-import { get, patch, post } from "../../config/axios-config";
+import { get, patch, post, remove2 } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 
 const extractFileList = (files) => {
@@ -106,6 +106,81 @@ export const holdBookingSlot = async ({
   });
 };
 
+export const releaseBookingSlot = async ({
+  kolId,
+  startTimeIso,
+  endTimeIso,
+} = {}) => {
+  if (!kolId || !startTimeIso || !endTimeIso) {
+    throw new Error("kolId, startTimeIso and endTimeIso are required");
+  }
+
+  return remove2({
+    url: CLIENT_API_PATHS.BOOKING.releaseSlot,
+    data: {
+      kolId,
+      startTimeIso,
+      endTimeIso,
+    },
+  });
+};
+
+export const getHeldBookingSlots = async ({ kolId, signal } = {}) => {
+  if (!kolId) {
+    throw new Error("kolId is required to fetch held booking slots");
+  }
+
+  const payload = await get({
+    url: CLIENT_API_PATHS.BOOKING.listHoldSlot(kolId),
+    config: signal ? { signal } : undefined,
+  });
+
+  const extractList = (data) => {
+    const candidates = [
+      data?.data?.data,
+      data?.data?.content,
+      data?.data?.items,
+      data?.data?.records,
+      data?.data,
+      data,
+    ];
+    return candidates.find((item) => Array.isArray(item)) || [];
+  };
+
+  const toIso = (value) => {
+    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return new Date(value).toISOString();
+    }
+    return null;
+  };
+
+  const normalizeUserId = (value) =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+
+  const rawData = extractList(payload);
+
+  return rawData
+    .map((item) => ({
+      userId:
+        normalizeUserId(item?.userId) ??
+        normalizeUserId(item?.user_id) ??
+        normalizeUserId(item?.userID) ??
+        null,
+      startAt:
+        toIso(item?.startAt) ??
+        toIso(item?.start_at) ??
+        toIso(item?.start_time) ??
+        null,
+      endAt:
+        toIso(item?.endAt) ??
+        toIso(item?.end_at) ??
+        toIso(item?.end_time) ??
+        null,
+    }))
+    .filter((slot) => slot.startAt && slot.endAt);
+};
+
 export const updateSingleBookingRequest = async ({
   requestId,
   updateBookingReqDTO,
@@ -154,6 +229,8 @@ export const cancelSingleBookingRequest = async ({
   bankName,
   bankNumber,
   bankShortName,
+  ownerName,
+  reason,
 } = {}) => {
   if (!requestId) {
     throw new Error("requestId is required to cancel single booking request");
@@ -169,6 +246,44 @@ export const cancelSingleBookingRequest = async ({
   const data = {
     ...(payload ?? {}),
   };
+
+  const normalizedOwnerName =
+    typeof ownerName === "string" && ownerName.trim().length > 0
+      ? ownerName.trim()
+      : typeof data.ownerName === "string" && data.ownerName.trim().length > 0
+      ? data.ownerName.trim()
+      : "";
+
+  if (!normalizedOwnerName) {
+    throw new Error("ownerName is required to cancel single booking request");
+  }
+
+  if (normalizedOwnerName.length > 255) {
+    throw new Error("ownerName must not exceed 255 characters");
+  }
+
+  data.ownerName = normalizedOwnerName;
+
+  const normalizedReasonCandidate =
+    typeof reason === "string" && reason.trim().length > 0
+      ? reason.trim()
+      : typeof data.reason === "string" && data.reason.trim().length > 0
+      ? data.reason.trim()
+      : typeof data.cancelReason === "string" &&
+        data.cancelReason.trim().length > 0
+      ? data.cancelReason.trim()
+      : "";
+
+  if (!normalizedReasonCandidate) {
+    throw new Error("reason is required to cancel single booking request");
+  }
+
+  if (normalizedReasonCandidate.length > 1000) {
+    throw new Error("reason must not exceed 1000 characters");
+  }
+
+  data.reason = normalizedReasonCandidate;
+  delete data.cancelReason;
 
   const normalizedBankName =
     typeof bankName === "string" && bankName.trim().length > 0

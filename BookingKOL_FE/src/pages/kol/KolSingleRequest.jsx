@@ -5,7 +5,7 @@ import "dayjs/locale/vi";
 import localeData from "dayjs/plugin/localeData";
 import updateLocale from "dayjs/plugin/updateLocale";
 import { Button, Card, Pagination, Table, Tag } from "antd";
-import { CalendarRange, Eye, RefreshCcw, BarChart3 } from "lucide-react";
+import { CalendarRange, RefreshCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
@@ -29,18 +29,28 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hoàn thành", value: "COMPLETED" },
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã thanh toán", value: "PAID" },
+  { label: "Đang chờ thực hiện", value: "PAID" },
   { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
-  REQUESTED: "processing",
+  REQUESTED: "default",
   IN_PROGRESS: "processing",
   COMPLETED: "success",
   EXPIRED: "volcano",
   CANCELLED: "error",
-  PAID: "success",
+  PAID: "processing",
   REFUNDED: "purple",
+};
+
+/* ===== Booking Type ===== */
+const BOOKING_TYPE_LABEL = {
+  SINGLE: "Book theo giờ",
+  CAMPAIGN: "Book theo chiến dịch",
+};
+const BOOKING_TYPE_COLOR = {
+  SINGLE: "orange",
+  CAMPAIGN: "purple",
 };
 
 const normalize = (v) => (v == null ? "" : String(v).trim());
@@ -48,12 +58,27 @@ const toUpper = (v) => normalize(v).toUpperCase();
 const getStatus = (r) =>
   toUpper(r?.status ?? r?.bookingStatus ?? r?.state ?? r?.requestStatus ?? "");
 
+const getBookingType = (r) =>
+  toUpper(
+    r?.bookingType ??
+      r?.type ??
+      r?.requestType ??
+      r?.bookingRequestType ??
+      r?.booking_request_type ??
+      ""
+  );
+
+/* Lấy requestId dùng chung */
+const getRequestId = (record) =>
+  record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
+
 /* Helpers */
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format(pattern) : "--";
 };
+
 const composeExecutionTime = (rec) => {
   const start = rec?.startAt ?? rec?.startTime ?? rec?.executionStart ?? null;
   const end = rec?.endAt ?? rec?.endTime ?? rec?.executionEnd ?? null;
@@ -72,6 +97,7 @@ const composeExecutionTime = (rec) => {
       )}`
     : `${s} -> ${e}`;
 };
+
 const pickValue = (record, keys, fallback = "--") => {
   for (const k of keys) {
     const v = record?.[k];
@@ -86,11 +112,9 @@ export default function KolSingleRequest() {
   const token = auth?.token || null;
   const authLoading = auth?.loading ?? false;
 
-  // Phân trang giống các màn khác
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
 
-  // ❗ Không gửi status: BE không hỗ trợ nhiều status → sẽ rỗng
   const buildParams = useCallback(() => ({ page, size }), [page, size]);
 
   const {
@@ -115,7 +139,6 @@ export default function KolSingleRequest() {
     if (token && !authLoading) refetch();
   }, [token, authLoading, refetch]);
 
-  // Chuẩn hoá giống các màn khác
   const raw = resp?.data ?? resp ?? {};
   const serverList = Array.isArray(raw?.content)
     ? raw.content
@@ -129,7 +152,7 @@ export default function KolSingleRequest() {
     (typeof raw?.total === "number" && raw.total) ||
     0;
 
-  // Ẩn DRAFT/EXPIRED ở UI
+  // Ẩn DRAFT/EXPIRED/CANCELLED/REFUNDED ở UI
   const dataSource = useMemo(
     () =>
       serverList.filter(
@@ -152,9 +175,21 @@ export default function KolSingleRequest() {
       {
         title: "Mã yêu cầu",
         key: "requestNumber",
-        width: 180,
+        width: 170,
         render: (_, record) =>
           pickValue(record, ["requestNumber", "code", "bookingCode", "id"]),
+      },
+      {
+        title: "Loại booking",
+        key: "bookingType",
+        width: 190,
+        render: (_, record) => {
+          const type = getBookingType(record);
+          const label = BOOKING_TYPE_LABEL[type] ?? (type || "--");
+          return (
+            <Tag color={BOOKING_TYPE_COLOR[type] ?? "default"}>{label}</Tag>
+          );
+        },
       },
       {
         title: "Trạng thái",
@@ -188,34 +223,44 @@ export default function KolSingleRequest() {
         key: "action",
         align: "center",
         width: 220,
-        render: (record) => {
-          const requestId =
-            record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
-          const normalized = getStatus(record);
-          const isInProgress = normalized === "IN_PROGRESS";
+        render: (_, record) => {
+          const requestId = getRequestId(record);
+          const status = getStatus(record);
+          const isInProgress = status === "IN_PROGRESS";
+
+          const goDetail = () => {
+            if (!requestId) return;
+            navigate(`/kol/booking/single-requests/detail/${requestId}`);
+          };
+
           return (
-            <div className="w-full flex justify-center gap-3">
-              <Button
-                onClick={() =>
-                  requestId &&
-                  navigate(`/kol/booking/single-requests/detail/${requestId}`)
-                }
-                className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-              >
-                <Eye size={18} className="font-semibold" />
-              </Button>
-              {isInProgress && requestId && (
+            <div className="w-full flex justify-center">
+              {/* Xếp dọc: Xem chi tiết (trên) - Metrics (dưới) */}
+              <div className="flex flex-col items-center gap-2">
                 <Button
-                  className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
-                  onClick={() =>
-                    navigate(
-                      `/kol/booking/single-requests/detail/${requestId}?metrics=1`
-                    )
-                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goDetail();
+                  }}
+                  className="!h-9 !px-3 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
                 >
-                  <BarChart3 size={18} />
+                  Xem chi tiết
                 </Button>
-              )}
+
+                {isInProgress && requestId && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(
+                        `/kol/booking/single-requests/detail/${requestId}?metrics=1`
+                      );
+                    }}
+                    className="!h-9 !px-3 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
+                  >
+                    Báo Cáo Livestream
+                  </Button>
+                )}
+              </div>
             </div>
           );
         },
@@ -232,10 +277,10 @@ export default function KolSingleRequest() {
         </div>
         <section>
           <h1 className="text-[18px] font-bold uppercase">
-            Booking lẻ của tôi
+            Tất cả yêu cầu Booking
           </h1>
           <p className="text-[14px] text-gray-600">
-            Danh sách yêu cầu booking bạn nhận được.
+            Danh sách yêu cầu booking.
           </p>
         </section>
         <div className="ml-auto">
@@ -256,9 +301,7 @@ export default function KolSingleRequest() {
           loading={isLoading}
           pagination={false}
           rowKey={(r) =>
-            r?.id ??
-            r?.requestId ??
-            r?.bookingRequestId ??
+            getRequestId(r) ??
             r?.requestNumber ??
             r?.code ??
             r?.bookingCode ??
@@ -266,6 +309,15 @@ export default function KolSingleRequest() {
           }
           scroll={{ x: "auto" }}
           locale={{ emptyText: "Không có booking hợp lệ trên trang này." }}
+          onRow={(record) => ({
+            onClick: () => {
+              const requestId = getRequestId(record);
+              if (requestId) {
+                navigate(`/kol/booking/single-requests/detail/${requestId}`);
+              }
+            },
+            style: { cursor: "pointer" },
+          })}
         />
 
         <div className="!my-4 py-5">

@@ -24,28 +24,40 @@ import {
   Search,
   Pencil,
   Plus,
+  FileDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { adminGetCampaignBookings } from "../../../services/admin/AdminBookingCampaignAPI";
+import { exportBookingRequestsExcel } from "../../../services/booking/BookingRequestAdminService";
 
 dayjs.locale("vi");
 const { RangePicker } = DatePicker;
 
 /* ====== STATUS mapping cho Campaign ====== */
-const CAMPAIGN_STATUS_OPTIONS = [
-  { label: "Đang yêu cầu", value: "REQUESTED" },
-  { label: "Đã phê duyệt", value: "APPROVED" },
-  { label: "Đã từ chối", value: "REJECTED" },
-  { label: "Hoàn tất", value: "COMPLETED" },
-];
+const CAMPAIGN_STATUS_LABEL = {
+  REQUESTED: "Đang yêu cầu",
+  NEGOTIATING: "Đang thương lượng",
+  ACCEPTED: "Đã chấp nhận",
+  REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  IN_PROGRESS: "Đang triển khai",
+  COMPLETED: "Hoàn tất",
+};
 
 const CAMPAIGN_STATUS_COLOR = {
   REQUESTED: "gold",
-  APPROVED: "green",
+  NEGOTIATING: "purple",
+  ACCEPTED: "green",
   REJECTED: "red",
+  CANCELLED: "default",
+  IN_PROGRESS: "geekblue",
   COMPLETED: "blue",
 };
+
+const CAMPAIGN_STATUS_OPTIONS = Object.entries(CAMPAIGN_STATUS_LABEL).map(
+  ([value, label]) => ({ value, label })
+);
 
 /* ====== helpers ====== */
 const fmt = (v, pattern = "DD/MM/YYYY") =>
@@ -62,9 +74,11 @@ const rangesOverlap = (aStart, aEnd, bStart, bEnd) => {
   const startA = dayjs(aStart || aEnd);
   const endA = dayjs(aEnd || aStart);
   if (!startA.isValid() || !endA.isValid()) return false;
+
   const startB = dayjs(bStart);
   const endB = dayjs(bEnd);
   if (!startB.isValid() || !endB.isValid()) return true;
+
   return (
     startA.valueOf() <= endB.valueOf() && endA.valueOf() >= startB.valueOf()
   );
@@ -76,6 +90,13 @@ export default function ManagementBookingCampaigns() {
 
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // ✅ server-side sort mặc định theo createdAt desc
+  const [sorter, setSorter] = useState({
+    field: "createdAt",
+    order: "descend",
+  });
 
   const [filters, setFilters] = useState({
     search: undefined,
@@ -84,9 +105,17 @@ export default function ManagementBookingCampaigns() {
     executionRange: undefined,
   });
 
+  const sortParam =
+    sorter?.field && sorter?.order
+      ? `${sorter.field},${sorter.order === "ascend" ? "asc" : "desc"}`
+      : "createdAt,desc";
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["admin-campaign-bookings", { page, size }],
-    queryFn: () => adminGetCampaignBookings({ params: { page, size } }),
+    queryKey: ["admin-campaign-bookings", { page, size, sortParam }],
+    queryFn: () =>
+      adminGetCampaignBookings({
+        params: { page, size, sort: sortParam },
+      }),
     keepPreviousData: true,
     retry: false,
     refetchOnWindowFocus: false,
@@ -99,14 +128,19 @@ export default function ManagementBookingCampaigns() {
     : data?.number ?? 0;
   const serverSize = Number.isFinite(data?.size) ? data.size : size;
 
+  // ✅ Select gói: NORMAL -> "Thường"
   const packageTypeOptions = useMemo(() => {
     const set = new Set(
       serverContent
         .map((r) => r?.packageType)
         .filter((x) => x !== undefined && x !== null && String(x).trim() !== "")
-        .map((x) => String(x))
+        .map((x) => String(x).toUpperCase())
     );
-    return [...set].map((v) => ({ value: v, label: String(v).toUpperCase() }));
+
+    return [...set].map((v) => ({
+      value: v,
+      label: v === "NORMAL" ? "Thường" : v,
+    }));
   }, [serverContent]);
 
   const filtered = useMemo(() => {
@@ -123,8 +157,9 @@ export default function ManagementBookingCampaigns() {
     const qEnd = hasRange ? filters.executionRange[1] : null;
 
     return serverContent.filter((r) => {
-      if (status && String(r?.status || "").toUpperCase() !== status)
-        return false;
+      const rowStatus = String(r?.campaignStatus || "").toUpperCase();
+      if (status && rowStatus !== status) return false;
+
       if (
         packageType &&
         String(r?.packageType || "").toLowerCase() !== packageType
@@ -134,15 +169,16 @@ export default function ManagementBookingCampaigns() {
       if (s) {
         const bucket = [
           r?.campaignName,
-          r?.objective,
           r?.packageName,
           r?.packageType,
           r?.buyerEmail,
           r?.id,
           r?.requestNumber,
+          r?.createdAt,
         ]
           .filter(Boolean)
           .map((x) => String(x).toLowerCase());
+
         if (!bucket.some((x) => x.includes(s))) return false;
       }
 
@@ -164,6 +200,7 @@ export default function ManagementBookingCampaigns() {
       packageType: packageType || undefined,
       executionRange: executionRange?.length === 2 ? executionRange : undefined,
     });
+    setPage(0);
   };
 
   const handleReset = () => {
@@ -174,6 +211,7 @@ export default function ManagementBookingCampaigns() {
       packageType: undefined,
       executionRange: undefined,
     });
+    setPage(0);
   };
 
   const goCreate = useCallback(() => {
@@ -182,35 +220,69 @@ export default function ManagementBookingCampaigns() {
 
   const goDetail = useCallback(
     (r) => {
-      const id = r?.id || r?.requestNumber || r?.code;
-      if (id) navigate(`/admin/management-booking-campaigns/${id}`);
+      const campaignId = r?.campaignId || r?.id || r?.code;
+      if (!campaignId) return;
+      navigate(
+        `/admin/management-booking-campaigns/${encodeURIComponent(campaignId)}`
+      );
     },
     [navigate]
   );
 
   const goEdit = useCallback(
     (r) => {
-      // ✅ PHẢI DÙNG campaignId từ API, KHÔNG dùng id
       const campaignId = r?.campaignId;
-      if (!campaignId) {
-        // Nếu không có campaignId thì không điều hướng (hoặc log ra để debug)
-        // console.error("Row không có campaignId:", r);
-        return;
-      }
+      if (!campaignId) return;
 
       navigate(
         `/admin/bookings/create?campaignId=${encodeURIComponent(campaignId)}`,
         {
-          // truyền đầy đủ row + campaignId chuẩn
-          state: {
-            ...r,
-            campaignId,
-          },
+          state: { ...r, campaignId },
         }
       );
     },
     [navigate]
   );
+
+  const goEditSchedule = useCallback(
+    (r) => {
+      const campaignId = r?.campaignId || r?.id || r?.code;
+      if (!campaignId) return;
+
+      navigate(
+        `/admin/management-booking-campaigns/${encodeURIComponent(
+          campaignId
+        )}/schedule`,
+        {
+          state: { campaignId, campaignName: r?.campaignName },
+        }
+      );
+    },
+    [navigate]
+  );
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      const blob = await exportBookingRequestsExcel("CAMPAIGN");
+      if (!blob) return;
+
+      const downloadUrl = URL.createObjectURL(
+        blob instanceof Blob ? blob : new Blob([blob])
+      );
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", "booking-campaigns.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Failed to export booking requests", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const columns = useMemo(
     () => [
@@ -222,11 +294,14 @@ export default function ManagementBookingCampaigns() {
         render: (v) => v || "--",
       },
       {
-        title: "Mục tiêu",
-        dataIndex: "objective",
-        key: "objective",
-        width: 300,
-        render: (v) => v || "--",
+        title: "Thời gian tạo",
+        dataIndex: "createdAt",
+        key: "createdAt",
+        width: 190,
+        render: (v) => fmt(v, "DD/MM/YYYY HH:mm"),
+        sorter: true,
+        sortOrder: sorter?.field === "createdAt" ? sorter?.order : null,
+        sortDirections: ["descend", "ascend"],
       },
       {
         title: "Bắt đầu",
@@ -247,22 +322,22 @@ export default function ManagementBookingCampaigns() {
         dataIndex: "packageType",
         key: "packageType",
         width: 130,
-        render: (v, r) =>
-          v ? String(v).toUpperCase() : r?.packageName || "--",
+        render: (v, r) => {
+          const type = String(v ?? "").toUpperCase();
+          if (type === "NORMAL") return "Thường";
+          return type ? type : r?.packageName || "--";
+        },
       },
       {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        width: 150,
+        title: "Trạng thái Campaign",
+        dataIndex: "campaignStatus",
+        key: "campaignStatus",
+        width: 170,
         render: (s) => {
           const k = String(s || "").toUpperCase();
-          const cfg = CAMPAIGN_STATUS_OPTIONS.find((o) => o.value === k);
-          return (
-            <Tag color={CAMPAIGN_STATUS_COLOR[k] || "default"}>
-              {cfg?.label || k || "--"}
-            </Tag>
-          );
+          const label = CAMPAIGN_STATUS_LABEL[k] || k || "--";
+          const color = CAMPAIGN_STATUS_COLOR[k] || "default";
+          return <Tag color={color}>{label}</Tag>;
         },
       },
       {
@@ -276,31 +351,63 @@ export default function ManagementBookingCampaigns() {
         title: "Thao tác",
         key: "actions",
         fixed: "right",
-        width: 150,
-        render: (_, r) => (
-          <Space>
-            <Button
-              type="link"
-              onClick={() => goDetail(r)}
-              className="!h-10 !w-10 !p-0 !rounded-xl !bg-blue-600 !text-white !border-none hover:!bg-blue-700 flex items-center justify-center"
-              title="Xem"
-            >
-              <Eye size={18} />
-            </Button>
-            <Button
-              type="link"
-              onClick={() => goEdit(r)}
-              className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-              style={{ backgroundColor: "#10B981" }}
-              title="Tạo booking từ campaign"
-            >
-              <Pencil size={18} />
-            </Button>
-          </Space>
-        ),
+        width: 360,
+        render: (_, r) => {
+          const st = String(r?.campaignStatus || "").toUpperCase();
+
+          const hideSchedule = [
+            "REQUESTED",
+            "NEGOTIATING",
+            "REJECTED",
+            "CANCELLED",
+          ].includes(st);
+
+          const hideCreateBooking = [
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "ACCEPTED",
+            "REJECTED",
+          ].includes(st);
+
+          return (
+            <Space wrap>
+              <Button
+                onClick={() => goDetail(r)}
+                icon={<Eye size={16} />}
+                className="!h-9 !px-3 !rounded-xl !bg-blue-600 !text-white !border-none hover:!bg-blue-700 flex items-center"
+                title="Xem Chi Tiết"
+              >
+                Xem Chi Tiết
+              </Button>
+
+              {!hideSchedule && (
+                <Button
+                  onClick={() => goEditSchedule(r)}
+                  icon={<CalendarRange size={16} />}
+                  className="!h-9 !px-3 !rounded-xl !bg-indigo-500 !text-white !border-none hover:!bg-indigo-600 flex items-center"
+                  title="Chỉnh sửa lịch làm"
+                >
+                  Lịch Làm Việc
+                </Button>
+              )}
+
+              {!hideCreateBooking && (
+                <Button
+                  onClick={() => goEdit(r)}
+                  icon={<Pencil size={16} />}
+                  className="!h-9 !px-3 !rounded-xl !bg-emerald-500 !text-white !border-none hover:!bg-emerald-600 flex items-center"
+                  title="Tạo booking từ campaign"
+                >
+                  Tạo Booking
+                </Button>
+              )}
+            </Space>
+          );
+        },
       },
     ],
-    [goDetail, goEdit]
+    [goDetail, goEdit, goEditSchedule, sorter]
   );
 
   return (
@@ -321,16 +428,6 @@ export default function ManagementBookingCampaigns() {
               </p>
             </div>
           </div>
-
-          <Button
-            type="link"
-            onClick={goCreate}
-            className="!h-10 !w-10 !p-0 !rounded-xl !text-white !border-none flex items-center justify-center"
-            style={{ backgroundColor: "#10B981" }}
-            title="Thêm campaign"
-          >
-            <Plus size={18} />
-          </Button>
         </div>
 
         {/* Bộ lọc */}
@@ -349,7 +446,7 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            <Form.Item label="Trạng thái" name="status">
+            <Form.Item label="Trạng thái Campaign" name="status">
               <Select
                 allowClear
                 placeholder="Chọn trạng thái"
@@ -366,7 +463,7 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            <Form.Item label="Gói (packageType)" name="packageType">
+            <Form.Item label="Gói" name="packageType">
               <Select
                 allowClear
                 placeholder="Chọn gói"
@@ -374,27 +471,41 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            <div>
-              <Space size="middle" wrap>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  icon={<Search size={16} />}
-                >
-                  Tìm kiếm
-                </Button>
-                <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
-                  Đặt lại
-                </Button>
-                <Button
-                  icon={<RefreshCcw size={16} />}
-                  onClick={() => refetch()}
-                  loading={isFetching}
-                >
-                  Làm mới
-                </Button>
-              </Space>
-            </div>
+            {/* ✅ Nút Xuất dữ liệu nằm ngang hàng với Tìm kiếm/Đặt lại/Làm mới */}
+            <Form.Item className="lg:col-span-4 md:col-span-2 !mb-0" label=" ">
+              <div className="flex justify-start">
+                <Space size="middle" wrap={false}>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    icon={<Search size={16} />}
+                  >
+                    Tìm kiếm
+                  </Button>
+
+                  <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
+                    Đặt lại
+                  </Button>
+
+                  <Button
+                    icon={<RefreshCcw size={16} />}
+                    onClick={() => refetch()}
+                    loading={isFetching}
+                  >
+                    Làm mới
+                  </Button>
+
+                  <Button
+                    onClick={handleExportExcel}
+                    loading={isExporting}
+                    icon={<FileDown size={16} />}
+                    className="!bg-blue-600 !text-white !border-none hover:!bg-blue-700"
+                  >
+                    Xuất dữ liệu
+                  </Button>
+                </Space>
+              </div>
+            </Form.Item>
           </Form>
         </Card>
 
@@ -407,6 +518,13 @@ export default function ManagementBookingCampaigns() {
             pagination={false}
             rowKey={rowKey}
             scroll={{ x: "auto" }}
+            onChange={(_, __, s) => {
+              const ss = Array.isArray(s) ? s[0] : s;
+              const field = ss?.field || ss?.columnKey || "createdAt";
+              const order = ss?.order || "descend";
+              setSorter({ field, order });
+              setPage(0);
+            }}
           />
 
           <div className="mt-4 flex justify-end">
