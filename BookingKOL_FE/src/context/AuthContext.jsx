@@ -6,14 +6,42 @@ import {
   useReducer,
   useMemo,
 } from "react";
-import { loadAuth, clearAuth } from "../utils/auth";
+import { clearAuth } from "../utils/auth";
 
 export const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 function loadAuthFromStorage() {
-  const { token, user } = loadAuth(); // read from local/session with keys auth_token/auth_user
-  return { token, user };
+  const read = (store) => {
+    const token = store.getItem("auth_token");
+    const userStr = store.getItem("auth_user");
+    if (!token) return null;
+    try {
+      return { token, user: userStr ? JSON.parse(userStr) : null };
+    } catch {
+      return { token, user: null };
+    }
+  };
+
+  // Primary source: sessionStorage
+  const sessionData = read(sessionStorage);
+  if (sessionData) return sessionData;
+
+  // Migrate any legacy localStorage data into sessionStorage once, then clear localStorage
+  const legacyLocal = read(localStorage);
+  if (legacyLocal) {
+    try {
+      sessionStorage.setItem("auth_token", legacyLocal.token);
+      sessionStorage.setItem("auth_user", JSON.stringify(legacyLocal.user));
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+    } catch {
+      // ignore storage errors
+    }
+    return legacyLocal;
+  }
+
+  return { token: null, user: null };
 }
 
 const boot = loadAuthFromStorage();
@@ -22,7 +50,7 @@ const initialState = {
   user: boot.user,
   token: boot.token,
   roles: boot.user?.roles || [],
-  remember: !!localStorage.getItem("auth_token"), // token in localStorage means "remember me"
+  remember: false, // always use sessionStorage
   loading: false,
   error: null,
 };
@@ -33,7 +61,7 @@ function authReducer(state, action) {
       return { ...state, loading: true, error: null };
 
     case "LOGIN_SUCCESS": {
-      const { user, token, roles = [], remember = true } = action.payload;
+      const { user, token, roles = [], remember = false } = action.payload;
       return {
         ...state,
         user,
@@ -83,26 +111,23 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Sync state <-> storage depending on remember flag
+  // Sync auth state to sessionStorage (no localStorage persistence)
   useEffect(() => {
-    const store = state.remember ? sessionStorage : localStorage;
-    const other = state.remember ? sessionStorage : localStorage;
-
     try {
-      // wipe the other storage to avoid mismatch
-      other.removeItem("auth_token");
-      other.removeItem("auth_user");
+      // always use sessionStorage; clear leftover localStorage data
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
 
       if (state.token && state.user) {
-        store.setItem("auth_token", state.token);
-        store.setItem("auth_user", JSON.stringify(state.user));
+        sessionStorage.setItem("auth_token", state.token);
+        sessionStorage.setItem("auth_user", JSON.stringify(state.user));
       } else {
         clearStorage();
       }
     } catch {
       // ignore storage quota errors
     }
-  }, [state.token, state.user, state.remember]);
+  }, [state.token, state.user]);
 
   // Handle OAuth redirect tokens (runs on every page, not only /login)
   useEffect(() => {
