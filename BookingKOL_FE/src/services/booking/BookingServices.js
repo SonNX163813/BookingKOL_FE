@@ -182,3 +182,25 @@ export const checkCampaignPaymentStatus = async (
     ),
   });
 };
+
+export const getUserBookingStatus = async (bookingRequestId) => {
+  if (!bookingRequestId) {
+    throw new Error("bookingRequestId is required to fetch booking status");
+  }
+
+  return get({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.getUserBookingStatus(
+      bookingRequestId
+    ),
+  });
+};
+
+export const completeUserWorkTime = async (workTimeId) => {
+  if (!workTimeId) {
+    throw new Error("workTimeId is required to complete work time");
+  }
+
+  return update({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.completeWorkTime(workTimeId),
+  });
+};

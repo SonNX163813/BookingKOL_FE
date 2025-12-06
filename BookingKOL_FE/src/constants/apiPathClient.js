@@ -95,6 +95,10 @@ export const CLIENT_API_PATHS = {
       `/v1/payment/check/campaign/${encodeURIComponent(
         contractPaymentScheduleId
       )}`,
+    getUserBookingStatus: (bookingRequestId) =>
+      `/v1/user/bookings/status/${encodeURIComponent(bookingRequestId)}`,
+    completeWorkTime: (workTimeId) =>
+      `/v1/user/bookings/complete/${encodeURIComponent(workTimeId)}`,
   },
   COURSE: {
     getAll: "/v1/courses/all",
