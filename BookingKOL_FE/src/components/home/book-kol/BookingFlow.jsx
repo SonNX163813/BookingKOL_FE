@@ -40,6 +40,7 @@ import { useReleaseBookingSlot } from "../../../hook/booking_single/useReleaseBo
 import { BOOKING_SINGLE_REVIEW_STORAGE_KEY } from "../../../constants/storageKeys";
 import { useGetPlatforms } from "../../../hook/platform/useGetPlatforms";
 import { loadAuth } from "../../../utils/auth";
+import { getMyUserProfile } from "../../../services/user/UserService";
 
 /* ------------------------- HẰNG SỐ & HÀM HỖ TRỢ ------------------------- */
 
@@ -110,6 +111,7 @@ const BookingFlow = ({
   const [heldSlot, setHeldSlot] = useState(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
   const [holdCountdown, setHoldCountdown] = useState(null);
+  const [myUserProfile, setMyUserProfile] = useState(null);
 
   const { isLoadingCreateBooking: submitting, handleCreateBooking } =
     useCreateSingleBooking(null, {
@@ -137,16 +139,29 @@ const BookingFlow = ({
 
     const now = dayjs();
     const tomorrow = now.add(1, "day");
+    const profileSource = myUserProfile || userProfile;
 
     setActiveStep(0);
     setStartDateTime(now);
     setEndDateTime(tomorrow.hour(now.hour()).minute(now.minute()));
     setContact({
-      fullName: userProfile?.fullName ?? userProfile?.name ?? "",
-      email: userProfile?.email ?? userProfile?.contactEmail ?? "",
-      phone: userProfile?.phone ?? userProfile?.phoneNumber ?? "",
+      fullName:
+        profileSource?.fullName ??
+        profileSource?.name ??
+        profileSource?.displayName ??
+        "",
+      email:
+        profileSource?.email ??
+        profileSource?.contactEmail ??
+        profileSource?.username ??
+        "",
+      phone: profileSource?.phone ?? profileSource?.phoneNumber ?? "",
       note: "",
-      location: "",
+      location:
+        profileSource?.address ??
+        profileSource?.location ??
+        profileSource?.cityAddress ??
+        "",
       platform: "",
       platformCustom: "",
     });
@@ -157,7 +172,100 @@ const BookingFlow = ({
     setHoldCountdown(null);
     hasReleasedSlotRef.current = false;
     hasHoldExpiredRef.current = false;
-  }, [open, userProfile]);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const controller = new AbortController();
+    const fetchProfile = async () => {
+      try {
+        const data = await getMyUserProfile({ signal: controller.signal });
+        const profileData = data?.data ?? data ?? null;
+        if (!profileData) return;
+        setMyUserProfile(profileData);
+        setContact((prev) => {
+          const updates = {};
+          const mapIfEmpty = (key, value) => {
+            if (!prev[key] && value) {
+              updates[key] = value;
+            }
+          };
+          const fullName =
+            profileData.fullName ??
+            profileData.name ??
+            profileData.displayName ??
+            "";
+          const email =
+            profileData.email ??
+            profileData.contactEmail ??
+            profileData.username ??
+            "";
+          const phone = profileData.phone ?? profileData.phoneNumber ?? "";
+          const location =
+            profileData.address ??
+            profileData.location ??
+            profileData.cityAddress ??
+            "";
+
+          mapIfEmpty("fullName", fullName);
+          mapIfEmpty("email", email);
+          mapIfEmpty("phone", phone);
+          mapIfEmpty("location", location);
+
+          if (!Object.keys(updates).length) return prev;
+          return { ...prev, ...updates };
+        });
+      } catch (error) {
+        const aborted =
+          controller.signal.aborted || error?.code === "ERR_CANCELED";
+        if (aborted) return;
+      }
+    };
+
+    fetchProfile();
+    return () => controller.abort();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const profileSource = myUserProfile || userProfile;
+    if (!profileSource) return;
+
+    setContact((prev) => {
+      const updates = {};
+      const mapIfEmpty = (key, value) => {
+        if (!prev[key] && value) {
+          updates[key] = value;
+        }
+      };
+
+      const fullName =
+        profileSource.fullName ??
+        profileSource.name ??
+        profileSource.displayName ??
+        "";
+      const email =
+        profileSource.email ??
+        profileSource.contactEmail ??
+        profileSource.username ??
+        "";
+      const phone = profileSource.phone ?? profileSource.phoneNumber ?? "";
+      const location =
+        profileSource.address ??
+        profileSource.location ??
+        profileSource.cityAddress ??
+        "";
+
+      mapIfEmpty("fullName", fullName);
+      mapIfEmpty("email", email);
+      mapIfEmpty("phone", phone);
+      mapIfEmpty("location", location);
+
+      if (!Object.keys(updates).length) return prev;
+      return { ...prev, ...updates };
+    });
+  }, [open, userProfile, myUserProfile]);
 
   const platformOptions = useMemo(() => {
     if (!Array.isArray(platforms)) return [];
@@ -185,16 +293,17 @@ const BookingFlow = ({
 
   const platformLoading = isLoadingPlatforms || isFetchingPlatforms;
   const currentUserId = useMemo(() => {
+    const profileSource = myUserProfile || userProfile;
     const fromProfile =
-      userProfile?.id ||
-      userProfile?.userId ||
-      userProfile?.user_id ||
-      userProfile?.userID;
+      profileSource?.id ||
+      profileSource?.userId ||
+      profileSource?.user_id ||
+      profileSource?.userID;
     if (fromProfile) return fromProfile;
 
     const { user } = loadAuth();
     return user?.id || user?.userId || user?.user_id || user?.userID || "";
-  }, [userProfile]);
+  }, [userProfile, myUserProfile]);
 
   useEffect(() => {
     if (!open) return;

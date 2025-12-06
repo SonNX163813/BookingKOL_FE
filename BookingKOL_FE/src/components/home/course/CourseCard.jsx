@@ -10,6 +10,15 @@ import {
 } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 
+const formatCurrency = (value) => {
+  if (value == null) return "";
+  return value.toLocaleString("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  });
+};
+
 const CourseCard = ({ course, onSelect }) => {
   const handleCardClick = () => {
     if (course.id) {
@@ -21,6 +30,16 @@ const CourseCard = ({ course, onSelect }) => {
     event.stopPropagation();
     handleCardClick();
   };
+
+  const hasDiscount =
+    typeof course?.discount === "number" &&
+    course.discount > 0 &&
+    course.price &&
+    course.currentPrice &&
+    course.currentPrice < course.price;
+
+  const displayPrice =
+    course.currentPrice != null ? course.currentPrice : course.price;
 
   return (
     <Card
@@ -54,7 +73,6 @@ const CourseCard = ({ course, onSelect }) => {
     >
       <Box
         sx={{
-          //position: "relative",
           width: "100%",
           height: { xs: 220, sm: 220, md: 300 },
           aspectRatio: { xs: "16 / 11", sm: "16 / 10", md: "16 / 9" },
@@ -75,15 +93,6 @@ const CourseCard = ({ course, onSelect }) => {
             transition: "transform 320ms ease",
           }}
         />
-        {/* <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(180deg, rgba(15, 23, 42, 0) 60%, rgba(15, 23, 42, 0.18) 100%)",
-            pointerEvents: "none",
-          }}
-        /> */}
       </Box>
       <CardContent
         sx={{
@@ -120,20 +129,32 @@ const CourseCard = ({ course, onSelect }) => {
           sx={{ mt: "auto" }}
         >
           <Stack spacing={0.5}>
-            <Typography
-              sx={{
-                color: "rgba(15, 23, 42, 0.6)",
-                fontSize: "0.75rem",
-                textTransform: "uppercase",
-                letterSpacing: 1.2,
-              }}
-            >
+            <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
               Học phí
             </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: "#4a74da" }}>
-              {course.priceLabel}
-            </Typography>
+
+            {/* Giá */}
+            <Stack direction="column" spacing={1} alignItems="baseline">
+              {hasDiscount && (
+                <Typography
+                  sx={{
+                    textDecoration: "line-through",
+                    color: "rgba(15, 23, 42, 0.5)",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {formatCurrency(course.price)}
+                </Typography>
+              )}
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 700, color: "#4a74da" }}
+              >
+                {formatCurrency(displayPrice)}
+              </Typography>
+            </Stack>
           </Stack>
+
           <Button
             variant="contained"
             size="small"
@@ -145,7 +166,8 @@ const CourseCard = ({ course, onSelect }) => {
               fontWeight: 700,
               bgcolor: "#4a74da",
               color: "#ffffff",
-              px: 2.5,
+              px: 3,
+              py: 1,
               borderRadius: 2,
               boxShadow: "0 12px 28px rgba(74, 116, 218, 0.18)",
               "&:hover": {

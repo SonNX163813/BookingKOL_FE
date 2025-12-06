@@ -48,10 +48,12 @@ const ContractDocPreview = ({ url }) => {
         await renderAsync(buffer, previewRef.current, undefined, {
           className: "docx-preview-content",
           inWrapper: true,
-          ignoreWidth: true,
+          ignoreWidth: false,
           ignoreHeight: true,
-          breakPages: false,
+          breakPages: true,
+          ignoreLastRenderedPageBreak: false,
         });
+
         if (isMounted) {
           setStatus("ready");
         }
@@ -102,6 +104,14 @@ const ContractDocPreview = ({ url }) => {
             color: BOOKING_FLOW_STYLE.textPrimary,
           },
           "& .docx p": { color: BOOKING_FLOW_STYLE.textPrimary },
+          "& p[class^='docx-preview-content-num'] > span:empty": {
+            display: "none",
+          },
+
+          // Nếu muốn ẩn luôn container p
+          "& p[class^='docx-preview-content-num']:has(span:empty)": {
+            display: "none",
+          },
         }}
       />
     </Box>
@@ -259,7 +269,8 @@ const ContractTermsDialog = ({
                         color: BOOKING_FLOW_STYLE.accent,
                       }}
                     >
-                      {BOOKING_STATUS_LABEL?.[contract.status] || contract.status}
+                      {BOOKING_STATUS_LABEL?.[contract.status] ||
+                        contract.status}
                     </Box>
                   </Typography>
 

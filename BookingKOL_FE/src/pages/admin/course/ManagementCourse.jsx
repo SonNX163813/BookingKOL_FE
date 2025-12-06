@@ -300,13 +300,13 @@ const ManagementCourse = () => {
       align: "center",
       render: (record) => (
         <div className="flex justify-center gap-2">
-          <Button
+          {/* <Button
             onClick={() => handleOpenView(record)}
             className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
             title="Xem nhanh"
           >
             <Eye size={18} className="font-semibold" />
-          </Button>
+          </Button> */}
           <Button
             onClick={() => handleEdit(record)}
             className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
