@@ -57,7 +57,7 @@ const sectionCardStyles = {
 };
 
 const FIELD_MAX_LENGTHS = {
-  fullName: 100,
+  fullName: 20,
   brandName: 100,
   address: 100,
   introduction: 100,
@@ -410,6 +410,9 @@ export default function UserProfile() {
       setError(null);
       setShowErrorSnackbar(false);
       await fetchProfile({ showGlobalLoading: false });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("user-profile-updated"));
+      }
     } catch (err) {
       const message =
         err?.response?.data?.message ??
