@@ -57,7 +57,7 @@ const sectionCardStyles = {
 };
 
 const FIELD_MAX_LENGTHS = {
-  fullName: 20,
+  fullName: 30,
   brandName: 100,
   address: 100,
   introduction: 100,

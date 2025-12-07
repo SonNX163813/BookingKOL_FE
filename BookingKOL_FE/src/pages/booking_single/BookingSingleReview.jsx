@@ -158,6 +158,7 @@ const BookingSingleReview = () => {
   const [cancelling, setCancelling] = useState(false);
   const [readTermsIds, setReadTermsIds] = useState([]);
   const [openContractTerms, setOpenContractTerms] = useState(null);
+  const [signedContractIds, setSignedContractIds] = useState([]);
 
   useEffect(() => {
     const stateRequest = location.state?.bookingRequest;
@@ -359,6 +360,7 @@ const BookingSingleReview = () => {
   useEffect(() => {
     setReadTermsIds([]);
     setOpenContractTerms(null);
+    setSignedContractIds([]);
   }, [bookingRequest?.id]);
 
   const errorMessageFromResponse = (error) => {
@@ -444,6 +446,13 @@ const BookingSingleReview = () => {
 
   const handleCloseContractTerms = () => {
     setOpenContractTerms(null);
+  };
+
+  const handleContractSigned = (contractId) => {
+    if (!contractId) return;
+    setSignedContractIds((prev) =>
+      prev.includes(contractId) ? prev : [...prev, contractId]
+    );
   };
 
   const handleContractTermsScroll = (contractId) => (event) => {
@@ -859,9 +868,6 @@ const BookingSingleReview = () => {
                             const contractTerms = contractTermsById.get(
                               contract.id
                             );
-                            const hasReadTerms = readTermsIds.includes(
-                              contract.id
-                            );
                             return (
                               <Stack key={contract.id} spacing={1}>
                                 <Stack
@@ -966,7 +972,7 @@ const BookingSingleReview = () => {
                             const contractTerms = contractTermsById.get(
                               contract.id
                             );
-                            const hasReadTerms = readTermsIds.includes(
+                            const isSigned = signedContractIds.includes(
                               contract.id
                             );
                             return (
@@ -992,7 +998,22 @@ const BookingSingleReview = () => {
                                       >
                                         Hợp đồng
                                       </Typography>
-                                      <Stack direction="row" spacing={1}>
+                                      <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
+                                      >
+                                        <Typography
+                                          sx={{
+                                            fontWeight: 700,
+                                            color: isSigned
+                                              ? "#2e7d32"
+                                              : BOOKING_FLOW_STYLE
+                                                  .textSecondary,
+                                          }}
+                                        >
+                                          {isSigned ? "Đã ký" : "Chưa ký"}
+                                        </Typography>
                                         <Button
                                           variant="outlined"
                                           size="small"
@@ -1131,6 +1152,12 @@ const BookingSingleReview = () => {
         contract={openContractTerms}
         onClose={handleCloseContractTerms}
         onScroll={handleContractTermsScroll}
+        onAcceptTerms={handleContractSigned}
+        initialAccepted={
+          openContractTerms
+            ? signedContractIds.includes(openContractTerms.id)
+            : false
+        }
         formatCurrency={formatCurrency}
       />
     </>

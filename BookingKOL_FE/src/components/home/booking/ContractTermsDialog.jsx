@@ -125,6 +125,8 @@ const ContractTermsDialog = ({
   onScroll,
   formatCurrency,
   acknowledgementRequired = true,
+  onAcceptTerms,
+  initialAccepted = false,
 }) => {
   const hasContract = Boolean(contract);
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
@@ -137,12 +139,12 @@ const ContractTermsDialog = ({
 
   useEffect(() => {
     if (!open) {
-      setHasReachedBottom(!requireAcknowledgement);
-      setAcceptedTerms(!requireAcknowledgement);
+      setHasReachedBottom(initialAccepted || !requireAcknowledgement);
+      setAcceptedTerms(initialAccepted || !requireAcknowledgement);
       return;
     }
 
-    if (!requireAcknowledgement) {
+    if (!requireAcknowledgement || initialAccepted) {
       setHasReachedBottom(true);
       setAcceptedTerms(true);
       return;
@@ -150,7 +152,17 @@ const ContractTermsDialog = ({
 
     setHasReachedBottom(false);
     setAcceptedTerms(false);
-  }, [open, contract?.id, requireAcknowledgement]);
+  }, [open, contract?.id, requireAcknowledgement, initialAccepted]);
+
+  useEffect(() => {
+    if (
+      acceptedTerms &&
+      contract?.id &&
+      typeof onAcceptTerms === "function"
+    ) {
+      onAcceptTerms(contract.id);
+    }
+  }, [acceptedTerms, contract?.id, onAcceptTerms]);
 
   const handleContentScroll = (event) => {
     if (externalScrollHandler) {
