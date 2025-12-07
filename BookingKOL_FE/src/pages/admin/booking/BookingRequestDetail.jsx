@@ -21,6 +21,7 @@ import {
   Select,
   Popconfirm,
   message,
+  Input, // ✅ add
 } from "antd";
 import {
   ArrowLeft,
@@ -52,6 +53,8 @@ import { adminUpdateSingleBookingRequestStatus } from "../../../services/admin/A
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
+
+const MAX_REQUEST_CODE_LEN = 100; // ✅ NEW
 
 /** ✅ 2 option fix cứng (bắt buộc chọn) */
 const ADMIN_NOTE_OPTIONS = [
@@ -395,6 +398,11 @@ const BookingRequestDetail = () => {
   const { requestId } = useParams();
   const navigate = useNavigate();
   const screens = useBreakpoint();
+
+  // ✅ NEW: input mã yêu cầu (max 100 + thông báo dưới input)
+  const [requestCodeInput, setRequestCodeInput] = useState("");
+  const isRequestCodeMax =
+    (requestCodeInput || "").length >= MAX_REQUEST_CODE_LEN;
 
   const [openCancelModal, setOpenCancelModal] = useState(false);
   const [selectedCancelWorktimeId, setSelectedCancelWorktimeId] =
@@ -755,7 +763,7 @@ const BookingRequestDetail = () => {
 
     setActionLoading(true);
     try {
-      // 1) notify KOL (approve + note) để KOL biết admin đã xử lý
+      // 1) notify KOL (approve + note)
       await adminApproveCancelRequest({
         requestId: entry.cancel.id,
         adminNote: adminNoteDraft,
@@ -845,7 +853,6 @@ const BookingRequestDetail = () => {
             statusCode === 400 &&
             /không tìm thấy\s+livestream\s+metric/i.test(String(messageText));
 
-          // ✅ không có data => ẩn luôn card
           if (isNoMetricsError) return null;
 
           return (
@@ -865,7 +872,6 @@ const BookingRequestDetail = () => {
           );
         }
 
-        // ✅ metrics null/empty => ẩn luôn card
         if (!metrics || !hasAnyLivestreamMetricValue(metrics)) return null;
 
         return (
@@ -945,6 +951,25 @@ const BookingRequestDetail = () => {
               {detail?.requestNumber ?? detail?.id ?? requestId ?? "--"}
             </Text>
           </Text>
+
+          {/* ✅ NEW: Input nhập mã yêu cầu (max 100) + thông báo dưới input khi max */}
+          <div
+            style={{
+              marginTop: 8,
+              width: 360,
+              maxWidth: "100%",
+              marginLeft: "auto",
+            }}
+          >
+            {isRequestCodeMax ? (
+              <Text
+                type="danger"
+                style={{ display: "block", marginTop: 4, fontSize: 12 }}
+              >
+                Đã đạt tối đa {MAX_REQUEST_CODE_LEN} ký tự.
+              </Text>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -1281,7 +1306,6 @@ const BookingRequestDetail = () => {
           </Card>
 
           {/* --- Livestream Metrics --- */}
-          {/* ✅ Nếu không có card nào có data -> render null luôn (không hiện Ca làm việc 1 + không hiện Empty) */}
           {livestreamWorktimeCards.length > 0 ? (
             <Card
               className="shadow-sm"
@@ -1409,7 +1433,6 @@ const BookingRequestDetail = () => {
                 </Space>
               }
             >
-              {/* ✅ Block 1: reason + created/approved */}
               <Descriptions
                 bordered
                 size="middle"
@@ -1440,7 +1463,6 @@ const BookingRequestDetail = () => {
                 )}
               </Descriptions>
 
-              {/* ✅ Block 2: adminNote luôn là "riêng 1 hàng" (column=1) */}
               {hasMeaningfulValue(selectedCancelEntry?.cancel?.adminNote) && (
                 <div className="mt-3">
                   <Descriptions
@@ -1458,12 +1480,10 @@ const BookingRequestDetail = () => {
                 </div>
               )}
 
-              {/* ✅ Nếu APPROVED: không cho chọn ghi chú nữa */}
               {!isCancelApproved && (
                 <>
                   <Divider />
 
-                  {/* ✅ Ghi chú bắt buộc */}
                   <div>
                     <Text strong>
                       Ghi chú admin <Text type="danger">*</Text>
@@ -1495,7 +1515,6 @@ const BookingRequestDetail = () => {
               <div className="flex flex-wrap justify-end gap-2">
                 <Button onClick={() => setOpenCancelModal(false)}>Đóng</Button>
 
-                {/* ✅ Nếu APPROVED: ẩn 2 nút thao tác */}
                 {!isCancelApproved && (
                   <>
                     <Button
@@ -1533,18 +1552,6 @@ const BookingRequestDetail = () => {
                   </>
                 )}
               </div>
-
-              {/* ✅ Badge trạng thái nếu APPROVED */}
-              {isCancelApproved && (
-                <div className="mt-3">
-                  <Alert
-                    type="success"
-                    showIcon
-                    message="Yêu cầu đã được duyệt"
-                    description="Yêu cầu ở trạng thái APPROVED nên không thể chọn ghi chú hoặc thực hiện thao tác nữa."
-                  />
-                </div>
-              )}
             </Card>
           </>
         )}
@@ -1564,13 +1571,6 @@ const BookingRequestDetail = () => {
         }}
         destroyOnClose
       >
-        <div className="mb-2">
-          <Text type="secondary">
-            Chỉ hiển thị KOL có lịch <b>AVAILABLE</b> và <b>bao trùm</b> đúng ca
-            của đơn.
-          </Text>
-        </div>
-
         {selectedWorktime?.startAt && selectedWorktime?.endAt && (
           <div className="mb-3 text-sm">
             <Text type="secondary">
@@ -1602,11 +1602,6 @@ const BookingRequestDetail = () => {
               .includes(String(input).toLowerCase())
           }
         />
-
-        <div className="mt-3 text-xs text-gray-500">
-          API đổi KOL: <b>PATCH /v1/admin/booking/single-requests/change-kol</b>{" "}
-          (bookingRequestId, kolId, kolAvailabilityId)
-        </div>
       </Modal>
     </div>
   );

@@ -32,16 +32,16 @@ export const getAllKol = async (
   size,
   minBookingPrice,
   minRating,
-  isAvailable
+  nameKeyword // ✅ đổi tên tham số
 ) => {
   return await get({
     url: API_PATHS.MANAGEMENT_USER.managementKOL,
     params: {
-      page: page,
-      size: size,
+      page,
+      size,
       minBookingPrice: minBookingPrice ?? null,
       minRating: minRating ?? null,
-      isAvailable: isAvailable ?? null,
+      nameKeyword: nameKeyword ?? null, // ✅ đổi key isAvailable -> nameKeyword
     },
   });
 };

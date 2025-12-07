@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import dayjs from "dayjs";
+import "dayjs/locale/vi";
 import {
   Button,
   Card,
@@ -12,13 +13,18 @@ import {
   Tag,
   Typography,
   message,
+  ConfigProvider,
 } from "antd";
+import viVN from "antd/locale/vi_VN";
 import { RefreshCcw, RotateCcw, Search } from "lucide-react";
 import { useGetAdminCourseHistory } from "../../../hook/admin/course/useGetAdminCourseHistory";
 import { confirmAdminCoursePurchase } from "../../../services/admin/AdminCourseHistoryAPI";
 
+dayjs.locale("vi");
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
+
+const MAX_SEARCH_LEN = 100;
 
 const COURSE_STATUS_META = {
   COURSEASSIGNED: { label: "Khóa học đã được gửi", color: "success" },
@@ -48,9 +54,7 @@ const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
 };
 
 const resolveCourseStatus = (status) => {
-  if (!status) {
-    return { label: "--", color: "default" };
-  }
+  if (!status) return { label: "--", color: "default" };
   const normalized = status.toUpperCase();
   return (
     COURSE_STATUS_META[normalized] ?? {
@@ -70,6 +74,10 @@ const ManagementCourseHistory = () => {
     endDate: undefined,
   });
   const [confirmingId, setConfirmingId] = useState(null);
+
+  // ✅ watch keyword để hiện thông báo khi đạt 100 ký tự
+  const searchValue = Form.useWatch("search", form);
+  const isSearchMax = (searchValue?.length ?? 0) >= MAX_SEARCH_LEN;
 
   const {
     data: response,
@@ -119,22 +127,24 @@ const ManagementCourseHistory = () => {
     setSize(pageSize);
   };
 
-  const handleConfirmCourse = useCallback(async (record) => {
-    if (!record?.id) return;
-    try {
-      setConfirmingId(record.id);
-      await confirmAdminCoursePurchase(record.id);
-      message.success("Xác nhận khóa học thành công");
-      refetch();
-    } catch (error) {
-      // message handled by interceptor, fallback
-      if (!error?.response) {
-        message.error("Không thể xác nhận khóa học. Vui lòng thử lại.");
+  const handleConfirmCourse = useCallback(
+    async (record) => {
+      if (!record?.id) return;
+      try {
+        setConfirmingId(record.id);
+        await confirmAdminCoursePurchase(record.id);
+        message.success("Xác nhận khóa học thành công");
+        refetch();
+      } catch (error) {
+        if (!error?.response) {
+          message.error("Không thể xác nhận khóa học. Vui lòng thử lại.");
+        }
+      } finally {
+        setConfirmingId(null);
       }
-    } finally {
-      setConfirmingId(null);
-    }
-  }, [refetch]);
+    },
+    [refetch]
+  );
 
   const pageRange = useMemo(() => {
     if (!totalElements) return null;
@@ -154,9 +164,6 @@ const ManagementCourseHistory = () => {
             <span className="font-semibold text-gray-900">
               {value || record?.id || "--"}
             </span>
-            {/* <span className="text-xs text-gray-500">
-              ID: {record?.id || "--"}
-            </span> */}
           </div>
         ),
       },
@@ -250,101 +257,122 @@ const ManagementCourseHistory = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Title level={3} className="!mb-0">
-            Lịch sử mua khóa học
-          </Title>
-          <Text type="secondary">
-            Theo dõi các đơn đăng ký khóa học và trạng thái thanh toán.
-          </Text>
-        </div>
-        <Button
-          icon={<RefreshCcw size={16} />}
-          onClick={() => refetch()}
-          loading={refreshing}
-        >
-          Làm mới
-        </Button>
-      </div>
-
-      <Card>
-        <Form
-          layout="vertical"
-          form={form}
-          initialValues={{ search: undefined, dateRange: [] }}
-          onFinish={handleSubmit}
-        >
-          <div className="grid gap-4 md:grid-cols-[2fr_2fr_auto_auto]">
-            <Form.Item label="Tìm kiếm" name="search" className="mb-0">
-              <Input
-                placeholder="Tìm theo tên, email hoặc mã đơn..."
-                allowClear
-                maxLength={120}
-              />
-            </Form.Item>
-            <Form.Item label="Khoảng ngày" name="dateRange" className="mb-0">
-              <RangePicker className="w-full" format="DD/MM/YYYY" allowClear />
-            </Form.Item>
-            <Form.Item label=" " colon={false} className="mb-0">
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<Search size={16} />}
-                className="w-full md:w-auto"
-              >
-                Lọc
-              </Button>
-            </Form.Item>
-            <Form.Item label=" " colon={false} className="mb-0">
-              <Button
-                icon={<RotateCcw size={16} />}
-                onClick={handleReset}
-                className="w-full md:w-auto"
-              >
-                Xóa lọc
-              </Button>
-            </Form.Item>
+    <ConfigProvider locale={viVN}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Title level={3} className="!mb-0">
+              Lịch sử mua khóa học
+            </Title>
+            <Text type="secondary">
+              Theo dõi các đơn đăng ký khóa học và trạng thái thanh toán.
+            </Text>
           </div>
-        </Form>
-      </Card>
-
-      <Card>
-        <Table
-          rowKey={(record) => record?.id ?? record?.purchasedCourseNumber}
-          columns={columns}
-          dataSource={rows}
-          loading={tableLoading}
-          pagination={false}
-          scroll={{ x: 960 }}
-          locale={{
-            emptyText: showLoadingPlaceholder ? (
-              "Đang tải dữ liệu..."
-            ) : (
-              <Empty description="Không có dữ liệu" />
-            ),
-          }}
-        />
-
-        <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <Text type="secondary">
-            {pageRange
-              ? `Đang hiển thị ${pageRange.start}-${pageRange.end} / ${totalElements}`
-              : "Không có dữ liệu"}
-          </Text>
-          <Pagination
-            current={page + 1}
-            pageSize={size}
-            pageSizeOptions={["10", "20", "50"]}
-            total={totalElements}
-            showSizeChanger
-            onChange={handlePageChange}
-            onShowSizeChange={handlePageChange}
-          />
+          <Button
+            icon={<RefreshCcw size={16} />}
+            onClick={() => refetch()}
+            loading={refreshing}
+          >
+            Làm mới
+          </Button>
         </div>
-      </Card>
-    </div>
+
+        <Card>
+          <Form
+            layout="vertical"
+            form={form}
+            initialValues={{ search: undefined, dateRange: [] }}
+            onFinish={handleSubmit}
+          >
+            <div className="grid gap-4 md:grid-cols-[2fr_2fr_auto_auto]">
+              {/* ✅ max 100 + warning dưới input khi đạt max */}
+              <Form.Item
+                label="Tìm kiếm"
+                name="search"
+                className="mb-0"
+                rules={[
+                  { max: MAX_SEARCH_LEN, message: "Từ khóa tối đa 100 ký tự." },
+                ]}
+                validateStatus={isSearchMax ? "warning" : undefined}
+                help={isSearchMax ? "Tối đa 100 ký tự." : undefined}
+              >
+                <Input
+                  placeholder="Tìm theo tên, email hoặc mã đơn..."
+                  allowClear
+                  maxLength={MAX_SEARCH_LEN}
+                />
+              </Form.Item>
+
+              {/* ✅ RangePicker tiếng Việt giống file Campaign */}
+              <Form.Item label="Khoảng ngày" name="dateRange" className="mb-0">
+                <RangePicker
+                  className="w-full"
+                  format="DD/MM/YYYY"
+                  allowClear
+                  placeholder={["Từ ngày", "Đến ngày"]}
+                />
+              </Form.Item>
+
+              <Form.Item label=" " colon={false} className="mb-0">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<Search size={16} />}
+                  className="w-full md:w-auto"
+                >
+                  Lọc
+                </Button>
+              </Form.Item>
+
+              <Form.Item label=" " colon={false} className="mb-0">
+                <Button
+                  icon={<RotateCcw size={16} />}
+                  onClick={handleReset}
+                  className="w-full md:w-auto"
+                >
+                  Xóa lọc
+                </Button>
+              </Form.Item>
+            </div>
+          </Form>
+        </Card>
+
+        <Card>
+          <Table
+            rowKey={(record) => record?.id ?? record?.purchasedCourseNumber}
+            columns={columns}
+            dataSource={rows}
+            loading={tableLoading}
+            pagination={false}
+            scroll={{ x: 960 }}
+            locale={{
+              emptyText: showLoadingPlaceholder ? (
+                "Đang tải dữ liệu..."
+              ) : (
+                <Empty description="Không có dữ liệu" />
+              ),
+            }}
+          />
+
+          <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <Text type="secondary">
+              {pageRange
+                ? `Đang hiển thị ${pageRange.start}-${pageRange.end} / ${totalElements}`
+                : "Không có dữ liệu"}
+            </Text>
+            <Pagination
+              current={page + 1}
+              pageSize={size}
+              pageSizeOptions={["10", "20", "50"]}
+              total={totalElements}
+              showSizeChanger
+              onChange={handlePageChange}
+              onShowSizeChange={handlePageChange}
+            />
+          </div>
+        </Card>
+      </div>
+    </ConfigProvider>
   );
 };
 

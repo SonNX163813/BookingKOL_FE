@@ -174,18 +174,6 @@ export default function MainLayoutKOL() {
         },
       ],
     },
-    {
-      key: "group-earnings",
-      icon: <PaidOutlined />,
-      label: "Doanh thu",
-      children: [
-        {
-          key: "kol-earnings",
-          icon: <PaidOutlined />,
-          label: <Link to="earnings">Báo cáo thu nhập</Link>,
-        },
-      ],
-    },
   ];
 
   const handleProfile = () => navigate("/kol/profile");

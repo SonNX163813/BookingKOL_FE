@@ -118,7 +118,7 @@ export default function TopBar({
             <ListItemIcon>
               <SettingsIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary="Settings" />
+            <ListItemText primary="Cài đặt tài khoản" />
           </MenuItem>
           <MenuItem
             onClick={() => {
@@ -129,7 +129,7 @@ export default function TopBar({
             <ListItemIcon>
               <PersonIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary="Profile" />
+            <ListItemText primary="Thông tin cá nhân" />
           </MenuItem>
           <Divider />
           <MenuItem

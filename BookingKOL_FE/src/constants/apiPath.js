@@ -42,6 +42,8 @@ export const API_PATHS = {
     list: "/v1/admin/bookings", // nếu Swagger của bạn KHÔNG có /v1 thì đổi thành "/admin/bookings"
     create: "/v1/admin/bookings/create",
     detail: "/v1/admin/bookings/admin", // + /{campaignId}
+    edit: (bookingRequestId) =>
+      `/v1/admin/bookings/edit/${encodeURIComponent(bookingRequestId)}`,
   },
   CAMPAIGN: {
     detail: "/v1/campaigns", // + /{campaignId}
