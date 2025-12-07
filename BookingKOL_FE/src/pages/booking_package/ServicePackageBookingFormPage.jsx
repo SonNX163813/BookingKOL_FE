@@ -1014,7 +1014,7 @@ const ServicePackageBookingFormPage = () => {
             <div className="flex flex-col gap-6 px-6 pb-8 pt-8 sm:px-10">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.4em] text-blue-600">
+                  <p className=" font-semibold uppercase  text-blue-600">
                     Quy trình đặt gói
                   </p>
 

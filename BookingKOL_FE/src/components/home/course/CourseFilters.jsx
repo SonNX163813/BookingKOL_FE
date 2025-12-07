@@ -72,9 +72,9 @@ const CourseFilters = ({
             variant="overline"
             sx={{ fontWeight: 700, color: "#4a74da", letterSpacing: 1 }}
           >
-            Bộ lọc khóa học
+            Quản lý khóa học
           </Typography>
-          <Typography
+          {/* <Typography
             variant="h5"
             sx={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}
           >
@@ -86,7 +86,7 @@ const CourseFilters = ({
           >
             Lọc nhanh theo ngân sách và ưu đãi để luôn nhìn thấy những gói phù
             hợp nhất với mục tiêu livestream hiện tại.
-          </Typography>
+          </Typography> */}
         </Stack>
 
         <Stack spacing={3}>

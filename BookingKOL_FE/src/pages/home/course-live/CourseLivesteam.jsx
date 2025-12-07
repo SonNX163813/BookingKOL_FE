@@ -193,15 +193,28 @@ const CourseLivesteam = () => {
         "Nâng cao khả năng livestream và chiến lược tăng trưởng bền vững.";
       const slug = slugify(name) || "khoa-hoc";
 
+      // Lấy giá trị số từ API
+      const price = Number.isFinite(Number(course?.price))
+        ? Number(course.price)
+        : undefined;
+
+      const currentPrice = Number.isFinite(Number(course?.currentPrice))
+        ? Number(course.currentPrice)
+        : undefined;
+
+      const discount = Number.isFinite(Number(course?.discount))
+        ? Number(course.discount)
+        : 0;
+
       return {
         id: course?.id,
         name,
         slug,
-        priceLabel: Number.isFinite(Number(course?.price))
-          ? currencyFormatter.format(Number(course.price))
-          : "Liên hệ",
         description,
         cover: cover ?? hotkolimg,
+        price,
+        currentPrice,
+        discount,
       };
     });
   }, [courses]);
@@ -308,29 +321,6 @@ const CourseLivesteam = () => {
           </Box>
         </Stack>
       </Container>
-
-      {/* <AppSnackbar
-        open={showErrorSnackbar}
-        onClose={() => setShowErrorSnackbar(false)}
-        severity="error"
-        message={error ?? "Không thể kết nối tới máy chủ"}
-        action={
-          <IconButton
-            size="small"
-            aria-label="thử lại"
-            color="inherit"
-            onClick={() => {
-              setShowErrorSnackbar(false);
-              handleRetry();
-            }}
-            sx={{ mr: 1 }}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              Thử lại
-            </Typography>
-          </IconButton>
-        }
-      /> */}
     </Box>
   );
 };

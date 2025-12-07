@@ -74,11 +74,12 @@ const BookingContactStep = ({
 
   // Gợi ý đính kèm tệp
   const attachmentHintTemplate = TEXT.messages.attachmentHint;
-  const attachmentHint = attachmentHintTemplate
+  const baseAttachmentHint = attachmentHintTemplate
     ? attachmentHintTemplate
         .replace("{limit}", limit)
         .replace("{size}", maxSize)
     : `Bạn có thể đính kèm tối đa ${limit} tệp (mỗi tệp tối đa ${maxSize}MB).`;
+  const attachmentHint = `${baseAttachmentHint}`;
 
   return (
     <Stack spacing={3}>
@@ -278,6 +279,9 @@ const BookingContactStep = ({
             Tệp đính kèm{" "}
             <Typography component="span" sx={{ color: "error.main", ml: 0.25 }}>
               *
+              <Typography variant="body2" sx={{ color: STYLE.textSecondary }}>
+                Đính kèm thông tin sản phẩm hoặc phiên live.
+              </Typography>
             </Typography>
           </Typography>
 
