@@ -6,7 +6,7 @@ export const useGetAllKol = (
   size,
   minBookingPrice,
   minRating,
-  isAvailable
+  nameKeyword // ✅ đổi từ isAvailable -> nameKeyword
 ) => {
   const {
     isPending: isLoadingGetALlKol,
@@ -19,10 +19,10 @@ export const useGetAllKol = (
       size,
       minBookingPrice,
       minRating,
-      isAvailable,
+      nameKeyword, // ✅
     ],
     queryFn: () =>
-      getAllKol(page, size, minBookingPrice, minRating, isAvailable),
+      getAllKol(page, size, minBookingPrice, minRating, nameKeyword), // ✅
     retry: false,
     enabled: false,
     keepPreviousData: true,

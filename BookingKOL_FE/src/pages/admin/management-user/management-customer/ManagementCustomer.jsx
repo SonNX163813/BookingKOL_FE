@@ -9,7 +9,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Button, Form, Input, Pagination, Table, Popconfirm } from "antd";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useGetAllBrands } from "../../../../hook/admin/management-user/useGetAllBrands";
 import { AccountCircleOutlined } from "@mui/icons-material";
 import { usePatchAdminUpdateStatusAccount } from "../../../../hook/admin/management-user/usePatchAdminUpdateStatusAccount";
@@ -22,12 +22,21 @@ const STATUS_VI = {
   PENDING: "Chờ duyệt",
 };
 
+const MAX_SEARCH_LEN = 100;
+
 const ManagementCustomer = () => {
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(20);
   const [form] = Form.useForm();
   const [searchValue, setSearchValue] = useState(undefined);
   const navigate = useNavigate();
+
+  // ✅ theo dõi độ dài input để hiện cảnh báo dưới ô
+  const searchText = Form.useWatch("search", form);
+  const reachedMax = useMemo(
+    () => (searchText?.length ?? 0) >= MAX_SEARCH_LEN,
+    [searchText]
+  );
 
   const { isLoadingGetAllBrands, ResponseGetAllBrands, refetchGetAllBrands } =
     useGetAllBrands(page, size, searchValue);
@@ -109,11 +118,9 @@ const ManagementCustomer = () => {
         const isActive = record.status === "ACTIVE";
         const canActivate =
           record.status === "PENDING" || record.status === "SUSPENDED";
-        // Nếu muốn cho INACTIVE cũng kích hoạt được thì thêm vào mảng trên.
 
         return (
           <div className="w-full flex justify-center gap-3">
-            {/* Xem chi tiết hồ sơ */}
             <Button
               onClick={() =>
                 navigate(`/admin/management-customer/${record.userId}`)
@@ -123,7 +130,6 @@ const ManagementCustomer = () => {
               <Eye size={18} className="font-semibold" />
             </Button>
 
-            {/* ✅ NEW: Xem lịch sử booking của user (giống bên KOL) */}
             <Button
               onClick={() =>
                 navigate(`/admin/management-customer/${record.userId}/bookings`)
@@ -140,7 +146,6 @@ const ManagementCustomer = () => {
               </span>
             </Button>
 
-            {/* Nếu ACTIVE → nút tạm khóa (X) */}
             {isActive && (
               <Popconfirm
                 title="Bạn có muốn tạm khóa tài khoản này không?"
@@ -159,7 +164,6 @@ const ManagementCustomer = () => {
               </Popconfirm>
             )}
 
-            {/* Nếu PENDING / SUSPENDED → nút kích hoạt (✔) */}
             {canActivate && (
               <Popconfirm
                 title="Bạn có muốn kích hoạt tài khoản này không?"
@@ -197,12 +201,19 @@ const ManagementCustomer = () => {
 
       <div className="flex gap-3 py-3">
         <Form form={form} className="flex gap-3" onFinish={handleSearch}>
-          <Form.Item name="search">
+          <Form.Item
+            name="search"
+            // ✅ hiện thông báo dưới ô khi đạt max
+            help={reachedMax ? `Tối đa ${MAX_SEARCH_LEN} ký tự.` : null}
+            validateStatus={reachedMax ? "warning" : ""}
+          >
             <Input
               className="!h-12"
               placeholder="Tìm email hoặc tên khách hàng"
+              maxLength={MAX_SEARCH_LEN} // ✅ chặn nhập quá 100 ký tự
             />
           </Form.Item>
+
           <Form.Item>
             <Button
               htmlType="submit"
@@ -211,6 +222,7 @@ const ManagementCustomer = () => {
               <Search size={16} /> Tìm kiếm
             </Button>
           </Form.Item>
+
           <Form.Item>
             <Button
               onClick={resetForm}

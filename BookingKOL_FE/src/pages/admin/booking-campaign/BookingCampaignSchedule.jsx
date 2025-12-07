@@ -19,6 +19,7 @@ import {
   message,
   ConfigProvider,
   Alert,
+  Tag,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
 import { CalendarRange, Plus } from "lucide-react";
@@ -35,25 +36,57 @@ const { RangePicker } = DatePicker;
 const { RangePicker: TimeRangePicker } = TimePicker;
 const { Text } = Typography;
 
-/**
- * BookingCampaignSchedule
- *
- * - BookingRequestId:
- *   + Ưu tiên lấy từ location.state.bookingRequestId (navigate từ màn khác).
- *   + Nếu không có, gọi /admin/bookings/admin/{campaignId} để lấy bookingRequests[0].id.
- *
- * - Flow tạo lịch:
- *   1) Chọn "Khoảng thời gian muốn tìm lịch rảnh" (searchRange).
- *   2) Bấm "Tìm KOL / trợ live rảnh" -> gọi adminSearchFreeSlots(startDate, endDate).
- *   3) Chọn 1 slot rảnh -> set selectedSlot (kolId, kolName, startAt, endAt, availabilityId).
- *   4) Chọn ngày + khoảng giờ cụ thể (workDate + timeRange) -> submit -> adminCreateWorktime.
- */
+// ===== Booking status label + tag color =====
+const BOOKING_STATUS_LABEL = {
+  DRAFT: "Bản nháp",
+  REQUESTED: "Đã yêu cầu",
+  PENDING: "Chờ xử lý",
+  NEGOTIATING: "Đang đàm phán",
+  APPROVED: "Đã phê duyệt",
+  ACCEPTED: "Đã chấp nhận",
+  CONFIRMED: "Đã xác nhận",
+  IN_PROGRESS: "Đang thực hiện",
+  DELIVERED: "Đã giao",
+  COMPLETED: "Hoàn thành",
+  DISPUTED: "Đang tranh chấp",
+  REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  CONTRACT_SIGNED: "Đã ký hợp đồng",
+  EXPIRED: "Hết hạn",
+  PAID: "Đã thanh toán",
+  WAIT_FOR_REFUND: "Đợi hoàn tiền",
+  REFUNDED: "Đã hoàn tiền",
+  OVERPAID: "Thanh toán thừa",
+  SIGNED: "Đã ký",
+};
+
+const STATUS_TAG_COLOR = {
+  DRAFT: "default",
+  REQUESTED: "processing",
+  PENDING: "processing",
+  NEGOTIATING: "cyan",
+  APPROVED: "success",
+  ACCEPTED: "success",
+  CONFIRMED: "blue",
+  IN_PROGRESS: "processing",
+  DELIVERED: "gold",
+  COMPLETED: "success",
+  DISPUTED: "magenta",
+  REJECTED: "error",
+  CANCELLED: "error",
+  CONTRACT_SIGNED: "purple",
+  EXPIRED: "volcano",
+  PAID: "success",
+  WAIT_FOR_REFUND: "cyan",
+  REFUNDED: "purple",
+  SIGNED: "magenta",
+};
+
 export default function BookingCampaignSchedule() {
   const { campaignId: campaignIdParam } = useParams();
   const location = useLocation();
   const [form] = Form.useForm();
 
-  // Nếu màn trước truyền bookingRequestId & campaignName qua state
   const prefilledBookingRequestId = location.state?.bookingRequestId || "";
   const prefilledCampaignName = location.state?.campaignName || "";
 
@@ -61,24 +94,227 @@ export default function BookingCampaignSchedule() {
     prefilledBookingRequestId
   );
 
-  // Danh sách slot rảnh & slot đang chọn
+  // Free slots + selected
   const [freeSlots, setFreeSlots] = useState([]);
   const [loadingFreeSlots, setLoadingFreeSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
+
+  // Filter KOL for free slots
   const [freeSlotKolFilter, setFreeSlotKolFilter] = useState(undefined);
 
-  // Bộ lọc cho "Lịch đăng ký của KOL / trợ live"
-  // 👉 mặc định: xem theo THÁNG hiện tại
+  // Worktime filter
   const [worktimeFilterMode, setWorktimeFilterMode] = useState("month"); // all | day | week | month
   const [worktimeFilterDate, setWorktimeFilterDate] = useState(dayjs());
 
-  // ===== disabledDate cho khoảng thời gian tìm lịch rảnh: chỉ từ hôm nay trở đi =====
+  // ===== UI key riêng cho từng slot (fix trường hợp 2 dòng chung availabilityId) =====
+  const buildSlotUiKey = (slot) =>
+    `${slot?.kolId ?? "kol"}__${slot?.id ?? "id"}__${slot?.startAt ?? "s"}__${
+      slot?.endAt ?? "e"
+    }`;
+
+  const attachUiKey = (list) =>
+    (list || []).map((s) => ({
+      ...s,
+      uiKey: s?.uiKey || buildSlotUiKey(s),
+    }));
+
+  // ===== disabledDate cho searchRange: từ hôm nay trở đi =====
   const disabledSearchDate = (current) => {
     if (!current) return false;
     return current < dayjs().startOf("day");
   };
 
-  // ===== LẤY BOOKING DETAIL THEO campaignId ĐỂ SUY RA bookingRequestId (NẾU CHƯA CÓ SẴN) =====
+  // ===== disabledDate cho workDate: chỉ chọn đúng ngày của slot đang chọn =====
+  const disabledWorkDate = (current) => {
+    if (!selectedSlot?.startAt) return false;
+    if (!current) return false;
+    const slotDay = dayjs(selectedSlot.startAt);
+    return !dayjs(current).isSame(slotDay, "day");
+  };
+
+  const normalizeList = (resp) => {
+    if (!resp) return [];
+    const maybe =
+      resp?.content ??
+      resp?.data?.content ??
+      resp?.data ??
+      resp?.result ??
+      resp;
+    return Array.isArray(maybe) ? maybe : [];
+  };
+
+  // ===== Bounds giờ theo slot (để TimeRangePicker không chọn out range) =====
+  const getSlotHourBounds = () => {
+    if (!selectedSlot?.startAt || !selectedSlot?.endAt) return null;
+
+    const s = dayjs(selectedSlot.startAt);
+    const e = dayjs(selectedSlot.endAt);
+    if (!s.isValid() || !e.isValid() || !e.isAfter(s)) return null;
+
+    // slot qua ngày khác thì RangePicker format "HH" khó khóa chuẩn -> bỏ disable UI, vẫn validate ở submit
+    if (!s.isSame(e, "day")) return null;
+
+    // nếu startAt có phút > 0 => giờ hợp lệ đầu tiên là giờ kế tiếp (HH:00)
+    const minStartHour = s.minute() > 0 ? s.hour() + 1 : s.hour();
+    const maxEndHour = e.hour();
+
+    if (maxEndHour - minStartHour < 1) return null; // không đủ 1 giờ
+    return { minStartHour, maxEndHour };
+  };
+
+  // ✅ Fix "chọn giờ xong bấm OK không được": disabledTime CHỈ dựa theo slot (không đọc timeRange trong form)
+  const disabledTimeBySlot = (_date, type) => {
+    const bounds = getSlotHourBounds();
+    if (!bounds) return {};
+
+    const { minStartHour, maxEndHour } = bounds;
+
+    const min = type === "start" ? minStartHour : minStartHour + 1;
+    const max = type === "start" ? maxEndHour - 1 : maxEndHour;
+
+    const disabledHours = () => {
+      const arr = [];
+      for (let h = 0; h < 24; h++) if (h < min || h > max) arr.push(h);
+      return arr;
+    };
+
+    return { disabledHours };
+  };
+
+  /**
+   * Reload slots theo searchRange trong form
+   * - keepSelection: giữ filter KOL + selectedSlot (theo uiKey) nếu còn tồn tại sau reload
+   * - silent: không warning nếu thiếu searchRange
+   */
+  const loadFreeSlotsByCurrentRange = async ({
+    keepSelection = false,
+    silent = false,
+  } = {}) => {
+    const range = form.getFieldValue("searchRange");
+    if (!Array.isArray(range) || range.length !== 2) {
+      if (!silent)
+        message.warning("Vui lòng chọn khoảng thời gian muốn tìm lịch rảnh.");
+      return false;
+    }
+
+    const [start, end] = range;
+    const startDateIso = dayjs(start).toISOString();
+    const endDateIso = dayjs(end).toISOString();
+
+    const prevSelectedKey = selectedSlot?.uiKey || null;
+    const prevKolFilter =
+      form.getFieldValue("freeSlotKolId") || freeSlotKolFilter;
+
+    try {
+      setLoadingFreeSlots(true);
+
+      const resp = await adminSearchFreeSlots({
+        startDate: startDateIso,
+        endDate: endDateIso,
+        page: 0,
+        size: 100,
+      });
+
+      const list = normalizeList(resp);
+      const qStart = dayjs(startDateIso);
+      const qEnd = dayjs(endDateIso);
+
+      // FE lọc: AVAILABLE + overlap khoảng query
+      const filtered = (list || []).filter((slot) => {
+        const status = String(slot.status || "").toUpperCase();
+        if (status !== "AVAILABLE") return false;
+        if (!slot.startAt || !slot.endAt) return false;
+
+        const s = dayjs(slot.startAt);
+        const e = dayjs(slot.endAt);
+        if (!s.isValid() || !e.isValid()) return false;
+
+        return s.isBefore(qEnd) && e.isAfter(qStart);
+      });
+
+      const filteredWithKey = attachUiKey(filtered);
+      setFreeSlots(filteredWithKey);
+
+      if (!keepSelection) {
+        setSelectedSlot(null);
+        setFreeSlotKolFilter(undefined);
+        form.setFieldsValue({
+          kolDisplay: undefined,
+          kolId: undefined,
+          availabilityId: undefined,
+          timeRange: undefined,
+          workDate: undefined,
+          freeSlotKolId: undefined,
+        });
+        return true;
+      }
+
+      // keep filter KOL
+      const nextFilter = prevKolFilter || undefined;
+      setFreeSlotKolFilter(nextFilter);
+      form.setFieldsValue({ freeSlotKolId: nextFilter });
+
+      // keep selected slot theo uiKey (nếu còn)
+      if (prevSelectedKey) {
+        const found = filteredWithKey.find((s) => s.uiKey === prevSelectedKey);
+
+        if (found) {
+          setSelectedSlot(found);
+
+          const currentWorkDate = form.getFieldValue("workDate");
+          const currentTimeRange = form.getFieldValue("timeRange");
+
+          form.setFieldsValue({
+            kolDisplay: found.kolName,
+            kolId: found.kolId,
+            availabilityId: found.id,
+            workDate: currentWorkDate ?? dayjs(found.startAt),
+            timeRange: currentTimeRange,
+          });
+
+          // nếu chưa có timeRange thì gợi ý giờ theo slot
+          if (!currentTimeRange) {
+            const s = dayjs(found.startAt);
+            const e = dayjs(found.endAt);
+
+            const suggestedStart =
+              s.minute() > 0
+                ? s.add(1, "hour").minute(0).second(0)
+                : s.minute(0).second(0);
+
+            let suggestedEnd = e.minute(0).second(0);
+            if (!suggestedEnd.isAfter(suggestedStart)) {
+              suggestedEnd = suggestedStart.add(1, "hour");
+            }
+
+            form.setFieldsValue({ timeRange: [suggestedStart, suggestedEnd] });
+          }
+        } else {
+          // slot cũ không còn (đã bị consume) -> clear
+          setSelectedSlot(null);
+          form.setFieldsValue({
+            kolDisplay: undefined,
+            kolId: undefined,
+            availabilityId: undefined,
+          });
+        }
+      }
+
+      return true;
+    } catch (e) {
+      console.error("Load free slots failed:", e);
+      const beMsg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Không tìm được lịch rảnh, vui lòng thử lại.";
+      message.error(beMsg);
+      return false;
+    } finally {
+      setLoadingFreeSlots(false);
+    }
+  };
+
+  // ===== Booking detail để suy ra bookingRequestId nếu chưa có =====
   const {
     data: bookingDetailResp,
     isLoading: loadingBookingDetail,
@@ -101,7 +337,6 @@ export default function BookingCampaignSchedule() {
     [bookingDetail?.bookingRequests]
   );
 
-  // Auto-fill bookingRequestId nếu chưa có mà API detail trả về bookingRequests
   useEffect(() => {
     if (prefilledBookingRequestId) return;
 
@@ -120,7 +355,7 @@ export default function BookingCampaignSchedule() {
     form,
   ]);
 
-  // ===== Load worktimes by bookingRequestId =====
+  // ===== Worktimes by bookingRequestId =====
   const {
     data: worktimeResp,
     isFetching: loadingWorktimes,
@@ -138,16 +373,14 @@ export default function BookingCampaignSchedule() {
 
   const worktimeList = useMemo(() => {
     if (!worktimeResp) return [];
-    const content = worktimeResp?.content ?? [];
+    const content = worktimeResp?.content ?? worktimeResp?.data?.content ?? [];
     return Array.isArray(content) ? content : [];
   }, [worktimeResp]);
 
-  // Áp dụng filter theo ngày / tuần / tháng cho lịch đăng ký
   const visibleWorktimes = useMemo(() => {
     if (!worktimeList || worktimeList.length === 0) return [];
-    if (worktimeFilterMode === "all" || !worktimeFilterDate) {
+    if (worktimeFilterMode === "all" || !worktimeFilterDate)
       return worktimeList;
-    }
 
     const ref = worktimeFilterDate;
 
@@ -156,18 +389,13 @@ export default function BookingCampaignSchedule() {
       const start = dayjs(w.startAt);
       if (!start.isValid()) return false;
 
-      if (worktimeFilterMode === "day") {
-        // theo NGÀY: so sánh cùng ngày
-        return start.isSame(ref, "day");
-      }
+      if (worktimeFilterMode === "day") return start.isSame(ref, "day");
 
       if (worktimeFilterMode === "week") {
-        // theo TUẦN: tuần chứa ngày ref (Chủ Nhật -> Thứ Bảy)
         const refDayStart = ref.startOf("day");
-        const dow = refDayStart.day(); // 0 (CN) - 6 (Th7)
+        const dow = refDayStart.day(); // 0-6
         const weekStart = refDayStart.subtract(dow, "day");
         const weekEnd = weekStart.add(7, "day");
-
         return (
           (start.isSame(weekStart) || start.isAfter(weekStart)) &&
           start.isBefore(weekEnd)
@@ -175,7 +403,6 @@ export default function BookingCampaignSchedule() {
       }
 
       if (worktimeFilterMode === "month") {
-        // theo THÁNG: cùng tháng/năm
         return start.year() === ref.year() && start.month() === ref.month();
       }
 
@@ -183,24 +410,28 @@ export default function BookingCampaignSchedule() {
     });
   }, [worktimeList, worktimeFilterMode, worktimeFilterDate]);
 
-  // ===== OPTION KOL / TRỢ LIVE TỪ DANH SÁCH SLOT RẢNH =====
+  // ===== Options KOL từ freeSlots =====
   const freeSlotKolOptions = useMemo(() => {
     const map = new Map();
     freeSlots.forEach((slot) => {
       if (slot.kolId) {
         const key = String(slot.kolId);
-        if (!map.has(key)) {
-          map.set(key, slot.kolName || key);
-        }
+        if (!map.has(key)) map.set(key, slot.kolName || key);
       }
     });
+
+    // giữ filter value nếu options biến mất (hiếm)
+    if (freeSlotKolFilter) {
+      const key = String(freeSlotKolFilter);
+      if (!map.has(key)) map.set(key, selectedSlot?.kolName || key);
+    }
+
     return Array.from(map.entries()).map(([value, label]) => ({
       value,
       label,
     }));
-  }, [freeSlots]);
+  }, [freeSlots, freeSlotKolFilter, selectedSlot?.kolName]);
 
-  // Dữ liệu hiển thị cho bảng slot rảnh: có filter theo KOL
   const filteredFreeSlots = useMemo(() => {
     if (!freeSlotKolFilter) return freeSlots;
     return freeSlots.filter(
@@ -208,75 +439,12 @@ export default function BookingCampaignSchedule() {
     );
   }, [freeSlots, freeSlotKolFilter]);
 
-  // ===== TÌM LỊCH RẢNH DỰA TRÊN searchRange (dùng startDate/endDate) =====
+  // ===== Search free slots =====
   const handleSearchFreeSlots = async () => {
-    try {
-      const range = form.getFieldValue("searchRange");
-      if (!Array.isArray(range) || range.length !== 2) {
-        message.warning("Vui lòng chọn khoảng thời gian muốn tìm lịch rảnh.");
-        return;
-      }
-
-      const [start, end] = range;
-
-      // swagger: startDate, endDate (date-time)
-      const startDateIso = dayjs(start).toISOString();
-      const endDateIso = dayjs(end).toISOString();
-
-      setLoadingFreeSlots(true);
-
-      // 1) Gọi API lấy slot rảnh
-      const list = await adminSearchFreeSlots({
-        startDate: startDateIso,
-        endDate: endDateIso,
-        page: 0,
-        size: 100,
-      });
-
-      const qStart = dayjs(startDateIso);
-      const qEnd = dayjs(endDateIso);
-
-      // 2) FE lọc lại: status AVAILABLE + có giao với khoảng đang tìm
-      const filtered = (list || []).filter((slot) => {
-        const status = String(slot.status || "").toUpperCase();
-        if (status !== "AVAILABLE") return false;
-
-        if (!slot.startAt || !slot.endAt) return false;
-
-        const s = dayjs(slot.startAt);
-        const e = dayjs(slot.endAt);
-        if (!s.isValid() || !e.isValid()) return false;
-
-        // Có giao nhau với [qStart, qEnd]
-        const overlap = s.isBefore(qEnd) && e.isAfter(qStart);
-        return overlap;
-      });
-
-      setFreeSlots(filtered);
-      setSelectedSlot(null);
-      setFreeSlotKolFilter(undefined);
-
-      form.setFieldsValue({
-        kolDisplay: undefined,
-        kolId: undefined,
-        availabilityId: undefined,
-        timeRange: undefined,
-        workDate: undefined,
-        freeSlotKolId: undefined,
-      });
-    } catch (e) {
-      console.error("Search free slots failed:", e);
-      const beMsg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "Không tìm được lịch rảnh, vui lòng thử lại.";
-      message.error(beMsg);
-    } finally {
-      setLoadingFreeSlots(false);
-    }
+    await loadFreeSlotsByCurrentRange({ keepSelection: false, silent: false });
   };
 
-  // ===== SUBMIT TẠO WORKTIME =====
+  // ===== Create worktime =====
   const handleCreateWorktime = async (values) => {
     try {
       const id =
@@ -315,16 +483,15 @@ export default function BookingCampaignSchedule() {
         return;
       }
 
-      // Combine ngày + giờ, phút luôn = 00
       const baseDate = dayjs(workDate).startOf("day");
       const startAt = baseDate
-        .hour(startTime.hour())
+        .hour(dayjs(startTime).hour())
         .minute(0)
         .second(0)
         .millisecond(0);
 
       const endAt = baseDate
-        .hour(endTime.hour())
+        .hour(dayjs(endTime).hour())
         .minute(0)
         .second(0)
         .millisecond(0);
@@ -377,8 +544,11 @@ export default function BookingCampaignSchedule() {
       setBookingRequestId(id);
       form.setFieldsValue({ bookingRequestId: id });
 
-      // reload worktimes
-      refetchWorktimes();
+      // ✅ refetch worktimes + refetch freeSlots nhưng GIỮ filter KOL & slot đang chọn (nếu còn)
+      await Promise.all([
+        refetchWorktimes(),
+        loadFreeSlotsByCurrentRange({ keepSelection: true, silent: true }),
+      ]);
     } catch (e) {
       console.error("Create worktime failed:", e);
       const beMsg =
@@ -389,14 +559,19 @@ export default function BookingCampaignSchedule() {
     }
   };
 
-  // ===== COLUMNS TABLE WORKTIME (đã bỏ cột ID) =====
+  // ===== Worktime columns (KOL name + STATUS) =====
   const worktimeColumns = [
     {
       title: "KOL",
-      dataIndex: "kolId",
-      key: "kolId",
-      width: 200,
-      render: (v) => v || "--",
+      key: "kol",
+      width: 220,
+      render: (_, r) =>
+        r?.kolName ||
+        r?.kol?.fullName ||
+        r?.kol?.name ||
+        r?.kol?.displayName ||
+        r?.kolId ||
+        "--",
     },
     {
       title: "Bắt đầu",
@@ -413,6 +588,18 @@ export default function BookingCampaignSchedule() {
       width: 180,
     },
     {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 160,
+      render: (v) => {
+        const s = String(v || "").toUpperCase();
+        const label = BOOKING_STATUS_LABEL[s] || v || "--";
+        const color = STATUS_TAG_COLOR[s] || "default";
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
       title: "Ghi chú",
       dataIndex: "note",
       key: "note",
@@ -421,7 +608,7 @@ export default function BookingCampaignSchedule() {
     },
   ];
 
-  // ===== COLUMNS TABLE FREE SLOTS =====
+  // ===== Free slot columns =====
   const freeSlotColumns = [
     {
       title: "KOL / Trợ live",
@@ -460,23 +647,40 @@ export default function BookingCampaignSchedule() {
       width: 120,
       render: (_, record) => (
         <Button
-          type={selectedSlot?.id === record.id ? "primary" : "default"}
+          type={selectedSlot?.uiKey === record.uiKey ? "primary" : "default"}
           onClick={() => {
-            setSelectedSlot(record);
+            const recordWithKey = {
+              ...record,
+              uiKey: record.uiKey || buildSlotUiKey(record),
+            };
+
+            setSelectedSlot(recordWithKey);
+
+            const s = dayjs(recordWithKey.startAt);
+            const e = dayjs(recordWithKey.endAt);
+
+            // gợi ý start = ceil lên giờ nếu có phút
+            const suggestedStart =
+              s.minute() > 0
+                ? s.add(1, "hour").minute(0).second(0)
+                : s.minute(0).second(0);
+
+            // gợi ý end = floor về HH:00
+            let suggestedEnd = e.minute(0).second(0);
+            if (!suggestedEnd.isAfter(suggestedStart)) {
+              suggestedEnd = suggestedStart.add(1, "hour");
+            }
+
             form.setFieldsValue({
-              kolDisplay: record.kolName,
-              kolId: record.kolId,
-              availabilityId: record.id,
-              workDate: dayjs(record.startAt),
-              // Gợi ý sẵn giờ, nhưng cũng ép phút = 00
-              timeRange: [
-                dayjs(record.startAt).minute(0).second(0),
-                dayjs(record.endAt).minute(0).second(0),
-              ],
+              kolDisplay: recordWithKey.kolName,
+              kolId: recordWithKey.kolId,
+              availabilityId: recordWithKey.id, // ✅ vẫn gửi về BE theo availabilityId
+              workDate: dayjs(recordWithKey.startAt),
+              timeRange: [suggestedStart, suggestedEnd],
             });
           }}
         >
-          {selectedSlot?.id === record.id ? "Đang chọn" : "Chọn"}
+          {selectedSlot?.uiKey === record.uiKey ? "Đang chọn" : "Chọn"}
         </Button>
       ),
     },
@@ -512,7 +716,6 @@ export default function BookingCampaignSchedule() {
                 setFreeSlots([]);
                 setSelectedSlot(null);
                 setFreeSlotKolFilter(undefined);
-                // Reset filter về mặc định: xem theo tháng hiện tại
                 setWorktimeFilterMode("month");
                 setWorktimeFilterDate(dayjs());
               }}
@@ -522,7 +725,7 @@ export default function BookingCampaignSchedule() {
           </Space>
         </div>
 
-        {/* FORM TÌM SLOT RẢNH + TẠO LỊCH */}
+        {/* FORM */}
         <Card bordered={false} className="shadow-sm">
           <Form
             form={form}
@@ -530,7 +733,6 @@ export default function BookingCampaignSchedule() {
             onFinish={handleCreateWorktime}
             initialValues={{ bookingRequestId: prefilledBookingRequestId }}
           >
-            {/* BookingRequestId + khoảng thời gian muốn tìm lịch rảnh */}
             <Row gutter={[12, 12]}>
               <Col xs={24} md={8}>
                 <Form.Item label="Booking Request ID" name="bookingRequestId">
@@ -552,10 +754,7 @@ export default function BookingCampaignSchedule() {
                   ]}
                 >
                   <RangePicker
-                    showTime={{
-                      format: "HH",
-                      minuteStep: 60,
-                    }}
+                    showTime={{ format: "HH", minuteStep: 60 }}
                     format="DD/MM/YYYY HH:00"
                     className="w-full"
                     placeholder={["Bắt đầu", "Kết thúc"]}
@@ -578,7 +777,7 @@ export default function BookingCampaignSchedule() {
               </Col>
             </Row>
 
-            {/* Bảng slot rảnh + CHỌN KOL FILTER Ở TRÊN */}
+            {/* Free slots */}
             {freeSlots.length > 0 && (
               <Card
                 className="mt-4"
@@ -595,9 +794,12 @@ export default function BookingCampaignSchedule() {
                         allowClear
                         placeholder="Tất cả KOL / trợ live"
                         options={freeSlotKolOptions}
-                        onChange={(val) =>
-                          setFreeSlotKolFilter(val || undefined)
-                        }
+                        value={freeSlotKolFilter}
+                        onChange={(val) => {
+                          const v = val || undefined;
+                          setFreeSlotKolFilter(v);
+                          form.setFieldsValue({ freeSlotKolId: v });
+                        }}
                       />
                     </Form.Item>
                   </Col>
@@ -606,21 +808,20 @@ export default function BookingCampaignSchedule() {
                 <Table
                   dataSource={filteredFreeSlots}
                   columns={freeSlotColumns}
-                  rowKey={(r) => r.id}
+                  rowKey={(r) => r.uiKey}
                   pagination={false}
                   scroll={{ x: "auto" }}
                 />
               </Card>
             )}
 
-            {/* Thông tin slot đã chọn + cấu hình time cụ thể */}
+            {/* Config time */}
             <div className="mt-6 border-t pt-4">
               <h2 className="text-base font-semibold mb-2">
                 Cấu hình thời gian cụ thể cho lịch làm việc
               </h2>
 
               <Row gutter={[12, 12]}>
-                {/* KOL đã chọn (readonly) */}
                 <Col xs={24} md={8}>
                   <Form.Item
                     label="KOL / trợ live"
@@ -630,7 +831,6 @@ export default function BookingCampaignSchedule() {
                     <Input disabled placeholder="Chưa chọn slot rảnh nào" />
                   </Form.Item>
 
-                  {/* hidden fields để submit */}
                   <Form.Item name="kolId" hidden>
                     <Input />
                   </Form.Item>
@@ -639,7 +839,6 @@ export default function BookingCampaignSchedule() {
                   </Form.Item>
                 </Col>
 
-                {/* Ngày làm việc */}
                 <Col xs={24} md={8}>
                   <Form.Item
                     label="Ngày làm việc"
@@ -650,11 +849,12 @@ export default function BookingCampaignSchedule() {
                       className="w-full"
                       format="DD/MM/YYYY"
                       placeholder="Chọn ngày"
+                      disabled={!selectedSlot}
+                      disabledDate={disabledWorkDate}
                     />
                   </Form.Item>
                 </Col>
 
-                {/* Khoảng giờ tạo lịch (chỉ chọn giờ, phút = 00) */}
                 <Col xs={24} md={8}>
                   <Form.Item
                     label="Khoảng giờ tạo lịch"
@@ -663,13 +863,12 @@ export default function BookingCampaignSchedule() {
                       { required: true, message: "Chọn khoảng giờ" },
                       () => ({
                         validator(_, value) {
-                          if (!value || value.length !== 2) {
+                          if (!value || value.length !== 2)
                             return Promise.resolve();
-                          }
+
                           const [startTime, endTime] = value || [];
-                          if (!startTime || !endTime) {
-                            return Promise.resolve();
-                          }
+                          if (!startTime || !endTime) return Promise.resolve();
+
                           if (!dayjs(endTime).isAfter(dayjs(startTime))) {
                             return Promise.reject(
                               new Error(
@@ -677,6 +876,7 @@ export default function BookingCampaignSchedule() {
                               )
                             );
                           }
+
                           const diffMinutes = endTime.diff(startTime, "minute");
                           if (diffMinutes < 60) {
                             return Promise.reject(
@@ -688,6 +888,38 @@ export default function BookingCampaignSchedule() {
                               new Error("Một lần tạo lịch tối đa là 3 giờ.")
                             );
                           }
+
+                          // bảo hiểm: nằm trong slot đã chọn
+                          const workDate = form.getFieldValue("workDate");
+                          if (
+                            selectedSlot?.startAt &&
+                            selectedSlot?.endAt &&
+                            workDate
+                          ) {
+                            const base = dayjs(workDate).startOf("day");
+                            const s = base
+                              .hour(dayjs(startTime).hour())
+                              .minute(0)
+                              .second(0)
+                              .millisecond(0);
+                            const e = base
+                              .hour(dayjs(endTime).hour())
+                              .minute(0)
+                              .second(0)
+                              .millisecond(0);
+
+                            const slotS = dayjs(selectedSlot.startAt);
+                            const slotE = dayjs(selectedSlot.endAt);
+
+                            if (s.isBefore(slotS) || e.isAfter(slotE)) {
+                              return Promise.reject(
+                                new Error(
+                                  "Khoảng giờ tạo lịch phải nằm trong khoảng rảnh đã chọn."
+                                )
+                              );
+                            }
+                          }
+
                           return Promise.resolve();
                         },
                       }),
@@ -698,18 +930,25 @@ export default function BookingCampaignSchedule() {
                       minuteStep={60}
                       className="w-full"
                       placeholder={["Giờ bắt đầu", "Giờ kết thúc"]}
+                      disabled={!selectedSlot}
+                      hideDisabledOptions
+                      disabledTime={disabledTimeBySlot}
                     />
                   </Form.Item>
                 </Col>
 
-                {/* Ghi chú + nút tạo lịch */}
                 <Col xs={24} md={8}>
                   <Form.Item label="Ghi chú" name="note">
                     <Input placeholder="Ghi chú (không bắt buộc)" />
                   </Form.Item>
 
                   <div className="flex items-center justify-end">
-                    <Button htmlType="submit" type="primary" icon={<Plus />}>
+                    <Button
+                      htmlType="submit"
+                      type="primary"
+                      icon={<Plus />}
+                      disabled={!selectedSlot}
+                    >
                       Tạo lịch
                     </Button>
                   </div>
@@ -717,7 +956,6 @@ export default function BookingCampaignSchedule() {
               </Row>
             </div>
 
-            {/* Thông báo load booking detail */}
             {loadingBookingDetail && !prefilledBookingRequestId && (
               <Alert
                 className="mt-2"
@@ -738,7 +976,7 @@ export default function BookingCampaignSchedule() {
           </Form>
         </Card>
 
-        {/* Bảng lịch đã tạo */}
+        {/* Worktimes */}
         <Card
           bordered={false}
           className="flex-1 shadow-sm"
@@ -763,12 +1001,9 @@ export default function BookingCampaignSchedule() {
                     value={worktimeFilterMode}
                     onChange={(val) => {
                       setWorktimeFilterMode(val);
-                      if (val === "all") {
-                        setWorktimeFilterDate(null);
-                      } else if (!worktimeFilterDate) {
-                        // nếu đang null -> set mặc định ngày hiện tại
+                      if (val === "all") setWorktimeFilterDate(null);
+                      else if (!worktimeFilterDate)
                         setWorktimeFilterDate(dayjs());
-                      }
                     }}
                     style={{ width: 150 }}
                     options={[

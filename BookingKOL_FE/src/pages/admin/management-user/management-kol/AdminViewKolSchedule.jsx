@@ -148,13 +148,6 @@ export default function AdminViewKolSchedule() {
           </p>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleAddSchedule}
-              className="h-8 px-4 rounded-md bg-[#0050ab] text-white text-sm md:text-base font-semibold hover:opacity-90 transition-colors flex items-center justify-center border-2 border-[#0050ab]"
-            >
-              + Thêm lịch làm việc
-            </button>
-
             <div className="rounded-full border flex overflow-hidden">
               <button
                 className={`px-4 py-1 ${

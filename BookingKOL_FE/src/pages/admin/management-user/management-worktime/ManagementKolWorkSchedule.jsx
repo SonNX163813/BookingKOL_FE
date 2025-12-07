@@ -21,6 +21,8 @@ import { API_PATHS } from "../../../../constants/apiPath"; // ✅ chỉnh path n
 
 const { Title, Text } = Typography;
 
+const MAX_KEYWORD_LEN = 100;
+
 const STATUS_META = {
   PENDING: { label: "Chờ duyệt", color: "gold" },
   APPROVED: { label: "Đã duyệt", color: "green" },
@@ -404,6 +406,8 @@ export default function ManagementKolWorkSchedule() {
     [kolMap, viewDetailMutation.isPending, viewingWorktimeId]
   );
 
+  const isKeywordMax = (keyword || "").length >= MAX_KEYWORD_LEN;
+
   return (
     <Card style={{ borderRadius: 12 }}>
       <Space direction="vertical" size={12} style={{ width: "100%" }}>
@@ -415,13 +419,35 @@ export default function ManagementKolWorkSchedule() {
 
         <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
           <Space wrap>
-            <Input
-              placeholder="Tìm theo tên KOL / mã yêu cầu / lý do / trạng thái..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              style={{ width: 520, maxWidth: "100%" }}
-              allowClear
-            />
+            {/* ✅ Input tìm kiếm: max 100 ký tự + thông báo dưới input khi đạt max */}
+            <div style={{ width: 520, maxWidth: "100%" }}>
+              <Input
+                placeholder="Tìm theo tên KOL / mã yêu cầu / lý do / trạng thái..."
+                value={keyword}
+                maxLength={MAX_KEYWORD_LEN}
+                showCount={false}
+                onChange={(e) => {
+                  const next = e?.target?.value ?? "";
+                  // ✅ chặn paste/nhập vượt 100 ký tự
+                  setKeyword(
+                    next.length > MAX_KEYWORD_LEN
+                      ? next.slice(0, MAX_KEYWORD_LEN)
+                      : next
+                  );
+                }}
+                style={{ width: "100%" }}
+                allowClear
+              />
+              {isKeywordMax ? (
+                <Text
+                  type="danger"
+                  style={{ display: "block", marginTop: 4, fontSize: 12 }}
+                >
+                  Đã đạt tối đa {MAX_KEYWORD_LEN} ký tự.
+                </Text>
+              ) : null}
+            </div>
+
             <Button
               onClick={() => {
                 cancelQuery.refetch();

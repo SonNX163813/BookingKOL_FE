@@ -234,13 +234,14 @@ const ManagementRefundRequests = () => {
 
   const columns = useMemo(
     () => [
-      // {
-      //   title: "Mã hoàn tiền",
-      //   dataIndex: "id",
-      //   key: "id",
-      //   render: (value) => value ?? "--",
-      //   // width: 220,
-      // },
+      // ✅ đưa "Mã hợp đồng" lên cột đầu
+      {
+        title: "Mã hợp đồng",
+        dataIndex: "contract",
+        key: "contract",
+        render: (contract) => extractContractLabel(contract),
+        // width: 160,
+      },
       {
         title: "Số tiền",
         dataIndex: "amount",
@@ -261,13 +262,6 @@ const ManagementRefundRequests = () => {
           );
         },
         // width: 140,
-      },
-      {
-        title: "Mã hợp đồng",
-        dataIndex: "contract",
-        key: "contract",
-        render: (contract) => extractContractLabel(contract),
-        // width: 160,
       },
       {
         title: "Số tài khoản",
@@ -406,6 +400,7 @@ const ManagementRefundRequests = () => {
           />
         </div>
       </Card>
+
       <Drawer
         title="Chi tiết yêu cầu hoàn tiền"
         width={640}

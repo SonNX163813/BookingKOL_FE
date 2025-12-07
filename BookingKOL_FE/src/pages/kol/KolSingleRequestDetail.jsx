@@ -194,7 +194,8 @@ const isAlreadyRequestedMsg = (txt) => /đã gửi yêu cầu hủy/i.test(txt |
 
 /**
  * ✅ GET /v1/requests/cancel/detail/{workTimeId}
- * NOTE: validateStatus cho phép 404 -> không bị reject -> không bắn toast "Không tìm thấy..." từ interceptor
+ * FIX: Cho phép 404 + 5xx -> không reject -> không bắn toast từ interceptor.
+ *      Với 404/5xx coi như "không có cancel detail" => return null.
  */
 async function getKolCancelRequestDetail(workTimeId, { signal } = {}) {
   if (!workTimeId) throw new Error("workTimeId is required");
@@ -210,11 +211,14 @@ async function getKolCancelRequestDetail(workTimeId, { signal } = {}) {
     config: {
       ...(signal ? { signal } : {}),
       validateStatus: (status) =>
-        (status >= 200 && status < 300) || status === 404,
+        (status >= 200 && status < 300) ||
+        status === 404 ||
+        (status >= 500 && status < 600),
     },
   });
 
   if (res?.status === 404) return null;
+  if (res?.status >= 500 && res?.status < 600) return null;
   return res?.data ?? null;
 }
 
@@ -248,9 +252,8 @@ export default function KolSingleRequestDetail() {
 
   const normalizedStatus = normalizeStatus(detail?.status);
 
-  // ✅ NEW: chỉ PAID mới được hiện button yêu cầu hủy
+  // ✅ chỉ PAID mới được hiện button yêu cầu hủy
   const canRequestCancel = normalizedStatus === "PAID";
-
   const canInputMetrics = normalizedStatus === "IN_PROGRESS";
   const requestNo = detail?.requestNumber ?? detail?.id ?? requestId ?? "--";
 
@@ -259,7 +262,7 @@ export default function KolSingleRequestDetail() {
 
   const worktimes = extractWorktimes(detail);
 
-  // ✅ NEW: nếu có >= 2 worktime => ẩn nút yêu cầu hủy
+  // ✅ nếu có >= 2 worktime => ẩn nút yêu cầu hủy
   const hasMultipleWorktimes = (worktimes?.length ?? 0) >= 2;
 
   const endedWorktime = worktimes.find(
@@ -305,16 +308,16 @@ export default function KolSingleRequestDetail() {
     data: cancelDetail,
     isLoading: isCancelDetailLoading,
     isFetching: isCancelDetailFetching,
-    error: cancelDetailError,
     refetch: refetchCancelDetail,
   } = useQuery({
     queryKey: ["kol-cancel-detail", token, selectedWorktimeId],
     queryFn: () => getKolCancelRequestDetail(selectedWorktimeId),
     enabled: !!token && !!selectedWorktimeId,
-    retry: (count) => count < 1,
+    retry: false,
   });
 
-  const showCancelCard = !!cancelDetail || !!cancelDetailError;
+  // ✅ Chỉ hiện card khi thật sự có data (ẩn hoàn toàn khi 404/500/null)
+  const showCancelCard = !!cancelDetail;
 
   /* POST metrics */
   const { mutateAsync: submitMetricsAsync, isLoading: isSubmitting } =
@@ -460,7 +463,7 @@ export default function KolSingleRequestDetail() {
   };
   /* =================== END CANCEL =================== */
 
-  // ✅ NEW: chỉ PAID + chưa có cancelDetail + không có >=2 worktimes
+  // ✅ chỉ PAID + chưa có cancelDetail + không có >=2 worktimes
   const canShowCancelButton =
     canRequestCancel && !cancelDetail && !hasMultipleWorktimes;
 
@@ -531,7 +534,7 @@ export default function KolSingleRequestDetail() {
         confirmLoading={isCancelling}
         okButtonProps={{
           danger: true,
-          loading: isCancelling, // ✅ spinner trên button OK
+          loading: isCancelling,
           disabled: isCancelling,
         }}
         cancelButtonProps={{ disabled: isCancelling }}
@@ -601,7 +604,7 @@ export default function KolSingleRequestDetail() {
             />
           )}
 
-          {/* ✅ Card chi tiết yêu cầu hủy */}
+          {/* ✅ Card chi tiết yêu cầu hủy (chỉ hiện khi có data) */}
           {showCancelCard && (
             <Card
               className="shadow-sm"
@@ -617,63 +620,52 @@ export default function KolSingleRequestDetail() {
                 </Button>
               }
             >
-              {cancelDetailError ? (
-                <Alert
-                  type="error"
-                  showIcon
-                  message="Không tải được chi tiết yêu cầu hủy."
-                  description={String(cancelDetailError?.message || "")}
-                />
-              ) : (
-                <Skeleton
-                  loading={isCancelDetailLoading}
-                  active
-                  paragraph={{ rows: 3 }}
-                >
-                  {(() => {
-                    const cancelKey = normalizeStatus(cancelDetail?.status);
-                    const meta = cancelKey
-                      ? CANCEL_STATUS_META[cancelKey]
-                      : null;
+              <Skeleton
+                loading={isCancelDetailLoading}
+                active
+                paragraph={{ rows: 3 }}
+              >
+                {(() => {
+                  const cancelKey = normalizeStatus(cancelDetail?.status);
+                  const meta = cancelKey ? CANCEL_STATUS_META[cancelKey] : null;
 
-                    return (
-                      <Descriptions
-                        bordered
-                        size="middle"
-                        column={screens.lg ? 3 : screens.md ? 2 : 1}
-                        labelStyle={{ width: 220 }}
-                        contentStyle={descContentStyle}
-                      >
-                        <Descriptions.Item label="Trạng thái">
-                          {cancelDetail?.status ? (
-                            <Tag color={meta?.color ?? "default"}>
-                              {meta?.label ?? cancelKey}
-                            </Tag>
-                          ) : (
-                            "--"
-                          )}
+                  return (
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 220 }}
+                      contentStyle={descContentStyle}
+                    >
+                      <Descriptions.Item label="Trạng thái">
+                        {cancelDetail?.status ? (
+                          <Tag color={meta?.color ?? "default"}>
+                            {meta?.label ?? cancelKey}
+                          </Tag>
+                        ) : (
+                          "--"
+                        )}
+                      </Descriptions.Item>
+
+                      <Descriptions.Item label="Lý do">
+                        <Text style={{ whiteSpace: "pre-wrap" }}>
+                          {cancelDetail?.reason ?? "--"}
+                        </Text>
+                      </Descriptions.Item>
+
+                      <Descriptions.Item label="Tạo lúc">
+                        {formatDateTime(cancelDetail?.createdAt)}
+                      </Descriptions.Item>
+
+                      {cancelDetail?.approvedAt ? (
+                        <Descriptions.Item label="Duyệt lúc">
+                          {formatDateTime(cancelDetail.approvedAt)}
                         </Descriptions.Item>
-
-                        <Descriptions.Item label="Lý do">
-                          <Text style={{ whiteSpace: "pre-wrap" }}>
-                            {cancelDetail?.reason ?? "--"}
-                          </Text>
-                        </Descriptions.Item>
-
-                        <Descriptions.Item label="Tạo lúc">
-                          {formatDateTime(cancelDetail?.createdAt)}
-                        </Descriptions.Item>
-
-                        {cancelDetail?.approvedAt ? (
-                          <Descriptions.Item label="Duyệt lúc">
-                            {formatDateTime(cancelDetail.approvedAt)}
-                          </Descriptions.Item>
-                        ) : null}
-                      </Descriptions>
-                    );
-                  })()}
-                </Skeleton>
-              )}
+                      ) : null}
+                    </Descriptions>
+                  );
+                })()}
+              </Skeleton>
             </Card>
           )}
 

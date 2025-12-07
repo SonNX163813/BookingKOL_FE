@@ -251,11 +251,11 @@ export default function KolScheduleChange() {
     <Card style={{ margin: 16 }}>
       <Space direction="vertical" size={12} style={{ width: "100%" }}>
         <Title level={4} style={{ marginBottom: 0 }}>
-          Hủy Lịch Làm
+          Hủy Lịch Đăng Ký
         </Title>
 
         {resolvingKolId ? (
-          <Text>Đang xác định KOL ID...</Text>
+          <Text>Đang tải thông tin .......</Text>
         ) : !kolId ? (
           <Text type="danger">
             Không tìm thấy KOL ID. Vui lòng đăng nhập bằng tài khoản KOL.
