@@ -825,16 +825,16 @@ export default function KolWorkRegistrationMui({
               }}
             >
               <Typography fontWeight={700} mb={1}>
-                Lịch rảnh trong tháng {monthAnchor.format("MM/YYYY")}
+                Lịch đã đăng ký trong tháng {monthAnchor.format("MM/YYYY")}
               </Typography>
 
               {loadingMonthSchedule ? (
                 <Typography color="text.secondary">
-                  Đang tải lịch rảnh...
+                  Đang tải lịch đã đăng ký...
                 </Typography>
               ) : !monthScheduleByDay.length ? (
                 <Typography color="text.secondary">
-                  Chưa có khoảng rảnh nào trong tháng này.
+                  Chưa có đã đăng ký nào trong tháng này.
                 </Typography>
               ) : (
                 <Stack spacing={0.75}>

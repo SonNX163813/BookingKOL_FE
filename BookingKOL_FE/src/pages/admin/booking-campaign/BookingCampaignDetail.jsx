@@ -44,13 +44,9 @@ const formatDate = (value, pattern = "DD/MM/YYYY") => {
 };
 
 const formatCurrency = (value, currency = "VND") => {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-
+  if (value === null || value === undefined || value === "") return "--";
   const numeric = typeof value === "number" ? value : Number.parseFloat(value);
   if (Number.isNaN(numeric)) return "--";
-
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency,
@@ -152,7 +148,9 @@ const BookingCampaignDetail = () => {
   const statusLabel =
     CAMPAIGN_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
 
-  const responseTimestamp = campaignResponse?.timestamp ?? null;
+  // ✅ ưu tiên timestamp từ API bookings/admin/{id} (bookingsResponse)
+  const responseTimestamp =
+    bookingsResponse?.timestamp ?? campaignResponse?.timestamp ?? null;
 
   const isLoadingAll = isLoadingBookings || isLoadingCampaign;
   const isFetchingAll = isFetchingBookings || isFetchingCampaign;
@@ -162,6 +160,22 @@ const BookingCampaignDetail = () => {
     refetchCampaign();
     refetchBookings();
   };
+
+  // ✅ KOL + Live tham gia lấy từ API bookings/admin/{id}
+  // fallback về campaignInfo nếu BE thay đổi
+  const customerKols = useMemo(() => {
+    const src = bookingsDetail ?? campaignInfo;
+    if (Array.isArray(src?.campaignKols)) return src.campaignKols;
+    if (Array.isArray(src?.kols)) return src.kols;
+    return [];
+  }, [bookingsDetail, campaignInfo]);
+
+  const customerLives = useMemo(() => {
+    const src = bookingsDetail ?? campaignInfo;
+    if (Array.isArray(src?.campaignLives)) return src.campaignLives;
+    if (Array.isArray(src?.lives)) return src.lives;
+    return [];
+  }, [bookingsDetail, campaignInfo]);
 
   const paymentScheduleColumns = useMemo(
     () => [
@@ -306,15 +320,17 @@ const BookingCampaignDetail = () => {
                 {formatDate(campaignInfo?.endDate)}
               </Descriptions.Item>
 
+              {/* ✅ lấy từ bookings/admin/{id}: campaignKols */}
               <Descriptions.Item label="KOL tham gia" span={screens.lg ? 3 : 1}>
-                {formatArrayText(campaignInfo?.kols)}
+                {formatArrayText(customerKols)}
               </Descriptions.Item>
 
+              {/* ✅ lấy từ bookings/admin/{id}: campaignLives */}
               <Descriptions.Item
                 label="Trợ Live tham gia"
                 span={screens.lg ? 3 : 1}
               >
-                {formatArrayText(campaignInfo?.lives)}
+                {formatArrayText(customerLives)}
               </Descriptions.Item>
 
               <Descriptions.Item label="Tạo lúc">

@@ -2,53 +2,53 @@
 import { api } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 
-const PATH_WORKTIME_CREATE = API_PATHS.WORKTIME_ADMIN.create; // /v1/availabilities/admin/worktime/create
-const PATH_WORKTIME_BY_BOOKING = API_PATHS.WORKTIME_ADMIN.getByBooking; // /v1/availabilities/admin/booking
+// ✅ API mới: /v1/availabilities/admin/scheduled-worktime/create
+const PATH_SCHEDULED_CREATE =
+  API_PATHS?.WORKTIME_ADMIN?.scheduledCreate ||
+  "/v1/availabilities/admin/scheduled-worktime/create";
+
+// ✅ API mới: /v1/availabilities/admin/scheduled-worktime/booking/{bookingRequestId}
+const PATH_SCHEDULED_BY_BOOKING =
+  API_PATHS?.WORKTIME_ADMIN?.getScheduledByBooking ||
+  "/v1/availabilities/admin/scheduled-worktime/booking";
+
+// ✅ API mới: PUT /v1/availabilities/admin/scheduled-worktime/assign
+const PATH_SCHEDULED_ASSIGN =
+  API_PATHS?.WORKTIME_ADMIN?.scheduledAssign ||
+  "/v1/availabilities/admin/scheduled-worktime/assign";
 
 // Dùng API /v1/availabilities/time-line/kol/all để lấy tất cả lịch rảnh
-const PATH_SEARCH_FREE_SLOTS = API_PATHS.SCHEDULER_ADMIN.kolTimelineAll; // /v1/availabilities/time-line/kol/all
+const PATH_SEARCH_FREE_SLOTS = API_PATHS?.SCHEDULER_ADMIN?.kolTimelineAll;
 
 /**
- * Tạo lịch làm việc (worktime)
+ * ✅ Tạo scheduled worktime
+ * POST /v1/availabilities/admin/scheduled-worktime/create
  *
  * Body:
  * {
- *   "bookingRequestId": "...",
- *   "availabilityId": "...",
- *   "kolId": "...",
- *   "startAt": "2025-11-18T07:52:23.769Z",
- *   "endAt": "2025-11-18T07:52:23.769Z",
- *   "note": "string"
+ *   bookingRequestId: string (required)
+ *   startAt: string(date-time) (required)
+ *   endAt: string(date-time) (required)
+ *   note?: string | null
+ *   kolId?: string (optional)
+ *   availabilityId?: string (optional)
  * }
- *
- * Interceptor trong axios-config:
- *  - Với POST: trả về response.data và tự show toast success nếu có message.
  */
 export const adminCreateWorktime = (payload, config = {}) => {
-  if (!payload?.bookingRequestId || !payload?.kolId) {
-    console.warn(
-      "[adminCreateWorktime] Thiếu bookingRequestId hoặc kolId trong payload:",
-      payload
-    );
+  if (!payload?.bookingRequestId) {
+    console.warn("[adminCreateWorktime] Thiếu bookingRequestId:", payload);
   }
   if (!payload?.startAt || !payload?.endAt) {
-    console.warn(
-      "[adminCreateWorktime] Thiếu startAt hoặc endAt trong payload:",
-      payload
-    );
+    console.warn("[adminCreateWorktime] Thiếu startAt/endAt:", payload);
   }
-
-  return api.post(PATH_WORKTIME_CREATE, payload, config);
+  return api.post(PATH_SCHEDULED_CREATE, payload, config);
 };
 
 /**
- * Xem lịch làm việc của 1 booking request
- * ✅ GET /v1/availabilities/admin/booking/{bookingRequestId}
+ * ✅ Xem scheduled worktime theo bookingRequestId
+ * GET /v1/availabilities/admin/scheduled-worktime/booking/{bookingRequestId}
  *
- * Tuỳ BE trả gì, ta normalize về { ...raw, content: [] } cho dễ dùng với Table:
- *  - [ ... ]
- *  - { status, message, data: [...] }
- *  - { status, message, data: { workTimes: [...] } }
+ * Normalize về { ...raw, content: [] }
  */
 export const adminGetWorktimesByBooking = async (
   bookingRequestId,
@@ -58,25 +58,18 @@ export const adminGetWorktimesByBooking = async (
     return Promise.reject(new Error("bookingRequestId is required"));
   }
 
-  const payload = await api.get(
-    `${PATH_WORKTIME_BY_BOOKING}/${encodeURIComponent(bookingRequestId)}`,
+  const res = await api.get(
+    `${PATH_SCHEDULED_BY_BOOKING}/${encodeURIComponent(bookingRequestId)}`,
     signal ? { signal } : undefined
   );
 
-  // Với interceptor hiện tại, payload = response.data từ BE
-  const raw = payload?.data ?? payload;
+  const raw = res?.data ?? res;
 
   let content = [];
-
-  if (Array.isArray(raw)) {
-    content = raw;
-  } else if (Array.isArray(raw?.workTimes)) {
-    content = raw.workTimes;
-  } else if (Array.isArray(raw?.content)) {
-    content = raw.content;
-  } else if (raw && typeof raw === "object") {
-    content = [raw];
-  }
+  if (Array.isArray(raw)) content = raw;
+  else if (Array.isArray(raw?.data)) content = raw.data;
+  else if (Array.isArray(raw?.content)) content = raw.content;
+  else if (raw && typeof raw === "object") content = [raw];
 
   return {
     ...(raw && typeof raw === "object" ? raw : {}),
@@ -85,31 +78,42 @@ export const adminGetWorktimesByBooking = async (
 };
 
 /**
- * Tìm tất cả slot rảnh của KOL / trợ live trong một khoảng thời gian
+ * ✅ Assign/đổi KOL cho scheduled worktime
+ * PUT /v1/availabilities/admin/scheduled-worktime/assign
  *
- * ✅ Gọi: GET /v1/availabilities/time-line/kol/all
- *    với query: startDate, endDate, page, size
- *
- * Swagger:
- * - startDate: string(date-time)
- * - endDate: string(date-time)
- * - page: int
- * - size: int
+ * Body:
+ * {
+ *   scheduledWorkTimeId: string (required)
+ *   kolId: string (required)
+ *   availabilityId: string (required)
+ * }
+ */
+export const adminAssignScheduledWorktime = (payload, config = {}) => {
+  if (!payload?.scheduledWorkTimeId) {
+    console.warn(
+      "[adminAssignScheduledWorktime] Thiếu scheduledWorkTimeId:",
+      payload
+    );
+  }
+  if (!payload?.kolId) {
+    console.warn("[adminAssignScheduledWorktime] Thiếu kolId:", payload);
+  }
+  if (!payload?.availabilityId) {
+    console.warn(
+      "[adminAssignScheduledWorktime] Thiếu availabilityId:",
+      payload
+    );
+  }
+  return api.put(PATH_SCHEDULED_ASSIGN, payload, config);
+};
+
+/**
+ * ✅ Tìm tất cả slot rảnh của KOL / trợ live trong một khoảng thời gian
+ * GET /v1/availabilities/time-line/kol/all?startDate=&endDate=&page=&size=
  *
  * BE trả ví dụ:
  * {
- *   "data": [
- *     {
- *       "id": "6b55a473-8a05-4909-b079-bd6a8c2d17e7",
- *       "kolId": "9b27c5e0-fe06-4e0a-a030-6e78ce3fd459",
- *       "kolName": "Angelina Jolie",
- *       "startAt": "2025-11-03T00:00:00Z",
- *       "endAt": "2025-11-03T05:00:00Z",
- *       "status": "AVAILABLE",
- *       "createdAt": "2025-11-02T14:10:38.488911Z"
- *     },
- *     ...
- *   ]
+ *  status, message, data: [ ... ]
  * }
  */
 export const adminSearchFreeSlots = async ({
@@ -119,8 +123,11 @@ export const adminSearchFreeSlots = async ({
   size = 100,
   signal,
 } = {}) => {
-  const params = { page, size };
+  if (!PATH_SEARCH_FREE_SLOTS) {
+    throw new Error("PATH_SEARCH_FREE_SLOTS is not defined in API_PATHS");
+  }
 
+  const params = { page, size };
   if (startDate) params.startDate = startDate;
   if (endDate) params.endDate = endDate;
 
