@@ -33,6 +33,17 @@ const DEFAULT_FILTERS = Object.freeze({
 const normalizePackageType = (type) =>
   type?.toLowerCase() === "vip" ? "vip" : "basic";
 
+const formatCurrency = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "Liên hệ";
+  }
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+};
+
 const extractErrorMessage = (error) => {
   if (!error) {
     return "Không thể tải danh sách gói chiến dịch.";
@@ -348,6 +359,45 @@ const ServicePackageCard = ({ data, onSelect }) => {
           <Typography variant="h5" sx={{ fontWeight: 700, color: "#0f172a" }}>
             Gói {data?.name}
           </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 3,
+              backgroundColor: subtleColor,
+              border: `1px solid ${accentColor}30`,
+            }}
+          >
+            <Stack spacing={0.5}>
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 800, color: accentColor, lineHeight: 1 }}
+              >
+                {formatCurrency(data?.price)}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ color: "rgba(15,23,42,0.72)", fontWeight: 600 }}
+              >
+                Mỗi chiến dịch
+              </Typography>
+            </Stack>
+            <Chip
+              label={isVip ? "Bao gồm quyền chọn Host" : "Tùy chọn Host cơ bản"}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 2,
+                color: accentColor,
+                backgroundColor: "#fff",
+                borderColor: accentColor,
+                borderWidth: 1,
+                borderStyle: "solid",
+              }}
+            />
+          </Box>
           {/* <Typography
             variant="body1"
             sx={{
@@ -430,7 +480,7 @@ const ServicePackageCard = ({ data, onSelect }) => {
               },
             }}
           >
-            {isVip ? "Đăng ký ngay - VIP" : "Chọn gói này"}
+            {isVip ? "Chọn gói này" : "Chọn gói này"}
           </Button>
         </Box>
       </CardContent>
@@ -538,6 +588,7 @@ const ServicePackagePage = () => {
           packageId: pkg.id,
           packageName: pkg.name,
           packageType: normalizePackageType(pkg.packageType),
+          packagePrice: pkg.price,
         },
       });
     },
