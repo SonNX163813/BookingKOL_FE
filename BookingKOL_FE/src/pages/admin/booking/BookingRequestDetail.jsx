@@ -35,6 +35,7 @@ import {
   Users,
 } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
+import ContractTermsDialog from "../../../components/home/booking/ContractTermsDialog";
 
 import { get, patch, post } from "../../../config/axios-config";
 import { API_PATHS } from "../../../constants/apiPath";
@@ -218,6 +219,13 @@ const getFileNameFromUrl = (url) => {
     const parts = url.split("/").filter(Boolean);
     return parts[parts.length - 1] || url;
   }
+};
+
+const extractContractFileUrl = (terms) => {
+  if (!terms) return "";
+  const raw = typeof terms === "string" ? terms : String(terms);
+  const match = raw.match(/https?:\/\/\S+/i);
+  return match ? match[0] : raw;
 };
 
 const hasAnyLivestreamMetricValue = (metrics) => {
@@ -419,6 +427,8 @@ const BookingRequestDetail = () => {
   const [selectedAvailabilityId, setSelectedAvailabilityId] = useState(null);
 
   const [actionLoading, setActionLoading] = useState(false);
+  const [openContractDialog, setOpenContractDialog] = useState(false);
+  const [selectedContract, setSelectedContract] = useState(null);
 
   const {
     isLoadingBookingRequestDetail,
@@ -529,6 +539,10 @@ const BookingRequestDetail = () => {
     [selectedCancelEntry?.cancel?.status]
   );
   const isCancelApproved = selectedCancelStatus === "APPROVED";
+  const handleCloseContractDialog = () => {
+    setOpenContractDialog(false);
+    setSelectedContract(null);
+  };
 
   /** ✅ Load danh sách availability phù hợp khi mở modal đổi KOL */
   useEffect(() => {
@@ -1169,7 +1183,7 @@ const BookingRequestDetail = () => {
                 const paymentStatus = normalizeStatus(
                   contract?.paymentDTO?.status
                 );
-                const contractFileUrl = contract?.terms;
+                const contractFileUrl = extractContractFileUrl(contract?.terms);
                 const contractFileName = contractFileUrl
                   ? getFileNameFromUrl(contractFileUrl)
                   : "";
@@ -1200,15 +1214,32 @@ const BookingRequestDetail = () => {
                         span={screens.lg ? 3 : 1}
                       >
                         {contractFileUrl ? (
-                          <a
-                            href={contractFileUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            download={contractFileName || true}
-                            className="text-blue-600 hover:text-blue-500"
-                          >
-                            {renderEllipsisText(contractFileName, 60)}
-                          </a>
+                          <Space direction="vertical" size={6}>
+                            <Button
+                              icon={<Eye size={14} />}
+                              size="small"
+                              onClick={() => {
+                                setSelectedContract({
+                                  ...contract,
+                                  termLinks: contractFileUrl
+                                    ? [contractFileUrl]
+                                    : [],
+                                });
+                                setOpenContractDialog(true);
+                              }}
+                            >
+                              Xem Hợp đồng
+                            </Button>
+                            {/* <a
+                              href={contractFileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={contractFileName || true}
+                              className="text-blue-600 hover:text-blue-500"
+                            >
+                              {contractFileName || contractFileUrl}
+                            </a> */}
+                          </Space>
                         ) : (
                           "--"
                         )}
@@ -1346,6 +1377,14 @@ const BookingRequestDetail = () => {
           </Card>
         </Skeleton>
       )}
+
+      <ContractTermsDialog
+        open={openContractDialog}
+        contract={selectedContract}
+        onClose={handleCloseContractDialog}
+        acknowledgementRequired={false}
+        formatCurrency={formatCurrency}
+      />
 
       {/* ✅ Modal xem yêu cầu hủy */}
       <Modal

@@ -374,7 +374,8 @@ const HistoryBookingPackagePage = () => {
       // const hasKolSchedule = kolWorktimes.length > 0;
 
       const canCancelBookingRequest =
-        normalizedCampaignStatus === "ACCEPTED" && bookingRequestId;
+        (normalizedCampaignStatus === "ACCEPTED" && bookingRequestId) ||
+        (normalizedCampaignStatus === "REQUESTED" && bookingRequestId);
       //  &&
       // hasKolSchedule;
 
@@ -465,7 +466,7 @@ const HistoryBookingPackagePage = () => {
               Xem chi tiết
             </Button>
           ) : null}
-          {canCancelContract ? (
+          {/* {canCancelContract ? (
             <Button
               danger
               style={{
@@ -481,7 +482,7 @@ const HistoryBookingPackagePage = () => {
             >
               Hủy hợp đồng
             </Button>
-          ) : null}
+          ) : null} */}
           {canCancelBookingRequest ? (
             <Button
               danger
@@ -505,7 +506,7 @@ const HistoryBookingPackagePage = () => {
     [
       handleAcceptContract,
       openRejectModal,
-      handleCancelContract,
+      // handleCancelContract,
       handleCancelBookingRequest,
       handleViewCampaignDetail,
       isSigningContract,

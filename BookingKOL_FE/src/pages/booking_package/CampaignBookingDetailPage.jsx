@@ -2,7 +2,18 @@ import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
-import { Alert, Button, Card, Empty, Skeleton, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
+  Empty,
+  Grid,
+  Skeleton,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
 import {
   ArrowLeft,
   CalendarRange,
@@ -26,8 +37,29 @@ import {
   getUserBookingStatus,
   initiateCampaignPayment,
 } from "../../services/booking/BookingServices";
+import { useGetWorktimeLivestreamMetrics } from "../../hook/user/booking/useGetWorktimeLivestreamMetrics";
+import { useConfirmMyWorktimeLivestreamMetrics } from "../../hook/user/booking/useConfirmMyWorktimeLivestreamMetrics";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
+
+const LIVESTREAM_METRIC_LABELS = [
+  { key: "revenue", label: "Tổng doanh thu" },
+  { key: "gpm", label: "GPM" },
+  { key: "avgOrderValue", label: "Giá trị TB mỗi đơn" },
+  { key: "totalOrders", label: "Tổng đơn hàng" },
+  { key: "buyers", label: "Số người mua" },
+  { key: "productsSold", label: "Các mặt hàng được bán" },
+  { key: "totalViews", label: "Tổng lượt xem" },
+  { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút" },
+  { key: "viewsUnder1min", label: "Lượt xem < 1 phút" },
+  { key: "pcu", label: "PCU (đồng xem cao nhất)" },
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)" },
+  { key: "commentsIn1min", label: "BL trong 1 phút" },
+  { key: "totalComments", label: "Tổng bình luận" },
+  { key: "productClickRate", label: "Tỷ lệ click SP" },
+  { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn" },
+];
 
 const formatCurrency = (value, currency = "VND") => {
   if (value === null || value === undefined) return "--";
@@ -97,6 +129,13 @@ const resolveBookingRequestId = (request) => {
   return firstValue ?? null;
 };
 
+const resolveWorkTimeId = (workTime) =>
+  workTime?.id ??
+  workTime?.workTimeId ??
+  workTime?.work_time_id ??
+  workTime?.availabilityId ??
+  null;
+
 const composeWorktimeDuration = (workTime) => {
   const start = workTime?.startAt ?? workTime?.startTime;
   const end = workTime?.endAt ?? workTime?.endTime;
@@ -116,13 +155,84 @@ const composeWorktimeDuration = (workTime) => {
     : `${startLabel} → ${endLabel}`;
 };
 
+const formatBoolean = (value) => {
+  if (value === null || value === undefined) return "--";
+  return value ? "Yes" : "No";
+};
+
+const formatLivestreamMetricValue = (key, value) => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  if (key === "revenue" || key === "avgOrderValue") {
+    return formatCurrency(value);
+  }
+
+  if (key === "isConfirmed") {
+    return formatBoolean(value);
+  }
+
+  if (key === "createdAt" || key === "confirmedAt") {
+    return formatDateTime(value);
+  }
+
+  return value;
+};
+
+const isMissingLivestreamMetricError = (error) => {
+  const response = error?.response;
+  if (!response) {
+    return false;
+  }
+
+  const { status, data } = response;
+  if (![400, 404].includes(status)) {
+    return false;
+  }
+
+  const rawMessage = data?.message;
+  const messages = Array.isArray(rawMessage)
+    ? rawMessage
+    : typeof rawMessage === "string"
+    ? [rawMessage]
+    : [];
+
+  const normalizedMessages = messages
+    .filter((message) => typeof message === "string")
+    .map((message) => message.toLowerCase());
+
+  const keywords = ["livestream metric", "không tìm thấy", "not found"];
+  const hasMissingMetricMessage = normalizedMessages.some((message) =>
+    keywords.some((keyword) => message.includes(keyword))
+  );
+
+  const hasDataProperty = Object.prototype.hasOwnProperty.call(
+    data ?? {},
+    "data"
+  );
+  const isEmptyPayload = hasDataProperty && data?.data === null;
+
+  if (hasMissingMetricMessage) {
+    return true;
+  }
+
+  if (isEmptyPayload && normalizedMessages.length === 0) {
+    return true;
+  }
+
+  return false;
+};
+
 const CampaignBookingDetailPage = () => {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const screens = useBreakpoint();
   const [contractPreview, setContractPreview] = useState(null);
   const [initiatingScheduleId, setInitiatingScheduleId] = useState(null);
   const [completingWorkTimeId, setCompletingWorkTimeId] = useState(null);
+  const [confirmingWorktimeId, setConfirmingWorktimeId] = useState(null);
   const initiatePaymentMutation = useMutation({
     mutationFn: ({ paymentScheduleId }) =>
       initiateCampaignPayment(paymentScheduleId),
@@ -189,6 +299,66 @@ const CampaignBookingDetailPage = () => {
     });
     return map;
   }, [bookingRequests, bookingStatusQueries]);
+
+  const worktimeIds = useMemo(() => {
+    const ids = [];
+    const seen = new Set();
+
+    bookingStatusQueries.forEach((query) => {
+      const workTimes = Array.isArray(query?.data?.data?.workTimes)
+        ? query.data.data.workTimes
+        : Array.isArray(query?.data?.workTimes)
+        ? query.data.workTimes
+        : [];
+
+      workTimes.forEach((workTime) => {
+        const id = resolveWorkTimeId(workTime);
+
+        if (id !== null && id !== undefined) {
+          const normalized = String(id).trim();
+
+          if (normalized && !seen.has(normalized)) {
+            seen.add(normalized);
+            ids.push(id);
+          }
+        }
+      });
+    });
+
+    return ids;
+  }, [bookingStatusQueries]);
+
+  const {
+    worktimeLivestreamMetricsMap,
+    worktimeLivestreamMetricQueries,
+    resolvedWorktimeIds,
+    isLoadingWorktimeLivestreamMetrics,
+    isFetchingWorktimeLivestreamMetrics,
+  } = useGetWorktimeLivestreamMetrics(worktimeIds, {
+    enabled: worktimeIds.length > 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const findMetricQueryByWorktimeId = useCallback(
+    (worktimeId) => {
+      if (worktimeId === null || worktimeId === undefined) {
+        return null;
+      }
+      const normalized = String(worktimeId);
+      const index = resolvedWorktimeIds.findIndex(
+        (id) => String(id) === normalized
+      );
+      return index >= 0 ? worktimeLivestreamMetricQueries[index] : null;
+    },
+    [resolvedWorktimeIds, worktimeLivestreamMetricQueries]
+  );
+
+  const {
+    isConfirmingWorktimeLivestreamMetrics,
+    handleConfirmWorktimeLivestreamMetrics,
+  } = useConfirmMyWorktimeLivestreamMetrics();
 
   const isInitialLoading = isGettingCampaignDetail && !detail;
 
@@ -331,6 +501,25 @@ const CampaignBookingDetailPage = () => {
       }
     },
     [completeWorkTimeMutation, queryClient, refetchCampaignDetail]
+  );
+
+  const handleConfirmMetrics = useCallback(
+    async (worktimeId, query) => {
+      if (worktimeId === null || worktimeId === undefined) return;
+      setConfirmingWorktimeId(worktimeId);
+      try {
+        await handleConfirmWorktimeLivestreamMetrics(worktimeId);
+        if (query?.refetch) {
+          await query.refetch();
+        }
+        await refetchCampaignDetail();
+      } catch (error) {
+        //
+      } finally {
+        setConfirmingWorktimeId(null);
+      }
+    },
+    [handleConfirmWorktimeLivestreamMetrics, refetchCampaignDetail]
   );
 
   const renderNameList = (names, emptyLabel) =>
@@ -508,13 +697,6 @@ const CampaignBookingDetailPage = () => {
       ? statusData.workTimes
       : [];
 
-    const resolveWorkTimeId = (workTime) =>
-      workTime?.id ??
-      workTime?.workTimeId ??
-      workTime?.work_time_id ??
-      workTime?.availabilityId ??
-      null;
-
     const renderContent = () => {
       // Lỗi lấy trạng thái công việc
       if (statusError) {
@@ -641,6 +823,183 @@ const CampaignBookingDetailPage = () => {
     );
   };
 
+  const renderLivestreamMetrics = (request) => {
+    const bookingRequestId = resolveBookingRequestId(request);
+    if (!bookingRequestId) return null;
+
+    const statusEntry = bookingStatusMap.get(bookingRequestId);
+    const isStatusLoading =
+      statusEntry?.isPending || statusEntry?.isLoading || false;
+    const statusError = statusEntry?.error;
+    const statusData = statusEntry?.statusData;
+    const workTimes = Array.isArray(statusData?.workTimes)
+      ? statusData.workTimes
+      : [];
+
+    const renderMetricContent = () => {
+      if (statusError) {
+        return (
+          <Alert
+            type="error"
+            showIcon
+            message="KhA'ng th ¯Ÿ t §œi ca livestream"
+            description={statusError?.message}
+            className="rounded-xl border border-red-200/60 bg-white/90"
+          />
+        );
+      }
+
+      if (isStatusLoading && !workTimes.length) {
+        return <Skeleton active paragraph={{ rows: 3 }} />;
+      }
+
+      if (!workTimes.length) {
+        return <Empty description="Ch’øa cA3 ca livestream nAÿo" />;
+      }
+
+      return (
+        <Space direction="vertical" size="middle" className="w-full">
+          {workTimes.map((workTime) => {
+            const workTimeId = resolveWorkTimeId(workTime);
+            const metrics =
+              (worktimeLivestreamMetricsMap.get(workTimeId) ?? null) || null;
+            const queryState = findMetricQueryByWorktimeId(workTimeId);
+            const metricsError = queryState?.error;
+            const errorMessage =
+              metricsError?.response?.data?.message ?? metricsError?.message;
+            const isMetricsMissing =
+              metricsError && isMissingLivestreamMetricError(metricsError);
+            const normalizedMetrics = isMetricsMissing ? null : metrics;
+            const isMetricsLoading =
+              !!(queryState?.isPending || queryState?.isFetching) ||
+              (!queryState &&
+                (isLoadingWorktimeLivestreamMetrics ||
+                  isFetchingWorktimeLivestreamMetrics));
+            const shouldShowMetricsError = Boolean(
+              metricsError && !isMetricsMissing
+            );
+            const isButtonLoading =
+              confirmingWorktimeId === workTimeId &&
+              isConfirmingWorktimeLivestreamMetrics;
+            const showConfirmTag =
+              typeof normalizedMetrics?.isConfirmed === "boolean";
+            const isConfirmedValue = showConfirmTag
+              ? normalizedMetrics.isConfirmed
+              : Boolean(normalizedMetrics?.confirmedAt);
+
+            return (
+              <div
+                key={workTimeId ?? workTime?.startAt ?? workTime?.startTime}
+                className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} />
+                    <span className="text-sm font-semibold text-slate-900">
+                      Ca livestream {workTimeId ?? ""}
+                    </span>
+                  </div>
+                  <Space size="small" wrap>
+                    {showConfirmTag ? (
+                      <Tag color={isConfirmedValue ? "green" : "orange"}>
+                        {isConfirmedValue ? "Đã xác nhận" : "Chưa xác nhận"}
+                      </Tag>
+                    ) : null}
+                    {normalizedMetrics?.confirmedAt ? (
+                      <Text type="secondary">
+                        Xác nhận lúc:{" "}
+                        {formatDateTime(normalizedMetrics.confirmedAt)}
+                      </Text>
+                    ) : null}
+                  </Space>
+                </div>
+
+                {isMetricsLoading ? (
+                  <Skeleton active paragraph={{ rows: 6 }} />
+                ) : shouldShowMetricsError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="Không thể tải thống kê livestream"
+                    description={
+                      errorMessage ? String(errorMessage) : undefined
+                    }
+                  />
+                ) : normalizedMetrics ? (
+                  <>
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 220 }}
+                    >
+                      {LIVESTREAM_METRIC_LABELS.map(({ key, label }) => (
+                        <Descriptions.Item key={key} label={label}>
+                          {formatLivestreamMetricValue(
+                            key,
+                            normalizedMetrics?.[key]
+                          )}
+                        </Descriptions.Item>
+                      ))}
+                    </Descriptions>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <Space size="small" wrap>
+                        {normalizedMetrics?.createdAt ? (
+                          <Text type="secondary">
+                            Cập nhật lúc:{" "}
+                            {formatDateTime(normalizedMetrics.createdAt)}
+                          </Text>
+                        ) : null}
+                        {normalizedMetrics?.confirmedAt ? (
+                          <Text type="secondary">
+                            Xác nhận lúc:{" "}
+                            {formatDateTime(normalizedMetrics.confirmedAt)}
+                          </Text>
+                        ) : null}
+                      </Space>
+                      {normalizedMetrics?.confirmedAt === null ? (
+                        <Button
+                          type="primary"
+                          ghost
+                          onClick={() =>
+                            handleConfirmMetrics(workTimeId, queryState)
+                          }
+                          loading={isButtonLoading}
+                          disabled={
+                            isButtonLoading ||
+                            isMetricsLoading ||
+                            !normalizedMetrics ||
+                            workTimeId === null ||
+                            workTimeId === undefined
+                          }
+                        >
+                          Xác nhận thống kê
+                        </Button>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <Empty description="Chưa có thống kê livestream" />
+                )}
+              </div>
+            );
+          })}
+        </Space>
+      );
+    };
+
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Sparkles size={16} />
+          <span>Thống kê livestream</span>
+        </div>
+        {renderMetricContent()}
+      </div>
+    );
+  };
+
   const renderBookingRequestCard = (request) => {
     const requestStatus = resolveStatusMeta(request?.status);
     const contractStatus =
@@ -723,7 +1082,7 @@ const CampaignBookingDetailPage = () => {
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Host chính sau đàm phán
+              Host chính ưu tiên tham gia
             </p>
             {renderNameList(
               negotiatedKolNames,
@@ -732,7 +1091,7 @@ const CampaignBookingDetailPage = () => {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Trợ Live tham gia sau đàm phán
+              Trợ Live ưu tiên tham gia
             </p>
             {renderNameList(
               negotiatedLiveNames,
@@ -746,6 +1105,8 @@ const CampaignBookingDetailPage = () => {
         </div>
 
         <div className="mt-6">{renderWorkTimes(request)}</div>
+
+        <div className="mt-6">{renderLivestreamMetrics(request)}</div>
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <Button
@@ -927,7 +1288,7 @@ const CampaignBookingDetailPage = () => {
                         className="mx-auto mb-3 text-indigo-500"
                       />
                       <p className="text-sm font-medium text-slate-600">
-                        Chưa có đơn booking nào
+                        Chưa có đơn nào cho chiến dịch này.
                       </p>
                       <p className="text-xs text-slate-500">
                         Khi có kết quả đàm phán, chi tiết sẽ được hiển thị tại

@@ -33,6 +33,17 @@ const DEFAULT_FILTERS = Object.freeze({
 const normalizePackageType = (type) =>
   type?.toLowerCase() === "vip" ? "vip" : "basic";
 
+const formatCurrency = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "Liên hệ";
+  }
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+};
+
 const extractErrorMessage = (error) => {
   if (!error) {
     return "Không thể tải danh sách gói chiến dịch.";
@@ -97,19 +108,39 @@ const PackageFilterPanel = ({
             variant="body2"
             sx={{ color: "rgba(15, 23, 42, 0.7)", lineHeight: 1.6 }}
           >
-            Lọc theo tên gói để thu hẹp danh sách chỉ còn những gói phù hợp
-            nhất.
+            Lọc theo tên gói, mô tả và hình thức lựa chọn KOL để thu hẹp danh
+            sách.
           </Typography>
         </Stack>
 
         <Stack spacing={2.5}>
+          {/* Search theo tên/mô tả */}
           <Stack spacing={1.5}>
-            {/* <Typography
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "rgba(15,23,42,0.8)" }}
+            >
+              Tìm theo tên gói
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="Nhập tên gói hoặc mô tả..."
+              value={filters.search}
+              onChange={onSearchChange}
+              disabled={disabled}
+              sx={fieldStyles}
+              size="medium"
+            />
+          </Stack>
+
+          {/* Lựa chọn kiểu gói */}
+          <Stack spacing={1.5}>
+            <Typography
               variant="subtitle2"
               sx={{ fontWeight: 600, color: "rgba(15,23,42,0.8)" }}
             >
               Quyền lựa chọn KOL
-            </Typography> */}
+            </Typography>
             <ToggleButtonGroup
               exclusive
               color="primary"
@@ -258,27 +289,43 @@ const ServicePackageCard = ({ data, onSelect }) => {
   const isVip = data?.packageType?.toLowerCase() === "vip";
   const accentColor = isVip ? "#a855f7" : "#4a74da";
   const subtleColor = isVip ? "rgba(168,85,247,0.24)" : "rgba(74,116,218,0.2)";
-
+  const vipStyles = {
+    border: "1px solid rgba(168, 85, 247, 0.6)",
+    boxShadow: "0 0 18px rgba(168, 85, 247, 0.3)",
+    background: "linear-gradient(to bottom right, #faf5ff, #ede9fe, #fef3c7)",
+    transform: "translateY(-2px)",
+  };
   return (
     <Card
       sx={{
         height: "100%",
         width: "100%",
         borderRadius: 4,
-        border: `1px solid ${subtleColor}`,
-        boxShadow: `0 24px 48px ${subtleColor}`,
-        background:
-          "linear-gradient(160deg, rgba(255,255,255,0.96), rgba(244,247,255,0.92))",
+        border: isVip ? vipStyles.border : "1px solid rgba(74, 116, 218, 0.25)",
+        boxShadow: isVip
+          ? vipStyles.boxShadow
+          : "0 18px 36px rgba(74,116,218,0.15)",
+        background: isVip
+          ? vipStyles.background
+          : "linear-gradient(160deg, #fff, rgba(244,247,255,0.92))",
         display: "flex",
         flexDirection: "column",
+        transition: "all .25s ease",
+        "&:hover": {
+          transform: isVip ? "scale(1.03)" : "scale(1.01)",
+          boxShadow: isVip
+            ? "0 0 30px rgba(168, 85, 247, 0.45)"
+            : "0 24px 48px rgba(74,116,218,0.22)",
+        },
       }}
     >
       <CardContent
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: 2,
+          gap: { xs: 1.5, md: 2 },
           flexGrow: 1,
+          p: { xs: 2.5, md: 3 },
         }}
       >
         <Stack
@@ -330,9 +377,60 @@ const ServicePackageCard = ({ data, onSelect }) => {
         </Stack>
 
         <Stack spacing={1}>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: "#0f172a" }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              color: "#0f172a",
+              fontSize: { xs: "1.1rem", md: "1.25rem" },
+            }}
+          >
             Gói {data?.name}
           </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 3,
+              backgroundColor: subtleColor,
+              border: `1px solid ${accentColor}30`,
+            }}
+          >
+            <Stack spacing={0.5}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 800,
+                  color: accentColor,
+                  lineHeight: 1,
+                  fontSize: { xs: "1.6rem", md: "2.1rem" },
+                }}
+              >
+                {formatCurrency(data?.price)}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ color: "rgba(15,23,42,0.72)", fontWeight: 600 }}
+              >
+                Mỗi chiến dịch
+              </Typography>
+            </Stack>
+            <Chip
+              label={isVip ? "Bao gồm quyền chọn Host" : "Tùy chọn Host cơ bản"}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 2,
+                color: accentColor,
+                backgroundColor: "#fff",
+                borderColor: accentColor,
+                borderWidth: 1,
+                borderStyle: "solid",
+              }}
+            />
+          </Box>
           {/* <Typography
             variant="body1"
             sx={{
@@ -351,7 +449,6 @@ const ServicePackageCard = ({ data, onSelect }) => {
               gap: "16px",
               lineHeight: 1.6,
               fontSize: "1rem",
-              // color: "#374151", // gray-200 : gray-700
             }}
           >
             {(isVip
@@ -383,7 +480,7 @@ const ServicePackageCard = ({ data, onSelect }) => {
                     height: "20px",
                     flexShrink: 0,
                     marginTop: "2px",
-                    color: isVip ? "#facc15" : "#2563eb", // yellow-400 / blue-600
+                    color: isVip ? "#facc15" : "#2563eb",
                   }}
                 />
                 <span>{item}</span>
@@ -395,18 +492,22 @@ const ServicePackageCard = ({ data, onSelect }) => {
         <Box sx={{ mt: "auto" }}>
           <Button
             fullWidth
-            variant={isVip ? "contained" : "outlined"}
+            variant="contained"
             onClick={() => onSelect(data)}
             sx={{
               textTransform: "none",
               fontWeight: 700,
               borderRadius: 3,
-              py: 1.25,
-              backgroundColor: isVip ? accentColor : "transparent",
-              borderColor: accentColor,
-              color: isVip ? "#ffffff" : accentColor,
+              py: 1.5,
+              background: isVip
+                ? "linear-gradient(90deg,#a855f7,#d946ef)"
+                : "transparent",
+              color: isVip ? "#ffffff" : "#4a74da",
+              fontSize: isVip ? "1.05rem" : "1rem",
               "&:hover": {
-                backgroundColor: isVip ? "#9333ea" : "rgba(74,116,218,0.08)",
+                background: isVip
+                  ? "linear-gradient(90deg,#9333ea,#c026d3)"
+                  : "rgba(74,116,218,0.08)",
               },
             }}
           >
@@ -518,6 +619,7 @@ const ServicePackagePage = () => {
           packageId: pkg.id,
           packageName: pkg.name,
           packageType: normalizePackageType(pkg.packageType),
+          packagePrice: pkg.price,
         },
       });
     },
@@ -528,20 +630,24 @@ const ServicePackagePage = () => {
     <Box
       sx={{
         bgcolor: "#f8fafc",
-        // minHeight: "100vh",
-        py: { xs: 8, md: 12 },
+        py: { xs: 6, md: 10 },
       }}
     >
       <Container
         maxWidth={false}
         sx={{
-          maxWidth: "1400px",
-          position: "relative",
-          zIndex: 1,
+          maxWidth: "1600px",
+          px: { xs: 2.5, sm: 3, md: 4 },
         }}
       >
-        <Stack spacing={6}>
-          <Stack spacing={2} textAlign="center" justifyContent="center">
+        <Stack spacing={{ xs: 4, md: 6 }}>
+          {/* HEADER */}
+          <Stack
+            spacing={2}
+            textAlign="center"
+            justifyContent="center"
+            sx={{ px: { xs: 1, md: 6 } }}
+          >
             <Typography
               variant="overline"
               sx={{ letterSpacing: 2, color: "#4a74da", fontWeight: 700 }}
@@ -554,42 +660,38 @@ const ServicePackagePage = () => {
                 fontWeight: 800,
                 color: "#0f172a",
                 letterSpacing: -0.5,
+                fontSize: { xs: "1.8rem", sm: "2.2rem", md: "2.6rem" },
+                lineHeight: 1.2,
               }}
             >
               Tùy chọn gói KOL phù hợp mục tiêu của bạn
             </Typography>
-            {/* <Typography
-              variant="body1"
-              sx={{
-                color: "rgba(15, 23, 42, 0.75)",
-
-                lineHeight: 1.7,
-              }}
-            >
-              BookingKOL cung cấp nhiều cấp độ dịch vụ để đáp ứng ngân sách và
-              kỳ vọng triển khai chiến dịch của bạn. So sánh nhanh, chọn gói ưng
-              ý và bắt đầu tạo chiến dịch chỉ với vài phút.
-            </Typography> */}
           </Stack>
 
-          <Box
+          {/* MAIN CONTENT: FILTER + LIST */}
+          <Grid
+            container
+            spacing={{ xs: 3, md: 4 }}
             sx={{
               display: "flex",
               flexDirection: "column",
-              gap: { xs: 4, md: 6 },
               alignItems: "stretch",
             }}
           >
-            {/* <PackageFilterPanel
-              filters={filters}
-              onSearchChange={handleSearchChange}
-              onAllowKolChange={handleAllowKolChange}
-              onReset={handleResetFilters}
-              disabled={loading}
-              hasActiveFilters={hasActiveFilters}
-            /> */}
+            {/* FILTER PANEL – full width trên mobile, sidebar trên md+ */}
+            {/* <Grid item xs={12} md={4} lg={3}>
+              <PackageFilterPanel
+                filters={filters}
+                onSearchChange={handleSearchChange}
+                onAllowKolChange={handleAllowKolChange}
+                onReset={handleResetFilters}
+                disabled={loading}
+                hasActiveFilters={hasActiveFilters}
+              />
+            </Grid> */}
 
-            <Box sx={{ width: "100%" }}>
+            {/* LIST */}
+            <Grid item xs={12} md={12} lg={12}>
               {loading ? (
                 <PackageListLoading />
               ) : error ? (
@@ -599,9 +701,9 @@ const ServicePackagePage = () => {
               ) : (
                 <Grid
                   container
-                  spacing={{ xs: 3, md: 4 }}
-                  justifyContent="center" // căn giữa cụm thẻ
-                  alignItems="stretch" // kéo giãn cho cao bằng nhau
+                  spacing={{ xs: 2.5, md: 3.5 }}
+                  justifyContent="center"
+                  alignItems="stretch"
                 >
                   {filteredPackages.map((pkg) => {
                     const isVip = pkg?.packageType?.toLowerCase() === "vip";
@@ -610,13 +712,13 @@ const ServicePackagePage = () => {
                         item
                         key={pkg.id}
                         xs={12}
-                        md={6} // 2 cột ở >= md
+                        sm={6}
+                        md={6}
+                        lg={4}
                         sx={{
-                          display: "flex", // để con fill chiều cao
-                          maxWidth: 460, // độ rộng thẻ giống ảnh
-                          minHeight: { xs: "auto", md: 400 }, // chiều cao tối thiểu để thẻ đồng đều
+                          display: "flex",
                         }}
-                        order={{ xs: 0, md: isVip ? 2 : 1 }} // VIP ở cột phải
+                        order={{ xs: 0, md: isVip ? 2 : 1 }} // VIP sang phải trên màn hình rộng
                       >
                         <Box sx={{ flex: 1, display: "flex" }}>
                           <ServicePackageCard
@@ -629,8 +731,8 @@ const ServicePackagePage = () => {
                   })}
                 </Grid>
               )}
-            </Box>
-          </Box>
+            </Grid>
+          </Grid>
         </Stack>
       </Container>
     </Box>
