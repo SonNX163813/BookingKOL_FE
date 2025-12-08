@@ -258,19 +258,34 @@ const ServicePackageCard = ({ data, onSelect }) => {
   const isVip = data?.packageType?.toLowerCase() === "vip";
   const accentColor = isVip ? "#a855f7" : "#4a74da";
   const subtleColor = isVip ? "rgba(168,85,247,0.24)" : "rgba(74,116,218,0.2)";
-
+  const vipStyles = {
+    border: "1px solid rgba(168, 85, 247, 0.6)",
+    boxShadow: "0 0 18px rgba(168, 85, 247, 0.3)",
+    background: "linear-gradient(to bottom right, #faf5ff, #ede9fe, #fef3c7)",
+    transform: "translateY(-2px)",
+  };
   return (
     <Card
       sx={{
         height: "100%",
         width: "100%",
         borderRadius: 4,
-        border: `1px solid ${subtleColor}`,
-        boxShadow: `0 24px 48px ${subtleColor}`,
-        background:
-          "linear-gradient(160deg, rgba(255,255,255,0.96), rgba(244,247,255,0.92))",
+        border: isVip ? vipStyles.border : "1px solid rgba(74, 116, 218, 0.25)",
+        boxShadow: isVip
+          ? vipStyles.boxShadow
+          : "0 18px 36px rgba(74,116,218,0.15)",
+        background: isVip
+          ? vipStyles.background
+          : "linear-gradient(160deg, #fff, rgba(244,247,255,0.92))",
         display: "flex",
         flexDirection: "column",
+        transition: "all .25s ease",
+        "&:hover": {
+          transform: isVip ? "scale(1.03)" : "scale(1.01)",
+          boxShadow: isVip
+            ? "0 0 30px rgba(168, 85, 247, 0.45)"
+            : "0 24px 48px rgba(74,116,218,0.22)",
+        },
       }}
     >
       <CardContent
@@ -395,22 +410,27 @@ const ServicePackageCard = ({ data, onSelect }) => {
         <Box sx={{ mt: "auto" }}>
           <Button
             fullWidth
-            variant={isVip ? "contained" : "outlined"}
+            variant="contained"
             onClick={() => onSelect(data)}
             sx={{
               textTransform: "none",
               fontWeight: 700,
               borderRadius: 3,
-              py: 1.25,
-              backgroundColor: isVip ? accentColor : "transparent",
-              borderColor: accentColor,
-              color: isVip ? "#ffffff" : accentColor,
+              py: 1.5,
+              background: isVip
+                ? "linear-gradient(90deg,#a855f7,#d946ef)"
+                : "transparent",
+              // borderColor: isVip ? "transparent" : "#4a74da",
+              color: isVip ? "#ffffff" : "#4a74da",
+              fontSize: isVip ? "1.05rem" : "1rem",
               "&:hover": {
-                backgroundColor: isVip ? "#9333ea" : "rgba(74,116,218,0.08)",
+                background: isVip
+                  ? "linear-gradient(90deg,#9333ea,#c026d3)"
+                  : "rgba(74,116,218,0.08)",
               },
             }}
           >
-            Chọn gói này
+            {isVip ? "Đăng ký ngay - VIP" : "Chọn gói này"}
           </Button>
         </Box>
       </CardContent>

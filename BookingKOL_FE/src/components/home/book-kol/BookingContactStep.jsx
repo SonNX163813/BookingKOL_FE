@@ -17,6 +17,7 @@ import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedI
 import AttachmentRoundedIcon from "@mui/icons-material/AttachmentRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
+import { toast } from "react-toastify";
 
 const BookingContactStep = ({
   contact,
@@ -57,6 +58,21 @@ const BookingContactStep = ({
     }
   };
 
+  const ALLOWED_EXTENSIONS = [
+    ".xlsx",
+    ".xls",
+    ".doc",
+    ".docx",
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+  ];
+
+  const isValidFileType = (file) => {
+    const name = file?.name?.toLowerCase() || "";
+    return ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
+  };
   // Định dạng kích thước tệp
   const formatFileSize = (size) => {
     if (!Number.isFinite(size)) return "";
@@ -68,18 +84,39 @@ const BookingContactStep = ({
   // Xử lý khi chọn tệp
   const handleFileInputChange = (event) => {
     const { files } = event.target;
-    if (files && onAddAttachments) onAddAttachments(files);
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+
+    // check định dạng
+    const invalidFiles = fileArray.filter((file) => !isValidFileType(file));
+
+    if (invalidFiles.length > 0) {
+      // Thông báo và chặn luôn
+      const message =
+        TEXT.messages.attachmentTypeInvalid ||
+        "Định dạng tệp không được hỗ trợ.";
+      toast.error(message);
+
+      // reset input để lần sau chọn lại
+      if (event.target) event.target.value = "";
+      return;
+    }
+
+    if (onAddAttachments) onAddAttachments(fileArray);
+
     if (event.target) event.target.value = "";
   };
 
   // Gợi ý đính kèm tệp
   const attachmentHintTemplate = TEXT.messages.attachmentHint;
+  const attachmentHintFormat = TEXT.messages.attachmentFormat;
   const baseAttachmentHint = attachmentHintTemplate
     ? attachmentHintTemplate
         .replace("{limit}", limit)
         .replace("{size}", maxSize)
     : `Bạn có thể đính kèm tối đa ${limit} tệp (mỗi tệp tối đa ${maxSize}MB).`;
-  const attachmentHint = `${baseAttachmentHint}`;
+  const attachmentHint = ` ${baseAttachmentHint}`;
 
   return (
     <Stack spacing={3}>
@@ -303,10 +340,13 @@ const BookingContactStep = ({
                 type="file"
                 hidden
                 multiple
+                accept=".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png"
                 onChange={handleFileInputChange}
               />
             </Button>
             <Typography variant="body2" sx={{ color: STYLE.textSecondary }}>
+              {attachmentHintFormat}
+              <br />
               {attachmentHint}
             </Typography>
           </Stack>

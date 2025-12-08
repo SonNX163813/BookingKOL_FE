@@ -14,8 +14,8 @@ import {
   Button,
   ConfigProvider,
   Select,
-  message,
   Descriptions,
+  Space,
 } from "antd";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
@@ -26,6 +26,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getKolProfiles, resolveAvatarUrl } from "../../services/kol/KolAPI";
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
+import { getMyUserProfile } from "../../services/user/UserService";
 
 dayjs.locale("vi");
 
@@ -40,6 +41,7 @@ import {
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
 import AttachmentRoundedIcon from "@mui/icons-material/AttachmentRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import { toast } from "react-toastify";
 
 const STYLE = {
   textPrimary: "#0f172a",
@@ -81,16 +83,71 @@ const HERO_STATS = [
   { value: "24/7", label: "Hỗ trợ vận hành" },
 ];
 
+// ==== Repeat type helpers (shared with admin campaign edit) ====
+const REPEAT_NONE = "NONE";
+const REPEAT_DAILY = "DAILY";
+const DOW = [
+  { key: "MON", label: "T2" },
+  { key: "TUE", label: "T3" },
+  { key: "WED", label: "T4" },
+  { key: "THU", label: "T5" },
+  { key: "FRI", label: "T6" },
+  { key: "SAT", label: "T7" },
+  { key: "SUN", label: "CN" },
+];
+const DOW_ORDER = DOW.map((d) => d.key);
+const isDowKey = (v) => DOW_ORDER.includes(v);
+
+const buildRepeatTypeTextFromSelection = (selection = []) => {
+  const sel = Array.isArray(selection) ? selection : [];
+
+  // NONE => không gửi repeatType
+  if (sel.includes(REPEAT_NONE)) return "";
+
+  if (sel.includes(REPEAT_DAILY)) return "Hàng ngày";
+
+  const days = sel.filter(isDowKey);
+  if (days.length) {
+    const sorted = [...new Set(days)].sort(
+      (a, b) => DOW_ORDER.indexOf(a) - DOW_ORDER.indexOf(b)
+    );
+    const labels = sorted
+      .map((k) => DOW.find((x) => x.key === k)?.label)
+      .filter(Boolean);
+    return `Hàng tuần: ${labels.join(", ")}`;
+  }
+  return "";
+};
+
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_ATTACHMENTS = 5;
 
-const attachmentHint = `Tối đa ${MAX_ATTACHMENTS} tệp, mỗi tệp ≤ 10MB`;
+// Danh sách đuôi file cho phép
+const ALLOWED_EXTENSIONS = [
+  ".xlsx",
+  ".xls",
+  ".doc",
+  ".docx",
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+];
 
+const attachmentHint = `Tối đa ${MAX_ATTACHMENTS} tệp, mỗi tệp ≤ 10MB. Hỗ trợ: .xlsx, .xls, .doc, .docx, .pdf, .jpg, .jpeg, .png`;
+
+// Helper format size
 const formatFileSize = (size) => {
   if (!size && size !== 0) return "";
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Check đúng định dạng file
+const isValidFileType = (file) => {
+  const name = file?.name?.toLowerCase() || "";
+  return ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
 };
 
 /** Tag render: avatar nhỏ + tên, không hiện id */
@@ -226,6 +283,7 @@ const ServicePackageBookingFormPage = () => {
   const [form] = Form.useForm();
   const [campaignData, setCampaignData] = useState({});
   const [vipExtraData, setVipExtraData] = useState({});
+  const [repeatSelection, setRepeatSelection] = useState([]);
 
   // attachments: [{ id, file, name, size }]
   const [attachments, setAttachments] = useState([]);
@@ -266,6 +324,48 @@ const ServicePackageBookingFormPage = () => {
     form.setFieldsValue({ kol: [], assistant: [] });
   }, [selectedPackage, form]);
 
+  const { data: myProfileResponse } = useQuery({
+    queryKey: ["my-user-profile"],
+    queryFn: ({ signal }) => getMyUserProfile({ signal }),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    const profileData = myProfileResponse?.data ?? myProfileResponse ?? null;
+    if (!profileData) return;
+
+    const updates = {};
+    const setIfEmpty = (key, value) => {
+      const current = form.getFieldValue(key);
+      if (!current && value) {
+        updates[key] = value;
+      }
+    };
+
+    const fullName =
+      profileData.fullName ?? profileData.displayName ?? profileData.name ?? "";
+    const phone =
+      profileData.phone ??
+      profileData.phoneNumber ??
+      profileData.contactPhone ??
+      "";
+    const address =
+      profileData.permanentAddress ??
+      profileData.address ??
+      profileData.location ??
+      profileData.cityAddress ??
+      "";
+
+    setIfEmpty("ordererFullName", fullName);
+    setIfEmpty("ordererPhone", phone);
+    setIfEmpty("permanentAddress", address);
+
+    if (Object.keys(updates).length) {
+      form.setFieldsValue(updates);
+    }
+  }, [myProfileResponse, form]);
+
   const {
     data: servicePackages,
     isError: isPackageFetchError,
@@ -295,7 +395,7 @@ const ServicePackageBookingFormPage = () => {
     if (!isPackageFetchError) return;
     const fallbackMessage =
       "Không thể tải danh sách gói dịch vụ. Vui lòng thử lại sau.";
-    message.error(packageFetchError?.message || fallbackMessage);
+    toast.error(packageFetchError?.message || fallbackMessage);
   }, [isPackageFetchError, packageFetchError]);
 
   const {
@@ -373,8 +473,57 @@ const ServicePackageBookingFormPage = () => {
     if (!isKolFetchError) return;
     const fallbackMessage =
       "Không thể tải danh sách KOL. Vui lòng thử lại sau.";
-    message.error(kolFetchError?.message || fallbackMessage);
+    toast.error(kolFetchError?.message || fallbackMessage);
   }, [isKolFetchError, kolFetchError]);
+
+  const repeatOptions = useMemo(() => {
+    const base = [
+      { value: REPEAT_NONE, label: "Không lặp" },
+      { value: REPEAT_DAILY, label: "Hàng ngày" },
+    ];
+    const days = DOW.map((d) => ({ value: d.key, label: d.label }));
+    return [
+      { label: "Tuỳ chọn", options: base },
+      { label: "Chọn thứ (Hàng tuần)", options: days },
+    ];
+  }, []);
+
+  const repeatHint =
+    buildRepeatTypeTextFromSelection(repeatSelection) || "Không lặp";
+
+  useEffect(() => {
+    form.setFieldValue("repeatSelection", repeatSelection);
+    const text = buildRepeatTypeTextFromSelection(repeatSelection);
+    form.setFieldValue("repeatType", text || "");
+  }, [repeatSelection, form]);
+
+  const handleRepeatSelect = (val) => {
+    if (val === REPEAT_NONE) {
+      setRepeatSelection([REPEAT_NONE]);
+      return;
+    }
+    if (val === REPEAT_DAILY) {
+      setRepeatSelection([REPEAT_DAILY]);
+      return;
+    }
+    if (isDowKey(val)) {
+      setRepeatSelection((prev) => {
+        const days = prev.filter(isDowKey);
+        return Array.from(new Set([...days, val]));
+      });
+    }
+  };
+
+  const handleRepeatDeselect = (val) => {
+    setRepeatSelection((prev) => {
+      if (val === REPEAT_NONE || val === REPEAT_DAILY) return [];
+      if (isDowKey(val)) {
+        const next = prev.filter((x) => x !== val);
+        return next;
+      }
+      return prev;
+    });
+  };
 
   useEffect(() => {
     if (selectedPackage !== "vip") return;
@@ -404,7 +553,14 @@ const ServicePackageBookingFormPage = () => {
   };
 
   const handleCampaignFormFinish = (values) => {
-    const { kol, assistant, startDate, endDate, ...rest } = values;
+    const {
+      kol,
+      assistant,
+      startDate,
+      endDate,
+      repeatSelection: _repeatSelection,
+      ...rest
+    } = values;
 
     // đảm bảo có file
     if (!attachments.length) {
@@ -416,6 +572,10 @@ const ServicePackageBookingFormPage = () => {
       ...rest,
       startDate: startDate.format("YYYY-MM-DD"),
       endDate: endDate.format("YYYY-MM-DD"),
+      livestreamHours:
+        rest.livestreamHours !== undefined && rest.livestreamHours !== null
+          ? Number(rest.livestreamHours)
+          : rest.livestreamHours,
     };
     setCampaignData(formatted);
 
@@ -445,6 +605,7 @@ const ServicePackageBookingFormPage = () => {
     form.resetFields();
     setAttachments([]);
     setVipExtraData({});
+    setRepeatSelection([]);
     navigate("/");
   };
 
@@ -456,15 +617,28 @@ const ServicePackageBookingFormPage = () => {
     const fileList = Array.from(event.target.files || []);
     if (!fileList.length) return;
 
+    // 1. Check định dạng trước – nếu có file sai, báo lỗi & chặn luôn
+    const invalidFiles = fileList.filter((file) => !isValidFileType(file));
+    if (invalidFiles.length > 0) {
+      toast.error(
+        `Một hoặc nhiều tệp có định dạng không được hỗ trợ. Chỉ chấp nhận: ${ALLOWED_EXTENSIONS.join(
+          ", "
+        )}`
+      );
+      if (event.target) {
+        event.target.value = "";
+      }
+      return;
+    }
+
     let merged = [...attachments];
 
+    // 2. Check size, trùng, giới hạn
     for (const file of fileList) {
       const size = typeof file.size === "number" ? file.size : 0;
 
       if (size > MAX_ATTACHMENT_SIZE) {
-        message.error(
-          `"${file.name}" vượt quá 10MB, vui lòng chọn tệp nhỏ hơn.`
-        );
+        toast.error(`"${file.name}" vượt quá 10MB, vui lòng chọn tệp nhỏ hơn.`);
         continue;
       }
 
@@ -481,7 +655,7 @@ const ServicePackageBookingFormPage = () => {
     }
 
     if (merged.length > MAX_ATTACHMENTS) {
-      message.warning(`Chỉ hỗ trợ tối đa ${MAX_ATTACHMENTS} tệp đính kèm.`);
+      toast.warning(`Chỉ hỗ trợ tối đa ${MAX_ATTACHMENTS} tệp đính kèm.`);
       merged = merged.slice(0, MAX_ATTACHMENTS);
     }
 
@@ -490,7 +664,9 @@ const ServicePackageBookingFormPage = () => {
     // cập nhật lỗi trong Form nếu có custom validator
     form.validateFields(["attachment"]).catch(() => {});
     // reset input để có thể chọn lại cùng file
-    event.target.value = "";
+    if (event.target) {
+      event.target.value = "";
+    }
   };
 
   const handleRemoveAttachment = (id) => {
@@ -506,7 +682,7 @@ const ServicePackageBookingFormPage = () => {
 
   const handleConfirm = () => {
     if (!selectedPackage) {
-      message.error("Vui lòng chọn gói dịch vụ trước khi tiếp tục.");
+      toast.error("Vui lòng chọn gói dịch vụ trước khi tiếp tục.");
       return;
     }
 
@@ -514,7 +690,7 @@ const ServicePackageBookingFormPage = () => {
       routePackageId || packageTypeIdMap[selectedPackage];
 
     if (!resolvedPackageId) {
-      message.error("Không tìm thấy thông tin gói dịch vụ.");
+      toast.error("Không tìm thấy thông tin gói dịch vụ.");
       return;
     }
 
@@ -523,7 +699,7 @@ const ServicePackageBookingFormPage = () => {
       .filter(Boolean);
 
     if (!finalAttachments.length) {
-      message.error(
+      toast.error(
         "Vui lòng chọn tệp đính kèm chiến dịch (tối đa 5 tệp, mỗi tệp ≤ 10MB)."
       );
       return;
@@ -537,6 +713,18 @@ const ServicePackageBookingFormPage = () => {
       startDate: campaignData.startDate,
       endDate: campaignData.endDate,
       recurrencePattern: campaignData.recurrencePattern,
+      repeatType: campaignData.repeatType,
+      livestreamHours:
+        campaignData.livestreamHours !== undefined &&
+        campaignData.livestreamHours !== null &&
+        campaignData.livestreamHours !== ""
+          ? Number(campaignData.livestreamHours)
+          : undefined,
+      livestreamAddress: campaignData.livestreamAddress,
+      permanentAddress: campaignData.permanentAddress,
+      ordererFullName: campaignData.ordererFullName,
+      ordererPhone: campaignData.ordererPhone,
+      taxCode: campaignData.taxCode || undefined,
       liveIds:
         selectedPackage === "vip" && Array.isArray(vipExtraData.assistant)
           ? vipExtraData.assistant
@@ -598,6 +786,14 @@ const ServicePackageBookingFormPage = () => {
             endDate: dayjs().add(7, "day"),
             kol: [],
             assistant: [],
+            repeatSelection: [],
+            repeatType: "",
+            livestreamHours: null,
+            livestreamAddress: "",
+            permanentAddress: "",
+            ordererFullName: "",
+            ordererPhone: "",
+            taxCode: "",
           }}
           onFinish={handleCampaignFormFinish}
         >
@@ -675,6 +871,109 @@ const ServicePackageBookingFormPage = () => {
             />
           </Form.Item>
 
+          <div className="grid gap-6 md:grid-cols-2">
+            <Form.Item
+              label="Tên người đặt"
+              name="ordererFullName"
+              rules={[
+                { required: true, message: "Vui lòng nhập tên người đặt!" },
+              ]}
+            >
+              <Input className="!h-12" placeholder="Nhập tên người đặt" />
+            </Form.Item>
+
+            <Form.Item
+              label="Số điện thoại"
+              name="ordererPhone"
+              rules={[
+                { required: true, message: "Vui lòng nhập số điện thoại!" },
+              ]}
+            >
+              <Input className="!h-12" placeholder="Nhập số điện thoại" />
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            label="Địa chỉ người đặt"
+            name="permanentAddress"
+            rules={[
+              { required: true, message: "Vui lòng nhập địa chỉ người đặt!" },
+            ]}
+          >
+            <Input className="!h-12" placeholder="Nhập địa chỉ người đặt" />
+          </Form.Item>
+
+          <Form.Item
+            label="Địa chỉ livestream"
+            name="livestreamAddress"
+            rules={[
+              { required: true, message: "Vui lòng nhập địa chỉ livestream!" },
+            ]}
+          >
+            <Input className="!h-12" placeholder="Nhập địa chỉ livestream" />
+          </Form.Item>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Form.Item
+              label="Số giờ live"
+              name="livestreamHours"
+              rules={[
+                { required: true, message: "Vui lòng nhập số giờ live!" },
+              ]}
+            >
+              <InputNumber className="!w-full !h-12" min={1} />
+            </Form.Item>
+
+            <Form.Item label="Mã thuế (không bắt buộc)" name="taxCode">
+              <Input className="!h-12" placeholder="Nhập mã số thuế (nếu có)" />
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            label="Kiểu lặp"
+            name="repeatSelection"
+            rules={[
+              {
+                validator: () =>
+                  repeatSelection.length
+                    ? Promise.resolve()
+                    : Promise.reject(new Error("Vui lòng chọn kiểu lặp")),
+              },
+            ]}
+          >
+            <Space direction="vertical" className="w-full" size={8}>
+              <Select
+                className="w-full"
+                mode="multiple"
+                allowClear
+                placeholder="Chọn: Không lặp / Hàng ngày / hoặc chọn các thứ"
+                options={repeatOptions}
+                value={repeatSelection}
+                maxTagCount="responsive"
+                onSelect={handleRepeatSelect}
+                onDeselect={handleRepeatDeselect}
+                onClear={() => setRepeatSelection([])}
+                onChange={(vals) => {
+                  if (!Array.isArray(vals)) return;
+                  if (vals.includes(REPEAT_NONE)) {
+                    setRepeatSelection([REPEAT_NONE]);
+                    return;
+                  }
+                  if (vals.includes(REPEAT_DAILY)) {
+                    setRepeatSelection([REPEAT_DAILY]);
+                    return;
+                  }
+                  setRepeatSelection(vals.filter(isDowKey));
+                }}
+              />
+              <div className="text-xs text-gray-500">{repeatHint}</div>
+            </Space>
+          </Form.Item>
+
+          <Form.Item name="repeatType" hidden>
+            <Input />
+          </Form.Item>
+
           {/* FORM TẢI TỆP MUI */}
           <Form.Item
             name="attachment"
@@ -726,6 +1025,7 @@ const ServicePackageBookingFormPage = () => {
                     type="file"
                     hidden
                     multiple
+                    accept=".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png"
                     onChange={handleFileInputChange}
                   />
                 </MuiButton>
@@ -921,6 +1221,27 @@ const ServicePackageBookingFormPage = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Tần suất triển khai">
                 {campaignData.recurrencePattern}
+              </Descriptions.Item>
+              <Descriptions.Item label="Kiểu lặp">
+                {campaignData.repeatType || "Không lặp"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số giờ live">
+                {campaignData.livestreamHours ?? "--"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ livestream">
+                {campaignData.livestreamAddress}
+              </Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ người đặt">
+                {campaignData.permanentAddress}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tên người đặt">
+                {campaignData.ordererFullName}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">
+                {campaignData.ordererPhone}
+              </Descriptions.Item>
+              <Descriptions.Item label="Mã thuế">
+                {campaignData.taxCode || "--"}
               </Descriptions.Item>
               {attachments.length > 0 && (
                 <Descriptions.Item label="Tệp đính kèm">

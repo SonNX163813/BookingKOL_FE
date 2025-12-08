@@ -1082,7 +1082,7 @@ const CampaignBookingDetailPage = () => {
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Host chính sau đàm phán
+              Host chính ưu tiên tham gia
             </p>
             {renderNameList(
               negotiatedKolNames,
@@ -1091,7 +1091,7 @@ const CampaignBookingDetailPage = () => {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Trợ Live tham gia sau đàm phán
+              Trợ Live ưu tiên tham gia
             </p>
             {renderNameList(
               negotiatedLiveNames,
@@ -1288,7 +1288,7 @@ const CampaignBookingDetailPage = () => {
                         className="mx-auto mb-3 text-indigo-500"
                       />
                       <p className="text-sm font-medium text-slate-600">
-                        Chưa có đơn booking nào
+                        Chưa có đơn nào cho chiến dịch này.
                       </p>
                       <p className="text-xs text-slate-500">
                         Khi có kết quả đàm phán, chi tiết sẽ được hiển thị tại

@@ -506,7 +506,7 @@ const HistoryBookingPackagePage = () => {
     [
       handleAcceptContract,
       openRejectModal,
-      handleCancelContract,
+      // handleCancelContract,
       handleCancelBookingRequest,
       handleViewCampaignDetail,
       isSigningContract,
