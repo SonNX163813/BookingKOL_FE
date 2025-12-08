@@ -894,7 +894,7 @@ export default function KolSingleRequestDetail() {
                     </Descriptions>
                   </>
                 ) : (
-                  <Empty description="Chưa có số liệu. Hãy nhấn 'Nhập số liệu' để lưu trước." />
+                  <Empty description="Chưa có số liệu báo cáo cho phiên livestream." />
                 )}
               </Skeleton>
             )}

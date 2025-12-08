@@ -80,8 +80,11 @@ export const API_PATHS = {
   },
   WORKTIME_ADMIN: {
     create: "/v1/availabilities/admin/worktime/create",
-
+    scheduledCreate: "/v1/availabilities/admin/scheduled-worktime/create",
     getByBooking: "/v1/availabilities/admin/booking", // + /{bookingRequestId}
+    getScheduledByBooking:
+      "/v1/availabilities/admin/scheduled-worktime/booking",
+    scheduledAssign: "/v1/availabilities/admin/scheduled-worktime/assign",
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",

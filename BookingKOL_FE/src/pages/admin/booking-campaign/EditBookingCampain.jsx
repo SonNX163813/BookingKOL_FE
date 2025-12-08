@@ -19,10 +19,18 @@ import {
   Space,
   Tag,
   Typography,
+  Upload,
   message,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
-import { ArrowLeft, Save, CalendarRange, XCircle, Layers } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  CalendarRange,
+  XCircle,
+  Layers,
+  Paperclip,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { getKolProfiles, resolveAvatarUrl } from "../../../services/kol/KolAPI";
@@ -204,6 +212,42 @@ const parseAmount = (value) => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const normalizeDecimalInput = (
+  val,
+  { maxIntDigits = 4, maxDecDigits = 2 } = {}
+) => {
+  const s = String(val ?? "")
+    .replace(/,/g, ".")
+    .replace(/[^\d.]/g, "");
+
+  if (!s) return "";
+
+  const firstDot = s.indexOf(".");
+  if (firstDot === -1) {
+    const intOnly = s.replace(/\D/g, "").slice(0, maxIntDigits);
+    return intOnly;
+  }
+
+  const intPart = s
+    .slice(0, firstDot)
+    .replace(/\D/g, "")
+    .slice(0, maxIntDigits);
+  const decPart = s
+    .slice(firstDot + 1)
+    .replace(/\D/g, "")
+    .slice(0, maxDecDigits);
+
+  return decPart ? `${intPart}.${decPart}` : intPart;
+};
+
+const parseDecimal = (value) => {
+  if (value === undefined || value === null) return undefined;
+  const raw = String(value).replace(/,/g, ".").trim();
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
 const splitDescToIntroExp = (raw) => {
   const t = String(raw || "").trim();
   if (!t) return { intro: "", experience: "" };
@@ -277,6 +321,12 @@ export default function EditBookingCampain() {
   // ✅ inline warning state (không dùng toast) + giảm lag
   const [contractTooLong, setContractTooLong] = useState(false);
   const [instTooLongMap, setInstTooLongMap] = useState({}); // { [fieldKey]: true }
+
+  // ✅ attachment
+  const [attachList, setAttachList] = useState([]);
+
+  // ✅ total computed warning
+  const [totalTooLong, setTotalTooLong] = useState(false);
 
   const screens = useBreakpoint();
   const row = location.state || {};
@@ -383,8 +433,17 @@ export default function EditBookingCampain() {
       repeatType: "",
       totalInstallments: 1,
       installments: [{ amount: "", dueDate: null }],
+
+      // ✅ new fields
+      liveHours: "",
+      unitPrice: "",
+      discountPercent: "",
+      totalAmount: "",
+      attachments: [],
+      contractAmount: "",
     });
 
+    setAttachList([]);
     setRepeatSelection([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, mode]);
@@ -430,6 +489,27 @@ export default function EditBookingCampain() {
       source?.description || ""
     );
 
+    // ✅ try map new fields if BE has them
+    const liveHours =
+      source?.liveHours ??
+      source?.hoursLive ??
+      source?.liveHour ??
+      source?.live_duration_hours ??
+      "";
+
+    const unitPrice =
+      source?.unitPrice ??
+      source?.pricePerHour ??
+      source?.unit_price ??
+      source?.unitPricePerHour ??
+      "";
+
+    const discountPercent =
+      source?.discountPercent ??
+      source?.discount ??
+      source?.discount_rate ??
+      "";
+
     form.setFieldsValue({
       campaignId: source?.campaignId || campaignId,
       intro,
@@ -448,6 +528,20 @@ export default function EditBookingCampain() {
         ? installments
         : [{ amount: "", dueDate: null }],
       repeatType: "",
+
+      // ✅ new fields
+      liveHours: liveHours
+        ? normalizeDecimalInput(liveHours, { maxIntDigits: 4, maxDecDigits: 2 })
+        : "",
+      unitPrice: unitPrice ? formatNumberWithCommas(unitPrice) : "",
+      discountPercent: discountPercent
+        ? normalizeDecimalInput(discountPercent, {
+            maxIntDigits: 3,
+            maxDecDigits: 2,
+          })
+        : "",
+      totalAmount: "", // computed below
+      attachments: [],
     });
 
     setRepeatSelection(parseRepeatTypeTextToSelection(repeatTypeText));
@@ -602,8 +696,47 @@ export default function EditBookingCampain() {
     return d.minute(0).second(0);
   };
 
+  // ✅ watchers
   const watchInstallments = Form.useWatch("installments", form);
   const watchContractAmountRaw = Form.useWatch("contractAmount", form);
+
+  const watchLiveHoursRaw = Form.useWatch("liveHours", form);
+  const watchUnitPriceRaw = Form.useWatch("unitPrice", form);
+  const watchDiscountRaw = Form.useWatch("discountPercent", form);
+
+  // ✅ compute totalAmount from (hours * unitPrice) * (1 - discount/100)
+  useEffect(() => {
+    const hours = parseDecimal(watchLiveHoursRaw);
+    const unit = parseAmount(watchUnitPriceRaw);
+    const disc = parseDecimal(watchDiscountRaw);
+
+    const hasHours =
+      typeof hours === "number" && !Number.isNaN(hours) && hours > 0;
+    const hasUnit = typeof unit === "number" && !Number.isNaN(unit) && unit > 0;
+
+    if (!hasHours || !hasUnit) {
+      // create mode: clear total when missing inputs
+      if (mode === "create") {
+        form.setFieldValue("totalAmount", "");
+      }
+      setTotalTooLong(false);
+      return;
+    }
+
+    const safeDisc =
+      typeof disc === "number" && Number.isFinite(disc) ? disc : 0;
+    const d = Math.min(100, Math.max(0, safeDisc));
+
+    const total = Math.round(hours * unit * (1 - d / 100)); // VND => làm tròn
+    const digits = String(total).replace(/\D/g, "");
+    setTotalTooLong(digits.length > 13);
+
+    form.setFieldValue(
+      "totalAmount",
+      formatNumberWithCommas(digits.slice(0, 13))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchLiveHoursRaw, watchUnitPriceRaw, watchDiscountRaw, mode]);
 
   const sumState = useMemo(() => {
     const contractAmount = parseAmount(watchContractAmountRaw);
@@ -688,6 +821,17 @@ export default function EditBookingCampain() {
         values.experience
       );
 
+      // ✅ new fields
+      const liveHours = parseDecimal(values.liveHours);
+      const unitPrice = parseAmount(values.unitPrice);
+      const discountPercent = parseDecimal(values.discountPercent);
+      const totalAmount = parseAmount(values.totalAmount);
+
+      const attachmentName =
+        Array.isArray(values.attachments) && values.attachments[0]
+          ? values.attachments[0]?.name
+          : undefined;
+
       if (mode === "create") {
         const bookingPayload = {
           campaignId: values.campaignId,
@@ -695,9 +839,19 @@ export default function EditBookingCampain() {
           repeatType: values.repeatType || undefined,
           startAt: values.startAt,
           repeatUntil: values.repeatUntil,
-          contractAmount: values.contractAmount,
+          contractAmount: values.contractAmount, // giữ nguyên như hiện tại
+
           kolIds: values.kolIds,
           liveIds: values.liveIds,
+
+          // ✅ add new fields (BE có thể ignore nếu chưa hỗ trợ)
+          liveHours: typeof liveHours === "number" ? liveHours : undefined,
+          unitPrice: typeof unitPrice === "number" ? unitPrice : undefined,
+          discountPercent:
+            typeof discountPercent === "number" ? discountPercent : undefined,
+          totalAmount:
+            typeof totalAmount === "number" ? totalAmount : undefined,
+          attachmentName,
         };
 
         const bookingResult = await adminCreateBookingFromCampaign(
@@ -778,7 +932,17 @@ export default function EditBookingCampain() {
             ? dayjs(values.repeatUntil).format("YYYY-MM-DD")
             : undefined,
           contractAmount: parseAmount(values.contractAmount) ?? 0,
-          contractFile: "", // nếu BE bắt buộc field này thì để string rỗng; có upload file thì set sau
+
+          // ✅ add new fields (BE có thể ignore nếu chưa hỗ trợ)
+          liveHours: typeof liveHours === "number" ? liveHours : undefined,
+          unitPrice: typeof unitPrice === "number" ? unitPrice : undefined,
+          discountPercent:
+            typeof discountPercent === "number" ? discountPercent : undefined,
+          totalAmount:
+            typeof totalAmount === "number" ? totalAmount : undefined,
+          attachmentName,
+
+          contractFile: "", // nếu BE bắt buộc field này thì để string rỗng
           kolIds: Array.isArray(values.kolIds) ? values.kolIds : [],
           liveIds: Array.isArray(values.liveIds) ? values.liveIds : [],
         },
@@ -1088,7 +1252,162 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ Giới thiệu (bắt buộc) */}
+              {/* ✅ NEW: Số giờ live */}
+              <Col xs={24} md={8}>
+                <Form.Item
+                  label="Số giờ live"
+                  name="liveHours"
+                  normalize={(val) =>
+                    normalizeDecimalInput(val, {
+                      maxIntDigits: 4,
+                      maxDecDigits: 2,
+                    })
+                  }
+                  rules={[
+                    { required: true, message: "Bắt buộc" },
+                    {
+                      validator: (_, v) => {
+                        const n = parseDecimal(v);
+                        if (n === undefined) return Promise.resolve();
+                        if (n <= 0)
+                          return Promise.reject(
+                            new Error("Số giờ live phải > 0")
+                          );
+                        if (n > 9999.99)
+                          return Promise.reject(
+                            new Error("Số giờ live quá lớn")
+                          );
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="VD: 2 hoặc 2.5" inputMode="decimal" />
+                </Form.Item>
+              </Col>
+
+              {/* ✅ NEW: Đơn giá (VND/giờ) */}
+              <Col xs={24} md={8}>
+                <Form.Item
+                  label="Đơn giá (VND/giờ)"
+                  name="unitPrice"
+                  normalize={(val) => {
+                    const digits = String(val || "").replace(/\D/g, "");
+                    const limited = digits.slice(0, 13);
+                    return formatNumberWithCommas(limited);
+                  }}
+                  rules={[
+                    { required: true, message: "Bắt buộc" },
+                    {
+                      validator: (_, v) => {
+                        const raw = String(v || "")
+                          .replace(/,/g, "")
+                          .trim();
+                        if (!raw) return Promise.resolve();
+                        if (!/^\d+$/.test(raw))
+                          return Promise.reject(
+                            new Error("Đơn giá không hợp lệ")
+                          );
+                        if (raw.length > 13)
+                          return Promise.reject(
+                            new Error("Chỉ tối đa 13 chữ số")
+                          );
+                        if (Number(raw) <= 0)
+                          return Promise.reject(new Error("Đơn giá phải > 0"));
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="VD: 500,000" inputMode="numeric" />
+                </Form.Item>
+              </Col>
+
+              {/* ✅ NEW: Giảm giá (%) */}
+              <Col xs={24} md={8}>
+                <Form.Item
+                  label="Giảm giá (%)"
+                  name="discountPercent"
+                  normalize={(val) =>
+                    normalizeDecimalInput(val, {
+                      maxIntDigits: 3,
+                      maxDecDigits: 2,
+                    })
+                  }
+                  rules={[
+                    {
+                      validator: (_, v) => {
+                        if (
+                          v === undefined ||
+                          v === null ||
+                          String(v).trim() === ""
+                        )
+                          return Promise.resolve();
+                        const n = parseDecimal(v);
+                        if (n === undefined)
+                          return Promise.reject(
+                            new Error("Giảm giá không hợp lệ")
+                          );
+                        if (n < 0 || n > 100)
+                          return Promise.reject(
+                            new Error("Giảm giá phải từ 0 - 100")
+                          );
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="VD: 10 hoặc 10.5" inputMode="decimal" />
+                </Form.Item>
+              </Col>
+
+              {/* ✅ NEW: Tổng tiền (computed) */}
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Tổng tiền (tự tính)"
+                  name="totalAmount"
+                  validateStatus={totalTooLong ? "error" : undefined}
+                  help={
+                    totalTooLong
+                      ? "Tổng tiền vượt quá 13 chữ số (đang bị cắt bớt)"
+                      : undefined
+                  }
+                >
+                  <Input
+                    readOnly
+                    placeholder="Tự động tính từ: giờ * đơn giá * (1 - %giảm)"
+                  />
+                </Form.Item>
+              </Col>
+
+              {/* ✅ NEW: Tệp đính kèm */}
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Tệp đính kèm"
+                  name="attachments"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) =>
+                    Array.isArray(e) ? e : e?.fileList
+                  }
+                >
+                  <Upload
+                    multiple={false}
+                    maxCount={1}
+                    beforeUpload={() => false}
+                    fileList={attachList}
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    onChange={(info) => {
+                      const next = (info?.fileList || []).slice(-1);
+                      setAttachList(next);
+                      form.setFieldValue("attachments", next);
+                    }}
+                  >
+                    <Button icon={<Paperclip size={16} />}>Chọn tệp</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              {/* ✅ Giới thiệu */}
               <Col xs={24}>
                 <Form.Item label="Mô tả chiến dịch" name="intro">
                   <Input.TextArea
@@ -1098,8 +1417,6 @@ export default function EditBookingCampain() {
                   />
                 </Form.Item>
               </Col>
-
-              {/* ✅ Kinh nghiệm (bắt buộc) */}
 
               {/* ✅ Contract amount (bắt buộc) + báo lỗi dưới input + giảm lag */}
               <Col xs={24} md={12}>

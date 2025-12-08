@@ -5,8 +5,6 @@ import { API_PATHS } from "../../constants/apiPath";
 
 const CREATE_PATH = API_PATHS.BOOKING_CAMPAIGN.create;
 
-// ✅ nếu bạn đã thêm API_PATHS.BOOKING_CAMPAIGN.edit thì dùng builder
-// nếu chưa thêm, nó sẽ fallback đúng path bạn nói
 const buildEditUrl = (bookingRequestId) => {
   const builder = API_PATHS?.BOOKING_CAMPAIGN?.edit;
   if (typeof builder === "function") return builder(bookingRequestId);
@@ -17,6 +15,7 @@ const buildEditUrl = (bookingRequestId) => {
 const toISO = (v) => {
   if (!v) return undefined;
 
+  // dayjs object / antd date obj (has toDate)
   if (v && typeof v.toDate === "function") {
     const d = v.toDate();
     return d instanceof Date && !Number.isNaN(d.getTime())
@@ -54,18 +53,44 @@ const toAmountNumber = (v) => {
 
 const toIdArray = (v) => {
   if (!v) return undefined;
-  const a = Array.isArray(v) ? v : String(v).split(/[,\s]+/);
-  const ids = a.map((s) => String(s).trim()).filter(Boolean);
+
+  const arr = Array.isArray(v) ? v : [v];
+
+  const ids = arr
+    .flatMap((item) => {
+      if (item == null) return [];
+
+      // string/number
+      if (typeof item === "string" || typeof item === "number") {
+        return [String(item).trim()];
+      }
+
+      // object from Select labelInValue / option / entity
+      if (typeof item === "object") {
+        const candidate = item.value ?? item.id ?? item.key;
+        return candidate ? [String(candidate).trim()] : [];
+      }
+
+      return [String(item).trim()];
+    })
+    .filter(Boolean);
+
   return ids.length ? Array.from(new Set(ids)) : undefined;
 };
 
 const stripEmpty = (raw) =>
   Object.entries(raw).reduce((acc, [key, value]) => {
     if (value === undefined || value === null) return acc;
+    if (typeof value === "string" && value.trim() === "") return acc;
     if (Array.isArray(value) && value.length === 0) return acc;
     acc[key] = value;
     return acc;
   }, {});
+
+const isFileLike = (v) =>
+  typeof File !== "undefined" && v instanceof File
+    ? true
+    : typeof Blob !== "undefined" && v instanceof Blob;
 
 /** POST /v1/admin/bookings/create */
 export const adminCreateBookingFromCampaign = async (
@@ -78,6 +103,8 @@ export const adminCreateBookingFromCampaign = async (
     status: body?.status, // optional
     repeatType: body?.repeatType,
     startAt: toISO(body?.startAt),
+    // ⚠️ nếu API create có endAt thì mới thêm:
+    // endAt: toISO(body?.endAt),
     repeatUntil: toYmd(body?.repeatUntil),
     contractAmount: toAmountNumber(body?.contractAmount),
     kolIds: toIdArray(body?.kolIds),
@@ -108,22 +135,43 @@ export const adminEditBookingRequest = async (
   const raw = {
     description: body?.description,
     repeatType: body?.repeatType,
-    dayOfWeek: body?.dayOfWeek,
+    dayOfWeek: body?.dayOfWeek, // nếu BE cần number thì bạn convert ở đây
     startAt: toISO(body?.startAt),
     endAt: toISO(body?.endAt),
     repeatUntil: toYmd(body?.repeatUntil),
     contractAmount: toAmountNumber(body?.contractAmount),
-    contractFile: body?.contractFile,
+    contractFile: body?.contractFile, // string URL hoặc File
     kolIds: toIdArray(body?.kolIds),
     liveIds: toIdArray(body?.liveIds),
   };
 
   const payload = stripEmpty(raw);
 
+  // ✅ Nếu contractFile là File/Blob -> gửi multipart/form-data
+  let data = payload;
+  let config = signal ? { signal } : undefined;
+
+  if (payload.contractFile && isFileLike(payload.contractFile)) {
+    const fd = new FormData();
+    Object.entries(payload).forEach(([k, v]) => {
+      if (Array.isArray(v)) v.forEach((x) => fd.append(k, x));
+      else fd.append(k, v);
+    });
+
+    data = fd;
+    config = {
+      ...(config ?? {}),
+      headers: {
+        ...(config?.headers ?? {}),
+        "Content-Type": "multipart/form-data",
+      },
+    };
+  }
+
   const res = await update({
     url: buildEditUrl(bookingRequestId),
-    data: payload,
-    config: signal ? { signal } : undefined,
+    data,
+    config,
   });
 
   return res?.data ?? res ?? null;
