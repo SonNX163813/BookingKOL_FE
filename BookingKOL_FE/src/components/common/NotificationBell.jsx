@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -28,11 +28,58 @@ import { toast } from "react-toastify";
 const formatTimestamp = (value) => {
   if (!value) return "";
 
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return String(value);
+  // Parse dd/MM/yyyy HH:mm:ss theo giờ Việt Nam (UTC+7)
+  const parseVietnamTime = (raw) => {
+    if (raw instanceof Date) return raw;
+    if (typeof raw === "number") return new Date(raw);
 
+    if (typeof raw === "string") {
+      const normalized = raw.replace("T", " ").trim();
+      const match = normalized.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/
+      );
+
+      if (match) {
+        const [, day, month, year, hour, minute, second] = match;
+        const utcTime = Date.UTC(
+          Number(year),
+          Number(month) - 1,
+          Number(day),
+          Number(hour) - 7, // convert từ UTC+7 sang UTC
+          Number(minute),
+          Number(second || 0)
+        );
+        return new Date(utcTime);
+      }
+
+      const parsed = new Date(normalized);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+
+    return null;
+  };
+
+  const date = parseVietnamTime(value);
+  if (!date) return String(value);
+
+  const formatAbsoluteVi = (d) =>
+    new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    }).format(d);
+
+  const time = date.getTime();
   const now = Date.now();
   const diffMs = now - time;
+
+  if (diffMs < 0) return formatAbsoluteVi(date);
+
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffSeconds / 60);
   const diffHours = Math.floor(diffMinutes / 60);
@@ -110,18 +157,13 @@ const NotificationBell = ({
         return;
       }
 
-      // ❌ BỎ đoạn này đi, để không dừng hẳn
-      // if (failureCountRef.current >= MAX_FAILURES) return;
-
       if (initial) setLoading(true);
 
       try {
         const data = await fetchNotifications();
         if (!mounted) return;
 
-        // ✅ thành công → reset đếm lỗi
         failureCountRef.current = 0;
-
         toastMutedRef.current = false;
 
         const list = Array.isArray(data)
@@ -131,16 +173,12 @@ const NotificationBell = ({
           : [];
 
         setNotifications(list);
-
-        // thành công → gọi lại với pollInterval bình thường
         scheduleNext(pollInterval);
       } catch (error) {
         console.error("Lỗi khi tải thông báo", error);
 
-        // tăng số lần lỗi
         failureCountRef.current += 1;
 
-        // ✅ CHỈ show toast trong 3 lần đầu
         // if (!toastMutedRef.current && failureCountRef.current <= MAX_FAILURES) {
         //   toast.error("Không thể tải thông báo, vui lòng thử lại sau.");
         // }
@@ -149,7 +187,6 @@ const NotificationBell = ({
           toastMutedRef.current = true;
         }
 
-        // vẫn tiếp tục backoff & poll tiếp
         const backoffDelay = Math.min(
           pollInterval * 2 ** failureCountRef.current,
           MAX_BACKOFF
@@ -270,7 +307,6 @@ const NotificationBell = ({
         keepMounted
         anchorOrigin={anchorOrigin}
         transformOrigin={transformOrigin}
-        // ✅ Thay thế hoàn toàn PaperProps + MenuListProps
         slotProps={{
           paper: {
             sx: {
@@ -299,8 +335,6 @@ const NotificationBell = ({
             justifyContent: "space-between",
             gap: 1,
             p: 2,
-            // background: "linear-gradient(135deg,#0ea5e9,#6366f1)",
-            // color: "#fff",
           }}
         >
           <Box>

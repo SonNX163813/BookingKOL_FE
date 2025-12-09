@@ -79,6 +79,12 @@ const composeCampaignDuration = (start, end) => {
   return `${startLabel} → ${endLabel}`;
 };
 
+const safeDisplay = (value, placeholder = "--") => {
+  if (value === null || value === undefined) return placeholder;
+  if (typeof value === "string" && value.trim() === "") return placeholder;
+  return value;
+};
+
 const PACKAGE_STATUS_FILTER_OPTIONS = BOOKING_STATUS_OPTIONS.filter((option) =>
   ["REQUESTED", "NEGOTIATING", "ACCEPTED"].includes(option.value)
 );
@@ -829,6 +835,48 @@ const HistoryBookingPackagePage = () => {
                             </span>
                             <span className="text-right font-semibold text-indigo-600">
                               {record?.objective ?? "--"}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số giờ live (giờ)
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.livestreamHours)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Kiểu lặp</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.repeatType)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Địa điểm livestream
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.livestreamAddress)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Người đặt</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.ordererFullName)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số điện thoại người đặt
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.ordererPhone)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Mã thuế</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.taxCode)}
                             </span>
                           </div>
                         </div>

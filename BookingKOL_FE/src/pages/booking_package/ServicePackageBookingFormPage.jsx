@@ -150,6 +150,25 @@ const isValidFileType = (file) => {
   return ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
 };
 
+// Không cho chọn ngày quá khứ
+const disablePastDate = (current) =>
+  current && current < dayjs().startOf("day");
+
+// Chỉ cho gõ số trong Input + giới hạn tối đa chữ số
+const handleNumberKeyPress = (e, maxLength) => {
+  if (!/[0-9]/.test(e.key)) {
+    e.preventDefault();
+    return;
+  }
+  if (typeof maxLength === "number") {
+    const value = (e.target.value || "").toString();
+    const digits = value.replace(/\D/g, "");
+    if (digits.length >= maxLength) {
+      e.preventDefault();
+    }
+  }
+};
+
 /** Tag render: avatar nhỏ + tên, không hiện id */
 const createTagRender = (options) => (tagProps) => {
   const { value, closable, onClose } = tagProps;
@@ -550,6 +569,7 @@ const ServicePackageBookingFormPage = () => {
       setVipExtraData({});
     }
     setCurrent(campaignStepIndex);
+    handleScrollToForm();
   };
 
   const handleCampaignFormFinish = (values) => {
@@ -802,10 +822,12 @@ const ServicePackageBookingFormPage = () => {
             name="campaignName"
             rules={[
               { required: true, message: "Vui lòng nhập tên chiến dịch!" },
+              { max: 100, message: "Tối đa 100 ký tự." },
             ]}
           >
             <Input
               className="!h-12"
+              maxLength={100}
               placeholder="VD: Chiến dịch tháng 8 - Ra mắt sản phẩm mới"
             />
           </Form.Item>
@@ -815,10 +837,12 @@ const ServicePackageBookingFormPage = () => {
             name="objective"
             rules={[
               { required: true, message: "Vui lòng nhập mục tiêu chiến dịch!" },
+              { max: 100, message: "Tối đa 100 ký tự." },
             ]}
           >
             <Input
               className="!h-12"
+              maxLength={100}
               placeholder="VD: Tăng nhận diện thương hiệu và thúc đẩy doanh số"
             />
           </Form.Item>
@@ -831,6 +855,18 @@ const ServicePackageBookingFormPage = () => {
                 required: true,
                 message: "Vui lòng nhập ngân sách mục tiêu!",
               },
+              {
+                validator: (_, value) => {
+                  if (value == null || value === "") return Promise.resolve();
+                  const digits = String(value).replace(/\D/g, "");
+                  if (digits.length > 13) {
+                    return Promise.reject(
+                      new Error("Ngân sách chỉ được tối đa 13 chữ số.")
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              },
             ]}
           >
             <InputNumber
@@ -840,6 +876,8 @@ const ServicePackageBookingFormPage = () => {
               }
               parser={(value) => (value ? value.replace(/,/g, "") : "")}
               min={0}
+              max={9999999999999} // 13 chữ số
+              onKeyPress={(e) => handleNumberKeyPress(e, 13)}
             />
           </Form.Item>
 
@@ -851,7 +889,11 @@ const ServicePackageBookingFormPage = () => {
                 { required: true, message: "Vui lòng chọn ngày bắt đầu!" },
               ]}
             >
-              <DatePicker className="w-full !h-12" format="DD/MM/YYYY" />
+              <DatePicker
+                className="w-full !h-12"
+                format="DD/MM/YYYY"
+                disabledDate={disablePastDate}
+              />
             </Form.Item>
             <Form.Item
               label="Ngày kết thúc"
@@ -860,16 +902,25 @@ const ServicePackageBookingFormPage = () => {
                 { required: true, message: "Vui lòng chọn ngày kết thúc!" },
               ]}
             >
-              <DatePicker className="w-full !h-12" format="DD/MM/YYYY" />
+              <DatePicker
+                className="w-full !h-12"
+                format="DD/MM/YYYY"
+                disabledDate={disablePastDate}
+              />
             </Form.Item>
           </div>
 
-          <Form.Item label="Tần suất triển khai" name="recurrencePattern">
+          {/* <Form.Item
+            label="Tần suất triển khai"
+            name="recurrencePattern"
+            rules={[{ max: 100, message: "Tối đa 100 ký tự." }]}
+          >
             <Input
               className="!h-12"
+              maxLength={100}
               placeholder="VD: Hàng tuần, Hàng tháng, hoặc Không lặp lại"
             />
-          </Form.Item>
+          </Form.Item> */}
 
           <div className="grid gap-6 md:grid-cols-2">
             <Form.Item
@@ -877,9 +928,14 @@ const ServicePackageBookingFormPage = () => {
               name="ordererFullName"
               rules={[
                 { required: true, message: "Vui lòng nhập tên người đặt!" },
+                { max: 100, message: "Tối đa 100 ký tự." },
               ]}
             >
-              <Input className="!h-12" placeholder="Nhập tên người đặt" />
+              <Input
+                className="!h-12"
+                maxLength={100}
+                placeholder="Nhập tên người đặt"
+              />
             </Form.Item>
 
             <Form.Item
@@ -887,9 +943,19 @@ const ServicePackageBookingFormPage = () => {
               name="ordererPhone"
               rules={[
                 { required: true, message: "Vui lòng nhập số điện thoại!" },
+                {
+                  pattern: /^0\d{9}$/,
+                  message:
+                    "Số điện thoại phải là số Việt Nam 10 chữ số và bắt đầu bằng 0.",
+                },
               ]}
             >
-              <Input className="!h-12" placeholder="Nhập số điện thoại" />
+              <Input
+                className="!h-12"
+                placeholder="Nhập số điện thoại"
+                maxLength={10}
+                onKeyPress={(e) => handleNumberKeyPress(e, 10)}
+              />
             </Form.Item>
           </div>
 
@@ -898,9 +964,14 @@ const ServicePackageBookingFormPage = () => {
             name="permanentAddress"
             rules={[
               { required: true, message: "Vui lòng nhập địa chỉ người đặt!" },
+              { max: 100, message: "Tối đa 100 ký tự." },
             ]}
           >
-            <Input className="!h-12" placeholder="Nhập địa chỉ người đặt" />
+            <Input
+              className="!h-12"
+              maxLength={100}
+              placeholder="Nhập địa chỉ người đặt"
+            />
           </Form.Item>
 
           <Form.Item
@@ -908,9 +979,14 @@ const ServicePackageBookingFormPage = () => {
             name="livestreamAddress"
             rules={[
               { required: true, message: "Vui lòng nhập địa chỉ livestream!" },
+              { max: 100, message: "Tối đa 100 ký tự." },
             ]}
           >
-            <Input className="!h-12" placeholder="Nhập địa chỉ livestream" />
+            <Input
+              className="!h-12"
+              maxLength={100}
+              placeholder="Nhập địa chỉ livestream"
+            />
           </Form.Item>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -919,19 +995,53 @@ const ServicePackageBookingFormPage = () => {
               name="livestreamHours"
               rules={[
                 { required: true, message: "Vui lòng nhập số giờ live!" },
+                {
+                  validator: (_, value) => {
+                    if (value == null || value === "") {
+                      return Promise.resolve();
+                    }
+                    if (Number(value) > 5000) {
+                      return Promise.reject(
+                        new Error("Số giờ live tối đa là 5000.")
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                },
               ]}
             >
-              <InputNumber className="!w-full !h-12" min={1} />
+              <InputNumber
+                className="!w-full !h-12"
+                min={1}
+                max={5000}
+                onKeyPress={(e) => handleNumberKeyPress(e, 4)}
+              />
             </Form.Item>
 
-            <Form.Item label="Mã thuế (không bắt buộc)" name="taxCode">
-              <Input className="!h-12" placeholder="Nhập mã số thuế (nếu có)" />
+            <Form.Item
+              label="Mã thuế (không bắt buộc)"
+              name="taxCode"
+              rules={[
+                { max: 13, message: "Mã số thuế tối đa 13 ký tự." },
+                {
+                  pattern: /^[0-9]*$/,
+                  message: "Mã số thuế chỉ được chứa chữ số.",
+                },
+              ]}
+            >
+              <Input
+                className="!h-12"
+                maxLength={13}
+                placeholder="Nhập mã số thuế (nếu có)"
+                onKeyPress={(e) => handleNumberKeyPress(e, 13)}
+              />
             </Form.Item>
           </div>
 
           <Form.Item
             label="Kiểu lặp"
             name="repeatSelection"
+            required
             rules={[
               {
                 validator: () =>
