@@ -507,8 +507,7 @@ const ServicePackageBookingFormPage = () => {
     ];
   }, []);
 
-  const repeatHint =
-    buildRepeatTypeTextFromSelection(repeatSelection) || "Không lặp";
+  const repeatHint = buildRepeatTypeTextFromSelection(repeatSelection);
 
   useEffect(() => {
     form.setFieldValue("repeatSelection", repeatSelection);
