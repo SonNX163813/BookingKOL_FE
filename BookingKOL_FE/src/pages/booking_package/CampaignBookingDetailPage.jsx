@@ -854,7 +854,7 @@ const CampaignBookingDetailPage = () => {
       }
 
       if (!workTimes.length) {
-        return <Empty description="Ch’øa cA3 ca livestream nAÿo" />;
+        return <Empty description="Chưa có thông tin thống kê Livestream" />;
       }
 
       return (
@@ -1226,6 +1226,62 @@ const CampaignBookingDetailPage = () => {
                       </p>
                       <p className="mt-1 text-base text-slate-900">
                         {detail?.createdByEmail ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Số giờ livestream
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.livestreamHours ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Kiểu lặp
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.repeatType ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Địa điểm livestream
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.livestreamAddress ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Địa chỉ người đặt
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.permanentAddress ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Tên người đặt
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.ordererFullName ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Số điện thoại người đặt
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.ordererPhone ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Mã thuế
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.taxCode ?? "--"}
                       </p>
                     </div>
                   </div>
