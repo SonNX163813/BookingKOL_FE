@@ -1,4 +1,3 @@
-// src/pages/auth/RegisterPage.jsx
 import { useState, useEffect, useMemo, useRef } from "react";
 import "./login.css"; // style chung (login + register)
 import "./register.css"; // style riêng cho Register
@@ -6,7 +5,7 @@ import logo from "../../assets/logocty.png";
 import googleLogo from "../../assets/google_logo.svg.png";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { API_BASE } from "../../utils/config"; // ✅ dùng chung như Login
+import { API_BASE, BASE_URL } from "../../utils/config"; // ✅ dùng chung như Login
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -34,6 +33,56 @@ export default function RegisterPage() {
   const location = useLocation();
   const backTo = location.state?.from?.pathname || "/";
 
+  // ================= GOOGLE OAUTH CALLBACK (GIỐNG LOGIN) ================= //
+  useEffect(() => {
+    if (token) return; // đã có token thì không xử lý lại
+
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    const rawUserData = params.get("user_data");
+
+    if (!accessToken || !rawUserData) return;
+
+    let parsedUser = null;
+    try {
+      const decodedUserData = decodeURIComponent(rawUserData);
+      parsedUser = JSON.parse(decodedUserData);
+    } catch (err) {
+      parsedUser = null;
+    }
+
+    const user = {
+      id: parsedUser?.id ?? null,
+      email: parsedUser?.email ?? "",
+      roles: parsedUser?.roles ?? [],
+    };
+
+    try {
+      sessionStorage.setItem("auth_token", accessToken);
+      sessionStorage.setItem("auth_user", JSON.stringify(user));
+    } catch (err) {
+      // ignore storage errors
+    }
+
+    dispatch({
+      type: "LOGIN_SUCCESS",
+      payload: {
+        user,
+        token: accessToken,
+        roles: user.roles,
+        remember: false, // giống LoginPage khi login bằng Google
+      },
+    });
+
+    // xoá query trên URL sau khi xử lý
+    const cleanedUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, "", cleanedUrl);
+
+    // sau khi đăng ký + login bằng Google → vào trang chủ (giống Login)
+    navigate("/", { replace: true });
+  }, [dispatch, navigate, token]);
+  // ======================================================================= //
+
   // ✅ Nếu đã đăng nhập (có token), tự điều hướng khỏi trang register
   useEffect(() => {
     if (token) {
@@ -42,10 +91,8 @@ export default function RegisterPage() {
   }, [token, backTo, navigate]);
 
   // ====== PASSWORD RULES / HINTS ======
-  // Regex gốc của bạn
   const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
 
-  // Kiểm tra chi tiết từng tiêu chí để hiển thị gợi ý trực quan
   const pwdRules = useMemo(() => {
     const len = password.length >= 8;
     const lower = /[a-z]/.test(password);
@@ -56,7 +103,6 @@ export default function RegisterPage() {
     return { len, lower, upper, digit, special, passed };
   }, [password]);
 
-  // Nhãn và thanh “độ mạnh” (validation vẫn theo regex strong)
   const strengthLabel = useMemo(() => {
     if (!password) return "";
     if (pwdRules.passed <= 2) return "Yếu";
@@ -69,7 +115,6 @@ export default function RegisterPage() {
     [password, pwdRules.passed]
   );
 
-  // Helpers
   async function safeJson(res) {
     let raw = "";
     try {
@@ -107,7 +152,6 @@ export default function RegisterPage() {
 
     setSubmitting(true);
 
-    // ✅ Chuẩn hoá endpoint như Login: ${API_BASE}/v1/...
     const url = `${API_BASE}/v1/register/brand`;
     const payload = { email, password, fullName };
 
@@ -115,7 +159,6 @@ export default function RegisterPage() {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // credentials: "include",
         body: JSON.stringify(payload),
       });
 
@@ -139,7 +182,6 @@ export default function RegisterPage() {
 
         setServerErr(String(finalMsg || "Đăng ký thất bại."));
 
-        // Field-level errors
         const fieldErr =
           data?.errors || data?.fieldErrors || data?.validationErrors || null;
         if (fieldErr && typeof fieldErr === "object") {
@@ -150,7 +192,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // 🎯 Thành công: chuyển qua trang thông báo xác minh email
       const search = new URLSearchParams({ email });
       navigate(`/verify-email?${search.toString()}`, { replace: true });
     } catch (err) {
@@ -159,8 +200,9 @@ export default function RegisterPage() {
     }
   };
 
+  // ✅ Google đăng ký: dùng cùng endpoint như Login
   const handleGoogleSignup = () => {
-    alert("UI-only: Gắn đăng ký với Google sau.");
+    window.location.href = `${BASE_URL}/v1/oauth2/authorization/google`;
   };
 
   // ===== Inline SVG Icons (không cần lib) =====
@@ -241,7 +283,6 @@ export default function RegisterPage() {
     </svg>
   );
 
-  // Item hiển thị một tiêu chí mật khẩu
   const RuleItem = ({ ok, text }) => (
     <li
       style={{
