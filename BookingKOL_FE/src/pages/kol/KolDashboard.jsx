@@ -4,6 +4,10 @@ import viVN from "antd/locale/vi_VN";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import { useKolDashboardSummary } from "../../hook/kol/useKolDashboardSummary";
+import {
+  BOOKING_STATUS_LABEL,
+  STATUS_TAG_COLOR,
+} from "../../constants/mySingleBookingStatuses";
 
 const { RangePicker } = DatePicker;
 
@@ -47,23 +51,39 @@ const formatHour = (value) => `${formatNumber(value)}h`;
 const formatDateTime = (value) =>
   value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "--";
 
-const statusTone = {
-  COMPLETED: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  IN_PROGRESS: "bg-sky-100 text-sky-700 border-sky-200",
-  UPCOMING: "bg-amber-100 text-amber-700 border-amber-200",
+const TAG_COLOR_TO_HEX = {
+  default: "#cbd5e1",
+  processing: "#4f8dfd",
+  cyan: "#06b6d4",
+  success: "#22c55e",
+  blue: "#3b82f6",
+  gold: "#fbbf24",
+  magenta: "#d946ef",
+  error: "#ef4444",
+  purple: "#a855f7",
+  volcano: "#fb923c",
+  warning: "#f59e0b",
 };
 
-const getStatusTone = (status) =>
-  statusTone[status?.toUpperCase()] ||
-  "bg-slate-100 text-slate-700 border-slate-200";
+const normalizeStatusKey = (status) =>
+  status ? status.toString().trim().toUpperCase() : "";
+
+const getStatusColor = (statusKey) => {
+  const tagColor = STATUS_TAG_COLOR[statusKey];
+  if (tagColor && TAG_COLOR_TO_HEX[tagColor]) return TAG_COLOR_TO_HEX[tagColor];
+  return "#cbd5e1";
+};
 
 const StatusBadge = ({ status }) => (
   <span
-    className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusTone(
-      status
-    )}`}
+    className="px-2.5 py-1 rounded-full text-xs font-semibold border"
+    style={{
+      color: getStatusColor(normalizeStatusKey(status)),
+      borderColor: getStatusColor(normalizeStatusKey(status)),
+      backgroundColor: `${getStatusColor(normalizeStatusKey(status))}1a`,
+    }}
   >
-    {status || "N/A"}
+    {BOOKING_STATUS_LABEL[normalizeStatusKey(status)] || status || "N/A"}
   </span>
 );
 
@@ -86,9 +106,8 @@ const WorkTimeCard = ({ item }) => (
   <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 flex flex-col gap-2">
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-semibold text-slate-900">
-        {item.bookingId
-          ? `Booking ${item.bookingId.slice(0, 8)}...`
-          : "Đặt lịch"}
+        {/* {item.bookingId ? `Booking request` : "Đặt lịch"} */}
+        {item.requestNumber ? `Đơn đặt lịch` : "Đơn đặt lịch"}
       </p>
       <StatusBadge status={item.status} />
     </div>
@@ -315,7 +334,9 @@ const KolDashboard = () => {
                       <p className="text-2xl font-semibold text-slate-900">
                         {metric.value}
                       </p>
-                      <p className="text-[13px] text-slate-600">{metric.hint}</p>
+                      <p className="text-[13px] text-slate-600">
+                        {metric.hint}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -356,9 +377,9 @@ const KolDashboard = () => {
                       <p className="text-sm font-semibold text-slate-900">
                         Lịch sắp tới
                       </p>
-                      <p className="text-xs text-slate-500">
+                      {/* <p className="text-xs text-slate-500">
                         Công việc đã nhận trong tương lai gần
-                      </p>
+                      </p> */}
                     </div>
                     <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
                       {formatNumber(summary.upcomingWorkTimes.length)} lịch
@@ -384,11 +405,11 @@ const KolDashboard = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
-                        Lịch vừa thực hiện
+                        Lịch đang thực hiện
                       </p>
-                      <p className="text-xs text-slate-500">
+                      {/* <p className="text-xs text-slate-500">
                         Đối soát nhanh các buổi đã hoàn thành gần đây
-                      </p>
+                      </p> */}
                     </div>
                     <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
                       {formatNumber(summary.recentWorkTimes.length)} lịch
@@ -453,14 +474,19 @@ const KolDashboard = () => {
                   {summary.completedWorkTimes.length ? (
                     summary.completedWorkTimes.slice(0, 4).map((item) => (
                       <div
-                        key={item.kolWorkTimeId || item.bookingId}
+                        key={
+                          item.kolWorkTimeId ||
+                          item.bookingId ||
+                          item.requestNumber
+                        }
                         className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100"
                       >
                         <div>
                           <p className="text-sm font-semibold text-slate-900">
-                            {item.bookingId
+                            {/* {item.bookingId
                               ? `Booking ${item.bookingId.slice(0, 6)}...`
-                              : "Lịch đã hoàn thành"}
+                              : "Lịch đã hoàn thành"} */}
+                            {item.requestNumber}
                           </p>
                           <p className="text-xs text-slate-500">
                             {formatDateTime(item.endAt)}
