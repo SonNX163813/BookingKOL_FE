@@ -202,13 +202,15 @@ const KolDashboard = () => {
       hint: "Khách quay lại đặt lịch",
     },
     {
-      title: "Giao tiếp",
+      title: "Khả năng giao tiếp",
       value:
         summary.feedbackStats.averageCommunicationRating?.toFixed?.(1) ?? "0.0",
-      hint: "Điểm trao đổi & phản hồi",
+      hint: `Trình độ: ${
+        summary.feedbackStats.averageCommunicationRating?.toFixed?.(1) ?? "0.0"
+      } / 5`,
     },
     {
-      title: "Chuyên nghiệp & tiến độ",
+      title: "Độ chuyên nghiệp",
       value:
         summary.feedbackStats.averageProfessionalismRating?.toFixed?.(1) ??
         "0.0",
@@ -221,7 +223,9 @@ const KolDashboard = () => {
       value:
         summary.feedbackStats.averageContentQualityRating?.toFixed?.(1) ??
         "0.0",
-      hint: "Phản hồi từ brand",
+      hint: `Chất lượng: ${
+        summary.feedbackStats.averageContentQualityRating?.toFixed?.(1) ?? "0.0"
+      } / 5`,
     },
   ];
 
