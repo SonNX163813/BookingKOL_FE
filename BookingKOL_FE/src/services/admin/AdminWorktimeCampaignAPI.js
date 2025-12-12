@@ -1,4 +1,3 @@
-// src/services/admin/AdminWorktimeCampaignAPI.js
 import { api } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 
@@ -12,6 +11,11 @@ const PATH_SCHEDULED_BY_BOOKING =
   API_PATHS?.WORKTIME_ADMIN?.getScheduledByBooking ||
   "/v1/availabilities/admin/scheduled-worktime/booking";
 
+// ✅ API mới: PUT /v1/availabilities/admin/scheduled-worktime/edit
+const PATH_SCHEDULED_EDIT =
+  API_PATHS?.WORKTIME_ADMIN?.scheduledEdit ||
+  "/v1/availabilities/admin/scheduled-worktime/edit";
+
 // ✅ API mới: PUT /v1/availabilities/admin/scheduled-worktime/assign
 const PATH_SCHEDULED_ASSIGN =
   API_PATHS?.WORKTIME_ADMIN?.scheduledAssign ||
@@ -23,16 +27,6 @@ const PATH_SEARCH_FREE_SLOTS = API_PATHS?.SCHEDULER_ADMIN?.kolTimelineAll;
 /**
  * ✅ Tạo scheduled worktime
  * POST /v1/availabilities/admin/scheduled-worktime/create
- *
- * Body:
- * {
- *   bookingRequestId: string (required)
- *   startAt: string(date-time) (required)
- *   endAt: string(date-time) (required)
- *   note?: string | null
- *   kolId?: string (optional)
- *   availabilityId?: string (optional)
- * }
  */
 export const adminCreateWorktime = (payload, config = {}) => {
   if (!payload?.bookingRequestId) {
@@ -47,8 +41,6 @@ export const adminCreateWorktime = (payload, config = {}) => {
 /**
  * ✅ Xem scheduled worktime theo bookingRequestId
  * GET /v1/availabilities/admin/scheduled-worktime/booking/{bookingRequestId}
- *
- * Normalize về { ...raw, content: [] }
  */
 export const adminGetWorktimesByBooking = async (
   bookingRequestId,
@@ -78,15 +70,35 @@ export const adminGetWorktimesByBooking = async (
 };
 
 /**
- * ✅ Assign/đổi KOL cho scheduled worktime
- * PUT /v1/availabilities/admin/scheduled-worktime/assign
+ * ✅ Sửa scheduled worktime
+ * PUT /v1/availabilities/admin/scheduled-worktime/edit
  *
  * Body:
  * {
  *   scheduledWorkTimeId: string (required)
- *   kolId: string (required)
- *   availabilityId: string (required)
+ *   kolId?: string
+ *   availabilityId?: string
+ *   startAt: string(date-time) (required)
+ *   endAt: string(date-time) (required)
+ *   note?: string | null
  * }
+ */
+export const adminEditScheduledWorktime = (payload, config = {}) => {
+  if (!payload?.scheduledWorkTimeId) {
+    console.warn(
+      "[adminEditScheduledWorktime] Thiếu scheduledWorkTimeId:",
+      payload
+    );
+  }
+  if (!payload?.startAt || !payload?.endAt) {
+    console.warn("[adminEditScheduledWorktime] Thiếu startAt/endAt:", payload);
+  }
+  return api.put(PATH_SCHEDULED_EDIT, payload, config);
+};
+
+/**
+ * ✅ Assign/đổi KOL cho scheduled worktime
+ * PUT /v1/availabilities/admin/scheduled-worktime/assign
  */
 export const adminAssignScheduledWorktime = (payload, config = {}) => {
   if (!payload?.scheduledWorkTimeId) {
@@ -109,12 +121,6 @@ export const adminAssignScheduledWorktime = (payload, config = {}) => {
 
 /**
  * ✅ Tìm tất cả slot rảnh của KOL / trợ live trong một khoảng thời gian
- * GET /v1/availabilities/time-line/kol/all?startDate=&endDate=&page=&size=
- *
- * BE trả ví dụ:
- * {
- *  status, message, data: [ ... ]
- * }
  */
 export const adminSearchFreeSlots = async ({
   startDate,
@@ -138,7 +144,6 @@ export const adminSearchFreeSlots = async ({
 
   const raw = res?.data ?? res;
 
-  // Ưu tiên raw.data nếu có, fallback sang raw nếu là array
   const list = Array.isArray(raw?.data)
     ? raw.data
     : Array.isArray(raw)

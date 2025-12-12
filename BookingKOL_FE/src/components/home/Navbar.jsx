@@ -33,9 +33,9 @@ const navItems = [
     label: "Các gói dịch vụ",
     hasDropdown: true,
     subItems: [
-      { label: "Danh sách KOL", to: "/danh-sach-kol" },
-      { label: "Danh sách khóa đào tạo livestream", to: "/danh-sach-khoa-hoc" },
-      { label: "Danh sách gói chiến dịch", to: "/goi-chien-dich" },
+      { label: "Dịch vụ LiveStream chuyên nghiệp", to: "/danh-sach-kol" },
+      { label: "Dịch vụ đào tạo LiveStream", to: "/danh-sach-khoa-hoc" },
+      { label: "Dịch vụ thuê theo gói", to: "/goi-chien-dich" },
     ],
   },
   { label: "Blog", to: "/blog" },
@@ -259,7 +259,10 @@ const Navbar = () => {
                       endIcon={<KeyboardArrowDownIcon />}
                       sx={{
                         px: 1.5,
+
+                        // ✅ CHỈ CHỈNH ĐẬM CHO "CÁC GÓI DỊCH VỤ"
                         fontWeight: 600,
+
                         textTransform: "none",
                         fontSize: "0.975rem",
                         borderRadius: 2,
@@ -541,7 +544,11 @@ const Navbar = () => {
                     },
                   }}
                 >
-                  <ListItemText primary={subItem.label} />
+                  {/* ✅ CHỈ CHỈNH ĐẬM CHO CHỮ SUB-ITEM DỊCH VỤ (DESKTOP DROPDOWN) */}
+                  <ListItemText
+                    primary={subItem.label}
+                    primaryTypographyProps={{ fontWeight: 700 }}
+                  />
                 </ListItemButton>
               </ListItem>
             ))}

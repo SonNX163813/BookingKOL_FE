@@ -5,15 +5,18 @@ import { CiClock2 } from "react-icons/ci";
 import { GoGoal } from "react-icons/go";
 import dayjs from "dayjs";
 import { getKolMySingleRequestDetail } from "../../../services/kol/KolAPI";
-import { getAvailabilityTimelineById } from "../../../services/kol/AvailabilityAPI"; // ✅
+import { getAvailabilityTimelineById } from "../../../services/kol/AvailabilityAPI";
 
 export default function TaskPopup({
   isDisplay,
   goalDetails,
   dayInfo,
   onClose,
+  // ✅ NEW: cho phép set zIndex khi popup bị “đè”
+  zIndex = 5000,
+  // ✅ NEW: trong case đang có overlay khác (Xem thêm), có thể tắt mask của modal này
+  mask = true,
 }) {
-  // Hooks luôn ở top-level
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detail, setDetail] = useState(null);
   const [err, setErr] = useState("");
@@ -50,14 +53,13 @@ export default function TaskPopup({
         setLoadingDetail(true);
 
         if (availabilityId) {
-          // ✅ ƯU TIÊN gọi theo availability
           const rec = await getAvailabilityTimelineById(availabilityId);
           if (!mounted) return;
 
-          // Chuẩn hoá dữ liệu hiển thị
           const firstWork = Array.isArray(rec?.workTimes)
             ? rec.workTimes[0]
             : null;
+
           const normalized = {
             source: "availability",
             id: rec?.id,
@@ -69,14 +71,15 @@ export default function TaskPopup({
             startAt: firstWork?.startAt || rec?.startAt || null,
             endAt: firstWork?.endAt || rec?.endAt || null,
           };
+
           setDetail(normalized);
           return;
         }
 
         if (requestId) {
-          // Fallback: gọi chi tiết đơn
           const rec = await getKolMySingleRequestDetail(requestId);
           if (!mounted) return;
+
           setDetail({
             source: "request",
             id: rec?.id,
@@ -90,8 +93,6 @@ export default function TaskPopup({
           });
           return;
         }
-
-        // Không có id nào → thôi
       } catch (e) {
         if (mounted) setErr(e?.message || "Không tải được chi tiết.");
       } finally {
@@ -125,6 +126,10 @@ export default function TaskPopup({
       destroyOnClose
       centered
       width={"min(92vw, 500px)"}
+      // ✅ quan trọng: nâng zIndex để nằm trên overlay “Xem thêm”
+      zIndex={zIndex}
+      // ✅ tuỳ chọn: tránh bị tối 2 lớp khi đang có overlay khác
+      mask={mask}
       styles={{
         content: {
           background: "#fff",
@@ -134,10 +139,8 @@ export default function TaskPopup({
         },
         body: { padding: 0 },
       }}
-      zIndex={2000}
       footer={null}
     >
-      {/* Header */}
       <div className="px-5 pt-3 pb-2 border-b border-gray-200 flex items-start justify-between">
         <h3 className="font-semibold text-[18px] leading-none mt-1">
           {titleText}
@@ -151,9 +154,7 @@ export default function TaskPopup({
         </button>
       </div>
 
-      {/* Body */}
       <div className="px-5 pt-4 pb-5 text-gray-700">
-        {/* Thời gian đã có từ slot */}
         <div className="flex items-start justify-between gap-3 text-[15px] flex-wrap">
           <div className="flex items-center gap-2">
             <CiClock2 className="text-xl text-gray-600" />
@@ -181,7 +182,6 @@ export default function TaskPopup({
           </span>
         </div>
 
-        {/* Chi tiết booking lấy từ API */}
         {isBooking && (
           <div className="mt-5 rounded-xl border border-gray-200 p-4 bg-gray-50">
             {loadingDetail ? (

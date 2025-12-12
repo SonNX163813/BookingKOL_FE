@@ -215,7 +215,15 @@ const MainLayoutSuperAdmin = () => {
       key: "management",
       icon: <FolderOutlined />,
       label: "Quản lý hệ thống",
+
       children: [
+        {
+          key: "management-service-packages",
+          icon: <LocalOfferOutlined />,
+          label: (
+            <Link to="management-service-packages">Quản lý gói Livestream</Link>
+          ),
+        },
         {
           key: "management-log-chat-ai",
           icon: <BarChartOutlined />,

@@ -30,26 +30,47 @@ import {
   XCircle,
   Layers,
   Paperclip,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { getKolProfiles, resolveAvatarUrl } from "../../../services/kol/KolAPI";
-import { adminCreateBookingFromCampaign } from "../../../services/admin/AdminBookingFromCampaignAPI";
+import {
+  adminCreateBookingFromCampaign,
+  adminEditBookingRequest,
+} from "../../../services/admin/AdminBookingFromCampaignAPI";
 import { adminCreateContractPayments } from "../../../services/admin/AdminContractPaymentAPI";
 import {
   adminGetCampaignInfo,
   adminGetCampaignBookingDetail,
 } from "../../../services/admin/AdminBookingCampaignAPI";
-import { update } from "../../../config/axios-config"; // ✅ PUT dùng update()
 
 dayjs.locale("vi");
 
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
-/** ===== Repeat type (1 dropdown) ===== */
+/** ===== Upload constraints ===== */
+const MAX_ATTACH_FILES = 5;
+const MAX_ATTACH_SIZE_MB = 10;
+const MAX_ATTACH_SIZE = MAX_ATTACH_SIZE_MB * 1024 * 1024;
+const ALLOWED_ATTACH_EXTS = [
+  ".xlsx",
+  ".xls",
+  ".doc",
+  ".docx",
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+];
+const ACCEPT_ATTACH = ".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png";
+
+/** ===== Repeat type (BE-friendly) ===== */
 const REPEAT_NONE = "NONE";
 const REPEAT_DAILY = "DAILY";
+const REPEAT_WEEKLY = "WEEKLY";
 
 const DOW = [
   { key: "MON", label: "T2" },
@@ -65,10 +86,7 @@ const isDowKey = (v) => DOW_ORDER.includes(v);
 
 const buildRepeatTypeTextFromSelection = (selection = []) => {
   const sel = Array.isArray(selection) ? selection : [];
-
-  // NONE => không gửi repeatType
-  if (sel.includes(REPEAT_NONE)) return "";
-
+  if (sel.includes(REPEAT_NONE)) return "Không lặp";
   if (sel.includes(REPEAT_DAILY)) return "Hàng ngày";
 
   const days = sel.filter(isDowKey);
@@ -81,7 +99,7 @@ const buildRepeatTypeTextFromSelection = (selection = []) => {
       .filter(Boolean);
     return `Hàng tuần: ${labels.join(", ")}`;
   }
-  return "";
+  return "Không lặp";
 };
 
 const parseRepeatTypeTextToSelection = (value) => {
@@ -113,11 +131,32 @@ const parseRepeatTypeTextToSelection = (value) => {
   }
 
   const found = Object.keys(mapLabelToKey).filter((lb) => text.includes(lb));
-  if (found.length) {
+  if (found.length)
     return [...new Set(found.map((lb) => mapLabelToKey[lb]).filter(Boolean))];
-  }
 
   return [];
+};
+
+const parseRepeatSelectionFromBE = (repeatType, dayOfWeek) => {
+  const rt = String(repeatType || "")
+    .trim()
+    .toUpperCase();
+
+  if (rt === REPEAT_NONE) return [REPEAT_NONE];
+  if (rt === REPEAT_DAILY) return [REPEAT_DAILY];
+
+  if (rt === REPEAT_WEEKLY) {
+    const days = String(dayOfWeek || "")
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean)
+      .filter(isDowKey);
+    return [...new Set(days)];
+  }
+
+  // fallback parse text (cũ)
+  const sel = parseRepeatTypeTextToSelection(repeatType);
+  return sel.length ? sel : [REPEAT_NONE];
 };
 
 /** Helpers */
@@ -219,7 +258,6 @@ const normalizeDecimalInput = (
   const s = String(val ?? "")
     .replace(/,/g, ".")
     .replace(/[^\d.]/g, "");
-
   if (!s) return "";
 
   const firstDot = s.indexOf(".");
@@ -270,7 +308,7 @@ const buildDescriptionPayload = (intro, experience) => {
   return `${a}\n\nKinh nghiệm:\n${b}`.trim();
 };
 
-/** ✅ Stepper rõ ràng (luôn có nút tăng/giảm) */
+/** Stepper rõ ràng (luôn có nút tăng/giảm) */
 const TotalInstallmentsStepper = ({
   value = 1,
   onChange,
@@ -305,6 +343,19 @@ const TotalInstallmentsStepper = ({
   );
 };
 
+/** Upload helpers */
+const getFileExt = (name = "") => {
+  const n = String(name || "").toLowerCase();
+  const idx = n.lastIndexOf(".");
+  return idx >= 0 ? n.slice(idx) : "";
+};
+
+const isAllowedAttachFile = (file) => {
+  const name = file?.name || file?.filename || "";
+  const ext = getFileExt(name);
+  return ALLOWED_ATTACH_EXTS.includes(ext);
+};
+
 export default function EditBookingCampain() {
   const [form] = Form.useForm();
   const [search] = useSearchParams();
@@ -315,18 +366,16 @@ export default function EditBookingCampain() {
   const [liveOptions, setLiveOptions] = useState([]);
   const [loadingKols, setLoadingKols] = useState(false);
 
-  // ✅ repeat selection (1 dropdown): ["DAILY"] | ["NONE"] | ["MON","WED",...]
-  const [repeatSelection, setRepeatSelection] = useState([]);
+  const [repeatSelection, setRepeatSelection] = useState([REPEAT_NONE]);
 
-  // ✅ inline warning state (không dùng toast) + giảm lag
   const [contractTooLong, setContractTooLong] = useState(false);
-  const [instTooLongMap, setInstTooLongMap] = useState({}); // { [fieldKey]: true }
+  const [instTooLongMap, setInstTooLongMap] = useState({});
 
-  // ✅ attachment
   const [attachList, setAttachList] = useState([]);
 
-  // ✅ total computed warning
   const [totalTooLong, setTotalTooLong] = useState(false);
+
+  const [collapseCampaignInfo, setCollapseCampaignInfo] = useState(false);
 
   const screens = useBreakpoint();
   const row = location.state || {};
@@ -335,7 +384,7 @@ export default function EditBookingCampain() {
   const campaignIdFromQuery = search.get("campaignId");
   const campaignId = campaignIdFromState || campaignIdFromQuery || "";
 
-  // ====== Campaign info ======
+  // Campaign info
   const {
     data: campaignResponse,
     isLoading: isLoadingCampaign,
@@ -356,7 +405,7 @@ export default function EditBookingCampain() {
   const isNegotiating = normalizedStatus === "NEGOTIATING";
   const mode = isNegotiating ? "edit" : "create";
 
-  // ✅ LẤY bookingRequests theo campaignId
+  // Booking detail (edit mode)
   const {
     data: campaignBookingRes,
     isLoading: isLoadingCampaignBooking,
@@ -399,7 +448,7 @@ export default function EditBookingCampain() {
   const hasCampaignLives =
     Array.isArray(campaignInfo?.lives) && campaignInfo.lives.length > 0;
 
-  /** ✅ Sync installments array theo count */
+  /** Sync installments array theo count */
   const syncInstallmentsByCount = (n) => {
     let count = Number(n);
     if (!Number.isFinite(count) || count < 1) count = 1;
@@ -420,21 +469,25 @@ export default function EditBookingCampain() {
     form.setFieldValue("installments", next);
   };
 
-  // Prefill (create mode)
+  // Prefill create mode
   useEffect(() => {
-    const stateRow = location.state || {};
     if (mode !== "create") return;
 
+    const stateRow = location.state || {};
     const intro = stateRow.objective || stateRow.campaignName || "";
+
     form.setFieldsValue({
       campaignId,
       intro,
       experience: "",
-      repeatType: "",
+
+      // ✅ default BE-friendly
+      repeatType: REPEAT_NONE,
+      dayOfWeek: undefined,
+
       totalInstallments: 1,
       installments: [{ amount: "", dueDate: null }],
 
-      // ✅ new fields
       liveHours: "",
       unitPrice: "",
       discountPercent: "",
@@ -444,11 +497,11 @@ export default function EditBookingCampain() {
     });
 
     setAttachList([]);
-    setRepeatSelection([]);
+    setRepeatSelection([REPEAT_NONE]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, mode]);
 
-  // Prefill (edit mode) từ targetBookingRecord
+  // Prefill edit mode from targetBookingRecord
   useEffect(() => {
     if (mode !== "edit") return;
     if (!targetBookingRecord) return;
@@ -483,14 +536,17 @@ export default function EditBookingCampain() {
       source?.contract?.amount ??
       "";
 
-    const repeatTypeText = source?.repeatType ?? source?.repeat_type ?? "";
+    const repeatTypeBE =
+      source?.repeatType ?? source?.repeat_type ?? REPEAT_NONE;
+    const dayOfWeekBE =
+      source?.dayOfWeek ?? source?.day_of_week ?? source?.dow ?? "";
 
     const { intro, experience } = splitDescToIntroExp(
       source?.description || ""
     );
 
-    // ✅ try map new fields if BE has them
     const liveHours =
+      source?.hours ??
       source?.liveHours ??
       source?.hoursLive ??
       source?.liveHour ??
@@ -505,8 +561,8 @@ export default function EditBookingCampain() {
       "";
 
     const discountPercent =
-      source?.discountPercent ??
       source?.discount ??
+      source?.discountPercent ??
       source?.discount_rate ??
       "";
 
@@ -517,19 +573,23 @@ export default function EditBookingCampain() {
       startAt,
       repeatUntil,
       contractAmount: formatNumberWithCommas(contractAmount),
+
       kolIds:
         source?.kolIds || source?.kols?.map((k) => k?.id).filter(Boolean) || [],
       liveIds:
         source?.liveIds ||
         source?.lives?.map((l) => l?.id).filter(Boolean) ||
         [],
+
       totalInstallments,
       installments: installments.length
         ? installments
         : [{ amount: "", dueDate: null }],
-      repeatType: "",
 
-      // ✅ new fields
+      // hidden fields will be synced by effect
+      repeatType: repeatTypeBE || REPEAT_NONE,
+      dayOfWeek: dayOfWeekBE || undefined,
+
       liveHours: liveHours
         ? normalizeDecimalInput(liveHours, { maxIntDigits: 4, maxDecDigits: 2 })
         : "",
@@ -540,30 +600,40 @@ export default function EditBookingCampain() {
             maxDecDigits: 2,
           })
         : "",
-      totalAmount: "", // computed below
+      totalAmount: "",
       attachments: [],
     });
 
-    setRepeatSelection(parseRepeatTypeTextToSelection(repeatTypeText));
+    setAttachList([]);
+
+    // ✅ selection theo BE repeatType + dayOfWeek (fallback parse text)
+    const sel = parseRepeatSelectionFromBE(repeatTypeBE, dayOfWeekBE);
+    setRepeatSelection(sel);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, targetBookingRecord]);
 
-  // ✅ Sync repeatType hidden field từ repeatSelection
+  /**
+   * ✅ Sync repeatType + dayOfWeek hidden field theo selection:
+   * - NONE / DAILY / WEEKLY
+   * - dayOfWeek: "MON,TUE"...
+   */
   useEffect(() => {
-    const text = buildRepeatTypeTextFromSelection(repeatSelection);
-    form.setFieldValue("repeatType", text || "");
+    const days = repeatSelection.filter(isDowKey);
+
+    let rt = REPEAT_NONE;
+    if (repeatSelection.includes(REPEAT_DAILY)) rt = REPEAT_DAILY;
+    else if (days.length) rt = REPEAT_WEEKLY;
+
+    form.setFieldValue("repeatType", rt);
+    form.setFieldValue("dayOfWeek", days.length ? days.join(",") : undefined);
   }, [repeatSelection, form]);
 
-  // ✅ Select logic: exclusive NONE/DAILY vs multiple DOW
+  // Select logic
   const handleRepeatSelect = (val) => {
-    if (val === REPEAT_NONE) {
-      setRepeatSelection([REPEAT_NONE]);
-      return;
-    }
-    if (val === REPEAT_DAILY) {
-      setRepeatSelection([REPEAT_DAILY]);
-      return;
-    }
+    if (val === REPEAT_NONE) return setRepeatSelection([REPEAT_NONE]);
+    if (val === REPEAT_DAILY) return setRepeatSelection([REPEAT_DAILY]);
+
     if (isDowKey(val)) {
       setRepeatSelection((prev) => {
         const days = prev.filter(isDowKey);
@@ -574,17 +644,17 @@ export default function EditBookingCampain() {
 
   const handleRepeatDeselect = (val) => {
     setRepeatSelection((prev) => {
-      if (val === REPEAT_NONE || val === REPEAT_DAILY) return [];
+      if (val === REPEAT_NONE || val === REPEAT_DAILY) return [REPEAT_NONE];
       if (isDowKey(val)) {
         const next = prev.filter((x) => x !== val);
         const stillHasDays = next.some(isDowKey);
-        return stillHasDays ? next.filter(isDowKey) : [];
+        return stillHasDays ? next.filter(isDowKey) : [REPEAT_NONE];
       }
       return prev;
     });
   };
 
-  // Load KOL / LIVE
+  // Load KOL/LIVE
   useEffect(() => {
     let ignore = false;
     const controller = new AbortController();
@@ -592,6 +662,7 @@ export default function EditBookingCampain() {
     const fetchKols = async () => {
       try {
         setLoadingKols(true);
+
         const res = await getKolProfiles({
           signal: controller.signal,
           params: { page: 0, size: 500 },
@@ -608,6 +679,7 @@ export default function EditBookingCampain() {
             item.email ||
             item.phone ||
             item.id;
+
           const avatar = resolveAvatarUrl(item) || item.avatarUrl || "";
 
           return {
@@ -696,7 +768,7 @@ export default function EditBookingCampain() {
     return d.minute(0).second(0);
   };
 
-  // ✅ watchers
+  // watchers
   const watchInstallments = Form.useWatch("installments", form);
   const watchContractAmountRaw = Form.useWatch("contractAmount", form);
 
@@ -704,7 +776,7 @@ export default function EditBookingCampain() {
   const watchUnitPriceRaw = Form.useWatch("unitPrice", form);
   const watchDiscountRaw = Form.useWatch("discountPercent", form);
 
-  // ✅ compute totalAmount from (hours * unitPrice) * (1 - discount/100)
+  // compute totalAmount
   useEffect(() => {
     const hours = parseDecimal(watchLiveHoursRaw);
     const unit = parseAmount(watchUnitPriceRaw);
@@ -715,10 +787,7 @@ export default function EditBookingCampain() {
     const hasUnit = typeof unit === "number" && !Number.isNaN(unit) && unit > 0;
 
     if (!hasHours || !hasUnit) {
-      // create mode: clear total when missing inputs
-      if (mode === "create") {
-        form.setFieldValue("totalAmount", "");
-      }
+      if (mode === "create") form.setFieldValue("totalAmount", "");
       setTotalTooLong(false);
       return;
     }
@@ -727,7 +796,7 @@ export default function EditBookingCampain() {
       typeof disc === "number" && Number.isFinite(disc) ? disc : 0;
     const d = Math.min(100, Math.max(0, safeDisc));
 
-    const total = Math.round(hours * unit * (1 - d / 100)); // VND => làm tròn
+    const total = Math.round(hours * unit * (1 - d / 100));
     const digits = String(total).replace(/\D/g, "");
     setTotalTooLong(digits.length > 13);
 
@@ -768,7 +837,7 @@ export default function EditBookingCampain() {
         !!errorCampaignBooking ||
         !targetBookingRecord));
 
-  // ✅ tránh spam validate trong khi gõ (giảm lag)
+  // soft validate (giảm lag)
   const validateTimerRef = useRef(null);
   const softValidateSumGuard = () => {
     if (validateTimerRef.current) clearTimeout(validateTimerRef.current);
@@ -780,11 +849,6 @@ export default function EditBookingCampain() {
   const onSubmit = async (values) => {
     try {
       if (!values.campaignId) throw new Error("Campaign ID là bắt buộc");
-
-      // sanitize repeatType: NONE -> rỗng
-      if (repeatSelection.includes(REPEAT_NONE)) {
-        form.setFieldValue("repeatType", "");
-      }
 
       const rawInstallments = Array.isArray(values.installments)
         ? values.installments
@@ -812,53 +876,53 @@ export default function EditBookingCampain() {
         totalInstallments = 1;
       if (totalInstallments > 5) totalInstallments = 5;
 
-      // ✅ dayOfWeek cho API edit: join keys MON,TUE...
-      const weeklyDays = repeatSelection.filter(isDowKey);
-      const dayOfWeek = weeklyDays.length ? weeklyDays.join(",") : undefined;
-
       const description = buildDescriptionPayload(
         values.intro,
         values.experience
       );
 
-      // ✅ new fields
+      // new fields
       const liveHours = parseDecimal(values.liveHours);
       const unitPrice = parseAmount(values.unitPrice);
       const discountPercent = parseDecimal(values.discountPercent);
       const totalAmount = parseAmount(values.totalAmount);
 
-      const attachmentName =
-        Array.isArray(values.attachments) && values.attachments[0]
-          ? values.attachments[0]?.name
-          : undefined;
+      // attachments: gửi cả fileList để service tự upload multipart
+      const attachments = Array.isArray(values.attachments)
+        ? values.attachments
+        : [];
 
       if (mode === "create") {
         const bookingPayload = {
           campaignId: values.campaignId,
           description,
-          repeatType: values.repeatType || undefined,
+
+          // ✅ BE-friendly
+          repeatType: values.repeatType, // NONE/DAILY/WEEKLY
+          dayOfWeek: values.dayOfWeek, // "MON,TUE"...
+
           startAt: values.startAt,
           repeatUntil: values.repeatUntil,
-          contractAmount: values.contractAmount, // giữ nguyên như hiện tại
+          contractAmount: values.contractAmount,
 
           kolIds: values.kolIds,
           liveIds: values.liveIds,
 
-          // ✅ add new fields (BE có thể ignore nếu chưa hỗ trợ)
           liveHours: typeof liveHours === "number" ? liveHours : undefined,
           unitPrice: typeof unitPrice === "number" ? unitPrice : undefined,
           discountPercent:
             typeof discountPercent === "number" ? discountPercent : undefined,
           totalAmount:
             typeof totalAmount === "number" ? totalAmount : undefined,
-          attachmentName,
+
+          // ✅ pass fileList
+          attachments,
         };
 
         const bookingResult = await adminCreateBookingFromCampaign(
           bookingPayload
         );
-        const data =
-          (bookingResult && bookingResult.data) || bookingResult || {};
+        const data = bookingResult?.data ?? bookingResult ?? {};
 
         const contractId =
           data.contractId ||
@@ -894,13 +958,12 @@ export default function EditBookingCampain() {
           }
         }
 
-        // ✅ KHÔNG navigate đi đâu: ở lại trang edit
         message.success("Tạo booking request thành công (đã giữ nguyên trang)");
         refetchCampaignInfo?.();
         return;
       }
 
-      // ✅ EDIT mode: gọi PUT /v1/admin/bookings/edit/{bookingRequestId}
+      // EDIT mode
       if (!bookingRequestId) {
         message.open({
           type: "error",
@@ -910,45 +973,34 @@ export default function EditBookingCampain() {
         return;
       }
 
-      // NOTE: Form hiện chưa có endAt => set tạm endAt = startAt + 1 giờ
       const startAtBase = values.startAt ? dayjs(values.startAt) : null;
       const endAtAuto = startAtBase ? startAtBase.add(1, "hour") : null;
 
-      const url = `/v1/admin/bookings/edit/${encodeURIComponent(
-        bookingRequestId
-      )}`;
+      await adminEditBookingRequest(bookingRequestId, {
+        description,
 
-      await update({
-        url,
-        data: {
-          description,
-          repeatType: values.repeatType || undefined,
-          dayOfWeek,
-          startAt: values.startAt
-            ? dayjs(values.startAt).toISOString()
-            : undefined,
-          endAt: endAtAuto ? dayjs(endAtAuto).toISOString() : undefined,
-          repeatUntil: values.repeatUntil
-            ? dayjs(values.repeatUntil).format("YYYY-MM-DD")
-            : undefined,
-          contractAmount: parseAmount(values.contractAmount) ?? 0,
+        // ✅ BE-friendly
+        repeatType: values.repeatType,
+        dayOfWeek: values.dayOfWeek,
 
-          // ✅ add new fields (BE có thể ignore nếu chưa hỗ trợ)
-          liveHours: typeof liveHours === "number" ? liveHours : undefined,
-          unitPrice: typeof unitPrice === "number" ? unitPrice : undefined,
-          discountPercent:
-            typeof discountPercent === "number" ? discountPercent : undefined,
-          totalAmount:
-            typeof totalAmount === "number" ? totalAmount : undefined,
-          attachmentName,
+        startAt: values.startAt,
+        endAt: endAtAuto,
+        repeatUntil: values.repeatUntil,
+        contractAmount: values.contractAmount,
 
-          contractFile: "", // nếu BE bắt buộc field này thì để string rỗng
-          kolIds: Array.isArray(values.kolIds) ? values.kolIds : [],
-          liveIds: Array.isArray(values.liveIds) ? values.liveIds : [],
-        },
+        liveHours: typeof liveHours === "number" ? liveHours : undefined,
+        unitPrice: typeof unitPrice === "number" ? unitPrice : undefined,
+        discountPercent:
+          typeof discountPercent === "number" ? discountPercent : undefined,
+        totalAmount: typeof totalAmount === "number" ? totalAmount : undefined,
+
+        kolIds: Array.isArray(values.kolIds) ? values.kolIds : [],
+        liveIds: Array.isArray(values.liveIds) ? values.liveIds : [],
+
+        // ✅ upload thật
+        attachments,
       });
 
-      // ✅ KHÔNG navigate: ở lại
       message.success(
         "Cập nhật booking request thành công (đã giữ nguyên trang)"
       );
@@ -962,26 +1014,19 @@ export default function EditBookingCampain() {
 
       const is409 = err?.response?.status === 409 || err?.appStatus === 409;
 
-      if (is409) {
-        message.open({
-          type: "error",
-          content:
-            beMsg || "Campaign này đã có Booking Request, không thể tạo thêm.",
-          icon: <XCircle size={18} className="text-red-500" />,
-        });
-      } else {
-        message.open({
-          type: "error",
-          content:
-            beMsg ||
-            (mode === "edit" ? "Cập nhật thất bại" : "Tạo booking thất bại"),
-          icon: <XCircle size={18} className="text-red-500" />,
-        });
-      }
+      message.open({
+        type: "error",
+        content:
+          (is409 &&
+            (beMsg ||
+              "Campaign này đã có Booking Request, không thể tạo thêm.")) ||
+          beMsg ||
+          (mode === "edit" ? "Cập nhật thất bại" : "Tạo booking thất bại"),
+        icon: <XCircle size={18} className="text-red-500" />,
+      });
     }
   };
 
-  // options cho 1 dropdown
   const repeatOptions = useMemo(() => {
     const base = [
       { value: REPEAT_NONE, label: "Không lặp" },
@@ -994,8 +1039,53 @@ export default function EditBookingCampain() {
     ];
   }, []);
 
-  const repeatHint =
-    buildRepeatTypeTextFromSelection(repeatSelection) || "Không lặp";
+  const repeatHint = buildRepeatTypeTextFromSelection(repeatSelection);
+
+  /** Upload handlers */
+  const beforeUploadAttachment = (file) => {
+    if (!isAllowedAttachFile(file)) {
+      message.error(
+        "Chỉ hỗ trợ: .xlsx, .xls, .doc, .docx, .pdf và ảnh (jpg, png...)."
+      );
+      return Upload.LIST_IGNORE;
+    }
+
+    if ((file?.size || 0) > MAX_ATTACH_SIZE) {
+      message.error(`Mỗi tệp tối đa ${MAX_ATTACH_SIZE_MB}MB.`);
+      return Upload.LIST_IGNORE;
+    }
+
+    const current = form.getFieldValue("attachments") || attachList || [];
+    if (Array.isArray(current) && current.length >= MAX_ATTACH_FILES) {
+      message.error(`Chỉ được đính kèm tối đa ${MAX_ATTACH_FILES} tệp.`);
+      return Upload.LIST_IGNORE;
+    }
+
+    // prevent auto upload (giữ fileList tại client)
+    return false;
+  };
+
+  const onChangeAttachment = (info) => {
+    let next = Array.isArray(info?.fileList) ? [...info.fileList] : [];
+
+    next = next.filter((f) => {
+      const raw = f?.originFileObj || f;
+      return isAllowedAttachFile(raw);
+    });
+
+    next = next.filter((f) => {
+      const raw = f?.originFileObj || f;
+      return (raw?.size || 0) <= MAX_ATTACH_SIZE;
+    });
+
+    if (next.length > MAX_ATTACH_FILES) {
+      message.warning(`Chỉ được đính kèm tối đa ${MAX_ATTACH_FILES} tệp.`);
+      next = next.slice(0, MAX_ATTACH_FILES);
+    }
+
+    setAttachList(next);
+    form.setFieldValue("attachments", next);
+  };
 
   return (
     <ConfigProvider locale={viVN}>
@@ -1009,7 +1099,7 @@ export default function EditBookingCampain() {
             <div>
               <h1 className="text-[18px] font-bold uppercase">
                 {mode === "edit"
-                  ? `Chỉnh sửa Booking Request `
+                  ? "Chỉnh sửa Booking Request"
                   : "Tạo/Chỉnh sửa Booking Campaign"}
               </h1>
             </div>
@@ -1030,13 +1120,29 @@ export default function EditBookingCampain() {
         <Card
           className="shadow-sm"
           bordered={false}
+          loading={isLoadingCampaign}
           title={
             <Space>
               <Layers size={18} />
               <span>Thông tin yêu cầu từ khách hàng</span>
             </Space>
           }
-          loading={isLoadingCampaign}
+          extra={
+            <Button
+              size="small"
+              type="default"
+              onClick={() => setCollapseCampaignInfo((v) => !v)}
+              icon={
+                collapseCampaignInfo ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronUp size={16} />
+                )
+              }
+            >
+              {collapseCampaignInfo ? "Mở rộng" : "Thu gọn"}
+            </Button>
+          }
         >
           {errorCampaign ? (
             <Alert
@@ -1055,64 +1161,127 @@ export default function EditBookingCampain() {
                 </Tag>
               </Space>
 
-              <Descriptions
-                bordered
-                size="middle"
-                column={screens.lg ? 3 : screens.md ? 2 : 1}
-                styles={{ label: { width: 180 } }}
-              >
-                <Descriptions.Item label="Tên Campaign">
-                  {campaignInfo?.name ?? "--"}
-                </Descriptions.Item>
-
-                <Descriptions.Item label="Người tạo (email)">
-                  <Text copyable>{campaignInfo?.createdBy ?? "--"}</Text>
-                </Descriptions.Item>
-
-                <Descriptions.Item label="Mục tiêu" span={screens.lg ? 3 : 1}>
-                  <Text style={{ whiteSpace: "pre-wrap" }}>
-                    {campaignInfo?.objective ?? "--"}
-                  </Text>
-                </Descriptions.Item>
-
-                <Descriptions.Item label="Giá mục tiêu">
-                  {formatCurrency(campaignInfo?.targetPrice)}
-                </Descriptions.Item>
-
-                <Descriptions.Item label="Ngày bắt đầu">
-                  {formatDate(campaignInfo?.startDate)}
-                </Descriptions.Item>
-
-                <Descriptions.Item label="Ngày kết thúc">
-                  {formatDate(campaignInfo?.endDate)}
-                </Descriptions.Item>
-
-                {hasCampaignKols && (
+              {collapseCampaignInfo ? (
+                <Descriptions
+                  bordered
+                  size="middle"
+                  column={screens.lg ? 3 : screens.md ? 2 : 1}
+                  styles={{ label: { width: 180 } }}
+                >
+                  <Descriptions.Item label="Tên Campaign">
+                    {campaignInfo?.name ?? "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngân sách chiến dịch">
+                    {formatCurrency(campaignInfo?.targetPrice)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Thời gian">
+                    {formatDate(campaignInfo?.startDate)} -{" "}
+                    {formatDate(campaignInfo?.endDate)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Người đặt">
+                    {campaignInfo?.ordererFullName ?? "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Số điện thoại">
+                    {campaignInfo?.ordererPhone ? (
+                      <Text copyable>{campaignInfo.ordererPhone}</Text>
+                    ) : (
+                      "--"
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Số giờ livestream">
+                    {campaignInfo?.livestreamHours ?? "--"}
+                  </Descriptions.Item>
+                </Descriptions>
+              ) : (
+                <Descriptions
+                  bordered
+                  size="middle"
+                  column={screens.lg ? 3 : screens.md ? 2 : 1}
+                  styles={{ label: { width: 180 } }}
+                >
+                  <Descriptions.Item label="Tên Campaign">
+                    {campaignInfo?.name ?? "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Họ và tên người đặt">
+                    {campaignInfo?.ordererFullName ?? "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Số điện thoại">
+                    {campaignInfo?.ordererPhone ? (
+                      <Text copyable>{campaignInfo.ordererPhone}</Text>
+                    ) : (
+                      "--"
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Email">
+                    <Text copyable>{campaignInfo?.createdBy ?? "--"}</Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Mục tiêu" span={screens.lg ? 3 : 1}>
+                    <Text style={{ whiteSpace: "pre-wrap" }}>
+                      {campaignInfo?.objective ?? "--"}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngân sách chiến dịch">
+                    {formatCurrency(campaignInfo?.targetPrice)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngày bắt đầu">
+                    {formatDate(campaignInfo?.startDate)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Ngày kết thúc">
+                    {formatDate(campaignInfo?.endDate)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Số giờ livestream">
+                    {campaignInfo?.livestreamHours ?? "--"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Kiểu lặp">
+                    {campaignInfo?.repeatType ?? "--"}
+                  </Descriptions.Item>
                   <Descriptions.Item
-                    label="KOL tham gia"
+                    label="Địa chỉ livestream"
                     span={screens.lg ? 3 : 1}
                   >
-                    {formatArrayText(campaignInfo?.kols)}
+                    <Text style={{ whiteSpace: "pre-wrap" }}>
+                      {campaignInfo?.livestreamAddress ?? "--"}
+                    </Text>
                   </Descriptions.Item>
-                )}
-
-                {hasCampaignLives && (
                   <Descriptions.Item
-                    label="Trợ Live tham gia"
+                    label="Địa chỉ thường trú"
                     span={screens.lg ? 3 : 1}
                   >
-                    {formatArrayText(campaignInfo?.lives)}
+                    <Text style={{ whiteSpace: "pre-wrap" }}>
+                      {campaignInfo?.permanentAddress ?? "--"}
+                    </Text>
                   </Descriptions.Item>
-                )}
-
-                <Descriptions.Item label="Tạo lúc">
-                  {formatDateTime(campaignInfo?.createdAt)}
-                </Descriptions.Item>
-
-                <Descriptions.Item label="Cập nhật lúc">
-                  {formatDateTime(campaignInfo?.updatedAt)}
-                </Descriptions.Item>
-              </Descriptions>
+                  <Descriptions.Item label="Mã số thuế">
+                    {campaignInfo?.taxCode ? (
+                      <Text copyable>{campaignInfo.taxCode}</Text>
+                    ) : (
+                      "--"
+                    )}
+                  </Descriptions.Item>
+                  {hasCampaignKols && (
+                    <Descriptions.Item
+                      label="KOL tham gia"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      {formatArrayText(campaignInfo?.kols)}
+                    </Descriptions.Item>
+                  )}
+                  {hasCampaignLives && (
+                    <Descriptions.Item
+                      label="Trợ Live tham gia"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      {formatArrayText(campaignInfo?.lives)}
+                    </Descriptions.Item>
+                  )}
+                  <Descriptions.Item label="Tạo lúc">
+                    {formatDateTime(campaignInfo?.createdAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Cập nhật lúc">
+                    {formatDateTime(campaignInfo?.updatedAt)}
+                  </Descriptions.Item>
+                </Descriptions>
+              )}
             </>
           ) : (
             <Text type="secondary">Không có dữ liệu campaign.</Text>
@@ -1123,10 +1292,9 @@ export default function EditBookingCampain() {
         <Card bordered={false} className="shadow-sm">
           <Form form={form} layout="vertical" onFinish={onSubmit}>
             <Row gutter={[16, 16]}>
-              {/* Campaign ID */}
               <Col xs={24} md={12}>
                 <Form.Item
-                  label="Campaign ID (campaignId)"
+                  label="Campaign ID"
                   name="campaignId"
                   rules={[{ required: true, message: "Bắt buộc" }]}
                 >
@@ -1137,7 +1305,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ Kiểu lặp */}
               <Col xs={24} md={12}>
                 <Form.Item label="Kiểu lặp">
                   <Space direction="vertical" className="w-full" size={8}>
@@ -1151,17 +1318,14 @@ export default function EditBookingCampain() {
                       maxTagCount="responsive"
                       onSelect={handleRepeatSelect}
                       onDeselect={handleRepeatDeselect}
-                      onClear={() => setRepeatSelection([])}
+                      onClear={() => setRepeatSelection([REPEAT_NONE])}
                       onChange={(vals) => {
-                        if (!Array.isArray(vals)) return;
-                        if (vals.includes(REPEAT_NONE)) {
-                          setRepeatSelection([REPEAT_NONE]);
-                          return;
-                        }
-                        if (vals.includes(REPEAT_DAILY)) {
-                          setRepeatSelection([REPEAT_DAILY]);
-                          return;
-                        }
+                        if (!Array.isArray(vals) || vals.length === 0)
+                          return setRepeatSelection([REPEAT_NONE]);
+                        if (vals.includes(REPEAT_NONE))
+                          return setRepeatSelection([REPEAT_NONE]);
+                        if (vals.includes(REPEAT_DAILY))
+                          return setRepeatSelection([REPEAT_DAILY]);
                         setRepeatSelection(vals.filter(isDowKey));
                       }}
                     />
@@ -1169,13 +1333,15 @@ export default function EditBookingCampain() {
                   </Space>
                 </Form.Item>
 
-                {/* hidden field submit đúng format BE */}
+                {/* ✅ hidden fields send to BE */}
                 <Form.Item name="repeatType" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="dayOfWeek" hidden>
                   <Input />
                 </Form.Item>
               </Col>
 
-              {/* StartAt */}
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Thời điểm bắt đầu (startAt)"
@@ -1211,15 +1377,16 @@ export default function EditBookingCampain() {
                     onChange={(val) => {
                       const fixed = normalizeStartAtMinute(val);
                       if (fixed) form.setFieldValue("startAt", fixed);
-                      setTimeout(() => {
-                        form.validateFields(["repeatUntil"]).catch(() => {});
-                      }, 0);
+                      setTimeout(
+                        () =>
+                          form.validateFields(["repeatUntil"]).catch(() => {}),
+                        0
+                      );
                     }}
                   />
                 </Form.Item>
               </Col>
 
-              {/* RepeatUntil */}
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Lặp đến ngày (repeatUntil)"
@@ -1252,7 +1419,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ NEW: Số giờ live */}
               <Col xs={24} md={8}>
                 <Form.Item
                   label="Số giờ live"
@@ -1286,7 +1452,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ NEW: Đơn giá (VND/giờ) */}
               <Col xs={24} md={8}>
                 <Form.Item
                   label="Đơn giá (VND/giờ)"
@@ -1323,7 +1488,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ NEW: Giảm giá (%) */}
               <Col xs={24} md={8}>
                 <Form.Item
                   label="Giảm giá (%)"
@@ -1361,10 +1525,9 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ NEW: Tổng tiền (computed) */}
               <Col xs={24} md={12}>
                 <Form.Item
-                  label="Tổng tiền (tự tính)"
+                  label="Tổng tiền (VND)"
                   name="totalAmount"
                   validateStatus={totalTooLong ? "error" : undefined}
                   help={
@@ -1373,14 +1536,10 @@ export default function EditBookingCampain() {
                       : undefined
                   }
                 >
-                  <Input
-                    readOnly
-                    placeholder="Tự động tính từ: giờ * đơn giá * (1 - %giảm)"
-                  />
+                  <Input readOnly placeholder="Tổng tiền đơn hàng" />
                 </Form.Item>
               </Col>
 
-              {/* ✅ NEW: Tệp đính kèm */}
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Tệp đính kèm"
@@ -1390,24 +1549,27 @@ export default function EditBookingCampain() {
                     Array.isArray(e) ? e : e?.fileList
                   }
                 >
-                  <Upload
-                    multiple={false}
-                    maxCount={1}
-                    beforeUpload={() => false}
-                    fileList={attachList}
-                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                    onChange={(info) => {
-                      const next = (info?.fileList || []).slice(-1);
-                      setAttachList(next);
-                      form.setFieldValue("attachments", next);
-                    }}
-                  >
-                    <Button icon={<Paperclip size={16} />}>Chọn tệp</Button>
-                  </Upload>
+                  <>
+                    <Upload
+                      multiple
+                      maxCount={MAX_ATTACH_FILES}
+                      beforeUpload={beforeUploadAttachment}
+                      fileList={attachList}
+                      accept={ACCEPT_ATTACH}
+                      onChange={onChangeAttachment}
+                    >
+                      <Button icon={<Paperclip size={16} />}>Chọn tệp</Button>
+                    </Upload>
+
+                    <div className="text-xs text-gray-500 mt-1">
+                      Chỉ hỗ trợ: .xlsx, .xls, .doc, .docx, .pdf và ảnh (jpg,
+                      png...). Tối đa {MAX_ATTACH_FILES} tệp (mỗi tệp tối đa{" "}
+                      {MAX_ATTACH_SIZE_MB}MB).
+                    </div>
+                  </>
                 </Form.Item>
               </Col>
 
-              {/* ✅ Giới thiệu */}
               <Col xs={24}>
                 <Form.Item label="Mô tả chiến dịch" name="intro">
                   <Input.TextArea
@@ -1418,7 +1580,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* ✅ Contract amount (bắt buộc) + báo lỗi dưới input + giảm lag */}
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Ngân sách chiến dịch (VND)"
@@ -1470,7 +1631,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* KOL IDs */}
               <Col xs={24} md={12}>
                 <Form.Item label="Host chính" name="kolIds">
                   <Select
@@ -1491,7 +1651,6 @@ export default function EditBookingCampain() {
                 </Form.Item>
               </Col>
 
-              {/* LIVE IDs */}
               <Col xs={24} md={12}>
                 <Form.Item label="Trợ Live" name="liveIds">
                   <Select
@@ -1561,7 +1720,6 @@ export default function EditBookingCampain() {
 
               <Row gutter={[16, 16]}>
                 <Col xs={24} md={8}>
-                  {/* ✅ không cho gõ số, mặc định 1, tăng/giảm tới 5 */}
                   <Form.Item
                     label="Số lần thanh toán (1 - 5)"
                     name="totalInstallments"

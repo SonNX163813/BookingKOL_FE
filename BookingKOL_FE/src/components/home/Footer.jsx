@@ -79,10 +79,6 @@ function Footer() {
             </li>
           </ul>
 
-          <h4 className="!mb-4 !mt-6 font-semibold text-[#3658b8]">
-            Chăm sóc khách hàng
-          </h4>
-
           <ul className="!space-y-3">
             <ScrollButton as="a" href="#faq-container">
               Câu hỏi thường gặp
@@ -97,19 +93,29 @@ function Footer() {
         <div className="lg:ml-[90px]">
           <h4 className="mb-4 font-semibold text-[#3658b8]">Các Gói Dịch Vụ</h4>
           <ul className="space-y-3">
-            <ScrollButton as="a" href="#features-container">
+            <ScrollButton as="a" href="/danh-sach-kol">
               Dịch vụ LiveStream chuyên nghiệp
             </ScrollButton>
-            <ScrollButton as="a" href="#pricing-container">
+            <ScrollButton as="a" href="/danh-sach-khoa-hoc">
               Dịch vụ đào tạo LiveStream
             </ScrollButton>
-            <ScrollButton as="a" href="#pricing-container">
+            <ScrollButton as="a" href="blog">
               Blog
             </ScrollButton>
-            <ScrollButton as="a" href="#guide-container">
+            <ScrollButton as="a" href="chat-AI">
               Trợ lý ảo AI
             </ScrollButton>
-            <ScrollButton as="a" href="#guide-container">
+            <ScrollButton
+              as="a"
+              href="#lead-forms"
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById("lead-forms");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+            >
               Liên hệ tư vấn
             </ScrollButton>
           </ul>
@@ -125,19 +131,19 @@ function Footer() {
                 href="mailto:nexusagency@gmail.com"
                 className="text-sm hover:text-blue-800"
               >
-                Email: nexusagency@gmail.com
+                Email: nexussocial@gmail.com
               </a>
             </li>
             <li className="flex items-center gap-3">
               <img src={phone} alt="phone" className="!w-[20px]" />
-              <a href="tel:0702260606" className="text-sm hover:text-blue-800">
+              <a href="tel:0379642539" className="text-sm hover:text-blue-800">
                 Hotline: 0379 642 539
               </a>
             </li>
             <li className="flex items-center gap-3">
               <FaFacebook size={21} className="mr-[1px]" />
               <a
-                href="https://www.facebook.com/planier.vn"
+                href="https://www.facebook.com/profile.php?id=61574879379872"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm hover:text-blue-800"
@@ -148,7 +154,7 @@ function Footer() {
             <li className="flex items-center gap-3">
               <img src={instagram} alt="instagram" className="!w-[20px]" />
               <a
-                href="https://www.instagram.com/planier.vn/"
+                href="instagram.com/cwab.dyung_/?fbclid=IwY2xjawOoOg9leHRuA2FlbQIxMABicmlkETFKcXZReElYWkc2Y1hQZEswc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHoY5zf9gv5EwzvmpTTUAbMDtjN3oj5rsjPlPJkPhw2LCdwPZneATJuidyCN9_aem_S1sW3RIBYVhQoo-f6UgM1Q#"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm hover:text-blue-800"
@@ -159,7 +165,7 @@ function Footer() {
             <li className="flex items-center gap-3">
               <img src={tiktok} alt="tiktok" className="!w-[18px]" />
               <a
-                href="https://www.tiktok.com/@planier.vn"
+                href="https://www.tiktok.com/@Cwab.dyung"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm hover:text-blue-800"

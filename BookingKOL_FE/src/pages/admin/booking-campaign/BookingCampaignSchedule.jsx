@@ -23,7 +23,6 @@ import {
   Input,
   Tooltip,
   Descriptions,
-  Divider,
   Empty,
   Grid,
 } from "antd";
@@ -36,6 +35,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ArrowLeft,
   FileText,
 } from "lucide-react";
@@ -44,22 +45,20 @@ import {
   adminGetWorktimesByBooking,
   adminCreateWorktime,
   adminSearchFreeSlots,
-  adminAssignScheduledWorktime,
+  adminEditScheduledWorktime, // dùng API edit mới
 } from "../../../services/admin/AdminWorktimeCampaignAPI";
 import { adminGetCampaignBookingDetail } from "../../../services/admin/AdminBookingCampaignAPI";
 import {
   BOOKING_STATUS_LABEL,
   STATUS_TAG_COLOR,
-  PAYMENT_STATUS_LABEL,
-  PAYMENT_STATUS_COLOR,
 } from "../../../constants/mySingleBookingStatuses";
 
 dayjs.locale("vi");
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { RangePicker: TimeRangePicker } = TimePicker;
 const { useBreakpoint } = Grid;
 
-/** ===== Helpers (giống BookingCampaignDetail) ===== */
+/** ===== Helpers ===== */
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);
@@ -83,8 +82,8 @@ const formatCurrency = (value, currency = "VND") => {
   }).format(numeric);
 };
 
-const normalizeStatus = (status) =>
-  status && typeof status === "string" ? status.toUpperCase() : status;
+const normalizeUpper = (val) =>
+  val && typeof val === "string" ? val.toUpperCase() : val;
 
 const formatArrayText = (items) => {
   if (!Array.isArray(items) || !items.length) return "--";
@@ -94,7 +93,7 @@ const formatArrayText = (items) => {
     .join(", ");
 };
 
-// mapping nhỏ cho status campaign (để xử lý NEGOTIATING giống BookingCampaignDetail)
+// mapping nhỏ cho status campaign
 const CAMPAIGN_STATUS_LABEL = {
   REQUESTED: "Đang yêu cầu",
   NEGOTIATING: "Đang thương lượng",
@@ -139,6 +138,7 @@ const WORKTIME_STATUS_LABEL = {
   DELIVERED: "Đã giao",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
+  PENDING_ASSIGNMENT: "Chưa có KOL",
 };
 
 const WORKTIME_STATUS_COLOR = {
@@ -148,6 +148,21 @@ const WORKTIME_STATUS_COLOR = {
   DELIVERED: "gold",
   COMPLETED: "success",
   CANCELLED: "error",
+  PENDING_ASSIGNMENT: "default",
+};
+
+/** ===== Worktime role (kolRole) =====
+ *  KOL = Host chính
+ *  LIVE = Trợ live
+ */
+const WORKTIME_ROLE_LABEL = {
+  KOL: "Host chính",
+  LIVE: "Trợ live",
+};
+
+const WORKTIME_ROLE_COLOR = {
+  KOL: "geekblue",
+  LIVE: "purple",
 };
 
 export default function BookingCampaignSchedule() {
@@ -173,22 +188,28 @@ export default function BookingCampaignSchedule() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [localOverrides, setLocalOverrides] = useState({});
 
+  // ✅ auto-open dropdown KOL (edit)
+  const [editKolDropdownOpen, setEditKolDropdownOpen] = useState(false);
+
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
   const [createForm] = Form.useForm();
 
-  // Create: KOL options (optional)
+  // Create: KOL options
   const [kolOptions, setKolOptions] = useState([]);
   const [kolLoading, setKolLoading] = useState(false);
   const [slotByKolId, setSlotByKolId] = useState({});
 
-  // Edit: KOL options (optional)
+  // Edit: KOL options
   const [editKolOptions, setEditKolOptions] = useState([]);
   const [editKolLoading, setEditKolLoading] = useState(false);
   const [editSlotByKolId, setEditSlotByKolId] = useState({});
 
-  // ISO without milliseconds (fix BE parse / filter)
+  // ✅ Thu gọn / mở rộng phần “Thông tin Booking Campaign”
+  const [campaignInfoCollapsed, setCampaignInfoCollapsed] = useState(false);
+
+  // ISO without milliseconds
   const toIsoNoMs = (d) =>
     dayjs(d)
       .toISOString()
@@ -222,55 +243,101 @@ export default function BookingCampaignSchedule() {
     return [];
   };
 
-  // ✅ disabledTime: giới hạn 1–3 tiếng (UI khóa luôn)
+  // ✅ disabledTime: chỉ cho chọn trong khoảng 1–3 giờ
   const makeDisabledTimeMax3Hours = (form, fieldName = "timeRange") => {
     return (_date, type) => {
-      const range = form.getFieldValue(fieldName);
-      const start = Array.isArray(range) ? range?.[0] : null;
-      const end = Array.isArray(range) ? range?.[1] : null;
+      const range = form.getFieldValue(fieldName) || [];
+      const start = Array.isArray(range) ? range[0] : null;
+      const end = Array.isArray(range) ? range[1] : null;
 
       const startHour = start ? dayjs(start).hour() : null;
       const endHour = end ? dayjs(end).hour() : null;
 
-      let min = 0;
-      let max = 23;
+      let minHour = 0;
+      let maxHour = 23;
 
       if (type === "start") {
-        min = 0;
-        max = 22;
-
-        if (Number.isInteger(endHour)) {
-          min = Math.max(0, endHour - 3);
-          max = Math.min(22, endHour - 1);
+        // Đang chọn giờ BẮT ĐẦU
+        if (endHour != null) {
+          // start chỉ được chọn trong [end - 3, end - 1]
+          minHour = Math.max(0, endHour - 3);
+          maxHour = Math.max(minHour, endHour - 1);
+        } else {
+          // Chưa chọn end => chỉ chặn giờ 23 để luôn còn ít nhất 1h
+          minHour = 0;
+          maxHour = 22;
         }
       } else {
-        min = 1;
-        max = 23;
-
-        if (Number.isInteger(startHour)) {
-          min = Math.max(1, startHour + 1);
-          max = Math.min(23, startHour + 3);
+        // type === "end" - đang chọn giờ KẾT THÚC
+        if (startHour != null) {
+          // end chỉ được chọn trong [start + 1, start + 3]
+          minHour = Math.min(23, startHour + 1);
+          maxHour = Math.min(23, startHour + 3);
+        } else {
+          // Chưa chọn start => không cho chọn 0h để luôn > start
+          minHour = 1;
+          maxHour = 23;
         }
       }
 
       const disabledHours = () => {
-        if (min > max) return Array.from({ length: 24 }, (_, h) => h);
-        const arr = [];
-        for (let h = 0; h < 24; h++) if (h < min || h > max) arr.push(h);
-        return arr;
+        const res = [];
+        for (let h = 0; h < 24; h++) {
+          if (h < minHour || h > maxHour) res.push(h);
+        }
+        return res;
       };
 
+      // Chỉ cho chọn đúng phút :00
       const disabledMinutes = () => {
-        const arr = [];
-        for (let m = 0; m < 60; m++) if (m !== 0) arr.push(m);
-        return arr;
+        const res = [];
+        for (let m = 0; m < 60; m++) if (m !== 0) res.push(m);
+        return res;
       };
 
       return { disabledHours, disabledMinutes };
     };
   };
 
-  /** ===== Booking detail (để render "Thông tin Booking Campaign") ===== */
+  // ✅ VALIDATOR: để lỗi hiện dưới ô TimeRange
+  const makeTimeRangeValidator = (form) => async (_rule, range) => {
+    const workDate = form.getFieldValue("workDate");
+
+    if (!workDate) return Promise.resolve();
+    if (!Array.isArray(range) || range.length !== 2) return Promise.resolve();
+
+    const [startTime, endTime] = range;
+    if (!startTime || !endTime) return Promise.resolve();
+
+    const base = dayjs(workDate).startOf("day");
+    const startAt = base
+      .hour(dayjs(startTime).hour())
+      .minute(0)
+      .second(0)
+      .millisecond(0);
+
+    const endAt = base
+      .hour(dayjs(endTime).hour())
+      .minute(0)
+      .second(0)
+      .millisecond(0);
+
+    if (!endAt.isAfter(startAt)) {
+      return Promise.reject(
+        new Error("Giờ kết thúc phải lớn hơn giờ bắt đầu.")
+      );
+    }
+
+    const diff = endAt.diff(startAt, "minute");
+    if (diff < 60)
+      return Promise.reject(new Error("Lịch làm việc phải tối thiểu 1 giờ."));
+    if (diff > 180)
+      return Promise.reject(new Error("Lịch làm việc phải tối đa 3 giờ."));
+
+    return Promise.resolve();
+  };
+
+  /** ===== Booking detail ===== */
   const {
     data: bookingDetailResp,
     isLoading: loadingBookingDetail,
@@ -314,57 +381,6 @@ export default function BookingCampaignSchedule() {
     bookingRequestId,
     bookingRequestsFromCampaign,
   ]);
-
-  /** ===== Payment schedule columns ===== */
-  const paymentScheduleColumns = useMemo(
-    () => [
-      {
-        title: "Lần thanh toán",
-        dataIndex: "installmentNumber",
-        key: "installmentNumber",
-        width: 120,
-      },
-      {
-        title: "Số tiền",
-        dataIndex: "amount",
-        key: "amount",
-        render: (v) => formatCurrency(v),
-      },
-      {
-        title: "Hạn thanh toán",
-        dataIndex: "dueDate",
-        key: "dueDate",
-        render: (v) => formatDate(v),
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "status",
-        key: "status",
-        render: (v) => {
-          const s = normalizeStatus(v);
-          if (!s) return "--";
-          return (
-            <Tag color={PAYMENT_STATUS_COLOR[s] ?? "default"}>
-              {PAYMENT_STATUS_LABEL[s] ?? s}
-            </Tag>
-          );
-        },
-      },
-      {
-        title: "Mã giao dịch",
-        dataIndex: "transactionId",
-        key: "transactionId",
-        width: 220,
-      },
-      {
-        title: "Trạng thái giao dịch",
-        dataIndex: "transactionStatus",
-        key: "transactionStatus",
-        render: (v) => normalizeStatus(v) ?? "--",
-      },
-    ],
-    []
-  );
 
   // ===== Worktimes by bookingRequestId =====
   const {
@@ -429,7 +445,7 @@ export default function BookingCampaignSchedule() {
     });
   }, [worktimeList, worktimeFilterMode, worktimeFilterDate]);
 
-  // ===== Helpers build startAt/endAt from date + timeRange =====
+  // ===== build start/end from date + timeRange =====
   const buildStartEndFromDateAndRange = (workDate, timeRange) => {
     if (!workDate) throw new Error("Vui lòng chọn ngày thực hiện.");
     if (!Array.isArray(timeRange) || timeRange.length !== 2)
@@ -454,13 +470,13 @@ export default function BookingCampaignSchedule() {
     if (!endAt.isAfter(startAt)) throw new Error("Giờ kết thúc > giờ bắt đầu.");
 
     const diff = endAt.diff(startAt, "minute");
-    if (diff < 60) throw new Error("Tối thiểu 1 giờ.");
-    if (diff > 180) throw new Error("Tối đa 3 giờ.");
+    if (diff < 60) throw new Error("Lịch làm việc phải tối thiểu 1 giờ.");
+    if (diff > 180) throw new Error("Lịch làm việc phải tối đa 3 giờ.");
 
     return { startAt, endAt };
   };
 
-  // ===== Load KOL AVAILABLE for a given (workDate + timeRange)
+  // ===== fetch KOL free slots cover range =====
   const fetchAvailableKolsFor = async ({
     workDate,
     timeRange,
@@ -485,7 +501,7 @@ export default function BookingCampaignSchedule() {
 
     const map = {};
     for (const slot of list || []) {
-      const st = String(slot?.status || "").toUpperCase();
+      const st = normalizeUpper(slot?.status);
       if (st !== "AVAILABLE") continue;
 
       const s = slot?.startAt ? dayjs(slot.startAt) : null;
@@ -524,7 +540,6 @@ export default function BookingCampaignSchedule() {
       record?.kol?.name ||
       (currentKolId ? "KOL đã gán" : "");
 
-    // ✅ PRE-SEED option để Select KHÔNG nháy kolId
     setEditKolOptions(
       currentKolId
         ? [{ value: currentKolId, label: currentKolLabel || "KOL đã gán" }]
@@ -544,6 +559,8 @@ export default function BookingCampaignSchedule() {
       note: record?.note ?? null,
       kolId: currentKolId || undefined,
     });
+
+    setEditKolDropdownOpen(true);
   };
 
   const cancelEdit = () => {
@@ -552,9 +569,9 @@ export default function BookingCampaignSchedule() {
     editForm.resetFields();
     setEditKolOptions([]);
     setEditSlotByKolId({});
+    setEditKolDropdownOpen(false);
   };
 
-  // ✅ Auto load KOL options khi đang edit và user đổi ngày/giờ
   const watchedEditWorkDate = Form.useWatch("workDate", editForm);
   const watchedEditTimeRange = Form.useWatch("timeRange", editForm);
 
@@ -569,6 +586,8 @@ export default function BookingCampaignSchedule() {
       !watchedEditTimeRange[1]
     ) {
       setEditSlotByKolId({});
+      setEditKolOptions([]);
+      setEditKolDropdownOpen(false);
       return;
     }
 
@@ -578,6 +597,7 @@ export default function BookingCampaignSchedule() {
     const timer = setTimeout(async () => {
       try {
         setEditKolLoading(true);
+        setEditKolDropdownOpen(true);
 
         const { options, slotMap } = await fetchAvailableKolsFor({
           workDate: watchedEditWorkDate,
@@ -588,39 +608,83 @@ export default function BookingCampaignSchedule() {
 
         if (canceled) return;
 
+        const currentKolIdRaw = editForm.getFieldValue("kolId");
         const currentKolId =
-          (editingRecord?.kolId ? String(editingRecord.kolId) : null) ||
-          (editForm.getFieldValue("kolId")
-            ? String(editForm.getFieldValue("kolId"))
-            : null);
+          currentKolIdRaw != null && currentKolIdRaw !== ""
+            ? String(currentKolIdRaw)
+            : editingRecord?.kolId
+            ? String(editingRecord.kolId)
+            : null;
 
-        const currentKolLabel =
-          editingRecord?.kolName ||
-          editingRecord?.kol?.fullName ||
-          editingRecord?.kol?.name ||
-          (currentKolId ? "KOL đã gán" : "");
+        // rangeChanged?
+        let rangeChanged = true;
+        try {
+          const { startAt, endAt } = buildStartEndFromDateAndRange(
+            watchedEditWorkDate,
+            watchedEditTimeRange
+          );
+          const newStartIso = toIsoNoMs(startAt);
+          const newEndIso = toIsoNoMs(endAt);
 
-        const finalOptions = [...options];
+          const oldStartIso = editingRecord?.startAt
+            ? toIsoNoMs(dayjs(editingRecord.startAt))
+            : null;
+          const oldEndIso = editingRecord?.endAt
+            ? toIsoNoMs(dayjs(editingRecord.endAt))
+            : null;
 
-        // ✅ đảm bảo KOL hiện tại luôn có label (không show kolId)
-        if (
-          currentKolId &&
-          !finalOptions.some((o) => String(o.value) === currentKolId)
-        ) {
-          finalOptions.unshift({
-            value: currentKolId,
-            label: currentKolLabel || "KOL đã gán",
-          });
+          if (oldStartIso && oldEndIso) {
+            rangeChanged =
+              newStartIso !== oldStartIso || newEndIso !== oldEndIso;
+          }
+        } catch (_err) {
+          rangeChanged = true;
         }
 
         setEditSlotByKolId(slotMap);
-        setEditKolOptions(finalOptions);
+
+        if (rangeChanged) {
+          setEditKolOptions(options);
+
+          // nếu KOL cũ không còn AVAILABLE hoặc list rỗng => bỏ chọn
+          if (
+            (currentKolId && !slotMap?.[currentKolId]) ||
+            (options?.length || 0) === 0
+          ) {
+            editForm.setFieldsValue({ kolId: undefined });
+          }
+
+          setEditKolDropdownOpen(true);
+        } else {
+          // chưa đổi giờ: giữ option KOL cũ nếu cần để không bị nháy
+          const currentKolLabel =
+            editingRecord?.kolName ||
+            editingRecord?.kol?.fullName ||
+            editingRecord?.kol?.name ||
+            (currentKolId ? "KOL đã gán" : "");
+
+          const finalOptions = [...options];
+          if (
+            currentKolId &&
+            !finalOptions.some((o) => String(o.value) === currentKolId)
+          ) {
+            finalOptions.unshift({
+              value: currentKolId,
+              label: currentKolLabel || "KOL đã gán",
+            });
+          }
+
+          setEditKolOptions(finalOptions);
+          setEditKolDropdownOpen(true);
+        }
       } catch (e) {
         if (canceled) return;
         message.error(
           e?.message || "Không tải được danh sách KOL rảnh (edit)."
         );
         setEditSlotByKolId({});
+        setEditKolOptions([]);
+        setEditKolDropdownOpen(false);
       } finally {
         if (!canceled) setEditKolLoading(false);
       }
@@ -644,16 +708,25 @@ export default function BookingCampaignSchedule() {
         values.timeRange
       );
 
-      const selectedKolId = values?.kolId ? String(values.kolId) : null;
       const scheduledWorkTimeId = getScheduledId(record);
+      if (!scheduledWorkTimeId) {
+        message.error("Không tìm thấy scheduledWorkTimeId để cập nhật.");
+        return;
+      }
 
-      // nếu user chọn KOL => gọi assign
+      const selectedKolId = values?.kolId ? String(values.kolId) : null;
+
+      // chuẩn hóa payload thời gian + ghi chú
+      const basePayload = {
+        scheduledWorkTimeId,
+        startAt: toIsoNoMs(startAt),
+        endAt: toIsoNoMs(endAt),
+        note: values.note || null,
+      };
+
+      // Nếu có chọn KOL thì lấy slot tương ứng để kèm kolId + availabilityId
+      let availabilityId;
       if (selectedKolId) {
-        if (!scheduledWorkTimeId) {
-          message.error("Không tìm thấy scheduledWorkTimeId để gán KOL.");
-          return;
-        }
-
         const slot = editSlotByKolId?.[selectedKolId];
         if (!slot?.id) {
           message.error(
@@ -661,26 +734,31 @@ export default function BookingCampaignSchedule() {
           );
           return;
         }
-
-        await adminAssignScheduledWorktime({
-          scheduledWorkTimeId,
-          kolId: selectedKolId,
-          availabilityId: slot.id,
-        });
+        availabilityId = slot.id;
       }
 
-      // update UI time/note (vì chưa có API update time/note)
+      // ✅ Gọi API edit: update startAt, endAt, note (+ optional KOL & availabilityId)
+      await adminEditScheduledWorktime({
+        ...basePayload,
+        ...(selectedKolId && availabilityId
+          ? { kolId: selectedKolId, availabilityId }
+          : {}),
+      });
+
+      // cập nhật tạm ở FE để table thấy ngay
       setLocalOverrides((prev) => ({
         ...prev,
         [key]: {
-          startAt: toIsoNoMs(startAt),
-          endAt: toIsoNoMs(endAt),
-          note: values.note || null,
+          startAt: basePayload.startAt,
+          endAt: basePayload.endAt,
+          note: basePayload.note,
         },
       }));
 
       message.success(
-        selectedKolId ? "Đã cập nhật & gán/đổi KOL thành công." : "Đã cập nhật."
+        selectedKolId
+          ? "Đã cập nhật lịch & KOL cho ca làm việc."
+          : "Đã cập nhật lịch làm việc."
       );
 
       setEditingKey(null);
@@ -688,8 +766,10 @@ export default function BookingCampaignSchedule() {
       editForm.resetFields();
       setEditKolOptions([]);
       setEditSlotByKolId({});
+      setEditKolDropdownOpen(false);
       await refetchWorktimes();
     } catch (e) {
+      if (e?.errorFields?.length) return; // lỗi validate -> đã hiện dưới input
       message.error(e?.message || "Cập nhật thất bại.");
     }
   };
@@ -710,7 +790,7 @@ export default function BookingCampaignSchedule() {
     createForm.setFieldsValue({
       workDate: dayjs(),
       timeRange: undefined,
-      kolId: undefined, // optional
+      kolId: undefined,
       note: null,
     });
   };
@@ -723,7 +803,6 @@ export default function BookingCampaignSchedule() {
     createForm.resetFields();
   };
 
-  // ✅ AUTO load KOL available for CREATE when date+time changes
   const watchedWorkDate = Form.useWatch("workDate", createForm);
   const watchedTimeRange = Form.useWatch("timeRange", createForm);
 
@@ -811,6 +890,7 @@ export default function BookingCampaignSchedule() {
       closeCreateModal();
       await refetchWorktimes();
     } catch (e) {
+      if (e?.errorFields?.length) return;
       message.error(e?.message || "Tạo lịch thất bại.");
     } finally {
       setCreateSaving(false);
@@ -825,12 +905,12 @@ export default function BookingCampaignSchedule() {
     editForm.resetFields();
     setEditKolOptions([]);
     setEditSlotByKolId({});
+    setEditKolDropdownOpen(false);
 
     await Promise.allSettled([refetchBookingDetail(), refetchWorktimes()]);
     message.success("Đã làm mới.");
   };
 
-  // ✅ nút chuyển ngày/tuần/tháng theo mode
   const shiftFilterDate = (dir) => {
     if (worktimeFilterMode === "all") return;
 
@@ -868,6 +948,7 @@ export default function BookingCampaignSchedule() {
             name="workDate"
             rules={[{ required: true, message: "Chọn ngày" }]}
             style={{ marginBottom: 0 }}
+            validateTrigger={["onChange", "onBlur"]}
           >
             <DatePicker className="w-full" format="DD/MM/YYYY" />
           </Form.Item>
@@ -877,7 +958,7 @@ export default function BookingCampaignSchedule() {
     {
       title: "Giờ thực hiện",
       key: "workTimeCol",
-      width: 220,
+      width: 240,
       render: (_v, record) => {
         if (!isEditing(record)) {
           const s = record?.startAt ? dayjs(record.startAt) : null;
@@ -888,8 +969,13 @@ export default function BookingCampaignSchedule() {
         return (
           <Form.Item
             name="timeRange"
-            rules={[{ required: true, message: "Chọn khoảng giờ" }]}
+            dependencies={["workDate"]}
+            rules={[
+              { required: true, message: "Chọn khoảng giờ" },
+              { validator: makeTimeRangeValidator(editForm) },
+            ]}
             style={{ marginBottom: 0 }}
+            validateTrigger={["onChange", "onBlur"]}
           >
             <TimeRangePicker
               format="HH"
@@ -904,15 +990,18 @@ export default function BookingCampaignSchedule() {
       },
     },
     {
-      title: "Trạng thái",
-      dataIndex: "status",
-      key: "status",
-      width: 160,
+      title: "Vai trò",
+      dataIndex: "kolRole",
+      key: "kolRole",
+      width: 140,
       render: (v) => {
-        const s = String(v || "").toUpperCase();
-        const label = WORKTIME_STATUS_LABEL[s] || v || "--";
-        const color = WORKTIME_STATUS_COLOR[s] || "default";
-        return <Tag color={color}>{label}</Tag>;
+        const role = normalizeUpper(v);
+        if (!role) return "--";
+        return (
+          <Tag color={WORKTIME_ROLE_COLOR[role] ?? "default"}>
+            {WORKTIME_ROLE_LABEL[role] ?? role}
+          </Tag>
+        );
       },
     },
     {
@@ -935,10 +1024,12 @@ export default function BookingCampaignSchedule() {
               showSearch
               allowClear
               loading={editKolLoading}
+              open={editKolDropdownOpen}
+              onDropdownVisibleChange={(open) => setEditKolDropdownOpen(open)}
               placeholder={
                 editKolLoading
                   ? "Đang tải KOL rảnh..."
-                  : "Chọn KOL (không bắt buộc)"
+                  : "Chọn KOL cho lịch làm việc"
               }
               options={editKolOptions}
               optionFilterProp="label"
@@ -952,6 +1043,21 @@ export default function BookingCampaignSchedule() {
               }
             />
           </Form.Item>
+        );
+      },
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      width: 160,
+      render: (v) => {
+        const s = normalizeUpper(v);
+        if (!s) return "--";
+        return (
+          <Tag color={WORKTIME_STATUS_COLOR[s] ?? "default"}>
+            {WORKTIME_STATUS_LABEL[s] ?? s}
+          </Tag>
         );
       },
     },
@@ -1037,7 +1143,7 @@ export default function BookingCampaignSchedule() {
           </div>
         </div>
 
-        {/* ✅ Thông tin Booking Campaign */}
+        {/* ✅ Thông tin Booking Campaign (có thu gọn) */}
         <Card
           className="shadow-sm"
           bordered={false}
@@ -1047,9 +1153,25 @@ export default function BookingCampaignSchedule() {
               <span>Thông tin Booking Campaign</span>
             </Space>
           }
+          extra={
+            <Button
+              size="small"
+              type="default"
+              icon={
+                campaignInfoCollapsed ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronUp size={16} />
+                )
+              }
+              onClick={() => setCampaignInfoCollapsed((p) => !p)}
+            >
+              {campaignInfoCollapsed ? "Mở rộng" : "Thu gọn"}
+            </Button>
+          }
           loading={loadingBookingDetail}
         >
-          {errorBookingDetail ? (
+          {campaignInfoCollapsed ? null : errorBookingDetail ? (
             <Alert
               type="error"
               showIcon
@@ -1058,30 +1180,7 @@ export default function BookingCampaignSchedule() {
             />
           ) : bookingRequestsFromCampaign.length ? (
             bookingRequestsFromCampaign.map((record, index) => {
-              // ✅ sort dueDate tăng dần
-              const schedules = (
-                Array.isArray(record?.paymentSchedules)
-                  ? record.paymentSchedules
-                  : []
-              )
-                .slice()
-                .sort((a, b) => {
-                  const da = a?.dueDate ? dayjs(a.dueDate) : null;
-                  const db = b?.dueDate ? dayjs(b.dueDate) : null;
-
-                  const va =
-                    da && da.isValid()
-                      ? da.valueOf()
-                      : Number.POSITIVE_INFINITY;
-                  const vb =
-                    db && db.isValid()
-                      ? db.valueOf()
-                      : Number.POSITIVE_INFINITY;
-
-                  return va - vb;
-                });
-
-              const bookingStatus = normalizeStatus(record?.status);
+              const bookingStatus = normalizeUpper(record?.status);
 
               const bookingStatusLabel =
                 bookingStatus === "NEGOTIATING"
@@ -1095,24 +1194,11 @@ export default function BookingCampaignSchedule() {
                   ? CAMPAIGN_STATUS_COLOR.NEGOTIATING
                   : STATUS_TAG_COLOR[bookingStatus] ?? "default";
 
-              const contractStatus = normalizeStatus(record?.contractStatus);
+              const contractStatus = normalizeUpper(record?.contractStatus);
               const contractStatusLabel =
                 CONTRACT_STATUS_LABEL[contractStatus] ?? contractStatus ?? "--";
               const contractStatusColor = getStatusColor(contractStatus);
 
-              const contractFileUrl =
-                record?.contractFileUrl?.match(/https?:\/\/\S+/)?.[0] ??
-                record?.contractFileUrl ??
-                "";
-
-              const contractFileName = contractFileUrl
-                ? decodeURIComponent(
-                    contractFileUrl.split("/").pop().split("?")[0]
-                  )
-                : null;
-
-              // ✅ 2 trường bạn nói: campaignKols / campaignLives
-              // fallback về kols / lives nếu BE trả khác
               const kolsForBooking = Array.isArray(record?.campaignKols)
                 ? record.campaignKols
                 : Array.isArray(record?.kols)
@@ -1154,27 +1240,36 @@ export default function BookingCampaignSchedule() {
                       </Text>
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Kiểu lặp">
-                      {record?.repeatType ?? "--"}
+                    {/* Ngày bắt đầu / kết thúc chiến dịch */}
+                    <Descriptions.Item label="Ngày bắt đầu chiến dịch">
+                      {formatDate(record?.startDate)}
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Lặp đến">
-                      {formatDate(record?.repeatUntil)}
+                    <Descriptions.Item label="Ngày kết thúc">
+                      {formatDate(record?.endDate)}
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Giá trị hợp đồng">
-                      {formatCurrency(record?.contractAmount)}
+                    {/* ✅ 4 trường mới: hours, unitPrice, discount, totalAmount */}
+                    <Descriptions.Item label="Tổng số giờ">
+                      {record?.hours != null ? `${record.hours} giờ` : "--"}
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Tổng giá trị booking">
-                      {formatCurrency(record?.amount)}
+                    <Descriptions.Item label="Đơn giá">
+                      {formatCurrency(record?.unitPrice)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Giảm giá (%)">
+                      {formatCurrency(record?.discount)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Tổng tiền">
+                      {formatCurrency(record?.totalAmount)}
                     </Descriptions.Item>
 
                     <Descriptions.Item label="Người tạo (email)">
                       <Text copyable>{record?.createdByEmail ?? "--"}</Text>
                     </Descriptions.Item>
 
-                    {/* ✅ CHỈ HIỆN NẾU CÓ DATA */}
                     {kolsForBooking.length > 0 && (
                       <Descriptions.Item label="KOL Livestream">
                         {formatArrayText(kolsForBooking)}
@@ -1309,7 +1404,7 @@ export default function BookingCampaignSchedule() {
                   rowKey={(r) => getRowKey(r)}
                   loading={loadingWorktimes}
                   pagination={false}
-                  scroll={{ x: 1400 }}
+                  scroll={{ x: 1750 }}
                 />
               </Form>
             </>
@@ -1333,6 +1428,7 @@ export default function BookingCampaignSchedule() {
                   label="Ngày thực hiện"
                   name="workDate"
                   rules={[{ required: true, message: "Chọn ngày thực hiện" }]}
+                  validateTrigger={["onChange", "onBlur"]}
                 >
                   <DatePicker className="w-full" format="DD/MM/YYYY" />
                 </Form.Item>
@@ -1342,7 +1438,12 @@ export default function BookingCampaignSchedule() {
                 <Form.Item
                   label="Giờ thực hiện"
                   name="timeRange"
-                  rules={[{ required: true, message: "Chọn giờ thực hiện" }]}
+                  dependencies={["workDate"]}
+                  rules={[
+                    { required: true, message: "Chọn giờ thực hiện" },
+                    { validator: makeTimeRangeValidator(createForm) },
+                  ]}
+                  validateTrigger={["onChange", "onBlur"]}
                 >
                   <TimeRangePicker
                     format="HH"
@@ -1360,9 +1461,9 @@ export default function BookingCampaignSchedule() {
             </Row>
 
             <Form.Item
-              label="Chọn KOL / trợ live (không bắt buộc)"
+              label="Chọn KOL / trợ live cho ca làm việc"
               name="kolId"
-              tooltip="Khi chọn KOL, hệ thống tự gán kolId + availabilityId theo lịch rảnh cover đúng khoảng giờ"
+              tooltip="Bạn có thể chọn KOL đã đăng ký lịch trong khoảng giờ này để gán cho ca làm việc."
             >
               <Select
                 showSearch
@@ -1372,8 +1473,8 @@ export default function BookingCampaignSchedule() {
                   !watchedWorkDate || !watchedTimeRange
                     ? "Chọn ngày và giờ trước"
                     : kolLoading
-                    ? "Đang tải danh sách KOL rảnh..."
-                    : "Chọn KOL "
+                    ? "Đang tải danh sách KOL đã đăng ký..."
+                    : "Chọn KOL"
                 }
                 options={kolOptions}
                 optionFilterProp="label"
@@ -1395,7 +1496,8 @@ export default function BookingCampaignSchedule() {
             </Form.Item>
 
             <Text type="secondary">
-              Giới hạn thời gian: tối thiểu 1 giờ, tối đa 3 giờ.
+              Giới hạn thời gian: Lịch làm việc phải tối thiểu 1 giờ, tối đa 3
+              giờ.
             </Text>
           </Form>
         </Modal>
