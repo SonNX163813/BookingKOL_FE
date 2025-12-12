@@ -1,6 +1,15 @@
-﻿export const heroBadges = ["Realtime KPI", "ROI-driven"];
+﻿import bookingImg from "../../../assets/services/1.jpg";
+import trainingImg from "../../../assets/services/5.jpg";
+import studioImg from "../../../assets/services/3.jpg";
+import operationImg from "../../../assets/services/6.jpg";
+import affiliateImg from "../../../assets/services/81.jpg";
+// // nếu có:
+import trackingImg from "../../../assets/services/12.png";
+import crmImg from "../../../assets/services/bi.png";
 
-export const introHighlights = [
+export const heroBadges = ["Realtime KPI", "ROI-driven"];
+
+export const introHighlights2 = [
   "Thực chiến TMĐT, kinh nghiệm đa ngành.",
   "Hệ sinh thái khép kín.",
   "Mạng lưới hàng ngàn KOL/KOC.",
@@ -11,17 +20,19 @@ export const servicesTabs = [
   {
     key: "booking",
     title: "Booking KOL/KOC",
+    image: bookingImg,
     description:
       "Tư vấn và lựa chọn KOL/KOC phù hợp mục tiêu, quản lý booking end-to-end từ deal giá đến hợp đồng.",
     bullets: [
-      "Danh sách verified theo ngành & ngân sách",
-      "Quy trình phê duyệt nội dung 2 chiều",
-      "Theo dõi realtime hiệu suất từng KOL",
+      "Đội ngũ livestream chuyên nghiệp, đa ngành",
+      "Kiểm duyệt & đánh giá chất lượng KOL",
+      "Theo dõi hiệu suất KOL cho từng phiên Live",
     ],
   },
   {
     key: "training",
     title: "Đào tạo Livestream",
+    image: trainingImg,
     description:
       "Xây dựng đội ngũ livestream nội bộ với giáo trình độc quyền, kịch bản chuyển đổi cao.",
     bullets: [
@@ -32,35 +43,54 @@ export const servicesTabs = [
   },
   {
     key: "studio",
-    title: "Setup Livestream Studio",
+    title: "Setup Livestream",
+    image: studioImg,
     description:
       "Thiết kế, thi công và tối ưu studio livestream chuẩn e-commerce, tối ưu âm thanh – ánh sáng.",
     bullets: [
-      "Blueprint studio đa bối cảnh",
-      "Trang thiết bị chuẩn thương mại điện tử",
-      "Hệ thống lighting & camera automation",
+      "Setup phòng live chuẩn studio",
+      "Host, trợ lý, kỹ thuật chuyên nghiệp",
+      "Tối ưu chuyển đổi theo phiên live",
     ],
   },
   {
     key: "operation",
-    title: "Vận hành Livestream",
+    title: "Livestream Production",
+    image: operationImg,
     description:
-      "Đội ngũ producer, CSKH, hậu cần theo mô hình war-room để giữ tỷ lệ chuyển đổi ổn định.",
+      "Sản xuất livestream trọn gói: kịch bản, set up, kỹ thuật đa góc máy, vận hành realtime, tối ưu tương tác và chuyển đổi.",
     bullets: [
-      "TikTok Shop / Shopee Live ready",
-      "Timeline on-air chi tiết từng phút",
-      "Dashboard KPI realtime & báo cáo",
+      "Tối ưu quy trình vận hành cho brand/dự án lớn",
+      "Thiết kế concept room",
+      "Hệ thống ánh sáng, camera, âm thanh chuyên nghiệp",
     ],
   },
   {
     key: "affiliate",
     title: "Affiliate & MCN",
+    image: affiliateImg,
     description:
       "Mở rộng doanh thu qua mạng lưới affiliate đa kênh, kết nối creator làm đại sứ.",
     bullets: [
       "Quản lý hoa hồng & chi phí linh hoạt",
       "API kết nối sàn & hệ thống CRM",
       "Scorecard đánh giá mỗi chiến dịch",
+    ],
+  },
+
+  // ✅ NEW 1
+
+  // ✅ NEW 2
+  {
+    key: "crm",
+    title: "Hệ thống CRM & Dashboard KPI",
+    image: crmImg,
+    description:
+      "CRM & Dashboard KPI giúp quản trị khách hàng, theo dõi hiệu suất realtime, tối ưu doanh thu, tự động báo cáo, cảnh báo thông minh.",
+    bullets: [
+      "Dữ liệu khách hàng tập trung, dễ quản trị.",
+      "KPI realtime, xem nhanh theo kênh/SKU.",
+      "Báo cáo tự động, cảnh báo lệch mục tiêu.",
     ],
   },
 ];
@@ -178,3 +208,30 @@ export const processSteps = [
     description: "Tổng kết KPI, bài học & chiến lược tiếp theo.",
   },
 ];
+// src/components/home/nexusLanding/data.js
+export const introQuoteLines = [
+  "Chúng tôi không chỉ vận hành livestream.",
+  "Chúng tôi xây dựng tương lai của Livestream Commerce.",
+];
+
+export const introHighlights = [
+  {
+    title: "Dựa trên dữ liệu",
+    desc: "Mọi quyết định được tối ưu bằng insight đa nền tảng",
+  },
+  {
+    title: "Dựa trên công nghệ",
+    desc: "Công cụ quản lý phiên, tracking sản phẩm, và phân tích hiệu suất",
+  },
+  {
+    title: "Dựa trên thực chiến",
+    desc: "Đội ngũ 5 năm kinh nghiệm, hơn 20.000 giờ livestream",
+  },
+];
+
+export const ceoInfo = {
+  role: "CEO",
+  name: "Bryan Nguyễn",
+  bgText: "BRYAN\nNGUYEN",
+  monogram: "BN",
+};

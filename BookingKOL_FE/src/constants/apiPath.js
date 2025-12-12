@@ -85,6 +85,7 @@ export const API_PATHS = {
     getScheduledByBooking:
       "/v1/availabilities/admin/scheduled-worktime/booking",
     scheduledAssign: "/v1/availabilities/admin/scheduled-worktime/assign",
+    scheduledEdit: "/v1/availabilities/admin/scheduled-worktime/edit",
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",

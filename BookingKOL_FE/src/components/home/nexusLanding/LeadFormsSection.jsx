@@ -320,24 +320,14 @@ const LeadFormsSection = () => {
       <Container maxWidth="lg" sx={{ py: { xs: 8, md: 10 } }}>
         <Stack
           spacing={2}
-          sx={{ textAlign: "center", mb: { xs: 6, md: 8 }, color: "#0f172a" }}
+          sx={{ textAlign: "center", mb: { xs: 6, md: 8 }, color: "#0b4aa2" }}
         >
-          <Typography
-            variant="overline"
-            sx={{
-              fontSize: "1rem",
-              letterSpacing: 2,
-              color: "rgba(15, 23, 42, 0.55)",
-            }}
-          >
-            Lead & CRM Hub
-          </Typography>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
             Kết nối nhanh với đội ngũ Nexus
           </Typography>
           <Typography variant="body1" sx={{ color: "rgba(15, 23, 42, 0.68)" }}>
-            Chọn form phù hợp để được tư vấn chiến dịch hoặc ứng tuyển trở thành
-            KOL/KOC trong mạng lưới của chúng tôi.
+            Sẵn sàng tăng trưởng qua Livestream Commerce? → Đặt lịch tư vấn cùng
+            CEO
           </Typography>
         </Stack>
 

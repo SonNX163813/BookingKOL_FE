@@ -1,70 +1,102 @@
 import React from "react";
 import { Box } from "@mui/material";
+
 import HeroBanner from "../../components/home/nexusLanding/HeroBanner";
+import ServicesSection from "../../components/home/nexusLanding/ServicesSection";
 import IntroSection from "../../components/home/nexusLanding/IntroSection";
 import CEOMessage from "../../components/home/nexusLanding/CEOMessage";
 import WhyChooseSection from "../../components/home/nexusLanding/WhyChooseSection";
-import ServicesSection from "../../components/home/nexusLanding/ServicesSection";
 import IndustriesSection from "../../components/home/nexusLanding/IndustriesSection";
 import CaseStudiesSection from "../../components/home/nexusLanding/CaseStudiesSection";
 import ProcessSection from "../../components/home/nexusLanding/ProcessSection";
 import LeadFormsSection from "../../components/home/nexusLanding/LeadFormsSection";
 
-const pageBackground = {
+import ScrollReveal from "../../components/home/nexusLanding/ScrollReveal";
+
+const pageSx = {
   minHeight: "100vh",
-  // backgroundColor: "#ffffff",
-  // backgroundImage: `
-  //   radial-gradient(circle at 12% 18%, rgba(141, 226, 237, 0.55), rgba(255, 255, 255, 0) 52%),
-  //   radial-gradient(circle at 88% 12%, rgba(147, 206, 246, 0.55), rgba(255, 255, 255, 0) 52%),
-  //   radial-gradient(circle at 50% 100%, rgba(74, 116, 218, 0.28), rgba(255, 255, 255, 0.85) 70%)
-  // `,
+  position: "relative",
+  overflow: "hidden",
+  backgroundColor: "#fff",
+  isolation: "isolate",
+};
+
+const bgLayerSx = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 0,
+  pointerEvents: "none",
+  backgroundColor: "#fff",
+  // ✅ NGANG trái -> phải
+  backgroundImage:
+    "linear-gradient(90deg, rgba(30, 201, 253, 0.2) 0%, rgba(224, 163, 194, 0.32) 100%)",
+};
+
+const contentSx = {
+  position: "relative",
+  zIndex: 1,
   display: "flex",
   flexDirection: "column",
 };
-const componentSx = {
-  backgroundImage: `
-  radial-gradient(circle at 50% 50%, rgba(141, 226, 237, 0.85) 0%, rgba(255, 255, 255, 0.9) 65%),
-  radial-gradient(circle at 15% 20%, rgba(147, 206, 246, 0.55) 0%, rgba(255, 255, 255, 0) 60%),
-  radial-gradient(circle at 85% 10%, rgba(74, 116, 218, 0.45) 0%, rgba(255, 255, 255, 0) 70%)
-`,
-};
-const sectionsWrapperSx = {
-  display: "flex",
-  flexDirection: "column",
-  gap: { xs: 6, md: 8 },
-  flexGrow: 1,
-};
+
+const sectionWrapSx = { background: "transparent" };
 
 const HomePage = () => {
   return (
-    <Box sx={pageBackground}>
-      <Box component="main">
-        <Box sx={componentSx}>
+    <Box sx={pageSx}>
+      <Box sx={bgLayerSx} aria-hidden />
+
+      <Box component="main" sx={contentSx}>
+        <Box sx={sectionWrapSx}>
           <HeroBanner />
         </Box>
-        <Box sx={componentSx}>
-          <IntroSection />
+
+        <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <ServicesSection />
+          </ScrollReveal>
         </Box>
-        <Box sx={componentSx}>
-          <CEOMessage />
+
+        <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <IntroSection />
+          </ScrollReveal>
         </Box>
-        <Box sx={componentSx}>
-          <WhyChooseSection />
+
+        <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <CEOMessage />
+          </ScrollReveal>
         </Box>
-        <Box sx={componentSx}>
-          <ServicesSection />
+
+        {/* <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <WhyChooseSection />
+          </ScrollReveal>
+        </Box> */}
+
+        <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <IndustriesSection />
+          </ScrollReveal>
         </Box>
-        <Box sx={componentSx}>
-          <IndustriesSection />
-        </Box>
-        <Box sx={componentSx}>
-          <CaseStudiesSection />
-        </Box>
-        <Box sx={componentSx}>
-          <ProcessSection />
-        </Box>
-        <Box sx={componentSx}>
-          <LeadFormsSection />
+
+        {/* <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <CaseStudiesSection />
+          </ScrollReveal>
+        </Box> */}
+
+        {/* <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.2} y={18}>
+            <ProcessSection />
+          </ScrollReveal>
+        </Box> */}
+
+        <Box sx={sectionWrapSx}>
+          <ScrollReveal amount={0.15} y={18}>
+            <LeadFormsSection />
+          </ScrollReveal>
         </Box>
       </Box>
     </Box>

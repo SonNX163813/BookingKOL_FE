@@ -527,7 +527,7 @@ export default function KolWorkRegistrationMui({
       if (hit) {
         return (
           `Ca ${i + 1} (${labelOf(pickedDate, s.start, s.end)}) ` +
-          `nằm trong khoảng không khả dụng do lịch đã đặt (bao gồm đệm ±${MIN_GAP_MINUTES}’).`
+          `đã trùng với lịch đã đăng ký hoặc lịch đã được đặt.`
         );
       }
     }
