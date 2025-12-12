@@ -71,9 +71,18 @@ const normalizeSummary = (payload = {}) => {
   };
 };
 
-export const getKolDashboardSummary = async ({ signal } = {}) => {
+export const getKolDashboardSummary = async ({
+  signal,
+  startDate,
+  endDate,
+} = {}) => {
+  const params = Object.create(null);
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+
   const payload = await get({
     url: API_PATHS.DASHBOARD.kolSummary,
+    params,
     config: signal ? { signal } : undefined,
   });
 
