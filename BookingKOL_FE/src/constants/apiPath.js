@@ -109,6 +109,7 @@ export const API_PATHS = {
 
   DASHBOARD: {
     adminSummary: "/v1/admin/dashboard/summary",
+    kolSummary: "/v1/kol/dashboard/summary",
   },
   FEEDBACK_ADMIN: {
     // GET /v1/admin/feedbacks/kol/{kolId}?page=&size=&minRating=&fromDate=&toDate=
