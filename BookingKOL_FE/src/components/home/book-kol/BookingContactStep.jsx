@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Button,
   Card,
   CardContent,
@@ -18,6 +19,9 @@ import AttachmentRoundedIcon from "@mui/icons-material/AttachmentRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
 import { toast } from "react-toastify";
+
+const HANOI_PROVINCE_ENDPOINT =
+  "https://provinces.open-api.vn/api/v2/p/1?depth=2";
 
 const BookingContactStep = ({
   contact,
@@ -49,6 +53,71 @@ const BookingContactStep = ({
     (option) => option.value === contact.platform
   );
   const isOtherSelected = selectedPlatformOption?.isOther === true;
+
+  const [provinceName, setProvinceName] = useState("");
+  const [wards, setWards] = useState([]);
+  const [wardsLoading, setWardsLoading] = useState(false);
+  const [wardsError, setWardsError] = useState("");
+  const [detailAddress, setDetailAddress] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchHanoiWards = async () => {
+      setWardsLoading(true);
+      setWardsError("");
+      try {
+        const response = await fetch(HANOI_PROVINCE_ENDPOINT, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch wards");
+        }
+        const data = await response.json();
+        setProvinceName(data?.name || "Thành phố Hà Nội");
+        setWards(Array.isArray(data?.wards) ? data.wards : []);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setWardsError("Không tải được danh sách phường/xã. Vui lòng thử lại.");
+        setProvinceName("Thành phố Hà Nội");
+      } finally {
+        if (!controller.signal.aborted) {
+          setWardsLoading(false);
+        }
+      }
+    };
+
+    fetchHanoiWards();
+    return () => controller.abort();
+  }, []);
+
+  const selectedWard = useMemo(
+    () =>
+      wards.find(
+        (ward) => String(ward.code) === String(selectedWardCode || "")
+      ) || null,
+    [selectedWardCode, wards]
+  );
+
+  useEffect(() => {
+    if (selectedWardCode || !wards.length) return;
+    const provinceLabel = provinceName || "Thành phố Hà Nội";
+    const target = contact.location?.trim() || "";
+    if (!target) return;
+    const matched = wards.find(
+      (ward) => target === `${ward.name}, ${provinceLabel}`
+    );
+    if (matched) setSelectedWardCode(matched.code);
+  }, [contact.location, provinceName, selectedWardCode, wards]);
+
+  const buildLocation = (wardName, detail) => {
+    const provinceLabel = provinceName || "Thành phố Hà Nội";
+    const wardLabel = wardName ? `${wardName}, ${provinceLabel}` : "";
+    if (detail && wardLabel) return `${detail}, ${wardLabel}`;
+    if (wardLabel) return wardLabel;
+    return detail || "";
+  };
 
   const handlePlatformChange = (value) => {
     onContactChange("platform", value);
@@ -144,7 +213,6 @@ const BookingContactStep = ({
             },
           }}
         />
-
         <TextField
           label="Email liên hệ "
           value={contact.email}
@@ -167,7 +235,6 @@ const BookingContactStep = ({
             },
           }}
         />
-
         <TextField
           label="Số điện thoại "
           value={contact.phone}
@@ -191,7 +258,6 @@ const BookingContactStep = ({
             },
           }}
         />
-
         <TextField
           label="Nền tảng livestream "
           value={contact.platform}
@@ -228,7 +294,6 @@ const BookingContactStep = ({
             </MenuItem>
           ))}
         </TextField>
-
         {platformError && onReloadPlatforms ? (
           <Button
             variant="text"
@@ -239,7 +304,6 @@ const BookingContactStep = ({
             Thử tải lại danh sách nền tảng
           </Button>
         ) : null}
-
         {isOtherSelected ? (
           <TextField
             label="Nền tảng cụ thể "
@@ -264,15 +328,86 @@ const BookingContactStep = ({
             }}
           />
         ) : null}
+        <TextField
+          label="Tỉnh / Thành phố "
+          value={provinceName || "Đang tải..."}
+          helperText="Dịch vụ hiện đang khả dụng tại Hà Nội"
+          InputProps={{ readOnly: true }}
+          error={Boolean(wardsError)}
+          required
+          InputLabelProps={{
+            required: true,
+            sx: {
+              "& .MuiFormLabel-asterisk": {
+                color: "error.main",
+              },
+            },
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: "16px",
+              backgroundColor: STYLE.subtleSurface,
+            },
+          }}
+        />
+        <Autocomplete
+          options={wards}
+          loading={wardsLoading}
+          value={selectedWard}
+          onChange={(_, ward) => {
+            const wardName = ward?.name || "";
+            setSelectedWardCode(ward?.code || "");
+            const locationLabel = buildLocation(wardName, detailAddress);
+            onContactChange("location", locationLabel);
+          }}
+          getOptionLabel={(option) => option?.name || ""}
+          isOptionEqualToValue={(option, value) =>
+            String(option?.code) === String(value?.code)
+          }
+          noOptionsText={
+            wardsLoading ? "Đang tải phường/xã..." : "Không tìm thấy phường/xã"
+          }
+          disabled={wardsLoading || (!wards.length && !wardsError)}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Phường / Xã tại Hà Nội "
+              placeholder={wardsLoading ? "Đang tải..." : "Tìm phường/xã"}
+              error={Boolean(errors.location) || Boolean(wardsError)}
+              helperText={errors.location || wardsError || undefined}
+              required
+              InputLabelProps={{
+                required: true,
+                sx: {
+                  "& .MuiFormLabel-asterisk": {
+                    color: "error.main",
+                  },
+                },
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "16px",
+                  backgroundColor: STYLE.subtleSurface,
+                },
+              }}
+            />
+          )}
+        />
 
         <TextField
-          label="Địa chỉ livestream "
-          value={contact.location}
-          onChange={(e) => onContactChange("location", e.target.value)}
-          error={Boolean(errors.location)}
-          helperText={errors.location}
-          multiline
-          minRows={3}
+          label="Số nhà / Tên đường / Tòa nhà "
+          value={detailAddress}
+          onChange={(e) => {
+            const detail = e.target.value;
+            setDetailAddress(detail);
+            const wardName = selectedWard?.name || "";
+            const locationLabel = buildLocation(wardName, detail);
+            onContactChange("location", locationLabel);
+          }}
+          placeholder="Ví dụ: 123 Trần Duy Hưng, Vinhomes..."
+          inputProps={{ maxLength: 100 }}
+          error={Boolean(errors.location) || Boolean(wardsError)}
+          helperText={errors.location || wardsError || undefined}
           required
           InputLabelProps={{
             required: true,
@@ -306,7 +441,6 @@ const BookingContactStep = ({
             },
           }}
         />
-
         {/* 📎 Khu vực đính kèm tệp */}
         <Stack spacing={1.5}>
           <Typography

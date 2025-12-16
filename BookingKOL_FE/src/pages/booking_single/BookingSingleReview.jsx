@@ -64,20 +64,20 @@ const getContractStatusLabel = (status) => {
 };
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
   maximumFractionDigits: 0,
 });
 
-const formatCurrency = (value) => {
+const formatCurrency = (value, fallback = FALLBACK_TEXT) => {
   if (value === null || value === undefined) {
-    return FALLBACK_TEXT;
+    return fallback;
   }
+
   const numeric = Number(value);
   if (Number.isNaN(numeric)) {
-    return FALLBACK_TEXT;
+    return fallback;
   }
-  return currencyFormatter.format(numeric);
+
+  return `${currencyFormatter.format(numeric)} VND`;
 };
 
 const formatFileSize = (value) => {
@@ -728,7 +728,15 @@ const BookingSingleReview = () => {
                         >
                           Địa điểm
                         </Typography>
-                        <Typography sx={{ fontWeight: 600 }}>
+                        <Typography
+                          sx={{
+                            fontWeight: 600,
+                            maxWidth: { xs: "60%", md: "55%" },
+                            height: "auto",
+                            wordBreak: "break-word",
+                            textAlign: "right",
+                          }}
+                        >
                           {contactInfo?.location || FALLBACK_TEXT}
                         </Typography>
                       </Stack>
@@ -1008,8 +1016,7 @@ const BookingSingleReview = () => {
                                             fontWeight: 700,
                                             color: isSigned
                                               ? "#2e7d32"
-                                              : BOOKING_FLOW_STYLE
-                                                  .textSecondary,
+                                              : BOOKING_FLOW_STYLE.textSecondary,
                                           }}
                                         >
                                           {isSigned ? "Đã ký" : "Chưa ký"}

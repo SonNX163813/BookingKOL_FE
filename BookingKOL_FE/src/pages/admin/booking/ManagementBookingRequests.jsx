@@ -51,12 +51,16 @@ const SERVER_DATE_FORMAT = "YYYY-MM-DD";
 
 const REQUEST_NUMBER_MAX = 20;
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+const formatCurrency = (value) => {
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";

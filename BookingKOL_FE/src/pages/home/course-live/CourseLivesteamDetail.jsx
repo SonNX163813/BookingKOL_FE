@@ -15,8 +15,6 @@ import CourseDetailLoading from "../../../components/home/course-detail/CourseDe
 import CourseDetailEmpty from "../../../components/home/course-detail/CourseDetailEmpty";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
   maximumFractionDigits: 0,
 });
 
@@ -172,14 +170,21 @@ const CourseLivesteamDetail = () => {
     } finally {
       setCreatingPurchase(false);
     }
-  }, [contactInfo, course, coursePackageId, creatingPurchase, navigate, validateContact]);
+  }, [
+    contactInfo,
+    course,
+    coursePackageId,
+    creatingPurchase,
+    navigate,
+    validateContact,
+  ]);
 
   const priceLabel = useMemo(() => {
     if (!course?.currentPrice) {
       return "Liên hệ";
     }
 
-    return currencyFormatter.format(Number(course.currentPrice));
+    return currencyFormatter.format(Number(course.currentPrice)) + " VND";
   }, [course]);
 
   const media = useMemo(() => adaptCourseMedia(course ?? {}), [course]);
@@ -328,5 +333,3 @@ const CourseLivesteamDetail = () => {
 };
 
 export default CourseLivesteamDetail;
-
-

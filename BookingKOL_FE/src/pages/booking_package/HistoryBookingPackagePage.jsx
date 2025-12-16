@@ -51,7 +51,7 @@ const formatCurrency = (value) => {
   if (value === null || value === undefined) return "--";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "--";
-  return `${new Intl.NumberFormat("vi-VN").format(numeric)} ₫`;
+  return `${new Intl.NumberFormat("vi-VN").format(numeric)} VND`;
 };
 
 const composeBudgetRange = (targetPrice) => {

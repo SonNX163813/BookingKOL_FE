@@ -12,11 +12,13 @@ import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 
 const formatCurrency = (value) => {
   if (value == null) return "";
-  return value.toLocaleString("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  });
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
 };
 
 const CourseCard = ({ course, onSelect }) => {

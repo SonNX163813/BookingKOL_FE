@@ -19,12 +19,16 @@ import { BASE_URL } from "../../utils/config";
 
 const COUNTDOWN_DURATION_MS = 15 * 60 * 1000;
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+const formatCurrency = (value) => {
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 
 const formatCountdown = (remainingMs) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -39,8 +43,7 @@ const formatCountdown = (remainingMs) => {
 const ensureCountdownDeadline = (payment) => {
   if (!payment) return null;
 
-  const candidate =
-    payment.expiresAt ?? payment.localCountdownDeadline ?? null;
+  const candidate = payment.expiresAt ?? payment.localCountdownDeadline ?? null;
 
   if (candidate && dayjs(candidate).isValid()) {
     return payment;
@@ -254,9 +257,7 @@ const CampaignPaymentPage = () => {
     ? `Đợt ${installmentNumber}`
     : "Đợt thanh toán";
   const campaignId =
-    campaignInfo?.id ??
-    paymentInfo?.campaignId ??
-    bookingRequest?.campaignId;
+    campaignInfo?.id ?? paymentInfo?.campaignId ?? bookingRequest?.campaignId;
 
   const handleBackToDetail = () => {
     if (campaignId) {
@@ -369,18 +370,14 @@ const CampaignPaymentPage = () => {
                     <Typography color="text.secondary" variant="body2">
                       Chủ tài khoản
                     </Typography>
-                    <Typography fontWeight={600}>
-                      {paymentInfo.name}
-                    </Typography>
+                    <Typography fontWeight={600}>{paymentInfo.name}</Typography>
                   </Stack>
 
                   <Stack spacing={0.5}>
                     <Typography color="text.secondary" variant="body2">
                       Ngân hàng
                     </Typography>
-                    <Typography fontWeight={600}>
-                      {paymentInfo.bank}
-                    </Typography>
+                    <Typography fontWeight={600}>{paymentInfo.bank}</Typography>
                   </Stack>
 
                   <Stack spacing={0.5}>

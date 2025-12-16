@@ -44,11 +44,11 @@ const formatMoney = (value, currency = "VND") => {
   const num = typeof value === "number" ? value : Number(value);
   if (Number.isNaN(num)) return String(value);
   try {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: currency === "VND" ? 0 : 2,
-    }).format(num);
+    return (
+      new Intl.NumberFormat("vi-VN", {
+        maximumFractionDigits: 0,
+      }).format(num) + " VND"
+    );
   } catch {
     // Nếu currency không hợp lệ, hiển thị dạng "1.000.000 VND"
     return `${new Intl.NumberFormat("vi-VN").format(num)} ${currency}`;

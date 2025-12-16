@@ -154,16 +154,6 @@ const ContractTermsDialog = ({
     setAcceptedTerms(false);
   }, [open, contract?.id, requireAcknowledgement, initialAccepted]);
 
-  useEffect(() => {
-    if (
-      acceptedTerms &&
-      contract?.id &&
-      typeof onAcceptTerms === "function"
-    ) {
-      onAcceptTerms(contract.id);
-    }
-  }, [acceptedTerms, contract?.id, onAcceptTerms]);
-
   const handleContentScroll = (event) => {
     if (externalScrollHandler) {
       externalScrollHandler(event);
@@ -189,8 +179,17 @@ const ContractTermsDialog = ({
     }
   };
 
-  const handleCloseClick = () => {
+  const handleIconClose = () => {
+    if (typeof onClose === "function") {
+      onClose();
+    }
+  };
+
+  const handleAgreeClick = () => {
     if (requireAcknowledgement && !acceptedTerms) return;
+    if (contract?.id && typeof onAcceptTerms === "function") {
+      onAcceptTerms(contract.id);
+    }
     if (typeof onClose === "function") {
       onClose();
     }
@@ -225,9 +224,8 @@ const ContractTermsDialog = ({
           </DialogTitle>
 
           <IconButton
-            onClick={handleCloseClick}
+            onClick={handleIconClose}
             aria-label="Đóng"
-            disabled={requireAcknowledgement && !acceptedTerms}
             sx={{
               position: "absolute",
               right: 12,
@@ -392,7 +390,7 @@ const ContractTermsDialog = ({
 
           <DialogActions sx={{ px: 3, py: 2, backgroundColor: "#fafbff" }}>
             <Button
-              onClick={handleCloseClick}
+              onClick={handleAgreeClick}
               disabled={requireAcknowledgement && !acceptedTerms}
               sx={{
                 textTransform: "none",

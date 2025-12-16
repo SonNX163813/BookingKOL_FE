@@ -37,16 +37,15 @@ const PAYMENT_STATUS_META = {
 };
 
 const formatCurrency = (value) => {
-  if (value === null || value === undefined) return "--";
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return "--";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(parsed);
-};
+  if (value == null) return "";
+  const number = Number(value) || 0;
 
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);

@@ -49,12 +49,15 @@ const MAX_ATTACHMENT_SIZE_MB = 50;
 const MAX_ATTACHMENT_SIZE_BYTES = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
 const HOLD_DURATION_SECONDS = 15 * 60;
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+const formatCurrency = (value) => {
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 
 const formatCountdown = (totalSeconds) => {
   const safeSeconds = Math.max(Number(totalSeconds) || 0, 0);
@@ -361,7 +364,7 @@ const BookingFlow = ({
         newErrors.phone = "Số điện thoại không hợp lệ.";
       }
       if (!location) {
-        newErrors.location = "Vui lòng nhập địa chỉ / khu vực.";
+        newErrors.location = "Vui lòng chọn phường/xã tại Hà Nội.";
       }
       // if (!note) {
       //   newErrors.note = "Vui lòng nhập ghi chú cho buổi làm việc.";

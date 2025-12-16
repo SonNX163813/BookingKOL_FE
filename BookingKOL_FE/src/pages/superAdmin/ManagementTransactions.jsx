@@ -39,12 +39,14 @@ const STATUS_OPTIONS = [
 ];
 
 const formatCurrency = (value) => {
-  const formatter = new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  });
-  return formatter.format(Number(value) || 0);
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
 };
 
 const formatDateTime = (value) => {
