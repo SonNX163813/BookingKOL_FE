@@ -45,7 +45,7 @@ import { getMyUserProfile } from "../../../services/user/UserService";
 /* ------------------------- HẰNG SỐ & HÀM HỖ TRỢ ------------------------- */
 
 const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_SIZE_MB = 10;
+const MAX_ATTACHMENT_SIZE_MB = 50;
 const MAX_ATTACHMENT_SIZE_BYTES = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
 const HOLD_DURATION_SECONDS = 15 * 60;
 

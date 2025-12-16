@@ -415,7 +415,7 @@ const ServicePackageCard = ({ data, onSelect }) => {
                 variant="body2"
                 sx={{ color: "rgba(15,23,42,0.72)", fontWeight: 600 }}
               >
-                Mỗi chiến dịch
+                Trên giờ
               </Typography>
             </Stack>
             <Chip

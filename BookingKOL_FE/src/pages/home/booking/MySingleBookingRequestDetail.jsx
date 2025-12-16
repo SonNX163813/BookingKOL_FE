@@ -264,7 +264,6 @@ const MySingleBookingRequestDetail = () => {
   const [fileIdsToDelete, setFileIdsToDelete] = useState([]);
   const [confirmingWorktimeId, setConfirmingWorktimeId] = useState(null);
   const [contractPreview, setContractPreview] = useState(null);
-
   const platformOptions = useMemo(() => {
     const unique = new Map();
     (platforms ?? []).forEach((item) => {
@@ -539,6 +538,7 @@ const MySingleBookingRequestDetail = () => {
 
   const status = normalizeStatus(detail?.status);
   const statusLabel = status ? BOOKING_STATUS_LABEL[status] ?? status : "--";
+  const isUpdated = status === "PAID";
 
   const handleBack = useCallback(() => {
     navigate("/don-booking-kol");
@@ -886,14 +886,12 @@ const MySingleBookingRequestDetail = () => {
                           </Space>
                         </Form.Item>
                       </div>
-
                       <Form.Item label="Ghi chú" name="description">
                         <Input.TextArea
                           rows={4}
                           placeholder="Mô tả chi tiết yêu cầu hoặc ghi chú"
                         />
                       </Form.Item>
-
                       <div className="grid gap-6 lg:grid-cols-2">
                         <div>
                           <p className="text-sm font-semibold text-slate-700">
@@ -958,17 +956,18 @@ const MySingleBookingRequestDetail = () => {
                           </Upload>
                         </div>
                       </div>
-
-                      <div className="mt-6 flex justify-end">
-                        <Button
-                          type="primary"
-                          htmlType="submit"
-                          loading={isUpdatingMySingleBookingRequest}
-                          className="!h-11 !rounded-xl !bg-indigo-600 !px-6 hover:!bg-indigo-500"
-                        >
-                          Cập nhật booking
-                        </Button>
-                      </div>
+                      {isUpdated ? (
+                        <div className="mt-6 flex justify-end">
+                          <Button
+                            type="primary"
+                            htmlType="submit"
+                            loading={isUpdatingMySingleBookingRequest}
+                            className="!h-11 !rounded-xl !bg-indigo-600 !px-6 hover:!bg-indigo-500"
+                          >
+                            Cập nhật thông tin
+                          </Button>
+                        </div>
+                      ) : null}
                     </Form>
                   </Space>
                 </section>

@@ -266,7 +266,7 @@ const BookingContactStep = ({
         ) : null}
 
         <TextField
-          label="Địa chỉ / Khu vực "
+          label="Địa chỉ livestream "
           value={contact.location}
           onChange={(e) => onContactChange("location", e.target.value)}
           error={Boolean(errors.location)}

@@ -119,7 +119,7 @@ const buildRepeatTypeTextFromSelection = (selection = []) => {
   return "";
 };
 
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 10MB
 const MAX_ATTACHMENTS = 5;
 
 // Danh sách đuôi file cho phép
@@ -134,7 +134,7 @@ const ALLOWED_EXTENSIONS = [
   ".png",
 ];
 
-const attachmentHint = `Tối đa ${MAX_ATTACHMENTS} tệp, mỗi tệp ≤ 10MB. Hỗ trợ: .xlsx, .xls, .doc, .docx, .pdf, .jpg, .jpeg, .png`;
+const attachmentHint = `Tối đa ${MAX_ATTACHMENTS} tệp, mỗi tệp ≤ 50MB. Hỗ trợ: .xlsx, .xls, .doc, .docx, .pdf, .jpg, .jpeg, .png`;
 
 // Helper format size
 const formatFileSize = (size) => {
