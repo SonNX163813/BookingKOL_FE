@@ -53,6 +53,56 @@ export const getKolProfiles = async ({ signal, params } = {}) => {
   return { ...data, content };
 };
 
+const KOL_SUGGESTION_ALLOWED_PARAMS = new Set(["startAt", "endAt", "page", "size"]);
+const KOL_SUGGESTION_DEFAULT_PARAMS = { page: 0, size: 20 };
+
+const buildKolSuggestionParams = (params = {}) => {
+  const merged = { ...KOL_SUGGESTION_DEFAULT_PARAMS, ...(params ?? {}) };
+  return Object.entries(merged).reduce((acc, [key, value]) => {
+    if (!KOL_SUGGESTION_ALLOWED_PARAMS.has(key)) return acc;
+    if (value === undefined || value === null) return acc;
+    if (typeof value === "string" && value.trim() === "") return acc;
+    acc[key] = value;
+    return acc;
+  }, {});
+};
+
+export const getSuggestedKolProfiles = async ({ signal, params } = {}) => {
+  const config = signal ? { signal } : undefined;
+  const payload = await get({
+    url: CLIENT_API_PATHS.KOL.suggestion,
+    params: buildKolSuggestionParams(params),
+    config,
+  });
+
+  const raw = payload?.data ?? payload ?? {};
+  const data = raw?.data ?? raw;
+  const content = Array.isArray(data?.content)
+    ? data.content
+    : Array.isArray(data)
+    ? data
+    : Array.isArray(raw?.content)
+    ? raw.content
+    : [];
+
+  const normalizedTotalPages = Number.isFinite(Number(data?.totalPages))
+    ? Number(data.totalPages)
+    : content.length > 0
+    ? 1
+    : 0;
+
+  const normalizedTotalElements = Number.isFinite(Number(data?.totalElements))
+    ? Number(data.totalElements)
+    : content.length;
+
+  return {
+    ...data,
+    content,
+    totalPages: normalizedTotalPages,
+    totalElements: normalizedTotalElements,
+  };
+};
+
 export const getKolProfileById = async (kolId, { signal } = {}) => {
   if (!kolId) throw new Error("kolId is required");
   const config = signal ? { signal } : undefined;

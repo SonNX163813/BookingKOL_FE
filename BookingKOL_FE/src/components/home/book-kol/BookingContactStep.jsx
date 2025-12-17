@@ -19,9 +19,12 @@ import AttachmentRoundedIcon from "@mui/icons-material/AttachmentRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
 import { toast } from "react-toastify";
+import provinceData from "../../../utils/province.json";
 
-const HANOI_PROVINCE_ENDPOINT =
-  "https://provinces.open-api.vn/api/v2/p/1?depth=2";
+const HANOI_PROVINCE_CODE = 1;
+const DEFAULT_PROVINCE_NAME = "Hà Nội";
+const WARDS_ERROR_MESSAGE =
+  "Không thể tải danh sách phường/xã. Vui lòng thử lại.";
 
 const BookingContactStep = ({
   contact,
@@ -62,34 +65,31 @@ const BookingContactStep = ({
   const [selectedWardCode, setSelectedWardCode] = useState("");
 
   useEffect(() => {
-    const controller = new AbortController();
+    setWardsLoading(true);
+    setWardsError("");
 
-    const fetchHanoiWards = async () => {
-      setWardsLoading(true);
-      setWardsError("");
-      try {
-        const response = await fetch(HANOI_PROVINCE_ENDPOINT, {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error("Failed to fetch wards");
-        }
-        const data = await response.json();
-        setProvinceName(data?.name || "Thành phố Hà Nội");
-        setWards(Array.isArray(data?.wards) ? data.wards : []);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setWardsError("Không tải được danh sách phường/xã. Vui lòng thử lại.");
-        setProvinceName("Thành phố Hà Nội");
-      } finally {
-        if (!controller.signal.aborted) {
-          setWardsLoading(false);
-        }
+    const hanoiProvince =
+      Array.isArray(provinceData) &&
+      provinceData.find(
+        (province) => String(province?.code) === String(HANOI_PROVINCE_CODE)
+      );
+
+    if (hanoiProvince) {
+      setProvinceName(hanoiProvince?.name || DEFAULT_PROVINCE_NAME);
+      setWards(Array.isArray(hanoiProvince?.wards) ? hanoiProvince.wards : []);
+      if (
+        !Array.isArray(hanoiProvince?.wards) ||
+        hanoiProvince.wards.length == 0
+      ) {
+        setWardsError(WARDS_ERROR_MESSAGE);
       }
-    };
+    } else {
+      setProvinceName(DEFAULT_PROVINCE_NAME);
+      setWards([]);
+      setWardsError(WARDS_ERROR_MESSAGE);
+    }
 
-    fetchHanoiWards();
-    return () => controller.abort();
+    setWardsLoading(false);
   }, []);
 
   const selectedWard = useMemo(
@@ -102,7 +102,7 @@ const BookingContactStep = ({
 
   useEffect(() => {
     if (selectedWardCode || !wards.length) return;
-    const provinceLabel = provinceName || "Thành phố Hà Nội";
+    const provinceLabel = provinceName || DEFAULT_PROVINCE_NAME;
     const target = contact.location?.trim() || "";
     if (!target) return;
     const matched = wards.find(
@@ -112,7 +112,7 @@ const BookingContactStep = ({
   }, [contact.location, provinceName, selectedWardCode, wards]);
 
   const buildLocation = (wardName, detail) => {
-    const provinceLabel = provinceName || "Thành phố Hà Nội";
+    const provinceLabel = provinceName || DEFAULT_PROVINCE_NAME;
     const wardLabel = wardName ? `${wardName}, ${provinceLabel}` : "";
     if (detail && wardLabel) return `${detail}, ${wardLabel}`;
     if (wardLabel) return wardLabel;

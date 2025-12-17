@@ -15,13 +15,17 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import dayjs from "dayjs";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useNavigate } from "react-router-dom";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import KOLCard from "../../../components/home/kol/KOLCard";
 import KolFilters from "../../../components/home/kol/KolFilters";
-import { getKolProfiles } from "../../../services/kol/KolAPI";
+import {
+  getKolProfiles,
+  getSuggestedKolProfiles,
+} from "../../../services/kol/KolAPI";
 import { getAllCategory } from "../../../services/CategoryServices";
 import { slugify } from "../../../utils/slugify";
 import hotkolimg from "../../../assets/hotkol.png";
@@ -45,6 +49,8 @@ const DEFAULT_FILTER_VALUES = Object.freeze({
   minRating: "",
   categoryId: "",
   role: "",
+  startAt: null,
+  endAt: null,
 });
 
 const FILTER_FIELDS = [
@@ -53,6 +59,8 @@ const FILTER_FIELDS = [
   "minRating",
   "categoryId",
   "role",
+  "startAt",
+  "endAt",
 ];
 
 const createDefaultFilters = () => ({
@@ -67,6 +75,23 @@ const parseNumericInput = (value) => {
 
   const numeric = Number(trimmed);
   return Number.isFinite(numeric) ? numeric : undefined;
+};
+
+const toIsoDateTime = (value) => {
+  if (!value) {
+    return undefined;
+  }
+  if (dayjs.isDayjs(value)) {
+    return value.isValid() ? value.toISOString() : undefined;
+  }
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.toISOString() : undefined;
+};
+
+const areDateTimesEqual = (a, b) => {
+  const isoA = toIsoDateTime(a);
+  const isoB = toIsoDateTime(b);
+  return isoA === isoB;
 };
 
 const sanitizeFilters = (rawFilters, pagination) => {
@@ -114,6 +139,20 @@ const sanitizeFilters = (rawFilters, pagination) => {
     typeof filters.categoryId === "string" ? filters.categoryId.trim() : "";
   if (categoryId) {
     params.categoryId = categoryId;
+  }
+
+  const startAtISO = toIsoDateTime(filters.startAt);
+  const endAtISO = toIsoDateTime(filters.endAt);
+  const now = dayjs();
+  if (
+    startAtISO &&
+    endAtISO &&
+    dayjs(endAtISO).isAfter(dayjs(startAtISO)) &&
+    !dayjs(startAtISO).isBefore(now) &&
+    !dayjs(endAtISO).isBefore(now)
+  ) {
+    params.startAt = startAtISO;
+    params.endAt = endAtISO;
   }
 
   return params;
@@ -469,8 +508,19 @@ const ListKOL = () => {
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
+  const showErrorMessage = useCallback((message) => {
+    setError(message);
+    setShowErrorSnackbar(true);
+  }, []);
+
   const hasFilterChanges = useMemo(
-    () => FILTER_FIELDS.some((key) => formFilters[key] !== filters[key]),
+    () =>
+      FILTER_FIELDS.some((key) => {
+        if (key === "startAt" || key === "endAt") {
+          return !areDateTimesEqual(formFilters[key], filters[key]);
+        }
+        return formFilters[key] !== filters[key];
+      }),
     [formFilters, filters]
   );
 
@@ -517,10 +567,45 @@ const ListKOL = () => {
     [handleFilterFieldChange]
   );
 
+  const handleDateTimeChange = useCallback((field, value) => {
+    setFormFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }, []);
+
+  const validateDateFilters = useCallback(() => {
+    const startISO = toIsoDateTime(formFilters.startAt);
+    const endISO = toIsoDateTime(formFilters.endAt);
+    if (!startISO && !endISO) {
+      return { valid: true };
+    }
+    if (!startISO || !endISO) {
+      showErrorMessage("Vui long chon ca thoi gian bat dau va ket thuc.");
+      return { valid: false };
+    }
+    const now = dayjs();
+    if (dayjs(startISO).isBefore(now) || dayjs(endISO).isBefore(now)) {
+      showErrorMessage("Khong the chon thoi gian nam trong qua khu.");
+      return { valid: false };
+    }
+    if (!dayjs(endISO).isAfter(dayjs(startISO))) {
+      showErrorMessage("Thoi gian ket thuc phai sau thoi gian bat dau.");
+      return { valid: false };
+    }
+    return { valid: true };
+  }, [formFilters.endAt, formFilters.startAt, showErrorMessage]);
+
   const handleApplyFilters = useCallback(() => {
+    const validation = validateDateFilters();
+    if (!validation.valid) {
+      return;
+    }
+    setError(null);
+    setShowErrorSnackbar(false);
     setFilters(() => ({ ...formFilters }));
     setPage(BASE_QUERY_PARAMS.page);
-  }, [formFilters, setPage]);
+  }, [formFilters, setPage, validateDateFilters]);
 
   const handleRoleChange = useCallback(
     (_event, value) => {
@@ -598,11 +683,19 @@ const ListKOL = () => {
       try {
         setLoading(true);
         setError(null);
-        const requestConfig = { params: queryParams };
+        const { startAt, endAt, ...listParams } = queryParams;
+        const isSuggestionMode = Boolean(startAt && endAt);
+        const requestConfig = {
+          params: isSuggestionMode
+            ? { startAt, endAt, page: queryParams.page, size: queryParams.size }
+            : listParams,
+        };
         if (signal) {
           requestConfig.signal = signal;
         }
-        const response = await getKolProfiles(requestConfig);
+        const response = isSuggestionMode
+          ? await getSuggestedKolProfiles(requestConfig)
+          : await getKolProfiles(requestConfig);
         const content = Array.isArray(response?.content)
           ? response.content
           : Array.isArray(response)
@@ -643,16 +736,28 @@ const ListKOL = () => {
         if (signal?.aborted) {
           return;
         }
-        const message = err?.message ?? "Không thể tải danh sách KOL";
-        setError(message);
-        setShowErrorSnackbar(true);
+        const rawMessage = Array.isArray(err?.response?.data?.message)
+          ? err.response.data.message[0]
+          : err?.response?.data?.message ?? err?.message;
+        const message =
+          typeof rawMessage === "string" && rawMessage.trim()
+            ? rawMessage
+            : "Khong the tai danh sach KOL.";
+        showErrorMessage(message);
       } finally {
         if (!signal?.aborted) {
           setLoading(false);
         }
       }
     },
-    [queryParams, setKolProfiles, setTotalElements, setTotalPages, setPage]
+    [
+      queryParams,
+      setKolProfiles,
+      setTotalElements,
+      setTotalPages,
+      setPage,
+      showErrorMessage,
+    ]
   );
 
   useEffect(() => {
@@ -755,6 +860,7 @@ const ListKOL = () => {
                 onFilterInputChange={handleFilterInputChange}
                 onMinRatingChange={handleMinRatingChange}
                 onRoleChange={handleRoleChange}
+                onDateTimeChange={handleDateTimeChange}
                 onApply={handleApplyFilters}
                 onReset={handleResetFilters}
                 loading={loading}
@@ -861,29 +967,12 @@ const ListKOL = () => {
           </Box>
         </Stack>
       </Container>
-
-      {/* <AppSnackbar
+      <AppSnackbar
         open={showErrorSnackbar}
         onClose={() => setShowErrorSnackbar(false)}
         severity="error"
-        message={error ?? "Không thể kết nối tới máy chủ"}
-        action={
-          <IconButton
-            size="small"
-            aria-label="thử lại"
-            color="inherit"
-            onClick={() => {
-              setShowErrorSnackbar(false);
-              handleRetry();
-            }}
-            sx={{ mr: 1 }}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              Thử lại
-            </Typography>
-          </IconButton>
-        }
-      /> */}
+        message={error || "Khong the tai danh sach KOL."}
+      />
     </Box>
   );
 };

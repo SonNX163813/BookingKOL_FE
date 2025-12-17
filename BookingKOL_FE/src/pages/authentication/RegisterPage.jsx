@@ -765,7 +765,7 @@ export default function RegisterPage() {
               Mật khẩu nhập lại chưa khớp.
             </p>
           )}
-          {errors.confirm && <p className="err-msg">{errors.confirm}</p>}
+          {/* {errors.confirm && <p className="err-msg">{errors.confirm}</p>} */}
 
           {/* Điều khoản */}
           <div className="remember-forgot" style={{ marginTop: 8 }}>
