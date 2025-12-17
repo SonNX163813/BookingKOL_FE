@@ -1,12 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
-  AlertTitle,
   Box,
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Container,
   Grid,
@@ -17,9 +14,8 @@ import {
   Typography,
 } from "@mui/material";
 import { CheckCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
-import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
-import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
 
 import { useNavigate } from "react-router-dom";
 
@@ -32,6 +28,16 @@ const DEFAULT_FILTERS = Object.freeze({
 
 const normalizePackageType = (type) =>
   type?.toLowerCase() === "vip" ? "vip" : "basic";
+
+const paletteByIndex = (index) => {
+  const palette = [
+    { header: "#e5e5e5", accent: "#6b7280", text: "#374151" },
+    { header: "#22c55e", accent: "#15803d", text: "#064e3b" },
+    { header: "#0ea5e9", accent: "#0f5f75", text: "#0f172a" },
+    { header: "#f59e0b", accent: "#b45309", text: "#92400e" },
+  ];
+  return palette[index % palette.length];
+};
 
 const formatCurrency = (value) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -287,235 +293,161 @@ const PackageListError = ({ message, onRetry }) => (
   </Stack>
 );
 
-const ServicePackageCard = ({ data, onSelect }) => {
+const ServicePackageCard = ({ data, onSelect, theme }) => {
   const isVip = data?.packageType?.toLowerCase() === "vip";
-  const accentColor = isVip ? "#a855f7" : "#4a74da";
-  const subtleColor = isVip ? "rgba(168,85,247,0.24)" : "rgba(74,116,218,0.2)";
-  const vipStyles = {
-    border: "1px solid rgba(168, 85, 247, 0.6)",
-    boxShadow: "0 0 18px rgba(168, 85, 247, 0.3)",
-    background: "linear-gradient(to bottom right, #faf5ff, #ede9fe, #fef3c7)",
-    transform: "translateY(-2px)",
-  };
+  const accentColor = theme?.accent || "#4b5563";
+  const headerColor = theme?.header || "#e5e7eb";
+  const textColor = theme?.text || "#1f2937";
+
+  const features = [
+    { label: "Tạo chiến dịch", available: true },
+    { label: "Thống kê hiệu suất", available: true },
+    { label: "Chọn KOL thủ công", available: Boolean(data?.allowKolSelection) },
+    { label: "Gợi ý KOL tự động", available: Boolean(data?.allowKolSelection) },
+    { label: "Báo cáo nâng cao", available: isVip },
+    { label: "Hỗ trợ triển khai", available: isVip },
+  ];
+
   return (
     <Card
       sx={{
         height: "100%",
         width: "100%",
-        borderRadius: 4,
-        border: isVip ? vipStyles.border : "1px solid rgba(74, 116, 218, 0.25)",
-        boxShadow: isVip
-          ? vipStyles.boxShadow
-          : "0 18px 36px rgba(74,116,218,0.15)",
-        background: isVip
-          ? vipStyles.background
-          : "linear-gradient(160deg, #fff, rgba(244,247,255,0.92))",
+        borderRadius: 3,
+        border: `1px solid ${headerColor}`,
+        overflow: "hidden",
+        boxShadow: "0 14px 30px rgba(0,0,0,0.08)",
         display: "flex",
         flexDirection: "column",
-        transition: "all .25s ease",
-        "&:hover": {
-          transform: isVip ? "scale(1.03)" : "scale(1.01)",
-          boxShadow: isVip
-            ? "0 0 30px rgba(168, 85, 247, 0.45)"
-            : "0 24px 48px rgba(74,116,218,0.22)",
-        },
       }}
     >
+      <Box
+        sx={{
+          backgroundColor: headerColor,
+          clipPath: "polygon(0 0, 100% 0, 100% 82%, 0 100%)",
+          width: { xs: "auto", md: 350, lg: 350 },
+          height: { xs: 110, md: 120 },
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          pb: 2,
+        }}
+      >
+        <Typography
+          sx={{
+            color: textColor,
+            fontWeight: 800,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            fontSize: { xs: "1rem", md: "1.05rem" },
+          }}
+        >
+          Gói {data?.name}
+        </Typography>
+      </Box>
+
       <CardContent
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: { xs: 1.5, md: 2 },
           flexGrow: 1,
-          p: { xs: 2.5, md: 3 },
+          gap: 2,
+          px: { xs: 2.5, md: 3 },
+          pb: { xs: 3, md: 4 },
         }}
       >
         <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          sx={{ flexWrap: "wrap" }}
+          spacing={2}
+          sx={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1,
+          }}
         >
-          <Chip
-            icon={<WorkspacePremiumRoundedIcon sx={{ color: accentColor }} />}
-            label={isVip ? "Gói VIP" : "Gói thường"}
-            sx={{
-              borderRadius: 2,
-              fontWeight: 600,
-              color: accentColor,
-              borderColor: subtleColor,
-              borderWidth: 1,
-              borderStyle: "solid",
-              backgroundColor: "rgba(255,255,255,0.6)",
-            }}
-          />
-          <Chip
-            icon={
-              data?.allowKolSelection ? (
-                <Diversity3RoundedIcon sx={{ color: "#15803d" }} />
-              ) : (
-                <CampaignRoundedIcon sx={{ color: "#0f172a" }} />
-              )
-            }
-            label={
-              data?.allowKolSelection
-                ? "Tự chọn KOL theo ý muốn"
-                : "Đề xuất KOL tự động"
-            }
-            sx={{
-              borderRadius: 2,
-              fontWeight: 600,
-              color: data?.allowKolSelection ? "#166534" : "#0f172a",
-              borderColor: data?.allowKolSelection
-                ? "rgba(22, 101, 52, 0.25)"
-                : "rgba(15, 23, 42, 0.25)",
-              borderWidth: 1,
-              borderStyle: "solid",
-              backgroundColor: data?.allowKolSelection
-                ? "rgba(187, 247, 208, 0.5)"
-                : "rgba(226, 232, 240, 0.6)",
-            }}
-          />
-        </Stack>
-
-        <Stack spacing={1}>
           <Typography
-            variant="h5"
             sx={{
-              fontWeight: 700,
-              color: "#0f172a",
-              fontSize: { xs: "1.1rem", md: "1.25rem" },
+              fontSize: { xs: "1.6rem", md: "2rem" },
+              fontWeight: 800,
+              color: textColor,
+              lineHeight: 1,
             }}
           >
-            Gói {data?.name}
+            {formatCurrency(data?.price)}
           </Typography>
-          <Box
+          <Typography
             sx={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              gap: 1.5,
-              p: 1.5,
-              borderRadius: 3,
-              backgroundColor: subtleColor,
-              border: `1px solid ${accentColor}30`,
+              textTransform: "uppercase",
+              color: "#6b7280",
+              fontSize: "0.95rem",
+              letterSpacing: 1,
             }}
           >
-            <Stack spacing={0.5}>
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: 800,
-                  color: accentColor,
-                  lineHeight: 1,
-                  fontSize: { xs: "1.6rem", md: "2.1rem" },
-                }}
-              >
-                {formatCurrency(data?.price)}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "rgba(15,23,42,0.72)", fontWeight: 600 }}
-              >
-                Trên giờ
-              </Typography>
-            </Stack>
-            <Chip
-              label={isVip ? "Bao gồm quyền chọn Host" : "Tùy chọn Host cơ bản"}
-              sx={{
-                fontWeight: 700,
-                borderRadius: 2,
-                color: accentColor,
-                backgroundColor: "#fff",
-                borderColor: accentColor,
-                borderWidth: 1,
-                borderStyle: "solid",
-              }}
-            />
-          </Box>
-          {/* <Typography
-            variant="body1"
-            sx={{
-              color: "rgba(15, 23, 42, 0.75)",
-              lineHeight: 1.7,
-              minHeight: 80,
-            }}
-          >
-            {data?.description}
-          </Typography> */}
-          <ul
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-              lineHeight: 1.6,
-              fontSize: "1rem",
-            }}
-          >
-            {(isVip
-              ? [
-                  "Chiến Lược Host Chính Cao Cấp",
-                  "Tự Chọn Host Cá Tính",
-                  "Trợ Lý Livestream Chuyên Nghiệp",
-                  "Ưu Đãi & Hỗ Trợ 24/7",
-                  "Báo Cáo Chuyên Sâu A-Z",
-                ]
-              : [
-                  "Chiến Dịch Host Cơ Bản",
-                  "Phân Tích & Lựa Chọn Host Tự Động",
-                  "Báo Cáo Hiệu Quả",
-                  "Cộng Tác Tự Booking Host",
-                ]
-            ).map((item, i) => (
-              <li
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "12px",
-                }}
-              >
-                <CheckCircle
-                  style={{
-                    width: "20px",
-                    height: "20px",
-                    flexShrink: 0,
-                    marginTop: "2px",
-                    color: isVip ? "#facc15" : "#2563eb",
-                  }}
-                />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+            / Giờ
+          </Typography>
         </Stack>
 
-        <Box sx={{ mt: "auto" }}>
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={() => onSelect(data)}
-            sx={{
-              textTransform: "none",
-              fontWeight: 700,
-              borderRadius: 3,
-              py: 1.5,
-              background: isVip
-                ? "linear-gradient(90deg,#a855f7,#d946ef)"
-                : "transparent",
-              color: isVip ? "#ffffff" : "#4a74da",
-              fontSize: isVip ? "1.05rem" : "1rem",
-              "&:hover": {
-                background: isVip
-                  ? "linear-gradient(90deg,#9333ea,#c026d3)"
-                  : "rgba(74,116,218,0.08)",
-              },
-            }}
-          >
-            Chọn gói này
-          </Button>
+        <Box
+          sx={{
+            backgroundColor: "#f3f4f6",
+            borderRadius: 2,
+            px: 2,
+            py: 1.5,
+            border: "1px solid #e5e7eb",
+            display: "flex",
+            gap: 1,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <WorkspacePremiumRoundedIcon sx={{ color: accentColor }} />
+          <Typography sx={{ fontWeight: 700, color: textColor }}>
+            {isVip ? "Quyền mở ưu tiên" : "Tiêu chuẩn cơ bản"}
+          </Typography>
         </Box>
+
+        <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0, flex: 1 }}>
+          {features.map((item, index) => {
+            const IconComponent = item.available ? CheckCircle : XCircle;
+            const iconColor = item.available ? "#16a34a" : "#ef4444";
+            return (
+              <Box
+                key={index}
+                component="li"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.2,
+                  py: 0.6,
+                  color: "#111827",
+                  fontSize: "0.98rem",
+                }}
+              >
+                <IconComponent
+                  style={{ color: iconColor, width: 20, height: 20 }}
+                />
+                <span>{item.label}</span>
+              </Box>
+            );
+          })}
+        </Box>
+
+        <Button
+          fullWidth
+          variant="contained"
+          onClick={() => onSelect(data)}
+          sx={{
+            textTransform: "none",
+            fontWeight: 700,
+            borderRadius: 2,
+            py: 1.2,
+            backgroundColor: accentColor,
+            "&:hover": { backgroundColor: textColor },
+          }}
+        >
+          Chọn gói này
+        </Button>
       </CardContent>
     </Card>
   );
@@ -662,7 +594,7 @@ const ServicePackagePage = () => {
                 fontWeight: 800,
                 color: "#0f172a",
                 letterSpacing: -0.5,
-                fontSize: { xs: "1.8rem", sm: "2.2rem", md: "2.6rem" },
+                fontSize: { xs: "1.8rem", sm: "2.2rem", md: "2.2rem" },
                 lineHeight: 1.2,
               }}
             >
@@ -707,8 +639,9 @@ const ServicePackagePage = () => {
                   justifyContent="center"
                   alignItems="stretch"
                 >
-                  {filteredPackages.map((pkg) => {
+                  {filteredPackages.map((pkg, index) => {
                     const isVip = pkg?.packageType?.toLowerCase() === "vip";
+                    const palette = paletteByIndex(index);
                     return (
                       <Grid
                         item
@@ -716,16 +649,17 @@ const ServicePackagePage = () => {
                         xs={12}
                         sm={6}
                         md={6}
-                        lg={4}
+                        lg={3}
                         sx={{
                           display: "flex",
                         }}
-                        order={{ xs: 0, md: isVip ? 2 : 1 }} // VIP sang phải trên màn hình rộng
+                        order={{ xs: 0, md: isVip ? 2 : 1 }}
                       >
                         <Box sx={{ flex: 1, display: "flex" }}>
                           <ServicePackageCard
                             data={pkg}
                             onSelect={handleSelectPackage}
+                            theme={palette}
                           />
                         </Box>
                       </Grid>
