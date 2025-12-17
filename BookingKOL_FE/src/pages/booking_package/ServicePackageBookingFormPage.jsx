@@ -32,6 +32,7 @@ import {
   phoneRule,
   maxLengthRule,
 } from "../../utils/formValidators";
+import provinceData from "../../utils/province.json";
 
 dayjs.locale("vi");
 
@@ -178,6 +179,11 @@ const handleNumberKeyPress = (e, maxLength) => {
   }
 };
 
+const HANOI_PROVINCE_CODE = 1;
+const DEFAULT_PROVINCE_NAME = "Hà Nội";
+const WARDS_ERROR_MESSAGE =
+  "Không thể tải danh sách phường/xã. Vui lòng thử lại.";
+
 /** Tag render: avatar nhỏ + tên, không hiện id */
 const createTagRender = (options) => (tagProps) => {
   const { value, closable, onClose } = tagProps;
@@ -316,6 +322,13 @@ const ServicePackageBookingFormPage = () => {
   // attachments: [{ id, file, name, size }]
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState("");
+  const [provinceName, setProvinceName] = useState("");
+  const [wards, setWards] = useState([]);
+  const [wardsLoading, setWardsLoading] = useState(false);
+  const [wardsError, setWardsError] = useState("");
+  const [detailAddress, setDetailAddress] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [locationTouched, setLocationTouched] = useState(false);
 
   const stepsWrapperRef = useRef(null);
 
@@ -336,6 +349,62 @@ const ServicePackageBookingFormPage = () => {
       setCurrent(campaignStepIndex);
     }
   };
+
+  useEffect(() => {
+    setWardsLoading(true);
+    setWardsError("");
+
+    const hanoiProvince =
+      Array.isArray(provinceData) &&
+      provinceData.find(
+        (province) => String(province?.code) === String(HANOI_PROVINCE_CODE)
+      );
+
+    if (hanoiProvince) {
+      setProvinceName(hanoiProvince?.name || DEFAULT_PROVINCE_NAME);
+      const wardList = Array.isArray(hanoiProvince?.wards)
+        ? hanoiProvince.wards
+        : [];
+      setWards(wardList);
+      if (!wardList.length) {
+        setWardsError(WARDS_ERROR_MESSAGE);
+      }
+    } else {
+      setProvinceName(DEFAULT_PROVINCE_NAME);
+      setWards([]);
+      setWardsError(WARDS_ERROR_MESSAGE);
+    }
+
+    setWardsLoading(false);
+  }, []);
+
+  const selectedWard = useMemo(
+    () =>
+      wards.find(
+        (ward) => String(ward.code) === String(selectedWardCode || "")
+      ) || null,
+    [selectedWardCode, wards]
+  );
+
+  const buildLocation = useCallback(
+    (wardName, detail) => {
+      const provinceLabel = provinceName || DEFAULT_PROVINCE_NAME;
+      const wardLabel = wardName ? `${wardName}, ${provinceLabel}` : "";
+      if (detail && wardLabel) return `${detail}, ${wardLabel}`;
+      if (wardLabel) return wardLabel;
+      return detail || "";
+    },
+    [provinceName]
+  );
+
+  useEffect(() => {
+    const wardName = selectedWard?.name || "";
+    const locationLabel = buildLocation(wardName, detailAddress);
+    form.setFieldsValue({ livestreamAddress: locationLabel });
+    if (locationTouched || form.isFieldTouched("livestreamAddress")) {
+      form.validateFields(["livestreamAddress"]).catch(() => {});
+    }
+  }, [buildLocation, detailAddress, form, locationTouched, selectedWard]);
 
   useEffect(() => {
     if (!initialPackageType) {
@@ -651,6 +720,9 @@ const ServicePackageBookingFormPage = () => {
     setAttachments([]);
     setVipExtraData({});
     setRepeatSelection([]);
+    setDetailAddress("");
+    setSelectedWardCode("");
+    setLocationTouched(false);
     navigate("/");
   };
 
@@ -994,19 +1066,105 @@ const ServicePackageBookingFormPage = () => {
             />
           </Form.Item>
 
-          <Form.Item
-            label="Địa chỉ livestream"
-            name="livestreamAddress"
-            rules={[
-              requiredRule("Địa chỉ livestream"),
-              maxLengthRule("Địa chỉ livestream", 100),
-            ]}
-          >
-            <Input
-              className="!h-12"
-              maxLength={100}
-              placeholder="Nhập địa chỉ livestream"
-            />
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const livestreamErrors = form.getFieldError("livestreamAddress");
+              const livestreamError = livestreamErrors?.[0] || "";
+              const helperText = livestreamError || wardsError || undefined;
+              const status = helperText ? "error" : "";
+
+              return (
+                <Form.Item
+                  label="Địa chỉ livestream"
+                  required
+                  validateStatus={status}
+                  help={helperText}
+                >
+                  <Space direction="vertical" size={12} className="w-full">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-slate-700">
+                        Tỉnh / Thành phố
+                      </div>
+                      <Input
+                        className="!h-12"
+                        value={provinceName || "Đang tải..."}
+                        readOnly
+                        status={wardsError ? "error" : ""}
+                        placeholder="Tỉnh / Thành phố"
+                      />
+                      <div className="text-xs text-gray-500">
+                        Dịch vụ hiện đang khả dụng tại Hà Nội
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-slate-700">
+                        Phường / Xã tại Hà Nội
+                      </div>
+                      <Select
+                        showSearch
+                        allowClear
+                        className="!w-full"
+                        placeholder={
+                          wardsLoading ? "Đang tải..." : "Chọn phường/xã"
+                        }
+                        loading={wardsLoading}
+                        options={wards.map((ward) => ({
+                          label: ward.name,
+                          value: ward.code,
+                        }))}
+                        value={selectedWardCode || undefined}
+                        onChange={(value) => {
+                          setLocationTouched(true);
+                          setSelectedWardCode(value || "");
+                        }}
+                        optionFilterProp="label"
+                        filterOption={(input, option) =>
+                          (option?.label || "")
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
+                        notFoundContent={
+                          wardsLoading
+                            ? "Đang tải phường/xã..."
+                            : wardsError || "Không tìm thấy phường/xã"
+                        }
+                        disabled={wardsLoading || (!wards.length && !wardsError)}
+                        status={status}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-slate-700">
+                        Số nhà / Tên đường / Tòa nhà
+                      </div>
+                      <Input
+                        className="!h-12"
+                        value={detailAddress}
+                        onChange={(e) => {
+                          setLocationTouched(true);
+                          setDetailAddress(e.target.value);
+                        }}
+                        placeholder="Ví dụ: 123 Trần Duy Hưng, Vinhomes..."
+                        maxLength={100}
+                        status={status}
+                      />
+                    </div>
+
+                    <Form.Item
+                      name="livestreamAddress"
+                      rules={[
+                        requiredRule("Địa chỉ livestream"),
+                        maxLengthRule("Địa chỉ livestream", 150),
+                      ]}
+                      hidden
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Space>
+                </Form.Item>
+              );
+            }}
           </Form.Item>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -1479,4 +1637,3 @@ const ServicePackageBookingFormPage = () => {
 };
 
 export default ServicePackageBookingFormPage;
-
