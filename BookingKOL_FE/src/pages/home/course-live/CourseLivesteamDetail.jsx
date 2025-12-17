@@ -97,15 +97,15 @@ const CourseLivesteamDetail = () => {
     };
 
     if (!email) {
-      errors.email = "Vui long nhap email.";
+      errors.email = "Vui lòng nhập email.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = "Email khong hop le.";
+      errors.email = "Email không hợp lệ.";
     }
 
     if (!phone) {
-      errors.phone = "Vui long nhap so dien thoai.";
+      errors.phone = "Vui lòng nhập số điện thoại.";
     } else if (!/^\+?\d{8,15}$/.test(phone.replace(/\s+/g, ""))) {
-      errors.phone = "So dien thoai khong hop le.";
+      errors.phone = "Số điện thoại không hợp lệ.";
     }
 
     return {

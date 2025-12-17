@@ -27,6 +27,12 @@ import { useQuery } from "@tanstack/react-query";
 import { getKolProfiles, resolveAvatarUrl } from "../../services/kol/KolAPI";
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
 import { getMyUserProfile } from "../../services/user/UserService";
+import {
+  requiredRule,
+  phoneRule,
+  maxLengthRule,
+} from "../../utils/formValidators";
+import provinceData from "../../utils/province.json";
 
 dayjs.locale("vi");
 
@@ -102,7 +108,7 @@ const buildRepeatTypeTextFromSelection = (selection = []) => {
   const sel = Array.isArray(selection) ? selection : [];
 
   // NONE => không gửi repeatType
-  if (sel.includes(REPEAT_NONE)) return "";
+  if (sel.includes(REPEAT_NONE)) return "Không lặp";
 
   if (sel.includes(REPEAT_DAILY)) return "Hàng ngày";
 
@@ -151,8 +157,12 @@ const isValidFileType = (file) => {
 };
 
 // Không cho chọn ngày quá khứ
-const disablePastDate = (current) =>
-  current && current < dayjs().startOf("day");
+const MIN_START_DATE_OFFSET_DAYS = 7;
+
+const getMinStartDate = () =>
+  dayjs().add(MIN_START_DATE_OFFSET_DAYS, "day").startOf("day");
+
+const disableStartDate = (current) => current && current < getMinStartDate();
 
 // Chỉ cho gõ số trong Input + giới hạn tối đa chữ số
 const handleNumberKeyPress = (e, maxLength) => {
@@ -168,6 +178,11 @@ const handleNumberKeyPress = (e, maxLength) => {
     }
   }
 };
+
+const HANOI_PROVINCE_CODE = 1;
+const DEFAULT_PROVINCE_NAME = "Hà Nội";
+const WARDS_ERROR_MESSAGE =
+  "Không thể tải danh sách phường/xã. Vui lòng thử lại.";
 
 /** Tag render: avatar nhỏ + tên, không hiện id */
 const createTagRender = (options) => (tagProps) => {
@@ -307,6 +322,13 @@ const ServicePackageBookingFormPage = () => {
   // attachments: [{ id, file, name, size }]
   const [attachments, setAttachments] = useState([]);
   const [attachmentError, setAttachmentError] = useState("");
+  const [provinceName, setProvinceName] = useState("");
+  const [wards, setWards] = useState([]);
+  const [wardsLoading, setWardsLoading] = useState(false);
+  const [wardsError, setWardsError] = useState("");
+  const [detailAddress, setDetailAddress] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [locationTouched, setLocationTouched] = useState(false);
 
   const stepsWrapperRef = useRef(null);
 
@@ -327,6 +349,62 @@ const ServicePackageBookingFormPage = () => {
       setCurrent(campaignStepIndex);
     }
   };
+
+  useEffect(() => {
+    setWardsLoading(true);
+    setWardsError("");
+
+    const hanoiProvince =
+      Array.isArray(provinceData) &&
+      provinceData.find(
+        (province) => String(province?.code) === String(HANOI_PROVINCE_CODE)
+      );
+
+    if (hanoiProvince) {
+      setProvinceName(hanoiProvince?.name || DEFAULT_PROVINCE_NAME);
+      const wardList = Array.isArray(hanoiProvince?.wards)
+        ? hanoiProvince.wards
+        : [];
+      setWards(wardList);
+      if (!wardList.length) {
+        setWardsError(WARDS_ERROR_MESSAGE);
+      }
+    } else {
+      setProvinceName(DEFAULT_PROVINCE_NAME);
+      setWards([]);
+      setWardsError(WARDS_ERROR_MESSAGE);
+    }
+
+    setWardsLoading(false);
+  }, []);
+
+  const selectedWard = useMemo(
+    () =>
+      wards.find(
+        (ward) => String(ward.code) === String(selectedWardCode || "")
+      ) || null,
+    [selectedWardCode, wards]
+  );
+
+  const buildLocation = useCallback(
+    (wardName, detail) => {
+      const provinceLabel = provinceName || DEFAULT_PROVINCE_NAME;
+      const wardLabel = wardName ? `${wardName}, ${provinceLabel}` : "";
+      if (detail && wardLabel) return `${detail}, ${wardLabel}`;
+      if (wardLabel) return wardLabel;
+      return detail || "";
+    },
+    [provinceName]
+  );
+
+  useEffect(() => {
+    const wardName = selectedWard?.name || "";
+    const locationLabel = buildLocation(wardName, detailAddress);
+    form.setFieldsValue({ livestreamAddress: locationLabel });
+    if (locationTouched || form.isFieldTouched("livestreamAddress")) {
+      form.validateFields(["livestreamAddress"]).catch(() => {});
+    }
+  }, [buildLocation, detailAddress, form, locationTouched, selectedWard]);
 
   useEffect(() => {
     if (!initialPackageType) {
@@ -380,8 +458,11 @@ const ServicePackageBookingFormPage = () => {
     setIfEmpty("ordererPhone", phone);
     setIfEmpty("permanentAddress", address);
 
-    if (Object.keys(updates).length) {
+    const updatedKeys = Object.keys(updates);
+    if (updatedKeys.length) {
       form.setFieldsValue(updates);
+      // re-run validation so auto-filled fields do not stay marked as empty once data is set
+      form.validateFields(updatedKeys).catch(() => {});
     }
   }, [myProfileResponse, form]);
 
@@ -543,23 +624,37 @@ const ServicePackageBookingFormPage = () => {
     });
   };
 
-  useEffect(() => {
-    if (selectedPackage !== "vip") return;
-    if (!hostOptions.length) return;
-    const currentKol = form.getFieldValue("kol");
-    if (!Array.isArray(currentKol) || currentKol.length === 0) {
-      form.setFieldsValue({ kol: [hostOptions[0].value] });
-    }
-  }, [selectedPackage, hostOptions, form]);
+  const disableEndDate = useCallback(
+    (current) => {
+      const start = form.getFieldValue("startDate");
+      const minDate = start ? dayjs(start).startOf("day") : getMinStartDate();
+      return current && current < minDate;
+    },
+    [form]
+  );
 
-  useEffect(() => {
-    if (selectedPackage !== "vip") return;
-    if (!liveOptions.length) return;
-    const currentAssistant = form.getFieldValue("assistant");
-    if (!Array.isArray(currentAssistant) || currentAssistant.length === 0) {
-      form.setFieldsValue({ assistant: [liveOptions[0].value] });
-    }
-  }, [selectedPackage, liveOptions, form]);
+  const validateStartDate = useCallback((_, value) => {
+    if (!value) return Promise.resolve();
+    return value.isBefore(getMinStartDate(), "day")
+      ? Promise.reject(
+          new Error("Ngày bắt đầu phải cách hiện tại ít nhất 7 ngày.")
+        )
+      : Promise.resolve();
+  }, []);
+
+  const validateEndDate = useCallback(
+    (_, value) => {
+      const startDate = form.getFieldValue("startDate");
+      if (!value || !startDate) return Promise.resolve();
+      const start = dayjs(startDate);
+      return value.isBefore(start, "day")
+        ? Promise.reject(
+            new Error("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.")
+          )
+        : Promise.resolve();
+    },
+    [form]
+  );
 
   const handleSelectPackage = (pkg) => {
     setSelectedPackage(pkg);
@@ -625,6 +720,9 @@ const ServicePackageBookingFormPage = () => {
     setAttachments([]);
     setVipExtraData({});
     setRepeatSelection([]);
+    setDetailAddress("");
+    setSelectedWardCode("");
+    setLocationTouched(false);
     navigate("/");
   };
 
@@ -801,8 +899,8 @@ const ServicePackageBookingFormPage = () => {
             campaignName: "",
             objective: "",
             targetPrice: 3000000,
-            startDate: dayjs(),
-            endDate: dayjs().add(7, "day"),
+            startDate: getMinStartDate(),
+            endDate: getMinStartDate().add(7, "day"),
             kol: [],
             assistant: [],
             repeatSelection: [],
@@ -820,8 +918,8 @@ const ServicePackageBookingFormPage = () => {
             label="Tên chiến dịch"
             name="campaignName"
             rules={[
-              { required: true, message: "Vui lòng nhập tên chiến dịch!" },
-              { max: 100, message: "Tối đa 100 ký tự." },
+              requiredRule("Tên chiến dịch"),
+              maxLengthRule("Tên chiến dịch", 100),
             ]}
           >
             <Input
@@ -835,8 +933,8 @@ const ServicePackageBookingFormPage = () => {
             label="Mục tiêu chiến dịch"
             name="objective"
             rules={[
-              { required: true, message: "Vui lòng nhập mục tiêu chiến dịch!" },
-              { max: 100, message: "Tối đa 100 ký tự." },
+              requiredRule("Mục tiêu chiến dịch"),
+              maxLengthRule("Mục tiêu chiến dịch", 100),
             ]}
           >
             <Input
@@ -886,12 +984,13 @@ const ServicePackageBookingFormPage = () => {
               name="startDate"
               rules={[
                 { required: true, message: "Vui lòng chọn ngày bắt đầu!" },
+                { validator: validateStartDate },
               ]}
             >
               <DatePicker
                 className="w-full !h-12"
                 format="DD/MM/YYYY"
-                disabledDate={disablePastDate}
+                disabledDate={disableStartDate}
               />
             </Form.Item>
             <Form.Item
@@ -899,12 +998,13 @@ const ServicePackageBookingFormPage = () => {
               name="endDate"
               rules={[
                 { required: true, message: "Vui lòng chọn ngày kết thúc!" },
+                { validator: validateEndDate },
               ]}
             >
               <DatePicker
                 className="w-full !h-12"
                 format="DD/MM/YYYY"
-                disabledDate={disablePastDate}
+                disabledDate={disableEndDate}
               />
             </Form.Item>
           </div>
@@ -926,8 +1026,8 @@ const ServicePackageBookingFormPage = () => {
               label="Tên người đặt"
               name="ordererFullName"
               rules={[
-                { required: true, message: "Vui lòng nhập tên người đặt!" },
-                { max: 100, message: "Tối đa 100 ký tự." },
+                requiredRule("Tên người đặt"),
+                maxLengthRule("Tên người đặt", 100),
               ]}
             >
               <Input
@@ -940,20 +1040,13 @@ const ServicePackageBookingFormPage = () => {
             <Form.Item
               label="Số điện thoại"
               name="ordererPhone"
-              rules={[
-                { required: true, message: "Vui lòng nhập số điện thoại!" },
-                {
-                  pattern: /^0\d{9}$/,
-                  message:
-                    "Số điện thoại phải là số Việt Nam 10 chữ số và bắt đầu bằng 0.",
-                },
-              ]}
+              rules={[requiredRule("Số điện thoại"), phoneRule]}
             >
               <Input
                 className="!h-12"
                 placeholder="Nhập số điện thoại"
-                maxLength={10}
-                onKeyPress={(e) => handleNumberKeyPress(e, 10)}
+                maxLength={12}
+                type="tel"
               />
             </Form.Item>
           </div>
@@ -962,8 +1055,8 @@ const ServicePackageBookingFormPage = () => {
             label="Địa chỉ người đặt"
             name="permanentAddress"
             rules={[
-              { required: true, message: "Vui lòng nhập địa chỉ người đặt!" },
-              { max: 100, message: "Tối đa 100 ký tự." },
+              requiredRule("Địa chỉ người đặt"),
+              maxLengthRule("Địa chỉ người đặt", 100),
             ]}
           >
             <Input
@@ -973,19 +1066,105 @@ const ServicePackageBookingFormPage = () => {
             />
           </Form.Item>
 
-          <Form.Item
-            label="Địa chỉ livestream"
-            name="livestreamAddress"
-            rules={[
-              { required: true, message: "Vui lòng nhập địa chỉ livestream!" },
-              { max: 100, message: "Tối đa 100 ký tự." },
-            ]}
-          >
-            <Input
-              className="!h-12"
-              maxLength={100}
-              placeholder="Nhập địa chỉ livestream"
-            />
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const livestreamErrors = form.getFieldError("livestreamAddress");
+              const livestreamError = livestreamErrors?.[0] || "";
+              const helperText = livestreamError || wardsError || undefined;
+              const status = helperText ? "error" : "";
+
+              return (
+                <Form.Item
+                  label="Địa chỉ livestream"
+                  required
+                  validateStatus={status}
+                  help={helperText}
+                >
+                  <Space direction="vertical" size={12} className="w-full">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-slate-700">
+                        Tỉnh / Thành phố
+                      </div>
+                      <Input
+                        className="!h-12"
+                        value={provinceName || "Đang tải..."}
+                        readOnly
+                        status={wardsError ? "error" : ""}
+                        placeholder="Tỉnh / Thành phố"
+                      />
+                      <div className="text-xs text-gray-500">
+                        Dịch vụ hiện đang khả dụng tại Hà Nội
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-slate-700">
+                        Phường / Xã tại Hà Nội
+                      </div>
+                      <Select
+                        showSearch
+                        allowClear
+                        className="!w-full"
+                        placeholder={
+                          wardsLoading ? "Đang tải..." : "Chọn phường/xã"
+                        }
+                        loading={wardsLoading}
+                        options={wards.map((ward) => ({
+                          label: ward.name,
+                          value: ward.code,
+                        }))}
+                        value={selectedWardCode || undefined}
+                        onChange={(value) => {
+                          setLocationTouched(true);
+                          setSelectedWardCode(value || "");
+                        }}
+                        optionFilterProp="label"
+                        filterOption={(input, option) =>
+                          (option?.label || "")
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
+                        notFoundContent={
+                          wardsLoading
+                            ? "Đang tải phường/xã..."
+                            : wardsError || "Không tìm thấy phường/xã"
+                        }
+                        disabled={wardsLoading || (!wards.length && !wardsError)}
+                        status={status}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-slate-700">
+                        Số nhà / Tên đường / Tòa nhà
+                      </div>
+                      <Input
+                        className="!h-12"
+                        value={detailAddress}
+                        onChange={(e) => {
+                          setLocationTouched(true);
+                          setDetailAddress(e.target.value);
+                        }}
+                        placeholder="Ví dụ: 123 Trần Duy Hưng, Vinhomes..."
+                        maxLength={100}
+                        status={status}
+                      />
+                    </div>
+
+                    <Form.Item
+                      name="livestreamAddress"
+                      rules={[
+                        requiredRule("Địa chỉ livestream"),
+                        maxLengthRule("Địa chỉ livestream", 150),
+                      ]}
+                      hidden
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Space>
+                </Form.Item>
+              );
+            }}
           </Form.Item>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -993,7 +1172,7 @@ const ServicePackageBookingFormPage = () => {
               label="Số giờ live"
               name="livestreamHours"
               rules={[
-                { required: true, message: "Vui lòng nhập số giờ live!" },
+                // requiredRule("Số giờ live"),
                 {
                   validator: (_, value) => {
                     if (value == null || value === "") {
@@ -1021,7 +1200,7 @@ const ServicePackageBookingFormPage = () => {
               label="Mã thuế (không bắt buộc)"
               name="taxCode"
               rules={[
-                { max: 13, message: "Mã số thuế tối đa 13 ký tự." },
+                maxLengthRule("Mã số thuế", 13),
                 {
                   pattern: /^[0-9]*$/,
                   message: "Mã số thuế chỉ được chứa chữ số.",
@@ -1207,16 +1386,7 @@ const ServicePackageBookingFormPage = () => {
               <p className="mb-4 text-sm text-slate-600">
                 Lựa chọn đội ngũ đồng hành phù hợp cho gói VIP của bạn.
               </p>
-              <Form.Item
-                label="Host chính"
-                name="kol"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn ít nhất một Host chính!",
-                  },
-                ]}
-              >
+              <Form.Item label="Host chính" name="kol" rules={[]}>
                 <Select
                   mode="multiple"
                   loading={isFetchingKols}
@@ -1239,16 +1409,7 @@ const ServicePackageBookingFormPage = () => {
                 />
               </Form.Item>
 
-              <Form.Item
-                label="Trợ lý LIVE"
-                name="assistant"
-                rules={[
-                  {
-                    required: true,
-                    message: "Vui lòng chọn ít nhất một Trợ lý LIVE!",
-                  },
-                ]}
-              >
+              <Form.Item label="Trợ lý LIVE" name="assistant" rules={[]}>
                 <Select
                   mode="multiple"
                   loading={isFetchingKols}
@@ -1279,15 +1440,7 @@ const ServicePackageBookingFormPage = () => {
                 Quay lại
               </Button>
             )}
-            <Button
-              className="!h-12 !px-10"
-              type="primary"
-              htmlType="submit"
-              disabled={
-                selectedPackage === "vip" &&
-                (!hostOptions.length || !liveOptions.length)
-              }
-            >
+            <Button className="!h-12 !px-10" type="primary" htmlType="submit">
               Lưu và tiếp tục
             </Button>
           </div>
@@ -1328,9 +1481,9 @@ const ServicePackageBookingFormPage = () => {
               <Descriptions.Item label="Ngày kết thúc">
                 {campaignData.endDate}
               </Descriptions.Item>
-              <Descriptions.Item label="Tần suất triển khai">
+              {/* <Descriptions.Item label="Tần suất triển khai">
                 {campaignData.recurrencePattern}
-              </Descriptions.Item>
+              </Descriptions.Item> */}
               <Descriptions.Item label="Kiểu lặp">
                 {campaignData.repeatType || "Không lặp"}
               </Descriptions.Item>
@@ -1370,11 +1523,14 @@ const ServicePackageBookingFormPage = () => {
                   labelStyle={{ fontWeight: "bold" }}
                 >
                   <Descriptions.Item label="Host chính">
-                    {vipExtraData.kolNames || vipExtraData.kol?.join(", ")}
+                    {vipExtraData.kolNames ||
+                      vipExtraData.kol?.join(", ") ||
+                      "--"}
                   </Descriptions.Item>
                   <Descriptions.Item label="Trợ lý LIVE">
                     {vipExtraData.assistantNames ||
-                      vipExtraData.assistant?.join(", ")}
+                      vipExtraData.assistant?.join(", ") ||
+                      "--"}
                   </Descriptions.Item>
                 </Descriptions>
               </div>

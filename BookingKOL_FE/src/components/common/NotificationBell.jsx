@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Badge,
   Box,
@@ -106,6 +107,7 @@ const NotificationBell = ({
   transformOrigin = { vertical: "top", horizontal: "right" },
   menuPaperSx,
 }) => {
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -259,6 +261,24 @@ const NotificationBell = ({
     setAnchorEl(event.currentTarget);
     if (!notifications.length || !hasUnread || updating) return;
     await handleMarkAllAsRead();
+  };
+
+  const handleNotificationClick = (item) => {
+    if (!item) return;
+
+    const { type, id } = item;
+    if (!id) return;
+
+    if (type === "bookingrequestcampaign") {
+      navigate(`/don-booking-chien-dich/${id}`);
+      setAnchorEl(null);
+      return;
+    }
+
+    if (type === "bookingrequestsingle" || type === "bookingrequest") {
+      navigate(`/don-booking-kol/${id}`);
+      setAnchorEl(null);
+    }
   };
 
   return (
@@ -474,6 +494,7 @@ const NotificationBell = ({
                 <ListItemButton
                   key={item?.id || item?.notificationId || index}
                   alignItems="flex-start"
+                  onClick={() => handleNotificationClick(item)}
                   sx={{
                     py: 1.35,
                     gap: 1.25,
