@@ -269,7 +269,18 @@ export const adminCreateBookingFromCampaign = async (
     config,
   });
 
-  return res?.data ?? res ?? null;
+  const out = res?.data ?? res ?? null;
+
+  // ✅ GHI ĐÈ message BE trả về
+  if (out && Array.isArray(out.message)) {
+    out.message = ["Tạo booking request thành công"];
+  } else if (out && out.message) {
+    out.message = ["Tạo booking request thành công"];
+  } else if (out) {
+    out.message = ["Tạo booking request thành công"];
+  }
+
+  return out;
 };
 
 /** PUT /v1/admin/bookings/edit/{bookingRequestId} */

@@ -93,6 +93,21 @@ const formatArrayText = (items) => {
     .join(", ");
 };
 
+/** ===== Repeat type label ===== */
+const REPEAT_TYPE_LABEL = {
+  WEEKLY: "Hàng tuần",
+  DAILY: "Hàng ngày",
+  MONTHLY: "Hàng tháng",
+  ONCE: "Một lần",
+  NONE: "Không lặp",
+};
+const formatRepeatType = (value) => {
+  if (value === null || value === undefined || value === "") return "--";
+  const raw = String(value).trim();
+  const upper = normalizeUpper(raw);
+  return REPEAT_TYPE_LABEL[upper] ?? raw; // nếu BE trả "hàng tuần" thì giữ nguyên
+};
+
 // mapping nhỏ cho status campaign
 const CAMPAIGN_STATUS_LABEL = {
   REQUESTED: "Đang yêu cầu",
@@ -1234,9 +1249,21 @@ export default function BookingCampaignSchedule() {
                       )}
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Mô tả" span={screens.lg ? 3 : 1}>
+                    {contractStatus && (
+                      <Descriptions.Item label="Trạng thái hợp đồng">
+                        <Tag color={contractStatusColor}>
+                          {contractStatusLabel}
+                        </Tag>
+                      </Descriptions.Item>
+                    )}
+
+                    {/* ✅ NEW: campaignObjective */}
+                    <Descriptions.Item
+                      label="Mục tiêu chiến dịch"
+                      span={screens.lg ? 3 : 1}
+                    >
                       <Text style={{ whiteSpace: "pre-wrap" }}>
-                        {record?.description ?? "--"}
+                        {record?.campaignObjective ?? "--"}
                       </Text>
                     </Descriptions.Item>
 
@@ -1249,7 +1276,7 @@ export default function BookingCampaignSchedule() {
                       {formatDate(record?.endDate)}
                     </Descriptions.Item>
 
-                    {/* ✅ 4 trường mới: hours, unitPrice, discount, totalAmount */}
+                    {/* ✅ 4 trường: hours, unitPrice, discount, totalAmount */}
                     <Descriptions.Item label="Tổng số giờ">
                       {record?.hours != null ? `${record.hours} giờ` : "--"}
                     </Descriptions.Item>
@@ -1262,7 +1289,7 @@ export default function BookingCampaignSchedule() {
                       {formatCurrency(record?.discount)}
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Tổng tiền">
+                    <Descriptions.Item label="Tổng tiền (VND)">
                       {formatCurrency(record?.totalAmount)}
                     </Descriptions.Item>
 
@@ -1270,17 +1297,14 @@ export default function BookingCampaignSchedule() {
                       <Text copyable>{record?.createdByEmail ?? "--"}</Text>
                     </Descriptions.Item>
 
-                    {kolsForBooking.length > 0 && (
-                      <Descriptions.Item label="KOL Livestream">
-                        {formatArrayText(kolsForBooking)}
-                      </Descriptions.Item>
-                    )}
+                    {/* ✅ KHÔNG ẨN khi null */}
+                    <Descriptions.Item label="KOL tham gia">
+                      {formatArrayText(kolsForBooking)}
+                    </Descriptions.Item>
 
-                    {livesForBooking.length > 0 && (
-                      <Descriptions.Item label="Livestream">
-                        {formatArrayText(livesForBooking)}
-                      </Descriptions.Item>
-                    )}
+                    <Descriptions.Item label="Live tham gia">
+                      {formatArrayText(livesForBooking)}
+                    </Descriptions.Item>
 
                     <Descriptions.Item label="Tạo lúc">
                       {formatDateTime(record?.createdAt)}
@@ -1289,6 +1313,8 @@ export default function BookingCampaignSchedule() {
                     <Descriptions.Item label="Cập nhật lúc">
                       {formatDateTime(record?.updatedAt)}
                     </Descriptions.Item>
+
+                    {/* ❌ BỎ ngân sách chiến dịch: không render field ngân sách ở đây */}
                   </Descriptions>
                 </Card>
               );
