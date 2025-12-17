@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { API_BASE, BASE_URL } from "../../utils/config"; // ✅ dùng chung như Login
 
 export default function RegisterPage() {
-  const MAX_PWD = 255;
+  const MAX_PWD = 70;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
