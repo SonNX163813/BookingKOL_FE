@@ -107,7 +107,7 @@ const buildRepeatTypeTextFromSelection = (selection = []) => {
   const sel = Array.isArray(selection) ? selection : [];
 
   // NONE => không gửi repeatType
-  if (sel.includes(REPEAT_NONE)) return "";
+  if (sel.includes(REPEAT_NONE)) return "Không lặp";
 
   if (sel.includes(REPEAT_DAILY)) return "Hàng ngày";
 
@@ -1479,3 +1479,4 @@ const ServicePackageBookingFormPage = () => {
 };
 
 export default ServicePackageBookingFormPage;
+
