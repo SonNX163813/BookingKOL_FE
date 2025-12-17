@@ -67,7 +67,7 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hoàn thành", value: "COMPLETED" },
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
-  { label: "Đã chờ thực hiện", value: "PAID" },
+  { label: "Đang chờ thực hiện", value: "PAID" },
 ];
 const STATUS_TAG_COLOR = {
   DRAFT: "default",

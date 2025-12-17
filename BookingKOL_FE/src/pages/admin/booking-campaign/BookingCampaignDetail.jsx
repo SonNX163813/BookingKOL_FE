@@ -1,5 +1,5 @@
 // src/pages/admin/booking-campaign/BookingCampaignDetail.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
@@ -15,7 +15,14 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { ArrowLeft, CalendarRange, FileText, Layers } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarRange,
+  FileText,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BOOKING_STATUS_LABEL,
@@ -54,8 +61,8 @@ const formatCurrency = (value, currency = "VND") => {
   }).format(numeric);
 };
 
-const normalizeStatus = (status) =>
-  status && typeof status === "string" ? status.toUpperCase() : status;
+const normalizeUpper = (val) =>
+  val && typeof val === "string" ? val.toUpperCase() : val;
 
 const formatArrayText = (items) => {
   if (!Array.isArray(items) || !items.length) return "--";
@@ -63,6 +70,29 @@ const formatArrayText = (items) => {
     .map((x) => x?.displayName || x?.name || x?.id)
     .filter(Boolean)
     .join(", ");
+};
+
+// ✅ repeatType label (giống BookingCampaignSchedule)
+const REPEAT_TYPE_LABEL = {
+  WEEKLY: "Hàng tuần",
+  DAILY: "Hàng ngày",
+  MONTHLY: "Hàng tháng",
+  ONCE: "Một lần",
+  NONE: "Không lặp",
+};
+
+const formatRepeatType = (value) => {
+  if (value === null || value === undefined || value === "") return "--";
+  const raw = String(value).trim();
+  const upper = normalizeUpper(raw);
+  return REPEAT_TYPE_LABEL[upper] ?? raw;
+};
+
+const formatPercent = (value) => {
+  if (value === null || value === undefined || value === "") return "--";
+  const n = typeof value === "number" ? value : Number.parseFloat(value);
+  if (Number.isNaN(n)) return String(value);
+  return `${n}%`;
 };
 
 // mapping nhỏ cho status campaign
@@ -86,26 +116,16 @@ const CAMPAIGN_STATUS_COLOR = {
   COMPLETED: "blue",
 };
 
-/** Label + Color cho trạng thái hợp đồng */
-const CONTRACT_STATUS_LABEL = {
-  REQUESTED: "Đang yêu cầu",
-  NEGOTIATING: "Đang thương lượng",
-  ACCEPTED: "Đã chấp nhận",
-  REJECTED: "Đã từ chối",
-  CANCELLED: "Đã hủy",
-  IN_PROGRESS: "Đang thực hiện",
-  COMPLETED: "Hoàn tất",
-};
-
-const getStatusColor = (status) => {
-  if (!status) return "default";
-  return STATUS_TAG_COLOR[status] ?? CAMPAIGN_STATUS_COLOR[status] ?? "default";
-};
-
 const BookingCampaignDetail = () => {
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const screens = useBreakpoint();
+
+  // ✅ Thu gọn/mở rộng phần “Thông tin Booking Campaign” (giống Schedule)
+  const [campaignInfoCollapsed, setCampaignInfoCollapsed] = useState(false);
+
+  // ✅ NEW: Thu gọn/mở rộng phần “Thông tin yêu cầu từ khách hàng” (giống EditBookingCampain)
+  const [collapseCampaignInfo, setCollapseCampaignInfo] = useState(false);
 
   const {
     data: bookingsResponse,
@@ -136,6 +156,11 @@ const BookingCampaignDetail = () => {
   const campaignInfo = campaignResponse?.data ?? campaignResponse ?? null;
   const bookingsDetail = bookingsResponse?.data ?? bookingsResponse ?? null;
 
+  const hasCampaignKols =
+    Array.isArray(campaignInfo?.kols) && campaignInfo.kols.length > 0;
+  const hasCampaignLives =
+    Array.isArray(campaignInfo?.lives) && campaignInfo.lives.length > 0;
+
   const bookingRequests = useMemo(
     () =>
       Array.isArray(bookingsDetail?.bookingRequests)
@@ -143,14 +168,6 @@ const BookingCampaignDetail = () => {
         : [],
     [bookingsDetail?.bookingRequests]
   );
-
-  const normalizedStatus = normalizeStatus(campaignInfo?.status);
-  const statusLabel =
-    CAMPAIGN_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
-
-  // ✅ ưu tiên timestamp từ API bookings/admin/{id} (bookingsResponse)
-  const responseTimestamp =
-    bookingsResponse?.timestamp ?? campaignResponse?.timestamp ?? null;
 
   const isLoadingAll = isLoadingBookings || isLoadingCampaign;
   const isFetchingAll = isFetchingBookings || isFetchingCampaign;
@@ -160,22 +177,6 @@ const BookingCampaignDetail = () => {
     refetchCampaign();
     refetchBookings();
   };
-
-  // ✅ KOL + Live tham gia lấy từ API bookings/admin/{id}
-  // fallback về campaignInfo nếu BE thay đổi
-  const customerKols = useMemo(() => {
-    const src = bookingsDetail ?? campaignInfo;
-    if (Array.isArray(src?.campaignKols)) return src.campaignKols;
-    if (Array.isArray(src?.kols)) return src.kols;
-    return [];
-  }, [bookingsDetail, campaignInfo]);
-
-  const customerLives = useMemo(() => {
-    const src = bookingsDetail ?? campaignInfo;
-    if (Array.isArray(src?.campaignLives)) return src.campaignLives;
-    if (Array.isArray(src?.lives)) return src.lives;
-    return [];
-  }, [bookingsDetail, campaignInfo]);
 
   const paymentScheduleColumns = useMemo(
     () => [
@@ -202,7 +203,7 @@ const BookingCampaignDetail = () => {
         dataIndex: "status",
         key: "status",
         render: (v) => {
-          const s = normalizeStatus(v);
+          const s = normalizeUpper(v);
           if (!s) return "--";
           return (
             <Tag color={PAYMENT_STATUS_COLOR[s] ?? "default"}>
@@ -221,7 +222,7 @@ const BookingCampaignDetail = () => {
         title: "Trạng thái giao dịch",
         dataIndex: "transactionStatus",
         key: "transactionStatus",
-        render: (v) => normalizeStatus(v) ?? "--",
+        render: (v) => normalizeUpper(v) ?? "--",
       },
     ],
     []
@@ -267,81 +268,198 @@ const BookingCampaignDetail = () => {
         </Card>
       ) : (
         <>
+          {/* ✅ UPDATED: Thông tin yêu cầu từ khách hàng (GIỐNG EditBookingCampain.jsx) */}
           <Card
             className="shadow-sm"
             bordered={false}
+            loading={isLoadingAll}
             title={
               <Space>
                 <Layers size={18} />
                 <span>Thông tin yêu cầu từ khách hàng</span>
               </Space>
             }
-            loading={isLoadingAll}
-          >
-            <Space size="middle" wrap className="justify-between w-full mb-4">
-              <Tag color={CAMPAIGN_STATUS_COLOR[normalizedStatus] ?? "default"}>
-                {statusLabel}
-              </Tag>
-
-              {responseTimestamp && (
-                <Text type="secondary">
-                  Thời gian phản hồi: {formatDateTime(responseTimestamp)}
-                </Text>
-              )}
-            </Space>
-
-            <Descriptions
-              bordered
-              size="middle"
-              column={screens.lg ? 3 : screens.md ? 2 : 1}
-              styles={{ label: { width: 180 } }}
-            >
-              <Descriptions.Item label="Tên Campaign">
-                {campaignInfo?.name ?? "--"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Người tạo (email)">
-                <Text copyable>{campaignInfo?.createdBy ?? "--"}</Text>
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Mục tiêu" span={screens.lg ? 3 : 1}>
-                <Text style={{ whiteSpace: "pre-wrap" }}>
-                  {campaignInfo?.objective ?? "--"}
-                </Text>
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Giá mục tiêu">
-                {formatCurrency(campaignInfo?.targetPrice)}
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Ngày bắt đầu">
-                {formatDate(campaignInfo?.startDate)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày kết thúc">
-                {formatDate(campaignInfo?.endDate)}
-              </Descriptions.Item>
-
-              {/* ✅ lấy từ bookings/admin/{id}: campaignKols */}
-              <Descriptions.Item label="KOL tham gia" span={screens.lg ? 3 : 1}>
-                {formatArrayText(customerKols)}
-              </Descriptions.Item>
-
-              {/* ✅ lấy từ bookings/admin/{id}: campaignLives */}
-              <Descriptions.Item
-                label="Trợ Live tham gia"
-                span={screens.lg ? 3 : 1}
+            extra={
+              <Button
+                size="small"
+                type="default"
+                onClick={() => setCollapseCampaignInfo((v) => !v)}
+                icon={
+                  collapseCampaignInfo ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronUp size={16} />
+                  )
+                }
               >
-                {formatArrayText(customerLives)}
-              </Descriptions.Item>
+                {collapseCampaignInfo ? "Mở rộng" : "Thu gọn"}
+              </Button>
+            }
+          >
+            {errorCampaign ? (
+              <Alert
+                type="error"
+                showIcon
+                message="Không thể tải thông tin campaign."
+                description={String(errorCampaign?.message ?? "")}
+              />
+            ) : campaignInfo ? (
+              <>
+                <Space
+                  size="middle"
+                  wrap
+                  className="justify-between w-full mb-4"
+                >
+                  <Tag
+                    color={
+                      CAMPAIGN_STATUS_COLOR[
+                        normalizeUpper(campaignInfo?.status)
+                      ] ?? "default"
+                    }
+                  >
+                    {CAMPAIGN_STATUS_LABEL[
+                      normalizeUpper(campaignInfo?.status)
+                    ] ??
+                      normalizeUpper(campaignInfo?.status) ??
+                      "--"}
+                  </Tag>
+                </Space>
 
-              <Descriptions.Item label="Tạo lúc">
-                {formatDateTime(campaignInfo?.createdAt)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Cập nhật lúc">
-                {formatDateTime(campaignInfo?.updatedAt)}
-              </Descriptions.Item>
-            </Descriptions>
+                {collapseCampaignInfo ? (
+                  <Descriptions
+                    bordered
+                    size="middle"
+                    column={screens.lg ? 3 : screens.md ? 2 : 1}
+                    styles={{ label: { width: 180 } }}
+                  >
+                    <Descriptions.Item label="Tên Campaign">
+                      {campaignInfo?.name ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Thời gian">
+                      {formatDate(campaignInfo?.startDate)} -{" "}
+                      {formatDate(campaignInfo?.endDate)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Người đặt">
+                      {campaignInfo?.ordererFullName ?? "--"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Số điện thoại">
+                      {campaignInfo?.ordererPhone ? (
+                        <Text copyable>{campaignInfo.ordererPhone}</Text>
+                      ) : (
+                        "--"
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Số giờ livestream">
+                      {campaignInfo?.livestreamHours ?? "--"}
+                    </Descriptions.Item>
+                  </Descriptions>
+                ) : (
+                  <Descriptions
+                    bordered
+                    size="middle"
+                    column={screens.lg ? 3 : screens.md ? 2 : 1}
+                    styles={{ label: { width: 180 } }}
+                  >
+                    <Descriptions.Item label="Tên Campaign">
+                      {campaignInfo?.name ?? "--"}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Họ và tên người đặt">
+                      {campaignInfo?.ordererFullName ?? "--"}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Số điện thoại">
+                      {campaignInfo?.ordererPhone ? (
+                        <Text copyable>{campaignInfo.ordererPhone}</Text>
+                      ) : (
+                        "--"
+                      )}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Email">
+                      <Text copyable>{campaignInfo?.createdBy ?? "--"}</Text>
+                    </Descriptions.Item>
+
+                    <Descriptions.Item
+                      label="Mục tiêu"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {campaignInfo?.objective ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Ngày bắt đầu">
+                      {formatDate(campaignInfo?.startDate)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Ngày kết thúc">
+                      {formatDate(campaignInfo?.endDate)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Số giờ livestream">
+                      {campaignInfo?.livestreamHours ?? "--"}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item
+                      label="Địa chỉ livestream"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {campaignInfo?.livestreamAddress ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
+
+                    <Descriptions.Item
+                      label="Địa chỉ thường trú"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {campaignInfo?.permanentAddress ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Mã số thuế">
+                      {campaignInfo?.taxCode ? (
+                        <Text copyable>{campaignInfo.taxCode}</Text>
+                      ) : (
+                        "--"
+                      )}
+                    </Descriptions.Item>
+
+                    {hasCampaignKols && (
+                      <Descriptions.Item
+                        label="KOL tham gia"
+                        span={screens.lg ? 3 : 1}
+                      >
+                        {formatArrayText(campaignInfo?.kols)}
+                      </Descriptions.Item>
+                    )}
+
+                    {hasCampaignLives && (
+                      <Descriptions.Item
+                        label="Trợ Live tham gia"
+                        span={screens.lg ? 3 : 1}
+                      >
+                        {formatArrayText(campaignInfo?.lives)}
+                      </Descriptions.Item>
+                    )}
+
+                    <Descriptions.Item label="Tạo lúc">
+                      {formatDateTime(campaignInfo?.createdAt)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Cập nhật lúc">
+                      {formatDateTime(campaignInfo?.updatedAt)}
+                    </Descriptions.Item>
+                  </Descriptions>
+                )}
+              </>
+            ) : (
+              <Text type="secondary">Không có dữ liệu campaign.</Text>
+            )}
           </Card>
 
+          {/* ✅ Thông tin Booking Campaign */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -351,10 +469,83 @@ const BookingCampaignDetail = () => {
                 <span>Thông tin Booking Campaign</span>
               </Space>
             }
+            extra={
+              <Button
+                size="small"
+                type="default"
+                icon={
+                  campaignInfoCollapsed ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronUp size={16} />
+                  )
+                }
+                onClick={() => setCampaignInfoCollapsed((p) => !p)}
+              >
+                {campaignInfoCollapsed ? "Mở rộng" : "Thu gọn"}
+              </Button>
+            }
+            loading={isLoadingAll}
           >
-            {bookingRequests.length ? (
+            {campaignInfoCollapsed ? null : errorBookings ? (
+              <Alert
+                type="error"
+                showIcon
+                message="Không thể tải chi tiết booking campaign."
+                description={String(errorBookings?.message ?? "")}
+              />
+            ) : bookingRequests.length ? (
               bookingRequests.map((record, index) => {
-                // ✅ sort dueDate tăng dần (ngày sớm lên trước)
+                const bookingStatus = normalizeUpper(record?.status);
+
+                const bookingStatusLabel =
+                  bookingStatus === "NEGOTIATING"
+                    ? CAMPAIGN_STATUS_LABEL.NEGOTIATING
+                    : BOOKING_STATUS_LABEL[bookingStatus] ??
+                      bookingStatus ??
+                      "--";
+
+                const bookingStatusColor =
+                  bookingStatus === "NEGOTIATING"
+                    ? CAMPAIGN_STATUS_COLOR.NEGOTIATING
+                    : STATUS_TAG_COLOR[bookingStatus] ?? "default";
+
+                const kolsForBooking = Array.isArray(record?.campaignKols)
+                  ? record.campaignKols
+                  : Array.isArray(record?.kols)
+                  ? record.kols
+                  : [];
+
+                const livesForBooking = Array.isArray(record?.campaignLives)
+                  ? record.campaignLives
+                  : Array.isArray(record?.lives)
+                  ? record.lives
+                  : [];
+
+                const campaignObjective =
+                  record?.campaignObjective ??
+                  record?.objective ??
+                  record?.campaign?.objective ??
+                  "--";
+
+                const hours =
+                  record?.hours ??
+                  record?.liveHours ??
+                  record?.livestreamHours ??
+                  null;
+
+                const unitPrice =
+                  record?.unitPrice ?? record?.pricePerHour ?? null;
+
+                const discount =
+                  record?.discount ??
+                  record?.discountPercent ??
+                  record?.discount_rate ??
+                  null;
+
+                const totalAmount =
+                  record?.totalAmount ?? record?.amount ?? null;
+
                 const schedules = (
                   Array.isArray(record?.paymentSchedules)
                     ? record.paymentSchedules
@@ -376,27 +567,6 @@ const BookingCampaignDetail = () => {
 
                     return va - vb;
                   });
-
-                const bookingStatus = normalizeStatus(record?.status);
-
-                const bookingStatusLabel =
-                  bookingStatus === "NEGOTIATING"
-                    ? CAMPAIGN_STATUS_LABEL.NEGOTIATING
-                    : BOOKING_STATUS_LABEL[bookingStatus] ??
-                      bookingStatus ??
-                      "--";
-
-                const bookingStatusColor =
-                  bookingStatus === "NEGOTIATING"
-                    ? CAMPAIGN_STATUS_COLOR.NEGOTIATING
-                    : STATUS_TAG_COLOR[bookingStatus] ?? "default";
-
-                const contractStatus = normalizeStatus(record?.contractStatus);
-                const contractStatusLabel =
-                  CONTRACT_STATUS_LABEL[contractStatus] ??
-                  contractStatus ??
-                  "--";
-                const contractStatusColor = getStatusColor(contractStatus);
 
                 const contractFileUrl =
                   record?.contractFileUrl?.match(/https?:\/\/\S+/)?.[0] ??
@@ -434,43 +604,69 @@ const BookingCampaignDetail = () => {
                         )}
                       </Descriptions.Item>
 
+                      <Descriptions.Item label="Tần suất lặp">
+                        {formatRepeatType(record?.repeatType)}
+                      </Descriptions.Item>
+
                       <Descriptions.Item
-                        label="Mô tả"
+                        label="Mục tiêu chiến dịch"
                         span={screens.lg ? 3 : 1}
                       >
                         <Text style={{ whiteSpace: "pre-wrap" }}>
-                          {record?.description ?? "--"}
+                          {campaignObjective}
                         </Text>
                       </Descriptions.Item>
 
-                      <Descriptions.Item label="Kiểu lặp">
-                        {record?.repeatType ?? "--"}
+                      <Descriptions.Item label="Ngày bắt đầu chiến dịch">
+                        {formatDate(record?.startDate)}
                       </Descriptions.Item>
 
-                      <Descriptions.Item label="Lặp đến">
-                        {formatDate(record?.repeatUntil)}
+                      <Descriptions.Item label="Ngày kết thúc">
+                        {formatDate(record?.endDate)}
                       </Descriptions.Item>
 
-                      <Descriptions.Item label="Giá trị hợp đồng">
-                        {formatCurrency(record?.contractAmount)}
+                      <Descriptions.Item label="Tổng số giờ">
+                        {hours != null && hours !== "" ? `${hours} giờ` : "--"}
                       </Descriptions.Item>
-                      <Descriptions.Item label="Tổng giá trị booking">
-                        {formatCurrency(record?.amount)}
+
+                      <Descriptions.Item label="Đơn giá">
+                        {unitPrice != null && unitPrice !== ""
+                          ? formatCurrency(unitPrice)
+                          : "--"}
                       </Descriptions.Item>
+
+                      <Descriptions.Item label="Giảm giá (%)">
+                        {discount != null && discount !== ""
+                          ? formatPercent(discount)
+                          : "--"}
+                      </Descriptions.Item>
+
+                      <Descriptions.Item label="Tổng tiền">
+                        {totalAmount != null && totalAmount !== ""
+                          ? formatCurrency(totalAmount)
+                          : "--"}
+                      </Descriptions.Item>
+
                       <Descriptions.Item label="Người tạo (email)">
                         <Text copyable>{record?.createdByEmail ?? "--"}</Text>
                       </Descriptions.Item>
 
-                      <Descriptions.Item label="KOL">
-                        {formatArrayText(record?.kols)}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Livestream">
-                        {formatArrayText(record?.lives)}
-                      </Descriptions.Item>
+                      {kolsForBooking.length > 0 && (
+                        <Descriptions.Item label="KOL Livestream">
+                          {formatArrayText(kolsForBooking)}
+                        </Descriptions.Item>
+                      )}
+
+                      {livesForBooking.length > 0 && (
+                        <Descriptions.Item label="Livestream">
+                          {formatArrayText(livesForBooking)}
+                        </Descriptions.Item>
+                      )}
 
                       <Descriptions.Item label="Tạo lúc">
                         {formatDateTime(record?.createdAt)}
                       </Descriptions.Item>
+
                       <Descriptions.Item label="Cập nhật lúc">
                         {formatDateTime(record?.updatedAt)}
                       </Descriptions.Item>
@@ -492,14 +688,8 @@ const BookingCampaignDetail = () => {
                         {record?.contractNumber ?? "--"}
                       </Descriptions.Item>
 
-                      <Descriptions.Item label="Trạng thái hợp đồng">
-                        {contractStatus ? (
-                          <Tag color={contractStatusColor}>
-                            {contractStatusLabel}
-                          </Tag>
-                        ) : (
-                          "--"
-                        )}
+                      <Descriptions.Item label="Giá trị hợp đồng">
+                        {formatCurrency(record?.contractAmount)}
                       </Descriptions.Item>
 
                       <Descriptions.Item label="File hợp đồng">
