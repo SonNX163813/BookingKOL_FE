@@ -30,10 +30,30 @@ import PricingPanel from "./PricingPanel";
 import { useAuth } from "../../../context/AuthContext";
 
 const statsConfig = [
-  { key: "followers", label: "Người theo dõi", icon: PeopleAltRoundedIcon },
-  { key: "fans", label: "Lượt xem TikTok", icon: FavoriteRoundedIcon },
-  { key: "orders", label: "Đơn hàng", icon: ShoppingBagRoundedIcon },
-  { key: "rating", label: "Đánh giá", icon: StarRoundedIcon },
+  {
+    key: "followers",
+    label: "Người theo dõi",
+    icon: PeopleAltRoundedIcon,
+    getValue: (stats) => `125430`,
+  },
+  {
+    key: "fans",
+    label: "Lượt xem TikTok",
+    icon: FavoriteRoundedIcon,
+    getValue: (stats) => `3.86M`,
+  },
+  {
+    key: "orders",
+    label: "Đơn hàng",
+    icon: ShoppingBagRoundedIcon,
+    getValue: (stats) => `250+`,
+  },
+  {
+    key: "rating",
+    label: "Đánh giá",
+    icon: StarRoundedIcon,
+    getValue: (stats) => (stats.rating ? `${stats.rating}` : "Chưa có"),
+  },
 ];
 
 const textPrimary = "#2f3c8c";
@@ -594,12 +614,13 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                       <Typography
                         variant="h6"
                         sx={{
+                          mt: "auto", // 👈 ĐẨY XUỐNG CUỐI
                           color: textPrimary,
                           fontWeight: 700,
                           fontSize: { xs: "1.1rem", md: "1.25rem" },
                         }}
                       >
-                        {stats[key] ?? "--"}
+                        {config.value ?? config.getValue?.(stats) ?? "--"}
                       </Typography>
                     </MotionBox>
                   );
