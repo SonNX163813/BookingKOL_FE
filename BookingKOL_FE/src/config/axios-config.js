@@ -55,7 +55,7 @@ api.interceptors.response.use(
 
     if (!error.config?.skipErrorToast) {
       const toastMessage = normalizeMessage(error.response?.data?.message);
-      toast.error(toastMessage);
+      toast.error(toastMessage || "Có lỗi xảy ra, vui lòng thử lại.");
     }
     return Promise.reject(error);
   }
