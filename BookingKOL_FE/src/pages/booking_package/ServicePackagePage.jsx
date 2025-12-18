@@ -302,10 +302,13 @@ const ServicePackageCard = ({ data, onSelect, theme }) => {
   const features = [
     { label: "Tạo chiến dịch", available: true },
     { label: "Thống kê hiệu suất", available: true },
-    { label: "Chọn KOL thủ công", available: Boolean(data?.allowKolSelection) },
+    { label: "Hỗ trợ triển khai", available: true },
+    {
+      label: "Chọn KOL theo ý muốn",
+      available: Boolean(data?.allowKolSelection),
+    },
     { label: "Gợi ý KOL tự động", available: Boolean(data?.allowKolSelection) },
     { label: "Báo cáo nâng cao", available: isVip },
-    { label: "Hỗ trợ triển khai", available: isVip },
   ];
 
   return (

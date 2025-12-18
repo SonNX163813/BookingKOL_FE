@@ -432,6 +432,7 @@ const BookingContactStep = ({
           multiline
           minRows={3}
           error={Boolean(errors.note)}
+          inputProps={{ maxLength: 100 }}
           helperText={errors.note}
           placeholder="Ví dụ: Mong muốn setup tại nhà, cần KOL hỗ trợ thiết bị..."
           sx={{

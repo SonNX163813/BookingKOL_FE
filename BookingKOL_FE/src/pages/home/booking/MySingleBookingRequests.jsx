@@ -1005,7 +1005,14 @@ const MySingleBookingRequests = () => {
                             <span className="text-slate-500">Ghi chú</span>
                           </div>
                           {description ? (
-                            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <div
+                              className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                              style={{
+                                maxWidth: "100%",
+                                height: "auto",
+                                wordBreak: "break-word",
+                              }}
+                            >
                               {description}
                             </div>
                           ) : null}

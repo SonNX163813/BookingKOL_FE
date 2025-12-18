@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import {
   Alert,
@@ -22,9 +22,21 @@ import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 import {
   BOOKING_SINGLE_PAYMENT_STORAGE_KEY,
   BOOKING_SINGLE_REVIEW_STORAGE_KEY,
+  BOOKING_SINGLE_REVIEW_EXPIRES_AT_STORAGE_PREFIX,
 } from "../../constants/storageKeys";
 
 const FALLBACK_TEXT = "---";
+const REVIEW_TIMEOUT_MS = 15 * 60 * 1000;
+
+const formatCountdown = (totalSeconds) => {
+  const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0"
+  )}`;
+};
 
 const formatDateTime = (value) => {
   if (!value) return FALLBACK_TEXT;
@@ -159,6 +171,8 @@ const BookingSingleReview = () => {
   const [readTermsIds, setReadTermsIds] = useState([]);
   const [openContractTerms, setOpenContractTerms] = useState(null);
   const [signedContractIds, setSignedContractIds] = useState([]);
+  const [remainingSeconds, setRemainingSeconds] = useState(null);
+  const redirectLockRef = useRef(false);
 
   useEffect(() => {
     const stateRequest = location.state?.bookingRequest;
@@ -198,6 +212,68 @@ const BookingSingleReview = () => {
 
     navigate("/", { replace: true });
   }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!bookingRequest?.id) return;
+
+    redirectLockRef.current = false;
+
+    const storageKey = `${BOOKING_SINGLE_REVIEW_EXPIRES_AT_STORAGE_PREFIX}:${bookingRequest.id}`;
+    const now = Date.now();
+    let expiresAt = null;
+
+    try {
+      const storedValue = sessionStorage.getItem(storageKey);
+      const parsed = storedValue ? Number(storedValue) : NaN;
+      if (Number.isFinite(parsed) && parsed > now) {
+        expiresAt = parsed;
+      }
+    } catch (error) {
+      console.error("Không thể đọc thời gian hết hạn thanh toán", error);
+    }
+
+    if (!expiresAt) {
+      expiresAt = now + REVIEW_TIMEOUT_MS;
+      try {
+        sessionStorage.setItem(storageKey, String(expiresAt));
+      } catch (error) {
+        console.error("Không thể lưu thời gian hết hạn thanh toán", error);
+      }
+    }
+
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+      setRemainingSeconds(seconds);
+
+      if (seconds <= 0 && !redirectLockRef.current) {
+        redirectLockRef.current = true;
+
+        try {
+          sessionStorage.removeItem(storageKey);
+          sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
+          sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
+        } catch (error) {
+          console.error("Không thể xoá dữ liệu booking đã hết hạn", error);
+        }
+
+        navigate("/thanh-toan-kol-le/that-bai", {
+          replace: true,
+          state: {
+            bookingRequest,
+            reason: "EXPIRED",
+            expiredAt: expiresAt,
+          },
+        });
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [bookingRequest, navigate]);
 
   const kolInfo = bookingRequest?.kol ?? null;
 
@@ -355,7 +431,10 @@ const BookingSingleReview = () => {
   }, [contractsWithTerms, readTermsIds]);
 
   const actionButtonsDisabled =
-    confirming || cancelling || !hasReadAllContractTerms;
+    confirming ||
+    cancelling ||
+    !hasReadAllContractTerms ||
+    (typeof remainingSeconds === "number" && remainingSeconds <= 0);
 
   useEffect(() => {
     setReadTermsIds([]);
@@ -379,6 +458,7 @@ const BookingSingleReview = () => {
 
   const handleConfirm = async () => {
     if (!bookingRequest?.id || confirming) return;
+    if (typeof remainingSeconds === "number" && remainingSeconds <= 0) return;
     setConfirming(true);
     try {
       const response = await confirmSingleBookingRequest({
@@ -402,6 +482,12 @@ const BookingSingleReview = () => {
       }
 
       sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
+      try {
+        const storageKey = `${BOOKING_SINGLE_REVIEW_EXPIRES_AT_STORAGE_PREFIX}:${bookingRequest.id}`;
+        sessionStorage.removeItem(storageKey);
+      } catch (error) {
+        console.error("Không thể xoá bộ đếm thời gian thanh toán", error);
+      }
       navigate("/thanh-toan-kol-le", {
         replace: true,
         state: {
@@ -425,6 +511,12 @@ const BookingSingleReview = () => {
       });
       sessionStorage.removeItem(BOOKING_SINGLE_REVIEW_STORAGE_KEY);
       sessionStorage.removeItem(BOOKING_SINGLE_PAYMENT_STORAGE_KEY);
+      try {
+        const storageKey = `${BOOKING_SINGLE_REVIEW_EXPIRES_AT_STORAGE_PREFIX}:${bookingRequest.id}`;
+        sessionStorage.removeItem(storageKey);
+      } catch (error) {
+        console.error("Không thể xoá bộ đếm thời gian thanh toán", error);
+      }
 
       navigate("/thanh-toan-kol-le/that-bai", {
         replace: true,
@@ -472,6 +564,15 @@ const BookingSingleReview = () => {
   if (!bookingRequest) {
     return null;
   }
+
+  const reviewCountdownSeverity =
+    typeof remainingSeconds === "number" && remainingSeconds <= 60
+      ? "error"
+      : "warning";
+  const countdownText =
+    typeof remainingSeconds === "number"
+      ? formatCountdown(remainingSeconds)
+      : formatCountdown(REVIEW_TIMEOUT_MS / 1000);
 
   return (
     <>
@@ -527,10 +628,58 @@ const BookingSingleReview = () => {
                   }}
                 >
                   Vui lòng kiểm tra lại thông tin đặt lịch trước khi xác nhận.
-                  Bạn có thể hủy nếu cần chỉnh sửa thêm.
                 </Typography>
               </Stack>
 
+              <Alert
+                severity={reviewCountdownSeverity}
+                sx={{
+                  borderRadius: "18px",
+                  fontSize: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  sx={{ width: "100%" }}
+                  spacing={1.5}
+                >
+                  <Box>
+                    Hết 15 phút mà chưa{" "}
+                    <Typography component="span" sx={{ fontWeight: 700 }}>
+                      Xác nhận & Thanh toán
+                    </Typography>{" "}
+                    thì đơn sẽ quá hạn và không thể tiếp tục thanh toán.
+                  </Box>
+
+                  <Box
+                    sx={{
+                      minWidth: 150,
+                      p: 3,
+                      borderRadius: "999px",
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      boxShadow: "0 0 0 1px rgba(255,193,7,0.3)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      {countdownText}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Alert>
               <Paper
                 variant="outlined"
                 sx={{
@@ -1083,6 +1232,9 @@ const BookingSingleReview = () => {
                         color: contactInfo?.description
                           ? BOOKING_FLOW_STYLE.textPrimary
                           : BOOKING_FLOW_STYLE.textSecondary,
+                        maxWidth: "100%",
+                        height: "auto",
+                        wordBreak: "break-word",
                       }}
                     >
                       {contactInfo?.description || "Không có ghi chú bổ sung"}
