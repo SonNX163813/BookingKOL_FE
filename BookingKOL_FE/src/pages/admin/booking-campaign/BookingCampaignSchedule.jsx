@@ -25,6 +25,7 @@ import {
   Descriptions,
   Empty,
   Grid,
+  Popconfirm,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
 import {
@@ -39,6 +40,7 @@ import {
   ChevronUp,
   ArrowLeft,
   FileText,
+  Trash2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -46,6 +48,7 @@ import {
   adminCreateWorktime,
   adminSearchFreeSlots,
   adminEditScheduledWorktime, // dùng API edit mới
+  adminDeleteScheduledWorktime, // ✅ thêm API xóa (đổi tên nếu dự án bạn khác)
 } from "../../../services/admin/AdminWorktimeCampaignAPI";
 import { adminGetCampaignBookingDetail } from "../../../services/admin/AdminBookingCampaignAPI";
 import {
@@ -86,7 +89,8 @@ const normalizeUpper = (val) =>
   val && typeof val === "string" ? val.toUpperCase() : val;
 
 const formatArrayText = (items) => {
-  if (!Array.isArray(items) || !items.length) return "--";
+  if (!Array.isArray(items) || !items.length)
+    return "Không có KOL nào được chọn";
   return items
     .map((x) => x?.displayName || x?.name || x?.id)
     .filter(Boolean)
@@ -105,7 +109,7 @@ const formatRepeatType = (value) => {
   if (value === null || value === undefined || value === "") return "--";
   const raw = String(value).trim();
   const upper = normalizeUpper(raw);
-  return REPEAT_TYPE_LABEL[upper] ?? raw; // nếu BE trả "hàng tuần" thì giữ nguyên
+  return REPEAT_TYPE_LABEL[upper] ?? raw;
 };
 
 // mapping nhỏ cho status campaign
@@ -224,6 +228,9 @@ export default function BookingCampaignSchedule() {
   // ✅ Thu gọn / mở rộng phần “Thông tin Booking Campaign”
   const [campaignInfoCollapsed, setCampaignInfoCollapsed] = useState(false);
 
+  // ✅ loading khi xóa
+  const [deletingId, setDeletingId] = useState(null);
+
   // ISO without milliseconds
   const toIsoNoMs = (d) =>
     dayjs(d)
@@ -272,24 +279,18 @@ export default function BookingCampaignSchedule() {
       let maxHour = 23;
 
       if (type === "start") {
-        // Đang chọn giờ BẮT ĐẦU
         if (endHour != null) {
-          // start chỉ được chọn trong [end - 3, end - 1]
           minHour = Math.max(0, endHour - 3);
           maxHour = Math.max(minHour, endHour - 1);
         } else {
-          // Chưa chọn end => chỉ chặn giờ 23 để luôn còn ít nhất 1h
           minHour = 0;
           maxHour = 22;
         }
       } else {
-        // type === "end" - đang chọn giờ KẾT THÚC
         if (startHour != null) {
-          // end chỉ được chọn trong [start + 1, start + 3]
           minHour = Math.min(23, startHour + 1);
           maxHour = Math.min(23, startHour + 3);
         } else {
-          // Chưa chọn start => không cho chọn 0h để luôn > start
           minHour = 1;
           maxHour = 23;
         }
@@ -303,7 +304,6 @@ export default function BookingCampaignSchedule() {
         return res;
       };
 
-      // Chỉ cho chọn đúng phút :00
       const disabledMinutes = () => {
         const res = [];
         for (let m = 0; m < 60; m++) if (m !== 0) res.push(m);
@@ -443,7 +443,7 @@ export default function BookingCampaignSchedule() {
 
       if (worktimeFilterMode === "week") {
         const refDayStart = ref.startOf("day");
-        const dow = refDayStart.day(); // 0-6
+        const dow = refDayStart.day();
         const weekStart = refDayStart.subtract(dow, "day");
         const weekEnd = weekStart.add(7, "day");
         return (
@@ -553,11 +553,11 @@ export default function BookingCampaignSchedule() {
       record?.kolName ||
       record?.kol?.fullName ||
       record?.kol?.name ||
-      (currentKolId ? "KOL đã gán" : "");
+      (currentKolId ? "KOL tham gia" : "");
 
     setEditKolOptions(
       currentKolId
-        ? [{ value: currentKolId, label: currentKolLabel || "KOL đã gán" }]
+        ? [{ value: currentKolId, label: currentKolLabel || "KOL tham gia" }]
         : []
     );
     setEditSlotByKolId({});
@@ -631,7 +631,6 @@ export default function BookingCampaignSchedule() {
             ? String(editingRecord.kolId)
             : null;
 
-        // rangeChanged?
         let rangeChanged = true;
         try {
           const { startAt, endAt } = buildStartEndFromDateAndRange(
@@ -661,7 +660,6 @@ export default function BookingCampaignSchedule() {
         if (rangeChanged) {
           setEditKolOptions(options);
 
-          // nếu KOL cũ không còn AVAILABLE hoặc list rỗng => bỏ chọn
           if (
             (currentKolId && !slotMap?.[currentKolId]) ||
             (options?.length || 0) === 0
@@ -671,7 +669,6 @@ export default function BookingCampaignSchedule() {
 
           setEditKolDropdownOpen(true);
         } else {
-          // chưa đổi giờ: giữ option KOL cũ nếu cần để không bị nháy
           const currentKolLabel =
             editingRecord?.kolName ||
             editingRecord?.kol?.fullName ||
@@ -731,7 +728,6 @@ export default function BookingCampaignSchedule() {
 
       const selectedKolId = values?.kolId ? String(values.kolId) : null;
 
-      // chuẩn hóa payload thời gian + ghi chú
       const basePayload = {
         scheduledWorkTimeId,
         startAt: toIsoNoMs(startAt),
@@ -739,7 +735,6 @@ export default function BookingCampaignSchedule() {
         note: values.note || null,
       };
 
-      // Nếu có chọn KOL thì lấy slot tương ứng để kèm kolId + availabilityId
       let availabilityId;
       if (selectedKolId) {
         const slot = editSlotByKolId?.[selectedKolId];
@@ -752,7 +747,6 @@ export default function BookingCampaignSchedule() {
         availabilityId = slot.id;
       }
 
-      // ✅ Gọi API edit: update startAt, endAt, note (+ optional KOL & availabilityId)
       await adminEditScheduledWorktime({
         ...basePayload,
         ...(selectedKolId && availabilityId
@@ -760,7 +754,6 @@ export default function BookingCampaignSchedule() {
           : {}),
       });
 
-      // cập nhật tạm ở FE để table thấy ngay
       setLocalOverrides((prev) => ({
         ...prev,
         [key]: {
@@ -784,8 +777,41 @@ export default function BookingCampaignSchedule() {
       setEditKolDropdownOpen(false);
       await refetchWorktimes();
     } catch (e) {
-      if (e?.errorFields?.length) return; // lỗi validate -> đã hiện dưới input
+      if (e?.errorFields?.length) return;
       message.error(e?.message || "Cập nhật thất bại.");
+    }
+  };
+
+  // ✅ Xóa worktime
+  const handleDeleteWorktime = async (record) => {
+    const scheduledWorkTimeId = getScheduledId(record);
+    if (!scheduledWorkTimeId) {
+      message.error("Không tìm thấy scheduledWorkTimeId để xóa.");
+      return;
+    }
+
+    try {
+      setDeletingId(String(scheduledWorkTimeId));
+      await adminDeleteScheduledWorktime(scheduledWorkTimeId);
+
+      // dọn override nếu có
+      const key = getRowKey(record);
+      setLocalOverrides((prev) => {
+        if (!prev?.[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+
+      // nếu đang edit đúng dòng đó thì cancel
+      if (isEditing(record)) cancelEdit();
+
+      message.success("Đã xóa lịch làm việc.");
+      await refetchWorktimes();
+    } catch (e) {
+      message.error(e?.message || "Xóa lịch làm việc thất bại.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -1093,10 +1119,14 @@ export default function BookingCampaignSchedule() {
     {
       title: "Thao tác",
       key: "actions",
-      width: 170,
+      width: 240,
       fixed: "right",
       render: (_v, record) => {
         const editing = isEditing(record);
+        const scheduledId = getScheduledId(record);
+        const isDeletingThis =
+          scheduledId != null && String(scheduledId) === String(deletingId);
+
         if (editing) {
           return (
             <Space>
@@ -1113,14 +1143,36 @@ export default function BookingCampaignSchedule() {
             </Space>
           );
         }
+
         return (
-          <Button
-            icon={<Pencil size={16} />}
-            onClick={() => startEdit(record)}
-            disabled={editingKey !== null}
-          >
-            Sửa
-          </Button>
+          <Space>
+            <Button
+              icon={<Pencil size={16} />}
+              onClick={() => startEdit(record)}
+              disabled={editingKey !== null || isDeletingThis}
+            >
+              Sửa
+            </Button>
+
+            <Popconfirm
+              title="Xóa lịch làm việc này?"
+              description="Hành động này không thể hoàn tác."
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDeleteWorktime(record)}
+              disabled={editingKey !== null || !scheduledId || isDeletingThis}
+            >
+              <Button
+                danger
+                icon={<Trash2 size={16} />}
+                loading={isDeletingThis}
+                disabled={editingKey !== null || !scheduledId}
+              >
+                Xóa
+              </Button>
+            </Popconfirm>
+          </Space>
         );
       },
     },
@@ -1257,7 +1309,6 @@ export default function BookingCampaignSchedule() {
                       </Descriptions.Item>
                     )}
 
-                    {/* ✅ NEW: campaignObjective */}
                     <Descriptions.Item
                       label="Mục tiêu chiến dịch"
                       span={screens.lg ? 3 : 1}
@@ -1267,7 +1318,6 @@ export default function BookingCampaignSchedule() {
                       </Text>
                     </Descriptions.Item>
 
-                    {/* Ngày bắt đầu / kết thúc chiến dịch */}
                     <Descriptions.Item label="Ngày bắt đầu chiến dịch">
                       {formatDate(record?.startDate)}
                     </Descriptions.Item>
@@ -1276,7 +1326,6 @@ export default function BookingCampaignSchedule() {
                       {formatDate(record?.endDate)}
                     </Descriptions.Item>
 
-                    {/* ✅ 4 trường: hours, unitPrice, discount, totalAmount */}
                     <Descriptions.Item label="Tổng số giờ">
                       {record?.hours != null ? `${record.hours} giờ` : "--"}
                     </Descriptions.Item>
@@ -1297,12 +1346,11 @@ export default function BookingCampaignSchedule() {
                       <Text copyable>{record?.createdByEmail ?? "--"}</Text>
                     </Descriptions.Item>
 
-                    {/* ✅ KHÔNG ẨN khi null */}
-                    <Descriptions.Item label="KOL tham gia">
+                    <Descriptions.Item label="Host chính tham gia">
                       {formatArrayText(kolsForBooking)}
                     </Descriptions.Item>
 
-                    <Descriptions.Item label="Live tham gia">
+                    <Descriptions.Item label="Trợ Live tham gia">
                       {formatArrayText(livesForBooking)}
                     </Descriptions.Item>
 
@@ -1313,8 +1361,6 @@ export default function BookingCampaignSchedule() {
                     <Descriptions.Item label="Cập nhật lúc">
                       {formatDateTime(record?.updatedAt)}
                     </Descriptions.Item>
-
-                    {/* ❌ BỎ ngân sách chiến dịch: không render field ngân sách ở đây */}
                   </Descriptions>
                 </Card>
               );
@@ -1430,7 +1476,7 @@ export default function BookingCampaignSchedule() {
                   rowKey={(r) => getRowKey(r)}
                   loading={loadingWorktimes}
                   pagination={false}
-                  scroll={{ x: 1750 }}
+                  scroll={{ x: 1850 }}
                 />
               </Form>
             </>

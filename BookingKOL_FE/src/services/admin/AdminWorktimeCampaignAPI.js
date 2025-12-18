@@ -23,6 +23,9 @@ const PATH_SCHEDULED_ASSIGN =
 
 // Dùng API /v1/availabilities/time-line/kol/all để lấy tất cả lịch rảnh
 const PATH_SEARCH_FREE_SLOTS = API_PATHS?.SCHEDULER_ADMIN?.kolTimelineAll;
+const PATH_SCHEDULED_DELETE =
+  API_PATHS?.WORKTIME_ADMIN?.scheduledDelete ||
+  "/v1/availabilities/admin/scheduled-worktime/delete";
 
 /**
  * ✅ Tạo scheduled worktime
@@ -151,4 +154,21 @@ export const adminSearchFreeSlots = async ({
     : [];
 
   return list;
+};
+/**
+ * ✅ Xóa scheduled worktime
+ * DELETE /v1/availabilities/admin/scheduled-worktime/delete/{scheduledWorkTimeId}
+ */
+export const adminDeleteScheduledWorktime = (
+  scheduledWorkTimeId,
+  config = {}
+) => {
+  if (!scheduledWorkTimeId) {
+    return Promise.reject(new Error("scheduledWorkTimeId is required"));
+  }
+
+  return api.delete(
+    `${PATH_SCHEDULED_DELETE}/${encodeURIComponent(scheduledWorkTimeId)}`,
+    config
+  );
 };
