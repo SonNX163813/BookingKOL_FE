@@ -14,10 +14,8 @@ import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
     maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+  }).format(Number(value) || 0) + " VND";
 
 const CampaignPaymentSuccessPage = () => {
   const navigate = useNavigate();
@@ -94,7 +92,14 @@ const CampaignPaymentSuccessPage = () => {
           value: installmentLabel,
         },
       ].filter((row) => Boolean(row.value)),
-    [amount, campaignName, contractId, contractNumber, installmentLabel, transferContent]
+    [
+      amount,
+      campaignName,
+      contractId,
+      contractNumber,
+      installmentLabel,
+      transferContent,
+    ]
   );
 
   if (!paymentInfo) {

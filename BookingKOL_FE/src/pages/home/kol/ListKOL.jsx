@@ -19,7 +19,6 @@ import dayjs from "dayjs";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useNavigate } from "react-router-dom";
-import AppSnackbar from "../../../components/UI/AppSnackbar";
 import KOLCard from "../../../components/home/kol/KOLCard";
 import KolFilters from "../../../components/home/kol/KolFilters";
 import {
@@ -29,10 +28,9 @@ import {
 import { getAllCategory } from "../../../services/CategoryServices";
 import { slugify } from "../../../utils/slugify";
 import hotkolimg from "../../../assets/hotkol.png";
+import { toast } from "react-toastify";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
   maximumFractionDigits: 0,
 });
 
@@ -581,20 +579,20 @@ const ListKOL = () => {
       return { valid: true };
     }
     if (!startISO || !endISO) {
-      showErrorMessage("Vui long chon ca thoi gian bat dau va ket thuc.");
+      toast.error("Vui lòng cung cấp đầy đủ thời gian bắt đầu và kết thúc.");
       return { valid: false };
     }
     const now = dayjs();
     if (dayjs(startISO).isBefore(now) || dayjs(endISO).isBefore(now)) {
-      showErrorMessage("Khong the chon thoi gian nam trong qua khu.");
+      toast.error("Không thể chọn thời gian nằm trong quá khứ.");
       return { valid: false };
     }
     if (!dayjs(endISO).isAfter(dayjs(startISO))) {
-      showErrorMessage("Thoi gian ket thuc phai sau thoi gian bat dau.");
+      toast.error("Thời gian kết thúc phải sau thời gian bắt đầu.");
       return { valid: false };
     }
     return { valid: true };
-  }, [formFilters.endAt, formFilters.startAt, showErrorMessage]);
+  }, [formFilters.endAt, formFilters.startAt]);
 
   const handleApplyFilters = useCallback(() => {
     const validation = validateDateFilters();
@@ -967,12 +965,6 @@ const ListKOL = () => {
           </Box>
         </Stack>
       </Container>
-      <AppSnackbar
-        open={showErrorSnackbar}
-        onClose={() => setShowErrorSnackbar(false)}
-        severity="error"
-        message={error || "Khong the tai danh sach KOL."}
-      />
     </Box>
   );
 };

@@ -22,6 +22,7 @@ import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import {
   deleteAllNotifications,
   fetchNotifications,
+  getNotificationIdentity,
   markAllNotificationsAsRead,
 } from "../../services/notification/notificationService";
 import { toast } from "react-toastify";
@@ -266,18 +267,60 @@ const NotificationBell = ({
   const handleNotificationClick = (item) => {
     if (!item) return;
 
-    const { type, id } = item;
-    if (!id) return;
+    const identity = getNotificationIdentity();
+    const role = identity?.role ? String(identity.role).toLowerCase() : "";
 
-    if (type === "bookingrequestcampaign") {
-      navigate(`/don-booking-chien-dich/${id}`);
-      setAnchorEl(null);
+    const type = item?.type ? String(item.type).toLowerCase() : "";
+    const requestId = item?.requestId ?? item?.bookingRequestId ?? item?.id;
+    const campaignId = item?.campaignId ?? item?.bookingCampaignId ?? item?.id;
+
+    const closeMenu = () => setAnchorEl(null);
+
+    if (!role) {
+      toast.error("Không xác định được vai trò người dùng.");
+      closeMenu();
       return;
     }
 
-    if (type === "bookingrequestsingle" || type === "bookingrequest") {
-      navigate(`/don-booking-kol/${id}`);
-      setAnchorEl(null);
+    // Admin routes
+    if (role.includes("admin")) {
+      if (type === "bookingrequestcampaign") {
+        if (!campaignId) return;
+        navigate(`/admin/management-booking-campaigns/${campaignId}`);
+        closeMenu();
+        return;
+      }
+
+      // bookingrequestsingle / bookingrequest / default -> single request detail
+      if (type === "bookingrequestsingle") {
+        if (!requestId) return;
+        navigate(`/admin/management-booking-requests/${requestId}`);
+        closeMenu();
+        return;
+      }
+    }
+
+    // KOL routes (all types go to single request detail)
+    if (role.includes("kol")) {
+      if (!requestId) return;
+      navigate(`/kol/booking/single-requests/detail/${requestId}`);
+      closeMenu();
+      return;
+    }
+
+    if (role.includes("user")) {
+      if (type === "bookingrequestsingle" || type === "bookingrequest") {
+        if (!requestId) return;
+        navigate(`/don-booking-kol/${requestId}`);
+        closeMenu();
+        return;
+      }
+      if (type === "bookingrequestcampaign") {
+        if (!campaignId) return;
+        navigate(`/don-booking-chien-dich/${campaignId}`);
+        closeMenu();
+        return;
+      }
     }
   };
 

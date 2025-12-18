@@ -208,25 +208,25 @@ const validateProfileField = (name, rawValue) => {
   switch (name) {
     case "fullName":
       if (!value) {
-        return "Vui long nhap ho va ten";
+        return "Vui lòng nhập họ và tên";
       }
       break;
     case "phoneNumber":
       if (!value) {
-        return "Vui long nhap so dien thoai";
+        return "Vui lòng nhập số điện thoại";
       }
       if (!PHONE_REGEX.test(value)) {
-        return "So dien thoai khong hop le";
+        return "Số điện thoại không hợp lệ";
       }
       break;
     case "dateOfBirth":
       if (value) {
         const parsed = dayjs(value);
         if (!parsed.isValid()) {
-          return "Ngay sinh khong hop le";
+          return "Ngày sinh không hợp lệ";
         }
         if (parsed.isAfter(dayjs())) {
-          return "Ngay sinh khong duoc vuot qua hien tai";
+          return "Ngày sinh không được vượt quá hiện tại";
         }
       }
       break;

@@ -13,10 +13,8 @@ import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
 const dinhDangTien = (value) =>
   new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
     maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+  }).format(Number(value) || 0) + " VND";
 
 const BookingSinglePaymentSuccess = () => {
   const navigate = useNavigate();

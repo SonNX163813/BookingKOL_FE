@@ -17,9 +17,11 @@ import { CheckCircle } from "lucide-react";
 import { XCircle } from "lucide-react";
 import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
 
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 import { getServicePackages } from "../../services/service-package/ServicePackageAPI";
+import { useAuth } from "../../context/AuthContext";
 
 const DEFAULT_FILTERS = Object.freeze({
   search: "",
@@ -28,6 +30,9 @@ const DEFAULT_FILTERS = Object.freeze({
 
 const normalizePackageType = (type) =>
   type?.toLowerCase() === "vip" ? "vip" : "basic";
+
+const LOGIN_REQUIRED_TOAST_MESSAGE =
+  "Vui lòng đăng nhập để tiếp tục đặt gói chiến dịch.";
 
 const paletteByIndex = (index) => {
   const palette = [
@@ -461,7 +466,10 @@ const ServicePackagePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const auth = useAuth?.() || {};
+  const { token } = auth;
   const navigate = useNavigate();
+  const location = useLocation();
 
   const loadPackages = useCallback(() => {
     const abortController = new AbortController();
@@ -551,6 +559,13 @@ const ServicePackagePage = () => {
       if (!pkg) {
         return;
       }
+      if (!token) {
+        toast.info(LOGIN_REQUIRED_TOAST_MESSAGE, {
+          toastId: "login-required-booking-package",
+        });
+        navigate("/login", { replace: false, state: { from: location } });
+        return;
+      }
       navigate("/goi-chien-dich/dat-goi", {
         state: {
           packageId: pkg.id,
@@ -560,7 +575,7 @@ const ServicePackagePage = () => {
         },
       });
     },
-    [navigate]
+    [location, navigate, token]
   );
 
   return (

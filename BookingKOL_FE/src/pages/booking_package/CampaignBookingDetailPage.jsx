@@ -65,11 +65,11 @@ const formatCurrency = (value, currency = "VND") => {
   if (value === null || value === undefined) return "--";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "--";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(numeric);
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(numeric) + " VND"
+  );
 };
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {

@@ -90,7 +90,7 @@ const CourseFilters = ({
         </Stack>
 
         <Stack spacing={3}>
-          <Box sx={inputsGrid}>
+          {/* <Box sx={inputsGrid}>
             <TextField
               label="Giá tối thiểu (VND)"
               type="number"
@@ -111,9 +111,9 @@ const CourseFilters = ({
               fullWidth
               sx={fieldStyles}
             />
-          </Box>
+          </Box> */}
 
-          <Box sx={inputsGrid}>
+          {/* <Box sx={inputsGrid}>
             <TextField
               label="Giảm giá tối thiểu (%)"
               type="number"
@@ -134,7 +134,7 @@ const CourseFilters = ({
               fullWidth
               sx={fieldStyles}
             />
-          </Box>
+          </Box> */}
 
           <Stack spacing={1.5}>
             <Typography

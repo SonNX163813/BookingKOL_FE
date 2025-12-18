@@ -14,12 +14,10 @@ import {
 dayjs.locale("vi");
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
   maximumFractionDigits: 0,
 });
 
-const formatCurrency = (value) => currencyFormatter.format(value || 0);
+const formatCurrency = (value) => currencyFormatter.format(value || 0) + " VND";
 const formatInteger = (value) =>
   Number.isFinite(value) ? value.toLocaleString("vi-VN") : "0";
 const formatPercent = (value, digits = 1) => {

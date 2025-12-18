@@ -50,13 +50,11 @@ const OTHER_PLATFORM_VALUE = "__OTHER_PLATFORM__";
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") =>
   value ? (dayjs(value).isValid() ? dayjs(value).format(pattern) : "--") : "--";
 
-const formatCurrency = (value, currency = "VND") =>
+const formatCurrency = (value) =>
   value
     ? new Intl.NumberFormat("vi-VN", {
-        style: "currency",
-        currency,
         maximumFractionDigits: 0,
-      }).format(value)
+      }).format(value) + " VND"
     : "--";
 
 const composeExecutionTime = (record) => {

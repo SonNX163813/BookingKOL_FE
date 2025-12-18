@@ -12,11 +12,11 @@ const formatCurrency = (value) => {
   if (Number.isNaN(numberValue)) return null;
 
   try {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(numberValue);
+    return (
+      new Intl.NumberFormat("vi-VN", {
+        maximumFractionDigits: 0,
+      }).format(numberValue) + " VND"
+    );
   } catch (error) {
     console.error("Không thể định dạng tiền tệ", error);
   }

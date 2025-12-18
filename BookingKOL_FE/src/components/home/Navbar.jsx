@@ -25,7 +25,6 @@ import logoweb from "../../assets/logocty.png";
 import { useAuth } from "../../context/AuthContext";
 import NotificationBell from "../common/NotificationBell";
 import { getMyUserProfile } from "../../services/user/UserService";
-import { toast } from "react-toastify";
 
 const navItems = [
   { label: "Trang chủ", to: "/" },
@@ -34,9 +33,9 @@ const navItems = [
     label: "Các gói dịch vụ",
     hasDropdown: true,
     subItems: [
-      { label: "Dịch vụ LiveStream chuyên nghiệp", to: "/danh-sach-kol" },
-      { label: "Dịch vụ đào tạo LiveStream", to: "/danh-sach-khoa-hoc" },
-      { label: "Dịch vụ thuê theo gói", to: "/goi-chien-dich" },
+      { label: "Danh sách KOL", to: "/danh-sach-kol" },
+      { label: "Danh sách khóa đào tạo livestream", to: "/danh-sach-khoa-hoc" },
+      { label: "Danh sách gói chiến dịch", to: "/goi-chien-dich" },
     ],
   },
   { label: "Blog", to: "/blog" },
@@ -62,19 +61,6 @@ const Navbar = () => {
   const auth = useAuth?.() || {};
   const { token, user, logout } = auth;
   const loggedIn = !!token;
-
-  const guardProtectedNav = useCallback(
-    (event, targetPath) => {
-      const requiresLogin = targetPath === "/goi-chien-dich";
-      if (loggedIn || !requiresLogin) return false;
-
-      event.preventDefault();
-      toast.info("Vui lòng đăng nhập để tiếp tục đặt dịch vụ.");
-      navigate("/login", { replace: false, state: { from: targetPath } });
-      return true;
-    },
-    [loggedIn, navigate]
-  );
 
   const fetchProfile = useCallback(
     async (signal) => {
@@ -273,10 +259,7 @@ const Navbar = () => {
                       endIcon={<KeyboardArrowDownIcon />}
                       sx={{
                         px: 1.5,
-
-                        // ✅ CHỈ CHỈNH ĐẬM CHO "CÁC GÓI DỊCH VỤ"
                         fontWeight: 600,
-
                         textTransform: "none",
                         fontSize: "0.975rem",
                         borderRadius: 2,
@@ -496,11 +479,7 @@ const Navbar = () => {
               {item.subItems.map((subItem) => (
                 <MenuItem
                   key={subItem.to}
-                  onClick={(event) => {
-                    const blocked = guardProtectedNav(event, subItem.to);
-                    handleClose();
-                    if (blocked) return;
-                  }}
+                  onClick={handleClose}
                   component={Link}
                   to={subItem.to}
                   sx={{ py: 1.25, pl: 4, fontWeight: 700 }}
@@ -553,11 +532,7 @@ const Navbar = () => {
                 <ListItemButton
                   component={Link}
                   to={subItem.to}
-                  onClick={(event) => {
-                    const blocked = guardProtectedNav(event, subItem.to);
-                    handleDropdownClose();
-                    if (blocked) return;
-                  }}
+                  onClick={handleDropdownClose}
                   sx={{
                     py: 1.5,
                     px: 2,
@@ -566,11 +541,7 @@ const Navbar = () => {
                     },
                   }}
                 >
-                  {/* ✅ CHỈ CHỈNH ĐẬM CHO CHỮ SUB-ITEM DỊCH VỤ (DESKTOP DROPDOWN) */}
-                  <ListItemText
-                    primary={subItem.label}
-                    primaryTypographyProps={{ fontWeight: 700 }}
-                  />
+                  <ListItemText primary={subItem.label} />
                 </ListItemButton>
               </ListItem>
             ))}

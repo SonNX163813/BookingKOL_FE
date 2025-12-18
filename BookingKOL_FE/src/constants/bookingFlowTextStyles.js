@@ -41,7 +41,7 @@ export const BOOKING_FLOW_TEXT = {
   messages: {
     selectPackage: "Vui lòng chọn gói dịch vụ và thời lượng.",
     selectSchedule: "Vui lòng chọn ngày và khung giờ.",
-    infoInvalid: "Vui long dien day du thong tin truoc khi tiep tuc.",
+    infoInvalid: "Vui lòng điền đầy đủ thông tin liên hệ hợp lệ.",
     slotTaken:
       "Khung giờ này vừa được người khác đặt. Vui lòng chọn khung giờ khác.",
     dayFull: "Ngày này đã kín lịch. Vui lòng chọn thời điểm khác.",

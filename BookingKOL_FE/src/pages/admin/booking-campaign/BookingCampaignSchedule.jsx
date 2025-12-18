@@ -75,11 +75,11 @@ const formatCurrency = (value, currency = "VND") => {
   if (value === null || value === undefined || value === "") return "--";
   const numeric = typeof value === "number" ? value : Number.parseFloat(value);
   if (Number.isNaN(numeric)) return "--";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(numeric);
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(numeric) + " VND"
+  );
 };
 
 const normalizeUpper = (val) =>
