@@ -65,6 +65,7 @@ export const API_PATHS = {
     getDetailByWorkTime: (workTimeId) =>
       `/v1/requests/booking/detail/${encodeURIComponent(workTimeId)}`,
     updateStatus: "/v1/admin/booking/single-requests/update-status",
+    create: "/v1/admin/booking/single-requests/create",
   },
 
   CONTRACT_PAYMENT: {
@@ -86,6 +87,7 @@ export const API_PATHS = {
       "/v1/availabilities/admin/scheduled-worktime/booking",
     scheduledAssign: "/v1/availabilities/admin/scheduled-worktime/assign",
     scheduledEdit: "/v1/availabilities/admin/scheduled-worktime/edit",
+    scheduledDelete: "/v1/availabilities/admin/scheduled-worktime",
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",

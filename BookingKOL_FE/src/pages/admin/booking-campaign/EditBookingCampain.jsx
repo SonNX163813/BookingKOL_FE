@@ -52,6 +52,9 @@ dayjs.locale("vi");
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
+/** ✅ List page route */
+const BOOKING_CAMPAIGN_LIST_PATH = "/admin/booking-campaign";
+
 /** ===== Upload constraints ===== */
 const MAX_ATTACH_FILES = 5;
 const MAX_ATTACH_SIZE_MB = 10;
@@ -97,6 +100,7 @@ const CAMPAIGN_STATUS_LABEL = {
   REQUESTED: "Đang yêu cầu",
   NEGOTIATING: "Đang thương lượng",
   APPROVED: "Đã phê duyệt",
+  ACCEPTED: "Đã chấp nhận",
   REJECTED: "Đã từ chối",
   COMPLETED: "Hoàn tất",
 };
@@ -104,6 +108,7 @@ const CAMPAIGN_STATUS_COLOR = {
   REQUESTED: "gold",
   NEGOTIATING: "orange",
   APPROVED: "green",
+  ACCEPTED: "cyan",
   REJECTED: "red",
   COMPLETED: "blue",
 };
@@ -340,6 +345,21 @@ export default function EditBookingCampain() {
   const normalizedStatus = normalizeStatus(campaignInfo?.status);
   const statusLabel =
     CAMPAIGN_STATUS_LABEL[normalizedStatus] ?? normalizedStatus ?? "--";
+
+  // ✅ Auto back to list when campaign is ACCEPTED or REJECTED
+  const redirectedRef = useRef(false);
+  useEffect(() => {
+    if (redirectedRef.current) return;
+    if (isLoadingCampaign) return;
+    if (!campaignInfo) return;
+
+    const st = normalizeStatus(campaignInfo?.status);
+    if (st === "ACCEPTED" || st === "REJECTED") {
+      redirectedRef.current = true;
+      message.info("Campaign đã được xử lý. Quay lại danh sách...");
+      navigate(BOOKING_CAMPAIGN_LIST_PATH, { replace: true });
+    }
+  }, [isLoadingCampaign, campaignInfo, navigate]);
 
   const isNegotiating = normalizedStatus === "NEGOTIATING";
   const mode = isNegotiating ? "edit" : "create";
@@ -696,7 +716,6 @@ export default function EditBookingCampain() {
     const hasUnit = typeof unit === "number" && !Number.isNaN(unit) && unit > 0;
 
     if (!hasHours || !hasUnit) {
-      // ✅ edit cũng clear để không giữ tổng tiền cũ
       form.setFieldValue("totalAmount", "");
       setTotalTooLong(false);
       softValidateSumGuard();
@@ -804,7 +823,6 @@ export default function EditBookingCampain() {
           campaignId: values.campaignId,
           description,
 
-          // ✅ no UI -> default NONE
           repeatType: REPEAT_NONE,
           dayOfWeek: undefined,
 
@@ -886,7 +904,6 @@ export default function EditBookingCampain() {
       await adminEditBookingRequest(bookingRequestId, {
         description,
 
-        // ✅ keep current BE values (hidden), user không chỉnh
         repeatType: values.repeatType ?? REPEAT_NONE,
         dayOfWeek: values.dayOfWeek,
 
@@ -933,28 +950,6 @@ export default function EditBookingCampain() {
   };
 
   /** Upload handlers */
-  const beforeUploadAttachment = (file) => {
-    if (!isAllowedAttachFile(file)) {
-      message.error(
-        "Chỉ hỗ trợ: .xlsx, .xls, .doc, .docx, .pdf và ảnh (jpg, png...)."
-      );
-      return Upload.LIST_IGNORE;
-    }
-
-    if ((file?.size || 0) > MAX_ATTACH_SIZE) {
-      message.error(`Mỗi tệp tối đa ${MAX_ATTACH_SIZE_MB}MB.`);
-      return Upload.LIST_IGNORE;
-    }
-
-    const current = form.getFieldValue("attachments") || attachList || [];
-    if (Array.isArray(current) && current.length >= MAX_ATTACH_FILES) {
-      message.error(`Chỉ được đính kèm tối đa ${MAX_ATTACH_FILES} tệp.`);
-      return Upload.LIST_IGNORE;
-    }
-
-    return false; // giữ fileList
-  };
-
   const onChangeAttachment = (info) => {
     let next = Array.isArray(info?.fileList) ? [...info.fileList] : [];
 
@@ -1328,7 +1323,6 @@ export default function EditBookingCampain() {
                 <Form.Item
                   label="Đơn giá (VND/giờ)"
                   name="unitPrice"
-                  // ✅ NEW: cảnh báo khi đạt 13 chữ số
                   validateStatus={unitPriceAtLimit ? "warning" : undefined}
                   help={
                     unitPriceAtLimit
