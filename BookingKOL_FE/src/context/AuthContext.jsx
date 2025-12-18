@@ -113,21 +113,25 @@ export function AuthProvider({ children }) {
 
   // Sync auth state to sessionStorage (no localStorage persistence)
   useEffect(() => {
+    const store = state.remember ? localStorage : sessionStorage;
+    const other = state.remember ? sessionStorage : localStorage;
+
     try {
-      // always use sessionStorage; clear leftover localStorage data
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_user");
+      // dọn nơi còn lại
+      other.removeItem("auth_token");
+      other.removeItem("auth_user");
 
       if (state.token && state.user) {
-        sessionStorage.setItem("auth_token", state.token);
-        sessionStorage.setItem("auth_user", JSON.stringify(state.user));
+        store.setItem("auth_token", state.token);
+        store.setItem("auth_user", JSON.stringify(state.user));
       } else {
+        // nếu chưa có token/user (chưa đăng nhập) thì xoá ở cả hai nơi
         clearStorage();
       }
-    } catch {
-      // ignore storage quota errors
+    } catch (e) {
+      // nếu lỗi (vd: storage đầy), xoá sạch cả hai nơi
     }
-  }, [state.token, state.user]);
+  }, [state.token, state.user, state.remember]);
 
   // Handle OAuth redirect tokens (runs on every page, not only /login)
   useEffect(() => {
