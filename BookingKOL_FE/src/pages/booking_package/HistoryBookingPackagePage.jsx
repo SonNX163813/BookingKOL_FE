@@ -489,7 +489,7 @@ const HistoryBookingPackagePage = () => {
               Hủy hợp đồng
             </Button>
           ) : null} */}
-          {canCancelBookingRequest ? (
+          {/* {canCancelBookingRequest ? (
             <Button
               danger
               style={{
@@ -505,7 +505,7 @@ const HistoryBookingPackagePage = () => {
             >
               Hủy đơn
             </Button>
-          ) : null}
+          ) : null} */}
         </div>
       );
     },

@@ -1097,59 +1097,80 @@ const ServicePackageBookingFormPage = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-slate-700">
-                        Phường / Xã tại Hà Nội
+                    <Form.Item
+                      name="wardCode"
+                      rules={[
+                        { required: true, message: "Vui lòng chọn phường/xã" },
+                      ]}
+                    >
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium text-slate-700">
+                          <span className="text-red-500">* </span>
+                          Phường / Xã tại Hà Nội
+                        </div>
+                        <Select
+                          showSearch
+                          allowClear
+                          className="!w-full"
+                          placeholder={
+                            wardsLoading ? "Đang tải..." : "Chọn phường/xã"
+                          }
+                          loading={wardsLoading}
+                          options={wards.map((ward) => ({
+                            label: ward.name,
+                            value: ward.code,
+                          }))}
+                          onChange={(value) => {
+                            setLocationTouched(true);
+                            setSelectedWardCode(value || "");
+                            form.setFieldValue("wardCode", value);
+                          }}
+                          optionFilterProp="label"
+                          filterOption={(input, option) =>
+                            (option?.label || "")
+                              .toLowerCase()
+                              .includes(input.toLowerCase())
+                          }
+                          notFoundContent={
+                            wardsLoading
+                              ? "Đang tải phường/xã..."
+                              : wardsError || "Không tìm thấy phường/xã"
+                          }
+                          disabled={
+                            wardsLoading || (!wards.length && !wardsError)
+                          }
+                        />
                       </div>
-                      <Select
-                        showSearch
-                        allowClear
-                        className="!w-full"
-                        placeholder={
-                          wardsLoading ? "Đang tải..." : "Chọn phường/xã"
-                        }
-                        loading={wardsLoading}
-                        options={wards.map((ward) => ({
-                          label: ward.name,
-                          value: ward.code,
-                        }))}
-                        value={selectedWardCode || undefined}
-                        onChange={(value) => {
-                          setLocationTouched(true);
-                          setSelectedWardCode(value || "");
-                        }}
-                        optionFilterProp="label"
-                        filterOption={(input, option) =>
-                          (option?.label || "")
-                            .toLowerCase()
-                            .includes(input.toLowerCase())
-                        }
-                        notFoundContent={
-                          wardsLoading
-                            ? "Đang tải phường/xã..."
-                            : wardsError || "Không tìm thấy phường/xã"
-                        }
-                        disabled={wardsLoading || (!wards.length && !wardsError)}
-                        status={status}
-                      />
-                    </div>
+                    </Form.Item>
 
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-slate-700">
-                        Số nhà / Tên đường / Tòa nhà
+                    <Form.Item
+                      name="detailAddress"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Vui lòng nhập số nhà / tên đường",
+                        },
+                        { max: 100, message: "Tối đa 100 ký tự" },
+                      ]}
+                    >
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium text-slate-700">
+                          <span className="text-red-500">* </span>
+                          Số nhà / Tên đường / Tòa nhà
+                        </div>
+
+                        <Input
+                          className="!h-12"
+                          placeholder="Ví dụ: 123 Trần Duy Hưng, Vinhomes..."
+                          maxLength={100}
+                          onChange={(e) => {
+                            setLocationTouched(true);
+                            setDetailAddress(e.target.value);
+                            form.setFieldValue("detailAddress", e.target.value);
+                          }}
+                        />
                       </div>
-                      <Input
-                        className="!h-12"
-                        value={detailAddress}
-                        onChange={(e) => {
-                          setLocationTouched(true);
-                          setDetailAddress(e.target.value);
-                        }}
-                        placeholder="Ví dụ: 123 Trần Duy Hưng, Vinhomes..."
-                        maxLength={100}
-                        status={status}
-                      />
-                    </div>
+                    </Form.Item>
 
                     <Form.Item
                       name="livestreamAddress"

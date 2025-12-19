@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Container, Typography, Stack, IconButton } from "@mui/material";
+import { Box, Container, Stack } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import CourseHeroSection from "../../../components/home/course/CourseHeroSection";
@@ -27,6 +27,7 @@ const BASE_QUERY_PARAMS = {
 };
 
 const DEFAULT_FILTER_VALUES = Object.freeze({
+  name: "", // ✅ thêm trường name
   minPrice: "",
   maxPrice: "",
   minDiscount: "",
@@ -35,6 +36,7 @@ const DEFAULT_FILTER_VALUES = Object.freeze({
 });
 
 const FILTER_FIELDS = [
+  "name", // ✅ thêm
   "minPrice",
   "maxPrice",
   "minDiscount",
@@ -62,6 +64,11 @@ const sanitizeFilters = (rawFilters) => {
     ...BASE_QUERY_PARAMS,
     sortDir: filters.sortDir === "desc" ? "desc" : "asc",
   };
+
+  // ✅ name
+  if (filters.name && filters.name.trim()) {
+    params.name = filters.name.trim();
+  }
 
   const minPrice = parseNumericInput(filters.minPrice);
   if (minPrice !== undefined && minPrice >= 0) {
@@ -191,7 +198,6 @@ const CourseLivesteam = () => {
         "Nâng cao khả năng livestream và chiến lược tăng trưởng bền vững.";
       const slug = slugify(name) || "khoa-hoc";
 
-      // Lấy giá trị số từ API
       const price = Number.isFinite(Number(course?.price))
         ? Number(course.price)
         : undefined;
@@ -254,8 +260,8 @@ const CourseLivesteam = () => {
           opacity: 0.65,
         }}
       />
+
       <Container
-        // maxWidth="xl"
         maxWidth={false}
         sx={{
           position: "relative",
@@ -286,13 +292,13 @@ const CourseLivesteam = () => {
               }}
             >
               {/* <CourseHeroSection
-            onExploreTopCourse={() =>
-              handleNavigateDetail(topCourse?.id, topCourse?.slug)
-            }
-            hasCourses={decoratedCourses.length > 0}
-            loading={loading}
-            onManualRefresh={handleRetry}
-          /> */}
+                onExploreTopCourse={() =>
+                  handleNavigateDetail(topCourse?.id, topCourse?.slug)
+                }
+                hasCourses={decoratedCourses.length > 0}
+                loading={loading}
+                onManualRefresh={handleRetry}
+              /> */}
               <CourseFilters
                 filters={formFilters}
                 onFilterInputChange={handleFilterInputChange}
@@ -319,6 +325,14 @@ const CourseLivesteam = () => {
           </Box>
         </Stack>
       </Container>
+
+      {/* ✅ Snackbar báo lỗi */}
+      {/* <AppSnackbar
+        open={showErrorSnackbar}
+        onClose={() => setShowErrorSnackbar(false)}
+        severity="error"
+        message={error}
+      /> */}
     </Box>
   );
 };
