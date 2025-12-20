@@ -398,7 +398,7 @@ const ContractTermsDialog = ({
                 borderRadius: "12px",
               }}
             >
-              {requireAcknowledgement ? "Đồng ý" : "Đóng"}
+              {requireAcknowledgement ? "Đóng" : "Đóng"}
             </Button>
           </DialogActions>
         </>

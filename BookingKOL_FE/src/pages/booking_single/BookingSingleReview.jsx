@@ -1168,7 +1168,9 @@ const BookingSingleReview = () => {
                                               : BOOKING_FLOW_STYLE.textSecondary,
                                           }}
                                         >
-                                          {isSigned ? "Đã ký" : "Chưa ký"}
+                                          {isSigned
+                                            ? "Đã đồng ý"
+                                            : "Chưa đồng ý"}
                                         </Typography>
                                         <Button
                                           variant="outlined"
