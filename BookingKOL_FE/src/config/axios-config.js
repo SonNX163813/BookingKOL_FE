@@ -19,6 +19,17 @@ const normalizeMessage = (message) => {
   return String(message);
 };
 
+const hasAuthToken = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    return Boolean(
+      localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token")
+    );
+  } catch {
+    return false;
+  }
+};
+
 // ✅ Chỉ im lặng đúng case "Không tìm thấy Livestream Metric..." tại endpoint metrics
 const shouldSilenceLivestreamMetricToast = (error) => {
   const status = error?.response?.status;
@@ -55,6 +66,13 @@ const isSilentConfig = (cfg) =>
   cfg?.skipToast === true ||
   cfg?.skipErrorToast === true;
 
+const shouldSilenceAuthlessError = (error) => {
+  const status = error?.response?.status;
+  if (error?.config?.skipAuthErrorToast) return true;
+  if (status !== 401 && status !== 403) return false;
+  return !hasAuthToken();
+};
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
@@ -83,6 +101,10 @@ api.interceptors.response.use(
 
     // ✅ NEW: không toast nhưng VẪN reject để caller catch -> return null (ẩn UI)
     if (shouldSilenceCancelDetailToast(error)) {
+      return Promise.reject(error);
+    }
+
+    if (shouldSilenceAuthlessError(error)) {
       return Promise.reject(error);
     }
 
@@ -129,7 +151,7 @@ export const post = ({ url, data, config }) => api.post(url, data, config);
 export const update = ({ url, data, config }) => api.put(url, data, config);
 
 // DELETE
-export const remove = ({ url }) => api.delete(url);
+export const remove = ({ url, config }) => api.delete(url, config);
 
 export const remove2 = ({ url, data, config }) =>
   api.request({ url, method: "delete", data, ...(config || {}) });

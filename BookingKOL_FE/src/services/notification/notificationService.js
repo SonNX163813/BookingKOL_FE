@@ -59,7 +59,12 @@ export const fetchNotifications = async () => {
       userId
     )}`,
     // Avoid showing global error toast on 401/null data from this endpoint
-    config: { skipErrorToast: true },
+    config: {
+      skipErrorToast: true,
+      skipAuthErrorToast: true,
+      silent: true,
+      skipToast: true,
+    },
   });
   return response?.data ?? response ?? [];
 };
@@ -76,7 +81,13 @@ export const markAllNotificationsAsRead = async () => {
       userId
     )}/markAllAsReaded`,
     data: {},
-    config: { skipSuccessToast: true },
+    config: {
+      skipSuccessToast: true,
+      skipErrorToast: true,
+      skipAuthErrorToast: true,
+      silent: true,
+      skipToast: true,
+    },
   });
 };
 
@@ -91,6 +102,13 @@ export const deleteAllNotifications = async () => {
     url: `/v1/notification/delete/${encodeURIComponent(
       role
     )}/${encodeURIComponent(userId)}`,
+    config: {
+      skipSuccessToast: true,
+      skipErrorToast: true,
+      skipAuthErrorToast: true,
+      silent: true,
+      skipToast: true,
+    },
   });
 };
 
