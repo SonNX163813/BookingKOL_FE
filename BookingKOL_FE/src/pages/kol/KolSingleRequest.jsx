@@ -4,8 +4,8 @@ import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import localeData from "dayjs/plugin/localeData";
 import updateLocale from "dayjs/plugin/updateLocale";
-import { Button, Card, Pagination, Table, Tag } from "antd";
-import { CalendarRange, RefreshCcw } from "lucide-react";
+import { Button, Card, Pagination, Table, Tag, Tabs } from "antd";
+import { CalendarRange, RefreshCcw, Zap, Layers } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
@@ -32,6 +32,7 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đang chờ thực hiện", value: "PAID" },
   { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
+
 const STATUS_TAG_COLOR = {
   DRAFT: "default",
   REQUESTED: "default",
@@ -48,6 +49,7 @@ const BOOKING_TYPE_LABEL = {
   SINGLE: "Book theo giờ",
   CAMPAIGN: "Book theo chiến dịch",
 };
+
 const BOOKING_TYPE_COLOR = {
   SINGLE: "orange",
   CAMPAIGN: "purple",
@@ -55,6 +57,7 @@ const BOOKING_TYPE_COLOR = {
 
 const normalize = (v) => (v == null ? "" : String(v).trim());
 const toUpper = (v) => normalize(v).toUpperCase();
+
 const getStatus = (r) =>
   toUpper(r?.status ?? r?.bookingStatus ?? r?.state ?? r?.requestStatus ?? "");
 
@@ -112,10 +115,22 @@ export default function KolSingleRequest() {
   const token = auth?.token || null;
   const authLoading = auth?.loading ?? false;
 
-  const [page, setPage] = useState(0);
-  const [size, setSize] = useState(20);
+  // ✅ 2 tab: SINGLE / CAMPAIGN
+  const [activeTab, setActiveTab] = useState("SINGLE");
 
-  const buildParams = useCallback(() => ({ page, size }), [page, size]);
+  // ✅ Lưu pagination riêng cho từng tab
+  const [paging, setPaging] = useState({
+    SINGLE: { page: 0, size: 20 },
+    CAMPAIGN: { page: 0, size: 20 },
+  });
+
+  const page = paging?.[activeTab]?.page ?? 0;
+  const size = paging?.[activeTab]?.size ?? 20;
+
+  const buildParams = useCallback(() => {
+    // ✅ ưu tiên nhờ BE filter theo bookingType nếu có support
+    return { page, size, bookingType: activeTab };
+  }, [page, size, activeTab]);
 
   const {
     data: resp,
@@ -123,7 +138,7 @@ export default function KolSingleRequest() {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ["kol-my-single-requests", token, { page, size }],
+    queryKey: ["kol-my-booking-requests", token, activeTab, page, size],
     queryFn: () => getMySingleBookingRequests({ params: buildParams() }),
     keepPreviousData: true,
     staleTime: 30_000,
@@ -147,20 +162,30 @@ export default function KolSingleRequest() {
     : Array.isArray(raw?.items)
     ? raw.items
     : [];
-  const totalElements =
+
+  const totalElementsFromServer =
     (typeof raw?.totalElements === "number" && raw.totalElements) ||
     (typeof raw?.total === "number" && raw.total) ||
     0;
 
-  // Ẩn DRAFT/EXPIRED/CANCELLED/REFUNDED ở UI
-  const dataSource = useMemo(
-    () =>
-      serverList.filter(
+  // ✅ lọc theo tab + ẩn trạng thái không muốn hiển thị
+  const dataSource = useMemo(() => {
+    return serverList
+      .filter((r) => getBookingType(r) === activeTab)
+      .filter(
         (r) =>
           !["DRAFT", "EXPIRED", "CANCELLED", "REFUNDED"].includes(getStatus(r))
-      ),
-    [serverList]
-  );
+      );
+  }, [serverList, activeTab]);
+
+  const totalElements = totalElementsFromServer;
+
+  const getDetailBasePath = (record) => {
+    const type = getBookingType(record);
+    // ✅ chỉnh route CAMPAIGN theo project nếu khác
+    if (type === "CAMPAIGN") return "/kol/booking/campaign-requests/detail";
+    return "/kol/booking/single-requests/detail";
+  };
 
   const columns = useMemo(
     () => [
@@ -227,15 +252,15 @@ export default function KolSingleRequest() {
           const requestId = getRequestId(record);
           const status = getStatus(record);
           const isInProgress = status === "IN_PROGRESS";
+          const basePath = getDetailBasePath(record);
 
           const goDetail = () => {
             if (!requestId) return;
-            navigate(`/kol/booking/single-requests/detail/${requestId}`);
+            navigate(`${basePath}/${requestId}`);
           };
 
           return (
             <div className="w-full flex justify-center">
-              {/* Xếp dọc: Xem chi tiết (trên) - Metrics (dưới) */}
               <div className="flex flex-col items-center gap-2">
                 <Button
                   onClick={(e) => {
@@ -251,9 +276,7 @@ export default function KolSingleRequest() {
                   <Button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(
-                        `/kol/booking/single-requests/detail/${requestId}?metrics=1`
-                      );
+                      navigate(`${basePath}/${requestId}?metrics=1`);
                     }}
                     className="!h-9 !px-3 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
                   >
@@ -269,20 +292,71 @@ export default function KolSingleRequest() {
     [navigate, page, size]
   );
 
+  const tableBlock = (
+    <>
+      <Table
+        columns={columns}
+        dataSource={dataSource}
+        loading={isLoading}
+        pagination={false}
+        rowKey={(r) =>
+          getRequestId(r) ??
+          r?.requestNumber ??
+          r?.code ??
+          r?.bookingCode ??
+          `${r?.createdAt}-${r?.startAt}-${r?.endAt}`
+        }
+        scroll={{ x: "auto" }}
+        locale={{ emptyText: "Không có booking hợp lệ trên trang này." }}
+        onRow={(record) => ({
+          onClick: () => {
+            const requestId = getRequestId(record);
+            if (!requestId) return;
+            const basePath = getDetailBasePath(record);
+            navigate(`${basePath}/${requestId}`);
+          },
+          style: { cursor: "pointer" },
+        })}
+      />
+
+      <div className="!my-4 py-5">
+        <Pagination
+          align="center"
+          current={page + 1}
+          pageSize={size}
+          pageSizeOptions={["10", "20", "50", "100"]}
+          onChange={(pageNumber, sizeNumber) => {
+            setPaging((prev) => ({
+              ...prev,
+              [activeTab]: {
+                page: pageNumber - 1,
+                size: sizeNumber,
+              },
+            }));
+          }}
+          total={totalElements}
+          showSizeChanger
+        />
+      </div>
+    </>
+  );
+
   return (
     <div className="h-full flex flex-col gap-4 p-4 md:p-6">
       <div className="flex gap-2 items-center">
         <div className="border-2 border-gray-300 p-2 rounded-md w-fit">
           <CalendarRange className="text-gray-500" size={20} />
         </div>
+
         <section>
           <h1 className="text-[18px] font-bold uppercase">
-            Tất cả yêu cầu Booking
+            Yêu cầu Booking của tôi
           </h1>
           <p className="text-[14px] text-gray-600">
-            Danh sách yêu cầu booking.
+            Danh sách yêu cầu booking theo từng loại.
           </p>
         </section>
+
         <div className="ml-auto">
           <Button
             icon={<RefreshCcw size={16} />}
@@ -295,45 +369,71 @@ export default function KolSingleRequest() {
       </div>
 
       <Card bordered={false} className="flex-1 shadow-sm">
-        <Table
-          columns={columns}
-          dataSource={dataSource}
-          loading={isLoading}
-          pagination={false}
-          rowKey={(r) =>
-            getRequestId(r) ??
-            r?.requestNumber ??
-            r?.code ??
-            r?.bookingCode ??
-            `${r?.createdAt}-${r?.startAt}-${r?.endAt}`
-          }
-          scroll={{ x: "auto" }}
-          locale={{ emptyText: "Không có booking hợp lệ trên trang này." }}
-          onRow={(record) => ({
-            onClick: () => {
-              const requestId = getRequestId(record);
-              if (requestId) {
-                navigate(`/kol/booking/single-requests/detail/${requestId}`);
-              }
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key)}
+          tabBarGutter={12}
+          tabBarStyle={{
+            marginBottom: 16,
+            padding: 8,
+            borderRadius: 14,
+            background: "rgba(0,0,0,0.02)",
+          }}
+          items={[
+            {
+              key: "SINGLE",
+              label: (
+                <div
+                  className={[
+                    "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
+                    "text-[14px] font-semibold select-none",
+                    activeTab === "SINGLE"
+                      ? "bg-orange-500 border-orange-500 text-white shadow-md"
+                      : "bg-white border-gray-200 text-gray-700 hover:border-orange-300 hover:shadow-sm",
+                  ].join(" ")}
+                >
+                  <Zap size={16} />
+                  <span>Đơn lẻ</span>
+                  <span
+                    className={[
+                      "ml-1 text-[11px] px-2 py-[2px] rounded-full font-bold tracking-wide",
+                      activeTab === "SINGLE"
+                        ? "bg-white/20 text-white"
+                        : "bg-orange-100 text-orange-700",
+                    ].join(" ")}
+                  ></span>
+                </div>
+              ),
+              children: tableBlock,
             },
-            style: { cursor: "pointer" },
-          })}
+            {
+              key: "CAMPAIGN",
+              label: (
+                <div
+                  className={[
+                    "flex items-center gap-2 px-4 py-2 rounded-full border transition-all",
+                    "text-[14px] font-semibold select-none",
+                    activeTab === "CAMPAIGN"
+                      ? "bg-purple-600 border-purple-600 text-white shadow-md"
+                      : "bg-white border-gray-200 text-gray-700 hover:border-purple-300 hover:shadow-sm",
+                  ].join(" ")}
+                >
+                  <Layers size={16} />
+                  <span>Chiến dịch</span>
+                  <span
+                    className={[
+                      "ml-1 text-[11px] px-2 py-[2px] rounded-full font-bold tracking-wide",
+                      activeTab === "CAMPAIGN"
+                        ? "bg-white/20 text-white"
+                        : "bg-purple-100 text-purple-700",
+                    ].join(" ")}
+                  ></span>
+                </div>
+              ),
+              children: tableBlock,
+            },
+          ]}
         />
-
-        <div className="!my-4 py-5">
-          <Pagination
-            align="center"
-            current={page + 1}
-            pageSize={size}
-            pageSizeOptions={["10", "20", "50", "100"]}
-            onChange={(pageNumber, sizeNumber) => {
-              setPage(pageNumber - 1);
-              setSize(sizeNumber);
-            }}
-            total={totalElements}
-            showSizeChanger
-          />
-        </div>
       </Card>
     </div>
   );
