@@ -179,7 +179,7 @@ const NotificationBell = ({
         scheduleNext(pollInterval);
       } catch (error) {
         console.error("Lỗi khi tải thông báo", error);
-
+        toastMutedRef.current = true;
         failureCountRef.current += 1;
 
         // if (!toastMutedRef.current && failureCountRef.current <= MAX_FAILURES) {
