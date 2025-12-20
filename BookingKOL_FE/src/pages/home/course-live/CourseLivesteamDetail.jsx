@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Container, Typography, Stack, Button } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   adaptCourseMedia,
   createCoursePurchase,
@@ -13,6 +13,8 @@ import CoursePurchaseContactDialog from "../../../components/home/course-detail/
 import CourseDetailOverview from "../../../components/home/course-detail/CourseDetailOverview";
 import CourseDetailLoading from "../../../components/home/course-detail/CourseDetailLoading";
 import CourseDetailEmpty from "../../../components/home/course-detail/CourseDetailEmpty";
+import { useAuth } from "../../../context/AuthContext";
+import { toast } from "react-toastify";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
@@ -23,7 +25,11 @@ const sanitizeContactValue = (value) =>
 
 const CourseLivesteamDetail = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { courseId, courseName: courseSlug } = useParams();
+  const auth = useAuth?.() || {};
+  const { user, token } = auth;
+  const isAuthenticated = Boolean(user && token);
   const fallbackCourseName = useMemo(() => {
     if (!courseSlug) {
       return null;
@@ -201,6 +207,26 @@ const CourseLivesteamDetail = () => {
     [course?.isAvailable, coursePackageId]
   );
 
+  const handlePurchaseIntent = useCallback(() => {
+    if (!isAuthenticated) {
+      toast.info("Vui lòng đăng nhập để tiếp tục.");
+      navigate("/login", { replace: false, state: { from: location } });
+      return;
+    }
+
+    if (!canPurchaseCourse) {
+      return;
+    }
+
+    handleOpenContactDialog();
+  }, [
+    canPurchaseCourse,
+    handleOpenContactDialog,
+    isAuthenticated,
+    location,
+    navigate,
+  ]);
+
   const coverImage = useMemo(() => media.cover ?? hotkolimg, [media]);
 
   const descriptionBlocks = useMemo(() => {
@@ -302,9 +328,7 @@ const CourseLivesteamDetail = () => {
                 discountChip={discountChip}
                 coverImage={coverImage}
                 onSeeOtherPackages={handleBack}
-                onPurchase={
-                  canPurchaseCourse ? handleOpenContactDialog : undefined
-                }
+                onPurchase={handlePurchaseIntent}
                 purchaseDisabled={!canPurchaseCourse}
                 purchaseLoading={creatingPurchase}
               />

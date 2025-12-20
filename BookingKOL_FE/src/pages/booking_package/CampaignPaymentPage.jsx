@@ -427,25 +427,29 @@ const CampaignPaymentPage = () => {
                     sx={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                {/* <Typography variant="body2" color="text.secondary">
                   Mã sẽ hết hạn sau {countdownLabel}
-                </Typography>
+                </Typography> */}
               </Stack>
             </Stack>
           </Paper>
 
           <Alert severity="warning" sx={{ borderRadius: 3 }}>
-            <Typography fontWeight={600}>Lưu ý quan trọng</Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              - Không chỉnh sửa nội dung chuyển khoản.
-            </Typography>
-            <Typography variant="body2">
-              - Hệ thống tự động đối soát trong 1 - 5 phút kể từ khi thanh toán.
-            </Typography>
-            <Typography variant="body2">
-              - Nếu giao dịch thất bại hoặc nhập sai thông tin, vui lòng quay
-              lại chi tiết chiến dịch để nhận mã mới.
-            </Typography>
+            <Stack spacing={1}>
+              <Typography fontWeight={600}>Lưu ý khi thanh toán</Typography>
+              <Typography variant="body2">
+                - Nhập đúng <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển khoản để hệ
+                thống tự động kiểm tra trong vòng 1 - 5 phút.
+              </Typography>
+              <Typography variant="body2">
+                - Thông tin ở trên chỉ sử dụng <b>một lần duy nhất</b>. Nếu dùng
+                lại, hệ thống sẽ không xử lý.
+              </Typography>
+              <Typography variant="body2">
+                - Trang web <b>không hỗ trợ hoàn tiền</b> nếu nhập sai thông
+                tin. Vui lòng kiểm tra kỹ trước khi chuyển.
+              </Typography>
+            </Stack>
           </Alert>
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

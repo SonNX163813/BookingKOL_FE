@@ -798,9 +798,9 @@ const HistoryBookingPackagePage = () => {
                           >
                             Gói {record?.packageName ?? "--"}
                           </Tag>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                          {/* <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
                             {composeBudgetRange(record?.targetPrice)}
-                          </span>
+                          </span> */}
                         </div>
 
                         <div className="grid gap-3 text-sm text-slate-600">

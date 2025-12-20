@@ -455,12 +455,14 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                       <Typography
                         component="h1"
                         sx={{
-                          fontSize: { xs: "2rem", md: "2.5rem", lg: "3rem" },
+                          fontSize: { xs: "2rem", md: "2rem", lg: "2.2rem" },
                           fontWeight: 700,
                           color: textPrimary,
-                          letterSpacing: "0.01em",
                           lineHeight: 1.2,
                           mb: 0,
+                          whiteSpace: "normal", // cho phép xuống dòng
+                          wordBreak: "break-word", // cắt từ dài
+                          overflowWrap: "break-word",
                         }}
                       >
                         {kolName}

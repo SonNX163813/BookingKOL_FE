@@ -25,7 +25,6 @@ import {
   getNotificationIdentity,
   markAllNotificationsAsRead,
 } from "../../services/notification/notificationService";
-import { toast } from "react-toastify";
 
 const formatTimestamp = (value) => {
   if (!value) return "";
@@ -96,7 +95,6 @@ const formatTimestamp = (value) => {
   if (diffMonths < 12) return `${diffMonths} tháng trước`;
   return `${diffYears} năm trước`;
 };
-const MAX_FAILURES = 3;
 const MAX_BACKOFF = 5 * 60 * 1000;
 
 const NotificationBell = ({
@@ -114,7 +112,6 @@ const NotificationBell = ({
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
   const failureCountRef = useRef(0);
-  const toastMutedRef = useRef(false);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item?.read).length,
@@ -156,7 +153,6 @@ const NotificationBell = ({
       if (!loggedIn) {
         setNotifications([]);
         failureCountRef.current = 0;
-        toastMutedRef.current = false;
         return;
       }
 
@@ -167,7 +163,6 @@ const NotificationBell = ({
         if (!mounted) return;
 
         failureCountRef.current = 0;
-        toastMutedRef.current = false;
 
         const list = Array.isArray(data)
           ? data
@@ -179,16 +174,7 @@ const NotificationBell = ({
         scheduleNext(pollInterval);
       } catch (error) {
         console.error("Lỗi khi tải thông báo", error);
-        toastMutedRef.current = true;
         failureCountRef.current += 1;
-
-        // if (!toastMutedRef.current && failureCountRef.current <= MAX_FAILURES) {
-        //   toast.error("Không thể tải thông báo, vui lòng thử lại sau.");
-        // }
-
-        if (failureCountRef.current > MAX_FAILURES) {
-          toastMutedRef.current = true;
-        }
 
         const backoffDelay = Math.min(
           pollInterval * 2 ** failureCountRef.current,
@@ -277,7 +263,6 @@ const NotificationBell = ({
     const closeMenu = () => setAnchorEl(null);
 
     if (!role) {
-      toast.error("Không xác định được vai trò người dùng.");
       closeMenu();
       return;
     }

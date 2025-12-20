@@ -481,7 +481,7 @@ const CampaignBookingDetailPage = () => {
   const handleCompleteWorkTime = useCallback(
     async ({ workTimeId, bookingRequestId }) => {
       if (!workTimeId) {
-        toast.error("Không tìm thấy ca công việc hợp lệ.");
+        toast.error("Không tìm thấy ca làm việc hợp lệ.");
         return;
       }
 
@@ -630,14 +630,14 @@ const CampaignBookingDetailPage = () => {
                     </Tag>
 
                     {/* Trạng thái giao dịch thanh toán */}
-                    {paymentStatus ? (
+                    {/* {paymentStatus ? (
                       <Tag
                         color={PAYMENT_STATUS_COLOR[paymentStatus] ?? "blue"}
                         className="rounded-full px-3 py-1 text-xs font-semibold"
                       >
                         {PAYMENT_STATUS_LABEL[paymentStatus] ?? paymentStatus}
                       </Tag>
-                    ) : null}
+                    ) : null} */}
                   </div>
 
                   <div className="mt-3 grid gap-3 text-slate-600 sm:grid-cols-2">
@@ -716,11 +716,11 @@ const CampaignBookingDetailPage = () => {
         return <Skeleton active paragraph={{ rows: 3 }} />;
       }
 
-      // Không có ca công việc
+      // Không có ca làm việc
       if (!workTimes.length) {
         return (
           <p className="text-sm text-slate-500">
-            Chưa có ca công việc nào cho booking này.
+            Chưa có ca làm việc nào cho booking này.
           </p>
         );
       }
@@ -737,7 +737,7 @@ const CampaignBookingDetailPage = () => {
             const canComplete =
               workTimeId &&
               workTimeStatus &&
-              !["COMPLETED", "CANCELLED"].includes(workTimeStatus);
+              !["COMPLETED", "CANCELLED", "PENDING"].includes(workTimeStatus);
             const isCompleting =
               completingWorkTimeId === workTimeId &&
               completeWorkTimeMutation?.isPending;
@@ -749,7 +749,7 @@ const CampaignBookingDetailPage = () => {
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-slate-900">
-                    Ca công việc
+                    Ca làm việc
                   </span>
                   <Tag
                     color={statusMeta.color}

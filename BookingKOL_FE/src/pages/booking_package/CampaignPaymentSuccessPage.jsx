@@ -20,6 +20,7 @@ const formatCurrency = (value) =>
 const CampaignPaymentSuccessPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const bookingRequest = location.state?.bookingRequest ?? null;
   const paymentInfo = location.state?.payment ?? null;
   const campaignInfo = location.state?.campaign ?? null;
   const scheduleInfo = location.state?.paymentSchedule ?? null;
@@ -57,7 +58,7 @@ const CampaignPaymentSuccessPage = () => {
 
   const amount = paymentInfo?.amount;
   const transferContent = paymentInfo?.transferContent;
-  const contractNumber = paymentInfo?.contractNumber;
+  const contractNumber = bookingRequest?.contractNumber;
   const contractId = paymentInfo?.contractId;
 
   const campaignName =
