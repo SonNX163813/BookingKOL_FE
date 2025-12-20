@@ -2,16 +2,37 @@
 import { post } from "../../config/axios-config";
 import { API_PATHS } from "../../constants/apiPath";
 
+const extractFileList = (files) => {
+  if (!files) return [];
+
+  if (files instanceof FileList) {
+    return Array.from(files);
+  }
+
+  if (Array.isArray(files)) {
+    return files.flatMap((item) => {
+      if (item instanceof File || item instanceof Blob) return item;
+      if (item?.file instanceof File || item?.file instanceof Blob)
+        return item.file;
+      if (typeof item === "string") return item;
+      return [];
+    });
+  }
+
+  if (files instanceof File || files instanceof Blob || typeof files === "string") {
+    return [files];
+  }
+
+  return [];
+};
+
 /**
  * ✅ POST /v1/admin/booking/single-requests/create
- * Body:
- * {
- *   bookingSingleReqByAdmin: {
- *     userId, kolId, fullName, phone, email,
- *     startAt, endAt, platform, description, location
- *   },
- *   attachedFiles: string[]
- * }
+ * Payload (multipart/form-data):
+ * - bookingSingleReqByAdmin: JSON blob (application/json) {
+ *     userId, kolId, fullName, phone, email, startAt, endAt, platform, description, location
+ *   }
+ * - attachedFiles: File[] | FileList | string[]
  */
 export async function adminCreateBookingSingleRequest(
   payload,
@@ -43,9 +64,21 @@ export async function adminCreateBookingSingleRequest(
     throw new Error(`Missing fields: ${missing.join(", ")}`);
   }
 
+  const formData = new FormData();
+
+  extractFileList(payload?.attachedFiles).forEach((file) => {
+    formData.append("attachedFiles", file);
+  });
+
+  const bookingJson = JSON.stringify(p ?? {});
+  const bookingBlob = new Blob([bookingJson], {
+    type: "application/json",
+  });
+  formData.append("bookingSingleReqByAdmin", bookingBlob);
+
   const res = await post({
     url,
-    data: payload,
+    data: formData,
     config: {
       ...(signal ? { signal } : {}),
       ...(timeout ? { timeout } : {}),
