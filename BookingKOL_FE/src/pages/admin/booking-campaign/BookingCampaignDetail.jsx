@@ -116,6 +116,25 @@ const CAMPAIGN_STATUS_COLOR = {
   COMPLETED: "blue",
 };
 
+/** ✅ NEW: Package type label ngay trong file */
+const PACKAGE_TYPE_LABEL = {
+  normal: "Gói thường",
+  vip: "Gói VIP",
+};
+
+const normalizePackageType = (value) => {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw === "vip") return "vip";
+  return "normal"; // ✅ default
+};
+
+const formatPackageType = (value) => {
+  const key = normalizePackageType(value);
+  return PACKAGE_TYPE_LABEL[key] ?? key;
+};
+
 const BookingCampaignDetail = () => {
   const { campaignId } = useParams();
   const navigate = useNavigate();
@@ -124,7 +143,7 @@ const BookingCampaignDetail = () => {
   // ✅ Thu gọn/mở rộng phần “Thông tin Booking Campaign” (giống Schedule)
   const [campaignInfoCollapsed, setCampaignInfoCollapsed] = useState(false);
 
-  // ✅ NEW: Thu gọn/mở rộng phần “Thông tin yêu cầu từ khách hàng” (giống EditBookingCampain)
+  // ✅ Thu gọn/mở rộng phần “Thông tin yêu cầu từ khách hàng”
   const [collapseCampaignInfo, setCollapseCampaignInfo] = useState(false);
 
   const {
@@ -265,7 +284,7 @@ const BookingCampaignDetail = () => {
         </Card>
       ) : (
         <>
-          {/* ✅ UPDATED: Thông tin yêu cầu từ khách hàng (GIỐNG EditBookingCampain.jsx) */}
+          {/* ✅ UPDATED: Thông tin yêu cầu từ khách hàng */}
           <Card
             className="shadow-sm"
             bordered={false}
@@ -332,13 +351,16 @@ const BookingCampaignDetail = () => {
                     <Descriptions.Item label="Tên chiến dịch">
                       {campaignInfo?.name ?? "--"}
                     </Descriptions.Item>
+
                     <Descriptions.Item label="Thời gian">
                       {formatDate(campaignInfo?.startDate)} -{" "}
                       {formatDate(campaignInfo?.endDate)}
                     </Descriptions.Item>
+
                     <Descriptions.Item label="Người đặt">
                       {campaignInfo?.ordererFullName ?? "--"}
                     </Descriptions.Item>
+
                     <Descriptions.Item label="Số điện thoại">
                       {campaignInfo?.ordererPhone ? (
                         <Text copyable>{campaignInfo.ordererPhone}</Text>
@@ -346,8 +368,14 @@ const BookingCampaignDetail = () => {
                         "--"
                       )}
                     </Descriptions.Item>
+
                     <Descriptions.Item label="Số giờ livestream">
                       {campaignInfo?.livestreamHours ?? "--"}
+                    </Descriptions.Item>
+
+                    {/* ✅ NEW: packageType */}
+                    <Descriptions.Item label="Gói dịch vụ">
+                      {formatPackageType(campaignInfo?.packageType ?? "normal")}
                     </Descriptions.Item>
                   </Descriptions>
                 ) : (
@@ -359,6 +387,11 @@ const BookingCampaignDetail = () => {
                   >
                     <Descriptions.Item label="Tên Campaign">
                       {campaignInfo?.name ?? "--"}
+                    </Descriptions.Item>
+
+                    {/* ✅ NEW: packageType */}
+                    <Descriptions.Item label="Gói dịch vụ">
+                      {formatPackageType(campaignInfo?.packageType ?? "normal")}
                     </Descriptions.Item>
 
                     <Descriptions.Item label="Họ và tên người đặt">
@@ -543,7 +576,6 @@ const BookingCampaignDetail = () => {
                 const totalAmount =
                   record?.totalAmount ?? record?.amount ?? null;
 
-                // ✅ NEW: livestreamAddress cho từng booking request
                 const livestreamAddress =
                   record?.livestreamAddress ??
                   record?.liveStreamAddress ??
@@ -552,6 +584,14 @@ const BookingCampaignDetail = () => {
                   record?.campaign?.livestreamAddress ??
                   record?.campaign?.liveStreamAddress ??
                   null;
+
+                // ✅ NEW: packageType per booking (fallback normal)
+                const packageType =
+                  record?.packageType ??
+                  record?.campaignPackageType ??
+                  record?.campaign?.packageType ??
+                  campaignInfo?.packageType ??
+                  "normal";
 
                 const schedules = (
                   Array.isArray(record?.paymentSchedules)
@@ -615,6 +655,11 @@ const BookingCampaignDetail = () => {
                         {formatRepeatType(record?.repeatType)}
                       </Descriptions.Item>
 
+                      {/* ✅ NEW: packageType */}
+                      <Descriptions.Item label="Gói dịch vụ">
+                        {formatPackageType(packageType)}
+                      </Descriptions.Item>
+
                       <Descriptions.Item
                         label="Mục tiêu chiến dịch"
                         span={screens.lg ? 3 : 1}
@@ -654,7 +699,6 @@ const BookingCampaignDetail = () => {
                           : "--"}
                       </Descriptions.Item>
 
-                      {/* ✅ NEW FIELD */}
                       <Descriptions.Item
                         label="Địa điểm livestream"
                         span={screens.lg ? 3 : 1}

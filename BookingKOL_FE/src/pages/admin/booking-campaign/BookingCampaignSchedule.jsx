@@ -158,6 +158,7 @@ const WORKTIME_STATUS_LABEL = {
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
   PENDING_ASSIGNMENT: "Chưa có KOL",
+  PENDING: "Chờ thực hiện",
 };
 
 const WORKTIME_STATUS_COLOR = {
@@ -168,6 +169,7 @@ const WORKTIME_STATUS_COLOR = {
   COMPLETED: "success",
   CANCELLED: "error",
   PENDING_ASSIGNMENT: "default",
+  PENDING: "blue",
 };
 
 /** ===== Worktime role (kolRole) =====
