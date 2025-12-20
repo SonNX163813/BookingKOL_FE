@@ -1,37 +1,30 @@
 // src/pages/admin/management-user/management-worktime/ManagementKolWorkSchedule.jsx
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
-import dayjs from "dayjs";
-import "dayjs/locale/vi";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Button,
   Card,
-  Col,
-  ConfigProvider,
-  DatePicker,
-  Form,
   Input,
-  Modal,
-  Row,
-  Segmented,
-  Select,
   Space,
-  Steps,
   Table,
   Tag,
   Typography,
-  Upload,
   message,
-  Descriptions,
+  DatePicker,
+  Segmented,
+  Modal,
+  Form,
+  Row,
+  Col,
+  Select,
+  Upload,
+  ConfigProvider,
+  Alert,
+  Pagination,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import "dayjs/locale/vi";
 import { Eye, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -43,33 +36,22 @@ import {
   resolveAvatarUrl,
 } from "../../../../services/kol/KolAPI";
 
-// ✅ USERS: lấy list 200, page 0 (ẩn pagination UI)
+// ✅ LẤY USER LIST GIỐNG ManagementCustomer (nhưng bỏ search UI)
 import { useGetAllBrands } from "../../../../hook/admin/management-user/useGetAllBrands";
-
-// ✅ Platforms giống BookingFlow
-import { useGetPlatforms } from "../../../../hook/platform/useGetPlatforms";
 
 dayjs.locale("vi");
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
-// ===== BookingFlow constants (admin reuse) =====
-const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_SIZE_MB = 50;
-const MAX_ATTACHMENT_SIZE_BYTES = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
+const MAX_KEYWORD_LEN = 100;
 
-// ✅ endpoint upload file (đổi theo BE nếu khác)
-const UPLOAD_ENDPOINT =
-  API_PATHS?.UPLOAD?.single || API_PATHS?.FILE?.upload || "/v1/files/upload";
-
-// ✅ build url xem file theo id (đổi theo BE nếu khác)
+// ✅ build url xem file theo id (đổi theo BE nếu khác) - dùng cho avatar fallback
 const FILE_VIEW_BUILDER =
   API_PATHS?.FILE?.view ||
   API_PATHS?.FILE?.getById ||
   API_PATHS?.FILE?.download ||
   ((id) => `/v1/files/${encodeURIComponent(id)}`);
-
-const MAX_KEYWORD_LEN = 100;
 
 const STATUS_META = {
   PENDING: { label: "Chờ duyệt", color: "gold" },
@@ -78,6 +60,7 @@ const STATUS_META = {
   REJECTED: { label: "Từ chối", color: "red" },
 };
 
+// ✅ mapping role label theo yêu cầu
 const ROLE_LABEL_VI = {
   KOL: "Host chính",
   LIVE: "Trợ live",
@@ -200,7 +183,8 @@ function toIso(v) {
   return typeof v === "string" ? v : "";
 }
 
-// ✅ DatePicker: cho phép phút=00, giây=00 (fix OK bị disable)
+// ✅ DatePicker: chỉ cho chọn phút = 00, giây = 00
+// ❗ FIX OK bị disable: không disable giây 0
 const disabledTimeOnlyHour = () => ({
   disabledMinutes: () =>
     Array.from({ length: 60 }, (_, i) => i).filter((m) => m !== 0),
@@ -224,7 +208,7 @@ async function adminGetAllCancelRequests({ signal } = {}) {
 }
 
 // =====================
-// API: REGISTER AVAILABILITY ✅ /availabilities/admin/add
+// API: REGISTER AVAILABILITY  ✅ /availabilities/admin/add
 // =====================
 const API_ADD_REGISTER_AVAILABILITY =
   API_PATHS?.SCHEDULER_ADMIN?.adminAddAvailability ||
@@ -290,34 +274,7 @@ async function adminGetKolTimelineAll({
   return list;
 }
 
-// =====================
-// helper: lấy url string từ response upload
-// =====================
-function pickUploadedFileUrl(resp) {
-  const url = pickFirst(resp, [
-    "url",
-    "fileUrl",
-    "path",
-    "filePath",
-    "data.url",
-    "data.fileUrl",
-    "data.path",
-    "data.filePath",
-    "result.url",
-    "result.fileUrl",
-    "result.path",
-    "result.filePath",
-  ]);
-  if (typeof url === "string" && url.trim()) return url.trim();
-
-  if (typeof resp === "string" && resp.trim()) return resp.trim();
-  if (typeof resp?.data === "string" && resp.data.trim())
-    return resp.data.trim();
-
-  return "";
-}
-
-// ✅ resolve avatar từ fileUsageDtos
+// ✅ resolve avatar từ fileUsageDtos (fallback nếu resolveAvatarUrl chưa handle id-only)
 function resolveAvatarFromFileUsageDtos(profile) {
   const list = Array.isArray(profile?.fileUsageDtos)
     ? profile.fileUsageDtos
@@ -356,6 +313,7 @@ function resolveKolAvatarSafe(profile) {
 
 export default function ManagementKolWorkSchedule() {
   const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState("registered");
 
   // TAB 1
@@ -367,27 +325,23 @@ export default function ManagementKolWorkSchedule() {
   const [selectedCancelRow, setSelectedCancelRow] = useState(null);
   const [viewingWorktimeId, setViewingWorktimeId] = useState(null);
 
-  // ✅ Modal thêm lịch làm việc (BookingFlow style)
+  // ✅ Modal thêm lịch làm việc
   const [createOpen, setCreateOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
-  const [createStep, setCreateStep] = useState(0); // 0: chọn lịch, 1: nhập info
   const [createForm] = Form.useForm();
 
+  // watch startAt để disable endAt theo startAt
   const startAtWatch = Form.useWatch("startAt", createForm);
-  const platformWatch = Form.useWatch("platform", createForm);
-
-  // ✅ giữ selected user (để lấy name/phone/email)
-  const [selectedUser, setSelectedUser] = useState(null);
 
   // ✅ KOL select options (hiển thị avatar + displayName) - ALL ROLE
   const [kolSelectOptions, setKolSelectOptions] = useState([]);
   const [kolSelectLoading, setKolSelectLoading] = useState(false);
 
   // =========================
-  // ✅ USERS: size 200, page 0 (ẩn pagination UI)
+  // ✅ USERS: dùng hook giống ManagementCustomer (BỎ SEARCH, chỉ phân trang)
   // =========================
-  const userPage = 0;
-  const userSize = 200;
+  const [userPage, setUserPage] = useState(0);
+  const [userSize, setUserSize] = useState(50);
 
   const {
     isLoadingGetAllBrands: userLoading,
@@ -396,7 +350,9 @@ export default function ManagementKolWorkSchedule() {
   } = useGetAllBrands(userPage, userSize, undefined);
 
   const userList = usersResponse?.data?.content || [];
-  const userMapRef = useRef({}); // id -> user
+  const userTotal = usersResponse?.data?.totalElements || 0;
+
+  const userMapRef = useRef({}); // id -> user (tích lũy các page đã load)
 
   useEffect(() => {
     const next = { ...(userMapRef.current || {}) };
@@ -436,78 +392,39 @@ export default function ManagementKolWorkSchedule() {
       .filter(Boolean);
   }, [userList]);
 
-  // ✅ khi chọn userId -> lấy name/phone/email theo userId (không nhập tay)
   const onUserChange = (userId) => {
     const u = userId ? userMapRef.current?.[String(userId)] : null;
-    setSelectedUser(u || null);
+    if (!u) return;
 
-    // lưu hidden fields (để submit payload dễ)
     createForm.setFieldsValue({
-      customerFullName: u?.fullName || u?.displayName || u?.name || "",
-      customerPhone: u?.phone || "",
-      customerEmail: u?.email || "",
+      fullName: u?.fullName || u?.displayName || u?.name || "",
+      phone: u?.phone || "",
+      email: u?.email || "",
     });
   };
 
-  // =========================
-  // Platforms (giống BookingFlow)
-  // =========================
-  const {
-    platforms,
-    isLoadingPlatforms,
-    isFetchingPlatforms,
-    refetchPlatforms,
-    platformsError,
-  } = useGetPlatforms();
-
-  const platformOptions = useMemo(() => {
-    if (!Array.isArray(platforms)) return [];
-    return platforms
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const name = typeof item.name === "string" ? item.name.trim() : "";
-        const key = typeof item.key === "string" ? item.key.trim() : "";
-        const id = typeof item.id === "string" ? item.id.trim() : "";
-        const label = name || key || id || "";
-        if (!label) return null;
-        const value = key || id || label;
-        const upperKey = key ? key.toUpperCase() : "";
-        return {
-          value,
-          label,
-          isOther: upperKey === "OTHER",
-        };
-      })
-      .filter(Boolean);
-  }, [platforms]);
-
-  const platformLoading = isLoadingPlatforms || isFetchingPlatforms;
-  const selectedPlatform = useMemo(() => {
-    const v = (platformWatch || "").trim();
-    return platformOptions.find((x) => x.value === v) || null;
-  }, [platformWatch, platformOptions]);
-
-  // Upload state
+  // ✅ Attachments theo BookingFlow: giữ File local, không upload trước
   const [fileList, setFileList] = useState([]);
-  const [attachedMap, setAttachedMap] = useState({}); // uid -> url string
 
-  const attachedFiles = useMemo(
-    () => Object.values(attachedMap).filter(Boolean),
-    [attachedMap]
-  );
+  const attachedFiles = useMemo(() => {
+    return (fileList || []).map((f) => f?.originFileObj).filter(Boolean); // File[]
+  }, [fileList]);
 
   // =========================
-  // ✅ RULE: chỉ chọn từ hôm nay + giờ hiện tại trở đi (phút=00)
+  // ✅ RULE: chỉ chọn từ hôm nay + giờ hiện tại trở đi (phút = 00)
   // =========================
   const disabledDateFromToday = (current) => {
     if (!current) return false;
     return current.isBefore(dayjs().startOf("day"));
   };
 
+  // do phút fix = 00:
+  // - nếu now có phút > 0 thì giờ hiện tại (HH:00) đã qua -> phải lên giờ + 1
+  // - nếu đang 23:xx -> minHour có thể = 24 => disable toàn bộ giờ hôm nay
   const minHourFromNow = () => {
     const now = dayjs();
     const needNextHour = now.minute() > 0 || now.second() > 0;
-    return now.hour() + (needNextHour ? 1 : 0);
+    return now.hour() + (needNextHour ? 1 : 0); // 0..24
   };
 
   const disabledTimeStart = (current) => {
@@ -530,8 +447,10 @@ export default function ManagementKolWorkSchedule() {
 
     const today = dayjs().startOf("day");
     const startDay = startAtWatch ? dayjs(startAtWatch).startOf("day") : null;
+
     const minDay = startDay && startDay.isAfter(today) ? startDay : today;
 
+    // nếu startAt là 23:00 thì endAt không thể cùng ngày
     if (
       startAtWatch &&
       dayjs(current).isSame(dayjs(startAtWatch), "day") &&
@@ -549,10 +468,12 @@ export default function ManagementKolWorkSchedule() {
 
     let minH = 0;
 
+    // rule theo "hiện tại"
     if (dayjs(current).isSame(dayjs(), "day")) {
       minH = Math.max(minH, minHourFromNow());
     }
 
+    // rule theo startAt: end phải sau start (tối thiểu +1 giờ vì phút = 00)
     if (startAtWatch && dayjs(current).isSame(dayjs(startAtWatch), "day")) {
       minH = Math.max(minH, dayjs(startAtWatch).hour() + 1);
     }
@@ -564,7 +485,7 @@ export default function ManagementKolWorkSchedule() {
     };
   };
 
-  // ===== load KOL options: HIỂN THỊ TẤT CẢ ROLE =====
+  // ===== load KOL options: HIỂN THỊ TẤT CẢ ROLE (label role theo yêu cầu) =====
   useEffect(() => {
     let ignore = false;
     const controller = new AbortController();
@@ -597,6 +518,7 @@ export default function ManagementKolWorkSchedule() {
             id;
 
           const avatar = resolveKolAvatarSafe(item);
+
           const roleRaw = String(item?.role || "").toUpperCase();
           const roleLabel = ROLE_LABEL_VI[roleRaw] || roleRaw || "UNKNOWN";
           const secondary = item?.email || item?.phone || "";
@@ -794,7 +716,7 @@ export default function ManagementKolWorkSchedule() {
     });
   }, [cancelList, cancelKeyword]);
 
-  // ✅ Mutation tạo lịch làm việc (single request)
+  // ✅ Mutation tạo lịch làm việc (single request) - sẽ gửi multipart/FormData ở service
   const createSingleBookingMutation = useMutation({
     mutationFn: async ({ payload, signal }) =>
       adminCreateBookingSingleRequest(payload, { signal }),
@@ -916,163 +838,39 @@ export default function ManagementKolWorkSchedule() {
   const openCreateModal = async () => {
     setCreateOpen(true);
     setCreateLoading(false);
-    setCreateStep(0);
 
     setFileList([]);
-    setAttachedMap({});
-    setSelectedUser(null);
     createForm.resetFields();
 
+    setUserPage(0);
+    setUserSize(50);
     refetchUsers?.();
-    refetchPlatforms?.();
 
     createForm.setFieldsValue({
       userId: undefined,
       kolId: undefined,
+      fullName: "",
+      phone: "",
+      email: "",
       startAt: null,
       endAt: null,
-      location: "",
-      description: "",
       platform: "",
-      platformCustom: "",
-
-      // hidden customer fields
-      customerFullName: "",
-      customerPhone: "",
-      customerEmail: "",
+      description: "",
+      location: "",
     });
   };
 
   const closeCreateModal = () => {
     setCreateOpen(false);
     setCreateLoading(false);
-    setCreateStep(0);
-    setSelectedUser(null);
     createForm.resetFields();
     setFileList([]);
-    setAttachedMap({});
   };
 
-  // ✅ Upload customRequest
-  const uploadAttachment = async ({ file, onSuccess, onError }) => {
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await api.post(UPLOAD_ENDPOINT, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const raw = res?.data ?? res;
-      const url = pickUploadedFileUrl(raw);
-
-      if (!url)
-        throw new Error(
-          "Upload thành công nhưng không nhận được đường dẫn tệp."
-        );
-
-      setAttachedMap((prev) => ({ ...prev, [file.uid]: url }));
-      onSuccess?.(raw);
-    } catch (e) {
-      onError?.(e);
-      message.error(e?.message || "Upload tệp thất bại.");
-    }
-  };
-
-  const onRemoveFile = (file) => {
-    setAttachedMap((prev) => {
-      const next = { ...prev };
-      delete next[file.uid];
-      return next;
-    });
-    return true;
-  };
-
-  const beforeUpload = (file) => {
-    if (fileList.length >= MAX_ATTACHMENTS) {
-      message.warning(`Chỉ được đính kèm tối đa ${MAX_ATTACHMENTS} tệp.`);
-      return Upload.LIST_IGNORE;
-    }
-    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
-      message.warning(`Mỗi tệp phải <= ${MAX_ATTACHMENT_SIZE_MB}MB.`);
-      return Upload.LIST_IGNORE;
-    }
-    return true;
-  };
-
-  // ✅ validate theo step (BookingFlow style)
-  const validateCreateStep = async (stepIndex, touch = true) => {
-    try {
-      if (stepIndex === 0) {
-        await createForm.validateFields([
-          "userId",
-          "kolId",
-          "startAt",
-          "endAt",
-        ]);
-        const start = createForm.getFieldValue("startAt");
-        const end = createForm.getFieldValue("endAt");
-        if (start && end && !dayjs(end).isAfter(dayjs(start))) {
-          if (touch) message.error("Kết thúc phải sau bắt đầu.");
-          return false;
-        }
-        return true;
-      }
-
-      // step 1: chỉ validate các field user nhập tay (không có name/phone/email)
-      const fields = ["location", "platform"];
-      if (selectedPlatform?.isOther) fields.push("platformCustom");
-      await createForm.validateFields(fields);
-
-      if (!attachedFiles.length) {
-        if (touch) message.error("Vui lòng đính kèm ít nhất 1 tệp.");
-        return false;
-      }
-
-      const uploading = (fileList || []).some((f) => f?.status === "uploading");
-      if (uploading) {
-        if (touch)
-          message.warning("Vui lòng chờ upload tệp đính kèm xong rồi hãy tạo.");
-        return false;
-      }
-
-      // ✅ check customer info must exist (từ userId)
-      const name =
-        selectedUser?.fullName ||
-        selectedUser?.displayName ||
-        selectedUser?.name ||
-        "";
-      const phone = selectedUser?.phone || "";
-      const email = selectedUser?.email || "";
-      if (!name || !phone || !email) {
-        if (touch)
-          message.error(
-            "User đang chọn thiếu thông tin (tên/sđt/email). Vui lòng chọn user khác hoặc bổ sung thông tin ở hồ sơ user."
-          );
-        return false;
-      }
-
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const onNextStep = async () => {
-    const ok = await validateCreateStep(0, true);
-    if (!ok) return;
-    setCreateStep(1);
-  };
-
-  const onPrevStep = () => setCreateStep(0);
-
-  // ✅ Submit tạo lịch làm việc (single request)
+  // ✅ Submit tạo lịch làm việc (single request) - attachedFiles là File[]
   const handleCreate = async () => {
-    const ok = await validateCreateStep(1, true);
-    if (!ok) return;
-
     try {
-      const values = createForm.getFieldsValue(true);
+      const values = await createForm.validateFields();
 
       const start = values?.startAt ? dayjs(values.startAt) : null;
       const end = values?.endAt ? dayjs(values.endAt) : null;
@@ -1086,6 +884,7 @@ export default function ManagementKolWorkSchedule() {
         return;
       }
 
+      // ✅ đảm bảo startAt >= now (theo rule phút=00)
       const now = dayjs();
       const minStartTodayHour = minHourFromNow();
       if (start.isSame(now, "day")) {
@@ -1100,41 +899,22 @@ export default function ManagementKolWorkSchedule() {
         return;
       }
 
-      const matchedPlatformOption = platformOptions.find(
-        (o) => o.value === (values?.platform || "").trim()
-      );
-      const resolvedPlatform = matchedPlatformOption?.isOther
-        ? (values?.platformCustom || "").trim()
-        : matchedPlatformOption?.label || (values?.platform || "").trim();
-
-      // ✅ customer info lấy từ userId (selectedUser)
-      const customerFullName =
-        selectedUser?.fullName ||
-        selectedUser?.displayName ||
-        selectedUser?.name ||
-        "";
-      const customerPhone = selectedUser?.phone || "";
-      const customerEmail = selectedUser?.email || "";
-
       setCreateLoading(true);
 
       const payload = {
         bookingSingleReqByAdmin: {
           userId: String(values.userId),
           kolId: String(values.kolId),
-
-          // ✅ lấy theo userId, không nhập tay
-          fullName: safeText(customerFullName),
-          phone: safeText(customerPhone),
-          email: safeText(customerEmail),
-
+          fullName: safeText(values.fullName),
+          phone: safeText(values.phone),
+          email: safeText(values.email),
           startAt: start.minute(0).second(0).millisecond(0).toISOString(),
           endAt: end.minute(0).second(0).millisecond(0).toISOString(),
-          platform: safeText(resolvedPlatform),
+          platform: safeText(values.platform),
           description: safeText(values.description),
           location: safeText(values.location),
         },
-        attachedFiles, // ✅ string[] url (đã upload)
+        attachedFiles, // ✅ File[]
       };
 
       const controller = new AbortController();
@@ -1148,11 +928,13 @@ export default function ManagementKolWorkSchedule() {
         clearTimeout(timer);
       }
     } catch (e) {
+      if (e?.errorFields?.length) return;
       message.error(e?.message || "Tạo lịch thất bại.");
       setCreateLoading(false);
     }
   };
 
+  // ✅ CLICK: thêm lịch đăng ký theo API mới
   const onClickAddRegister = () => {
     const row = ensureCancelRowSelected();
     if (!row) return;
@@ -1253,6 +1035,7 @@ export default function ManagementKolWorkSchedule() {
         fixed: "right",
         render: (_, record) => {
           const wtId = getCancelWorkTimeId(record);
+
           const loadingThisRow =
             viewDetailMutation.isPending &&
             viewingWorktimeId &&
@@ -1289,42 +1072,6 @@ export default function ManagementKolWorkSchedule() {
   const isScheduleKeywordMax =
     (scheduleKeyword || "").length >= MAX_KEYWORD_LEN;
   const isCancelKeywordMax = (cancelKeyword || "").length >= MAX_KEYWORD_LEN;
-
-  const modalFooter = (
-    <div style={{ display: "flex", justifyContent: "space-between" }}>
-      <Button
-        onClick={() => {
-          if (createStep === 0) closeCreateModal();
-          else onPrevStep();
-        }}
-        disabled={createSingleBookingMutation.isPending || createLoading}
-      >
-        {createStep === 0 ? "Hủy" : "Quay lại"}
-      </Button>
-
-      <Space>
-        {createStep === 0 ? (
-          <Button
-            type="primary"
-            onClick={onNextStep}
-            loading={createLoading}
-            disabled={createSingleBookingMutation.isPending || createLoading}
-          >
-            Tiếp tục
-          </Button>
-        ) : (
-          <Button
-            type="primary"
-            onClick={handleCreate}
-            loading={createSingleBookingMutation.isPending || createLoading}
-            disabled={createSingleBookingMutation.isPending || createLoading}
-          >
-            Tạo
-          </Button>
-        )}
-      </Space>
-    </div>
-  );
 
   return (
     <ConfigProvider locale={viVN}>
@@ -1395,11 +1142,23 @@ export default function ManagementKolWorkSchedule() {
                     alignItems: "center",
                   }}
                 >
+                  <div style={{ minWidth: 260 }}>
+                    <RangePicker
+                      value={range}
+                      onChange={(v) => setRange(v)}
+                      allowClear
+                      style={{ width: "100%" }}
+                      placeholder={["Từ ngày", "Đến ngày"]}
+                      format="DD/MM/YYYY"
+                    />
+                  </div>
+
                   <div style={{ flex: 1, minWidth: 280 }}>
                     <Input
                       placeholder="Tìm theo tên KOL..."
                       value={scheduleKeyword}
                       maxLength={MAX_KEYWORD_LEN}
+                      showCount={false}
                       onChange={(e) => {
                         const next = e?.target?.value ?? "";
                         setScheduleKeyword(
@@ -1456,6 +1215,7 @@ export default function ManagementKolWorkSchedule() {
                       placeholder="Tìm theo tên KOL / mã yêu cầu / lý do / trạng thái..."
                       value={cancelKeyword}
                       maxLength={MAX_KEYWORD_LEN}
+                      showCount={false}
                       onChange={(e) => {
                         const next = e?.target?.value ?? "";
                         setCancelKeyword(
@@ -1511,283 +1271,223 @@ export default function ManagementKolWorkSchedule() {
             </Space>
           )}
 
-          {/* Popup tạo lịch làm việc (BookingFlow style 2 bước) */}
+          {/* Popup tạo lịch làm việc */}
           <Modal
             open={createOpen}
             title="Thêm lịch làm việc"
             onCancel={closeCreateModal}
-            footer={modalFooter}
+            onOk={handleCreate}
+            okText="Tạo"
+            cancelText="Hủy"
+            confirmLoading={createSingleBookingMutation.isPending}
             destroyOnClose
             maskClosable={!createSingleBookingMutation.isPending}
           >
-            <Steps
-              current={createStep}
-              items={[{ title: "Chọn lịch" }, { title: "Nhập thông tin" }]}
-              style={{ marginBottom: 16 }}
-            />
-
             <Form form={createForm} layout="vertical" disabled={createLoading}>
-              {/* hidden fields: lưu customer info theo userId */}
-              <Form.Item name="customerFullName" hidden>
-                <Input />
+              {/* ✅ userId: CHỈ LIST, KHÔNG SEARCH */}
+              <Form.Item
+                label="Khách hàng (User)"
+                name="userId"
+                rules={[
+                  { required: true, message: "Vui lòng chọn khách hàng" },
+                ]}
+              >
+                <Select
+                  allowClear
+                  loading={userLoading}
+                  placeholder={userLoading ? "Đang tải..." : "Chọn khách hàng"}
+                  options={userOptions}
+                  showSearch={false}
+                  filterOption={false}
+                  notFoundContent={
+                    userLoading ? "Đang tải..." : "Không có user"
+                  }
+                  onChange={onUserChange}
+                />
               </Form.Item>
-              <Form.Item name="customerPhone" hidden>
-                <Input />
+
+              {/* ✅ Pagination user (để lật trang danh sách) */}
+              <div style={{ marginTop: -6, marginBottom: 12 }}>
+                <Pagination
+                  current={userPage + 1}
+                  pageSize={userSize}
+                  pageSizeOptions={["10", "20", "50", "100"]}
+                  onChange={(pageNumber, sizeNumber) => {
+                    setUserPage(pageNumber - 1);
+                    setUserSize(sizeNumber);
+                  }}
+                  total={userTotal}
+                  showSizeChanger
+                />
+              </div>
+
+              {/* ✅ KOL list tất cả role (CHỈ LIST, KHÔNG SEARCH) */}
+              <Form.Item
+                label="Chọn người thực hiện"
+                name="kolId"
+                rules={[
+                  { required: true, message: "Vui lòng chọn người thực hiện" },
+                ]}
+              >
+                <Select
+                  allowClear
+                  placeholder={
+                    kolSelectLoading
+                      ? "Đang tải danh sách..."
+                      : "Chọn người thực hiện"
+                  }
+                  loading={kolSelectLoading}
+                  options={kolSelectOptions}
+                  showSearch={false}
+                  filterOption={false}
+                  notFoundContent={
+                    kolSelectLoading ? "Đang tải..." : "Không có dữ liệu"
+                  }
+                />
               </Form.Item>
-              <Form.Item name="customerEmail" hidden>
-                <Input />
-              </Form.Item>
 
-              {createStep === 0 ? (
-                <>
+              <Row gutter={12}>
+                <Col span={12}>
                   <Form.Item
-                    label="Khách hàng (User)"
-                    name="userId"
+                    label="Họ và tên"
+                    name="fullName"
                     rules={[
-                      { required: true, message: "Vui lòng chọn khách hàng" },
-                    ]}
-                  >
-                    <Select
-                      allowClear
-                      loading={userLoading}
-                      placeholder={
-                        userLoading ? "Đang tải..." : "Chọn khách hàng"
-                      }
-                      options={userOptions}
-                      showSearch={false}
-                      filterOption={false}
-                      notFoundContent={
-                        userLoading ? "Đang tải..." : "Không có user"
-                      }
-                      onChange={onUserChange}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label="Chọn người thực hiện"
-                    name="kolId"
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng chọn người thực hiện",
-                      },
-                    ]}
-                  >
-                    <Select
-                      allowClear
-                      placeholder={
-                        kolSelectLoading
-                          ? "Đang tải danh sách..."
-                          : "Chọn người thực hiện"
-                      }
-                      loading={kolSelectLoading}
-                      options={kolSelectOptions}
-                      showSearch={false}
-                      filterOption={false}
-                      notFoundContent={
-                        kolSelectLoading ? "Đang tải..." : "Không có dữ liệu"
-                      }
-                    />
-                  </Form.Item>
-
-                  <Row gutter={12}>
-                    <Col span={12}>
-                      <Form.Item
-                        label="Bắt đầu"
-                        name="startAt"
-                        rules={[
-                          { required: true, message: "Chọn thời gian bắt đầu" },
-                        ]}
-                      >
-                        <DatePicker
-                          className="w-full"
-                          disabledDate={disabledDateFromToday}
-                          showTime={{
-                            format: "HH:mm",
-                            minuteStep: 60,
-                            showSecond: false,
-                            defaultValue: dayjs().minute(0).second(0),
-                          }}
-                          disabledTime={disabledTimeStart}
-                          format="DD/MM/YYYY HH:mm"
-                          inputReadOnly
-                          onChange={(val) => {
-                            if (!val) return;
-                            const d = dayjs(val)
-                              .minute(0)
-                              .second(0)
-                              .millisecond(0);
-                            createForm.setFieldValue("startAt", d);
-
-                            const endVal = createForm.getFieldValue("endAt");
-                            if (endVal && !dayjs(endVal).isAfter(d)) {
-                              createForm.setFieldValue("endAt", null);
-                            }
-                          }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        label="Kết thúc"
-                        name="endAt"
-                        rules={[
-                          {
-                            required: true,
-                            message: "Chọn thời gian kết thúc",
-                          },
-                        ]}
-                      >
-                        <DatePicker
-                          className="w-full"
-                          disabledDate={disabledDateEnd}
-                          showTime={{
-                            format: "HH:mm",
-                            minuteStep: 60,
-                            showSecond: false,
-                            defaultValue: dayjs().minute(0).second(0),
-                          }}
-                          disabledTime={disabledTimeEnd}
-                          format="DD/MM/YYYY HH:mm"
-                          inputReadOnly
-                          onChange={(val) => {
-                            if (!val) return;
-                            const d = dayjs(val)
-                              .minute(0)
-                              .second(0)
-                              .millisecond(0);
-                            createForm.setFieldValue("endAt", d);
-                          }}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </>
-              ) : (
-                <>
-                  {/* ✅ Thông tin khách hàng lấy từ userId (readonly) */}
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="Thông tin khách hàng được lấy tự động theo user đã chọn"
-                    style={{ marginBottom: 12 }}
-                  />
-
-                  <Descriptions
-                    size="small"
-                    column={1}
-                    bordered
-                    style={{ marginBottom: 12 }}
-                  >
-                    <Descriptions.Item label="Họ và tên">
-                      {selectedUser?.fullName ||
-                        selectedUser?.displayName ||
-                        selectedUser?.name ||
-                        "--"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Số điện thoại">
-                      {selectedUser?.phone || "--"}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Email">
-                      {selectedUser?.email || "--"}
-                    </Descriptions.Item>
-                  </Descriptions>
-
-                  <Form.Item
-                    label="Địa điểm"
-                    name="location"
-                    rules={[
-                      { required: true, message: "Vui lòng nhập địa điểm" },
+                      { required: true, message: "Vui lòng nhập họ tên" },
                     ]}
                   >
                     <Input />
                   </Form.Item>
-
+                </Col>
+                <Col span={12}>
                   <Form.Item
-                    label="Nền tảng"
-                    name="platform"
+                    label="Số điện thoại"
+                    name="phone"
                     rules={[
-                      { required: true, message: "Vui lòng chọn nền tảng" },
+                      {
+                        required: true,
+                        message: "Vui lòng nhập số điện thoại",
+                      },
                     ]}
                   >
-                    <Select
-                      allowClear
-                      loading={platformLoading}
-                      options={platformOptions.map((p) => ({
-                        value: p.value,
-                        label: p.label,
-                      }))}
-                      placeholder={
-                        platformLoading ? "Đang tải..." : "Chọn nền tảng"
-                      }
-                      notFoundContent={
-                        platformLoading ? "Đang tải..." : "Không có dữ liệu"
-                      }
-                      showSearch={false}
-                      filterOption={false}
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: "Vui lòng nhập email" },
+                  { type: "email", message: "Email không hợp lệ" },
+                ]}
+              >
+                <Input />
+              </Form.Item>
+
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Bắt đầu"
+                    name="startAt"
+                    rules={[
+                      { required: true, message: "Chọn thời gian bắt đầu" },
+                    ]}
+                  >
+                    <DatePicker
+                      className="w-full"
+                      disabledDate={disabledDateFromToday}
+                      showTime={{
+                        format: "HH:mm",
+                        minuteStep: 60,
+                        showSecond: false,
+                        defaultValue: dayjs().minute(0).second(0),
+                      }}
+                      disabledTime={disabledTimeStart}
+                      format="DD/MM/YYYY HH:mm"
+                      inputReadOnly
+                      onChange={(val) => {
+                        if (!val) return;
+                        const d = dayjs(val).minute(0).second(0).millisecond(0);
+                        createForm.setFieldValue("startAt", d);
+
+                        // nếu endAt <= startAt thì clear để chọn lại
+                        const endVal = createForm.getFieldValue("endAt");
+                        if (endVal && !dayjs(endVal).isAfter(d)) {
+                          createForm.setFieldValue("endAt", null);
+                        }
+                      }}
                     />
                   </Form.Item>
-
-                  {selectedPlatform?.isOther ? (
-                    <Form.Item
-                      label="Nền tảng khác"
-                      name="platformCustom"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Vui lòng nhập nền tảng khác",
-                        },
-                      ]}
-                    >
-                      <Input placeholder="Nhập nền tảng..." />
-                    </Form.Item>
-                  ) : null}
-
-                  {platformsError ? (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      message="Không tải được danh sách nền tảng"
-                      description={
-                        <Space>
-                          <span>Hãy thử tải lại.</span>
-                          <Button
-                            size="small"
-                            onClick={() => refetchPlatforms?.()}
-                          >
-                            Tải lại
-                          </Button>
-                        </Space>
-                      }
-                      style={{ marginBottom: 12 }}
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Kết thúc"
+                    name="endAt"
+                    rules={[
+                      { required: true, message: "Chọn thời gian kết thúc" },
+                    ]}
+                  >
+                    <DatePicker
+                      className="w-full"
+                      disabledDate={disabledDateEnd}
+                      showTime={{
+                        format: "HH:mm",
+                        minuteStep: 60,
+                        showSecond: false,
+                        defaultValue: dayjs().minute(0).second(0),
+                      }}
+                      disabledTime={disabledTimeEnd}
+                      format="DD/MM/YYYY HH:mm"
+                      inputReadOnly
+                      onChange={(val) => {
+                        if (!val) return;
+                        const d = dayjs(val).minute(0).second(0).millisecond(0);
+                        createForm.setFieldValue("endAt", d);
+                      }}
                     />
-                  ) : null}
-
-                  <Form.Item label="Mô tả" name="description">
-                    <Input.TextArea rows={3} />
                   </Form.Item>
+                </Col>
+              </Row>
 
-                  <Form.Item label="Tệp đính kèm (upload)">
-                    <Upload
-                      multiple
-                      fileList={fileList}
-                      beforeUpload={beforeUpload}
-                      customRequest={uploadAttachment}
-                      onChange={({ fileList: fl }) => setFileList(fl)}
-                      onRemove={onRemoveFile}
-                    >
-                      <Button>Chọn tệp để upload</Button>
-                    </Upload>
+              <Form.Item label="Nền tảng" name="platform">
+                <Input />
+              </Form.Item>
 
-                    <div
-                      style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}
-                    >
-                      Tối đa {MAX_ATTACHMENTS} tệp • Mỗi tệp ≤{" "}
-                      {MAX_ATTACHMENT_SIZE_MB}MB
-                    </div>
-                  </Form.Item>
-                </>
-              )}
+              <Form.Item label="Mô tả" name="description">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+
+              <Form.Item label="Địa điểm" name="location">
+                <Input />
+              </Form.Item>
+
+              {/* ✅ Upload theo BookingFlow: chỉ chọn file, không upload trước */}
+              <Form.Item label="Tệp đính kèm">
+                <Upload
+                  multiple
+                  fileList={fileList}
+                  beforeUpload={() => false} // ✅ quan trọng
+                  onChange={({ fileList: fl }) => setFileList(fl)}
+                  onRemove={(file) => {
+                    setFileList((prev) =>
+                      prev.filter((f) => f.uid !== file.uid)
+                    );
+                    return true;
+                  }}
+                >
+                  <Button>Chọn tệp</Button>
+                </Upload>
+              </Form.Item>
+
+              {!userLoading && userOptions.length === 0 ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Không có dữ liệu user"
+                  description="Hook useGetAllBrands trả về rỗng. Kiểm tra lại BE endpoint mà hook đang gọi."
+                />
+              ) : null}
             </Form>
           </Modal>
         </Space>
