@@ -223,10 +223,20 @@ export const adminCreateBookingFromCampaign = async (
     body?.attachmentName ||
     (attachmentNames?.length ? attachmentNames.join(" | ") : undefined);
 
+  // ✅ NEW: livestreamAddress
+  const livestreamAddress =
+    body?.livestreamAddress ??
+    body?.liveStreamAddress ??
+    body?.livestream_address ??
+    body?.live_address;
+
   const raw = {
     campaignId: body?.campaignId,
     description: body?.description,
     status: body?.status, // optional
+
+    // ✅ NEW
+    livestreamAddress,
 
     repeatType: body?.repeatType,
     dayOfWeek: body?.dayOfWeek,
@@ -299,8 +309,18 @@ export const adminEditBookingRequest = async (
     body?.attachmentName ||
     (attachmentNames?.length ? attachmentNames.join(" | ") : undefined);
 
+  // ✅ NEW: livestreamAddress
+  const livestreamAddress =
+    body?.livestreamAddress ??
+    body?.liveStreamAddress ??
+    body?.livestream_address ??
+    body?.live_address;
+
   const raw = {
     description: body?.description,
+
+    // ✅ NEW
+    livestreamAddress,
 
     repeatType: body?.repeatType,
     dayOfWeek: body?.dayOfWeek,

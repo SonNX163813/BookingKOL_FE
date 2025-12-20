@@ -78,6 +78,7 @@ export const API_PATHS = {
     kolTimeline: "/v1/availabilities/time-line/kol", // + /{kolId}
     kolTimelineAll: "/v1/availabilities/time-line/kol/all", // list lịch rảnh của tất cả KOL (do dev đặt tên sai)
     adminSchedule: "/v1/availabilities/admin/schedule",
+    adminAddAvailability: "/v1/availabilities/admin/add",
   },
   WORKTIME_ADMIN: {
     create: "/v1/availabilities/admin/worktime/create",

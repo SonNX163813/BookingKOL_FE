@@ -25,7 +25,6 @@ import logoweb from "../../assets/logocty.png";
 import { useAuth } from "../../context/AuthContext";
 import NotificationBell from "../common/NotificationBell";
 import { getMyUserProfile } from "../../services/user/UserService";
-import { toast } from "react-toastify";
 
 const navItems = [
   { label: "Trang chủ", to: "/" },
@@ -62,19 +61,6 @@ const Navbar = () => {
   const auth = useAuth?.() || {};
   const { token, user, logout } = auth;
   const loggedIn = !!token;
-
-  const guardProtectedNav = useCallback(
-    (event, targetPath) => {
-      const requiresLogin = targetPath === "/goi-chien-dich";
-      if (loggedIn || !requiresLogin) return false;
-
-      event.preventDefault();
-      toast.info("Vui lòng đăng nhập để tiếp tục đặt dịch vụ.");
-      navigate("/login", { replace: false, state: { from: targetPath } });
-      return true;
-    },
-    [loggedIn, navigate]
-  );
 
   const fetchProfile = useCallback(
     async (signal) => {
@@ -496,11 +482,7 @@ const Navbar = () => {
               {item.subItems.map((subItem) => (
                 <MenuItem
                   key={subItem.to}
-                  onClick={(event) => {
-                    const blocked = guardProtectedNav(event, subItem.to);
-                    handleClose();
-                    if (blocked) return;
-                  }}
+                  onClick={handleClose}
                   component={Link}
                   to={subItem.to}
                   sx={{ py: 1.25, pl: 4, fontWeight: 700 }}
@@ -553,11 +535,7 @@ const Navbar = () => {
                 <ListItemButton
                   component={Link}
                   to={subItem.to}
-                  onClick={(event) => {
-                    const blocked = guardProtectedNav(event, subItem.to);
-                    handleDropdownClose();
-                    if (blocked) return;
-                  }}
+                  onClick={handleDropdownClose}
                   sx={{
                     py: 1.5,
                     px: 2,
