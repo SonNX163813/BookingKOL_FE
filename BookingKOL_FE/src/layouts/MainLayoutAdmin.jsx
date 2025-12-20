@@ -137,7 +137,7 @@ const MainLayoutAdmin = () => {
           key: "management-booking-requests",
           icon: <CalendarMonthOutlined />,
           label: (
-            <Link to="management-booking-requests">Quản lý booking lẻ</Link>
+            <Link to="management-booking-requests">Quản lý đơn đặt lẻ</Link>
           ),
         },
         {
@@ -145,7 +145,7 @@ const MainLayoutAdmin = () => {
           icon: <BarChartOutlined />,
           label: (
             <Link to="management-booking-campaigns">
-              Quản lý booking Campaign
+              Quản lý đơn đặt chiến dịch
             </Link>
           ),
         },

@@ -251,9 +251,6 @@ const BookingCampaignDetail = () => {
           <Title level={4} className="!mb-1">
             Chi tiết Booking Campaign
           </Title>
-          <Text type="secondary">
-            Tên Campaign: <Text strong>{campaignInfo?.name ?? "--"}</Text>
-          </Text>
         </div>
       </div>
 
@@ -332,7 +329,7 @@ const BookingCampaignDetail = () => {
                     column={screens.lg ? 3 : screens.md ? 2 : 1}
                     styles={{ label: { width: 180 } }}
                   >
-                    <Descriptions.Item label="Tên Campaign">
+                    <Descriptions.Item label="Tên chiến dịch">
                       {campaignInfo?.name ?? "--"}
                     </Descriptions.Item>
                     <Descriptions.Item label="Thời gian">
@@ -546,6 +543,16 @@ const BookingCampaignDetail = () => {
                 const totalAmount =
                   record?.totalAmount ?? record?.amount ?? null;
 
+                // ✅ NEW: livestreamAddress cho từng booking request
+                const livestreamAddress =
+                  record?.livestreamAddress ??
+                  record?.liveStreamAddress ??
+                  record?.livestream_address ??
+                  record?.live_address ??
+                  record?.campaign?.livestreamAddress ??
+                  record?.campaign?.liveStreamAddress ??
+                  null;
+
                 const schedules = (
                   Array.isArray(record?.paymentSchedules)
                     ? record.paymentSchedules
@@ -638,13 +645,23 @@ const BookingCampaignDetail = () => {
                       <Descriptions.Item label="Giảm giá (%)">
                         {discount != null && discount !== ""
                           ? formatPercent(discount)
-                          : "--"}
+                          : "0"}
                       </Descriptions.Item>
 
                       <Descriptions.Item label="Tổng tiền">
                         {totalAmount != null && totalAmount !== ""
                           ? formatCurrency(totalAmount)
                           : "--"}
+                      </Descriptions.Item>
+
+                      {/* ✅ NEW FIELD */}
+                      <Descriptions.Item
+                        label="Địa điểm livestream"
+                        span={screens.lg ? 3 : 1}
+                      >
+                        <Text style={{ whiteSpace: "pre-wrap" }}>
+                          {livestreamAddress ?? "--"}
+                        </Text>
                       </Descriptions.Item>
 
                       <Descriptions.Item label="Người tạo (email)">

@@ -53,7 +53,7 @@ const { Text } = Typography;
 const { useBreakpoint } = Grid;
 
 /** ✅ List page route */
-const BOOKING_CAMPAIGN_LIST_PATH = "/admin/booking-campaign";
+const BOOKING_CAMPAIGN_LIST_PATH = "/admin/management-booking-campaigns";
 
 /** ===== Upload constraints ===== */
 const MAX_ATTACH_FILES = 5;
@@ -70,6 +70,9 @@ const ALLOWED_ATTACH_EXTS = [
   ".png",
 ];
 const ACCEPT_ATTACH = ".xlsx,.xls,.doc,.docx,.pdf,.jpg,.jpeg,.png";
+
+/** ✅ Livestream address constraints */
+const MAX_LIVESTREAM_ADDR_LEN = 500;
 
 /** ===== Repeat type (BE-friendly) ===== */
 const REPEAT_NONE = "NONE";
@@ -222,16 +225,19 @@ const TotalInstallmentsStepper = ({
   onStep,
   min = 1,
   max = 5,
+  disabled = false,
 }) => {
   const v = Number(value) || min;
 
   const dec = () => {
+    if (disabled) return;
     const next = Math.max(min, v - 1);
     onChange?.(next);
     onStep?.(next);
   };
 
   const inc = () => {
+    if (disabled) return;
     const next = Math.min(max, v + 1);
     onChange?.(next);
     onStep?.(next);
@@ -239,11 +245,11 @@ const TotalInstallmentsStepper = ({
 
   return (
     <Space.Compact className="w-full">
-      <Button onClick={dec} disabled={v <= min}>
+      <Button onClick={dec} disabled={disabled || v <= min}>
         -
       </Button>
-      <Input value={v} readOnly className="text-center" />
-      <Button onClick={inc} disabled={v >= max}>
+      <Input value={v} readOnly disabled={disabled} className="text-center" />
+      <Button onClick={inc} disabled={disabled || v >= max}>
         +
       </Button>
     </Space.Compact>
@@ -318,8 +324,13 @@ export default function EditBookingCampain() {
   const [totalTooLong, setTotalTooLong] = useState(false);
   const [collapseCampaignInfo, setCollapseCampaignInfo] = useState(false);
 
-  // ✅ NEW: cảnh báo khi đơn giá đạt 13 chữ số
+  // ✅ cảnh báo khi đơn giá đạt 13 chữ số
   const [unitPriceAtLimit, setUnitPriceAtLimit] = useState(false);
+
+  // ✅ chống double submit
+  const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
+  const isBusy = submitting;
 
   const screens = useBreakpoint();
   const row = location.state || {};
@@ -440,6 +451,10 @@ export default function EditBookingCampain() {
       intro,
       experience: "",
 
+      // ✅ livestreamAddress
+      livestreamAddress:
+        stateRow.livestreamAddress || campaignInfo?.livestreamAddress || "",
+
       // ✅ no UI for repeat -> default
       repeatType: REPEAT_NONE,
       dayOfWeek: undefined,
@@ -455,9 +470,18 @@ export default function EditBookingCampain() {
     });
 
     setAttachList([]);
-    setUnitPriceAtLimit(false); // ✅ reset warning
+    setUnitPriceAtLimit(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, mode]);
+
+  // ✅ nếu campaignInfo load sau, auto fill livestreamAddress khi đang create & field đang trống
+  useEffect(() => {
+    if (mode !== "create") return;
+    const cur = String(form.getFieldValue("livestreamAddress") || "").trim();
+    if (cur) return;
+    const addr = String(campaignInfo?.livestreamAddress || "").trim();
+    if (addr) form.setFieldValue("livestreamAddress", addr);
+  }, [mode, campaignInfo?.livestreamAddress, form]);
 
   // Prefill edit mode from targetBookingRecord
   useEffect(() => {
@@ -519,7 +543,7 @@ export default function EditBookingCampain() {
       source?.discount_rate ??
       "";
 
-    // ✅ set warning state theo unitPrice từ BE
+    // ✅ warning state theo unitPrice từ BE
     const unitDigits = String(unitPrice || "").replace(/\D/g, "");
     setUnitPriceAtLimit(unitDigits.length >= 13);
 
@@ -527,6 +551,14 @@ export default function EditBookingCampain() {
       campaignId: source?.campaignId || campaignId,
       intro,
       experience,
+
+      // ✅ livestreamAddress (ưu tiên booking, fallback campaign)
+      livestreamAddress:
+        source?.livestreamAddress ||
+        source?.liveAddress ||
+        campaignInfo?.livestreamAddress ||
+        "",
+
       startAt,
       repeatUntil,
 
@@ -555,7 +587,7 @@ export default function EditBookingCampain() {
             maxDecDigits: 2,
           })
         : "",
-      totalAmount: "", // (auto tính lại bởi useEffect compute)
+      totalAmount: "", // auto compute
       attachments: [],
     });
 
@@ -696,6 +728,12 @@ export default function EditBookingCampain() {
   const watchUnitPriceRaw = Form.useWatch("unitPrice", form);
   const watchDiscountRaw = Form.useWatch("discountPercent", form);
 
+  // ✅ livestreamAddress watcher (fix rules-of-hooks lint)
+  const useWatch = Form.useWatch;
+  const watchLivestreamAddress = useWatch("livestreamAddress", form);
+  const livestreamAddrLen = String(watchLivestreamAddress || "").length;
+  const livestreamAddrAtLimit = livestreamAddrLen >= MAX_LIVESTREAM_ADDR_LEN;
+
   // soft validate (giảm lag)
   const validateTimerRef = useRef(null);
   const softValidateSumGuard = () => {
@@ -764,6 +802,7 @@ export default function EditBookingCampain() {
   }, [watchInstallments, watchTotalAmountRaw]);
 
   const disableSave =
+    isBusy ||
     sumState.sumMismatch ||
     (mode === "edit" &&
       (isLoadingCampaignBooking ||
@@ -771,6 +810,10 @@ export default function EditBookingCampain() {
         !targetBookingRecord));
 
   const onSubmit = async (values) => {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
+    setSubmitting(true);
+
     try {
       if (!values.campaignId) throw new Error("Thiếu campaignId");
 
@@ -810,7 +853,7 @@ export default function EditBookingCampain() {
       const discountPercent = parseDecimal(values.discountPercent);
       const totalAmount = parseAmount(values.totalAmount);
 
-      // ✅ bỏ “giá booking” khỏi UI -> dùng totalAmount làm contractAmount để BE vẫn nhận
+      // ✅ bỏ “giá booking” -> dùng totalAmount làm contractAmount
       const contractAmount =
         typeof totalAmount === "number" ? totalAmount : undefined;
 
@@ -818,10 +861,14 @@ export default function EditBookingCampain() {
         ? values.attachments
         : [];
 
+      const livestreamAddress = String(values.livestreamAddress || "").trim();
+
       if (mode === "create") {
         const bookingPayload = {
           campaignId: values.campaignId,
           description,
+
+          livestreamAddress: livestreamAddress || undefined,
 
           repeatType: REPEAT_NONE,
           dayOfWeek: undefined,
@@ -883,8 +930,9 @@ export default function EditBookingCampain() {
           }
         }
 
+        // ✅ NEW: tạo xong -> quay lại trang list yêu cầu
         message.success("Tạo yêu cầu chiến dịch thành công ");
-        refetchCampaignInfo?.();
+        navigate(BOOKING_CAMPAIGN_LIST_PATH, { replace: true });
         return;
       }
 
@@ -903,6 +951,8 @@ export default function EditBookingCampain() {
 
       await adminEditBookingRequest(bookingRequestId, {
         description,
+
+        livestreamAddress: livestreamAddress || undefined,
 
         repeatType: values.repeatType ?? REPEAT_NONE,
         dayOfWeek: values.dayOfWeek,
@@ -946,6 +996,9 @@ export default function EditBookingCampain() {
           (mode === "edit" ? "Cập nhật thất bại" : "Tạo thất bại"),
         icon: <XCircle size={18} className="text-red-500" />,
       });
+    } finally {
+      setSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -960,7 +1013,7 @@ export default function EditBookingCampain() {
 
     next = next.filter((f) => {
       const raw = f?.originFileObj || f;
-      const size = raw?.size || 0; // server file thường 0/undefined -> ok
+      const size = raw?.size || 0;
       return size <= MAX_ATTACH_SIZE;
     });
 
@@ -1008,6 +1061,7 @@ export default function EditBookingCampain() {
               type="default"
               onClick={() => navigate(-1)}
               icon={<ArrowLeft size={16} />}
+              disabled={isBusy}
             >
               Quay lại
             </Button>
@@ -1030,6 +1084,7 @@ export default function EditBookingCampain() {
               size="small"
               type="default"
               onClick={() => setCollapseCampaignInfo((v) => !v)}
+              disabled={isBusy}
               icon={
                 collapseCampaignInfo ? (
                   <ChevronDown size={16} />
@@ -1190,7 +1245,12 @@ export default function EditBookingCampain() {
             </Space>
           }
         >
-          <Form form={form} layout="vertical" onFinish={onSubmit}>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={onSubmit}
+            disabled={isBusy}
+          >
             {/* ✅ Ẩn Campaign ID nhưng vẫn submit */}
             <Form.Item
               name="campaignId"
@@ -1256,7 +1316,7 @@ export default function EditBookingCampain() {
 
               <Col xs={24} md={12}>
                 <Form.Item
-                  label="Lặp đến ngày"
+                  label="Thời điểm kết thúc"
                   name="repeatUntil"
                   rules={[
                     { required: true, message: "Bắt buộc" },
@@ -1282,6 +1342,39 @@ export default function EditBookingCampain() {
                     placeholder="Chọn ngày kết thúc lặp"
                     disabledDate={disabledRepeatUntilDate}
                     inputReadOnly
+                  />
+                </Form.Item>
+              </Col>
+
+              {/* ✅ Livestream address + warning dưới input khi đạt max */}
+              <Col xs={24}>
+                <Form.Item
+                  label="Địa chỉ livestream"
+                  name="livestreamAddress"
+                  validateStatus={livestreamAddrAtLimit ? "warning" : undefined}
+                  help={
+                    livestreamAddrAtLimit
+                      ? `Đã đạt tối đa ${MAX_LIVESTREAM_ADDR_LEN} ký tự.`
+                      : undefined
+                  }
+                  rules={[
+                    {
+                      validator: (_, v) => {
+                        if (!v) return Promise.resolve();
+                        if (String(v).length > MAX_LIVESTREAM_ADDR_LEN) {
+                          return Promise.reject(
+                            new Error(`Tối đa ${MAX_LIVESTREAM_ADDR_LEN} ký tự`)
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input.TextArea
+                    rows={2}
+                    maxLength={MAX_LIVESTREAM_ADDR_LEN}
+                    placeholder="Nhập địa chỉ livestream (không bắt buộc)"
                   />
                 </Form.Item>
               </Col>
@@ -1432,6 +1525,7 @@ export default function EditBookingCampain() {
                     <Upload
                       multiple
                       maxCount={MAX_ATTACH_FILES}
+                      disabled={isBusy}
                       beforeUpload={(file) => {
                         if (!isAllowedAttachFile(file)) {
                           message.error(
@@ -1468,7 +1562,9 @@ export default function EditBookingCampain() {
                         showPreviewIcon: true,
                       }}
                     >
-                      <Button icon={<Paperclip size={16} />}>Chọn tệp</Button>
+                      <Button icon={<Paperclip size={16} />} disabled={isBusy}>
+                        Chọn tệp
+                      </Button>
                     </Upload>
 
                     <div className="text-xs text-gray-500 mt-1">
@@ -1506,6 +1602,7 @@ export default function EditBookingCampain() {
                         .includes(input.toLowerCase())
                     }
                     tagRender={createTagRender(kolOptions)}
+                    disabled={isBusy}
                   />
                 </Form.Item>
               </Col>
@@ -1526,6 +1623,7 @@ export default function EditBookingCampain() {
                         .includes(input.toLowerCase())
                     }
                     tagRender={createTagRender(liveOptions)}
+                    disabled={isBusy}
                   />
                 </Form.Item>
               </Col>
@@ -1605,6 +1703,7 @@ export default function EditBookingCampain() {
                     <TotalInstallmentsStepper
                       min={1}
                       max={5}
+                      disabled={isBusy}
                       onStep={(n) => {
                         syncInstallmentsByCount(n);
                         softValidateSumGuard();
@@ -1759,12 +1858,16 @@ export default function EditBookingCampain() {
                 type="primary"
                 icon={<Save size={16} />}
                 disabled={disableSave}
+                loading={isBusy}
               >
                 {mode === "edit"
                   ? "Cập nhật yêu cầu chiến dịch"
                   : "Tạo yêu cầu chiến dịch"}
               </Button>
-              <Button onClick={() => navigate(-1)}>Hủy</Button>
+
+              <Button onClick={() => navigate(-1)} disabled={isBusy}>
+                Hủy
+              </Button>
             </div>
           </Form>
         </Card>

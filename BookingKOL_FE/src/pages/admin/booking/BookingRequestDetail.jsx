@@ -640,7 +640,7 @@ const BookingRequestDetail = () => {
         },
       },
       {
-        title: "Liên kết tệp",
+        title: "Tải xuống",
         key: "fileUrl",
         render: (_v, record) =>
           renderFilePreviewCell({

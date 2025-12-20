@@ -1278,6 +1278,16 @@ export default function BookingCampaignSchedule() {
                 ? record.lives
                 : [];
 
+              // ✅ NEW: địa điểm livestream (fallback nhiều key)
+              const livestreamAddress =
+                record?.livestreamAddress ??
+                record?.liveStreamAddress ??
+                record?.livestream_address ??
+                record?.live_address ??
+                record?.campaign?.livestreamAddress ??
+                record?.campaign?.liveStreamAddress ??
+                null;
+
               return (
                 <Card
                   key={record?.id ?? index}
@@ -1315,6 +1325,16 @@ export default function BookingCampaignSchedule() {
                     >
                       <Text style={{ whiteSpace: "pre-wrap" }}>
                         {record?.campaignObjective ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
+
+                    {/* ✅ NEW FIELD */}
+                    <Descriptions.Item
+                      label="Địa điểm livestream"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {livestreamAddress ?? "--"}
                       </Text>
                     </Descriptions.Item>
 
