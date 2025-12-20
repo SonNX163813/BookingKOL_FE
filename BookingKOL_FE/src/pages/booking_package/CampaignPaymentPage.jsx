@@ -19,12 +19,16 @@ import { BASE_URL } from "../../utils/config";
 
 const COUNTDOWN_DURATION_MS = 15 * 60 * 1000;
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+const formatCurrency = (value) => {
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 
 const formatCountdown = (remainingMs) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -39,8 +43,7 @@ const formatCountdown = (remainingMs) => {
 const ensureCountdownDeadline = (payment) => {
   if (!payment) return null;
 
-  const candidate =
-    payment.expiresAt ?? payment.localCountdownDeadline ?? null;
+  const candidate = payment.expiresAt ?? payment.localCountdownDeadline ?? null;
 
   if (candidate && dayjs(candidate).isValid()) {
     return payment;
@@ -254,9 +257,7 @@ const CampaignPaymentPage = () => {
     ? `Đợt ${installmentNumber}`
     : "Đợt thanh toán";
   const campaignId =
-    campaignInfo?.id ??
-    paymentInfo?.campaignId ??
-    bookingRequest?.campaignId;
+    campaignInfo?.id ?? paymentInfo?.campaignId ?? bookingRequest?.campaignId;
 
   const handleBackToDetail = () => {
     if (campaignId) {
@@ -369,18 +370,14 @@ const CampaignPaymentPage = () => {
                     <Typography color="text.secondary" variant="body2">
                       Chủ tài khoản
                     </Typography>
-                    <Typography fontWeight={600}>
-                      {paymentInfo.name}
-                    </Typography>
+                    <Typography fontWeight={600}>{paymentInfo.name}</Typography>
                   </Stack>
 
                   <Stack spacing={0.5}>
                     <Typography color="text.secondary" variant="body2">
                       Ngân hàng
                     </Typography>
-                    <Typography fontWeight={600}>
-                      {paymentInfo.bank}
-                    </Typography>
+                    <Typography fontWeight={600}>{paymentInfo.bank}</Typography>
                   </Stack>
 
                   <Stack spacing={0.5}>
@@ -430,25 +427,29 @@ const CampaignPaymentPage = () => {
                     sx={{ width: "100%", height: "100%", objectFit: "contain" }}
                   />
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                {/* <Typography variant="body2" color="text.secondary">
                   Mã sẽ hết hạn sau {countdownLabel}
-                </Typography>
+                </Typography> */}
               </Stack>
             </Stack>
           </Paper>
 
           <Alert severity="warning" sx={{ borderRadius: 3 }}>
-            <Typography fontWeight={600}>Lưu ý quan trọng</Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              - Không chỉnh sửa nội dung chuyển khoản.
-            </Typography>
-            <Typography variant="body2">
-              - Hệ thống tự động đối soát trong 1 - 5 phút kể từ khi thanh toán.
-            </Typography>
-            <Typography variant="body2">
-              - Nếu giao dịch thất bại hoặc nhập sai thông tin, vui lòng quay
-              lại chi tiết chiến dịch để nhận mã mới.
-            </Typography>
+            <Stack spacing={1}>
+              <Typography fontWeight={600}>Lưu ý khi thanh toán</Typography>
+              <Typography variant="body2">
+                - Nhập đúng <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển khoản để hệ
+                thống tự động kiểm tra trong vòng 1 - 5 phút.
+              </Typography>
+              <Typography variant="body2">
+                - Thông tin ở trên chỉ sử dụng <b>một lần duy nhất</b>. Nếu dùng
+                lại, hệ thống sẽ không xử lý.
+              </Typography>
+              <Typography variant="body2">
+                - Trang web <b>không hỗ trợ hoàn tiền</b> nếu nhập sai thông
+                tin. Vui lòng kiểm tra kỹ trước khi chuyển.
+              </Typography>
+            </Stack>
           </Alert>
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

@@ -33,6 +33,7 @@ import CreateBlog from "../pages/admin/blog/CreateBlog";
 import ManagementAllUser from "../pages/superAdmin/ManagementAllUser";
 import ManagementMerchant from "../pages/superAdmin/ManagementMerchant";
 import ManagementTransactions from "../pages/superAdmin/ManagementTransactions";
+import ManagementServicePackages from "../pages/superAdmin/service-packages/ManagementServicePackages";
 
 export const routerSuperAdmin = [
   { path: "/login", element: <LoginPage /> },
@@ -59,6 +60,7 @@ export const routerSuperAdmin = [
         path: "management-customer/:userId/bookings",
         element: <AdminUserBookingById />,
       },
+
       {
         path: "management-booking-requests",
         element: <ManagementBookingRequests />,
@@ -68,7 +70,10 @@ export const routerSuperAdmin = [
         path: "management-booking-requests/:requestId",
         element: <BookingRequestDetail />,
       },
-
+      {
+        path: "management-service-packages",
+        element: <ManagementServicePackages />,
+      },
       { path: "management-course", element: <ManagementCourse /> },
       { path: "edit-detail-course/:id", element: <ViewDetailCourse /> },
       { path: "management-category", element: <ManagementCategory /> },

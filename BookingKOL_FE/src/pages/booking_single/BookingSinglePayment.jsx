@@ -23,10 +23,8 @@ const THOI_GIAN_DEM_NGUOC = 15 * 60 * 1000; // 15 phút = 900.000 ms
 
 const dinhDangTien = (value) =>
   new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
     maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+  }).format(Number(value) || 0) + " VND";
 
 const dinhDangThoiGianDemNguoc = (remainingMs) => {
   const tongGiay = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -264,7 +262,7 @@ const BookingSinglePayment = () => {
   if (!thongTinThanhToan) return null;
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 4, md: 6 } }}>
+    <Container maxWidth={false} sx={{ py: { xs: 4, md: 6 }, maxWidth: 1000 }}>
       <Stack spacing={4}>
         {/* --- Tiêu đề và đồng hồ đếm ngược --- */}
         <Stack spacing={1} alignItems="center">

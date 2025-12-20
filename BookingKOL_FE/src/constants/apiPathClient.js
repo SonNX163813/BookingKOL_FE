@@ -7,6 +7,7 @@ export const CLIENT_API_PATHS = {
     kol: "/v1/public/contact/kol",
   },
   KOL: {
+    suggestion: "/v1/kol-profiles/suggestion",
     getAllAvailable: "/v1/kol-profiles/all-available",
     getDetailByKolId: "/v1/kol-profiles/kol-id",
     getDetailByUserId: "/v1/kol-profiles/user-id",
@@ -95,6 +96,10 @@ export const CLIENT_API_PATHS = {
       `/v1/payment/check/campaign/${encodeURIComponent(
         contractPaymentScheduleId
       )}`,
+    getUserBookingStatus: (bookingRequestId) =>
+      `/v1/user/bookings/status/${encodeURIComponent(bookingRequestId)}`,
+    completeWorkTime: (workTimeId) =>
+      `/v1/user/bookings/complete/${encodeURIComponent(workTimeId)}`,
   },
   COURSE: {
     getAll: "/v1/courses/all",

@@ -16,4 +16,9 @@ export const API_PATHS_SUPERADMIN = {
     getAll: "/v1/superadmin/transactions/all",
     getDetail: "/v1/superadmin/transactions/detail",
   },
+  SERVICE_PACKAGE: {
+    getAll: "v1/service-packages/all",
+    update: (packageId) =>
+      `v1/service-packages/update/${encodeURIComponent(packageId)}`,
+  },
 };

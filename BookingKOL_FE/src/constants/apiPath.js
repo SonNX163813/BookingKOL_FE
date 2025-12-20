@@ -42,6 +42,8 @@ export const API_PATHS = {
     list: "/v1/admin/bookings", // nếu Swagger của bạn KHÔNG có /v1 thì đổi thành "/admin/bookings"
     create: "/v1/admin/bookings/create",
     detail: "/v1/admin/bookings/admin", // + /{campaignId}
+    edit: (bookingRequestId) =>
+      `/v1/admin/bookings/edit/${encodeURIComponent(bookingRequestId)}`,
   },
   CAMPAIGN: {
     detail: "/v1/campaigns", // + /{campaignId}
@@ -63,6 +65,7 @@ export const API_PATHS = {
     getDetailByWorkTime: (workTimeId) =>
       `/v1/requests/booking/detail/${encodeURIComponent(workTimeId)}`,
     updateStatus: "/v1/admin/booking/single-requests/update-status",
+    create: "/v1/admin/booking/single-requests/create",
   },
 
   CONTRACT_PAYMENT: {
@@ -75,11 +78,17 @@ export const API_PATHS = {
     kolTimeline: "/v1/availabilities/time-line/kol", // + /{kolId}
     kolTimelineAll: "/v1/availabilities/time-line/kol/all", // list lịch rảnh của tất cả KOL (do dev đặt tên sai)
     adminSchedule: "/v1/availabilities/admin/schedule",
+    adminAddAvailability: "/v1/availabilities/admin/add",
   },
   WORKTIME_ADMIN: {
     create: "/v1/availabilities/admin/worktime/create",
-
+    scheduledCreate: "/v1/availabilities/admin/scheduled-worktime/create",
     getByBooking: "/v1/availabilities/admin/booking", // + /{bookingRequestId}
+    getScheduledByBooking:
+      "/v1/availabilities/admin/scheduled-worktime/booking",
+    scheduledAssign: "/v1/availabilities/admin/scheduled-worktime/assign",
+    scheduledEdit: "/v1/availabilities/admin/scheduled-worktime/edit",
+    scheduledDelete: "/v1/availabilities/admin/scheduled-worktime",
   },
   REFUND: {
     getAll: "/v1/admin/refunds/all",
@@ -103,6 +112,7 @@ export const API_PATHS = {
 
   DASHBOARD: {
     adminSummary: "/v1/admin/dashboard/summary",
+    kolSummary: "/v1/kol/dashboard/summary",
   },
   FEEDBACK_ADMIN: {
     // GET /v1/admin/feedbacks/kol/{kolId}?page=&size=&minRating=&fromDate=&toDate=

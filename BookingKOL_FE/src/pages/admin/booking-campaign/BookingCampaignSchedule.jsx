@@ -1,15 +1,12 @@
 // src/pages/admin/booking-campaign/BookingCampaignSchedule.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
   Button,
   Card,
   DatePicker,
-  TimePicker,
-  Form,
-  Input,
   Row,
   Col,
   Select,
@@ -19,41 +16,180 @@ import {
   message,
   ConfigProvider,
   Alert,
+  Tag,
+  Modal,
+  Form,
+  TimePicker,
+  Input,
+  Tooltip,
+  Descriptions,
+  Empty,
+  Grid,
+  Popconfirm,
 } from "antd";
 import viVN from "antd/locale/vi_VN";
-import { CalendarRange, Plus } from "lucide-react";
+import {
+  CalendarRange,
+  Plus,
+  Pencil,
+  Save,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+  FileText,
+  Trash2,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   adminGetWorktimesByBooking,
   adminCreateWorktime,
   adminSearchFreeSlots,
+  adminEditScheduledWorktime, // dùng API edit mới
+  adminDeleteScheduledWorktime, // ✅ thêm API xóa (đổi tên nếu dự án bạn khác)
 } from "../../../services/admin/AdminWorktimeCampaignAPI";
 import { adminGetCampaignBookingDetail } from "../../../services/admin/AdminBookingCampaignAPI";
+import {
+  BOOKING_STATUS_LABEL,
+  STATUS_TAG_COLOR,
+} from "../../../constants/mySingleBookingStatuses";
 
 dayjs.locale("vi");
-const { RangePicker } = DatePicker;
-const { RangePicker: TimeRangePicker } = TimePicker;
 const { Text } = Typography;
+const { RangePicker: TimeRangePicker } = TimePicker;
+const { useBreakpoint } = Grid;
 
-/**
- * BookingCampaignSchedule
- *
- * - BookingRequestId:
- *   + Ưu tiên lấy từ location.state.bookingRequestId (navigate từ màn khác).
- *   + Nếu không có, gọi /admin/bookings/admin/{campaignId} để lấy bookingRequests[0].id.
- *
- * - Flow tạo lịch:
- *   1) Chọn "Khoảng thời gian muốn tìm lịch rảnh" (searchRange).
- *   2) Bấm "Tìm KOL / trợ live rảnh" -> gọi adminSearchFreeSlots(startDate, endDate).
- *   3) Chọn 1 slot rảnh -> set selectedSlot (kolId, kolName, startAt, endAt, availabilityId).
- *   4) Chọn ngày + khoảng giờ cụ thể (workDate + timeRange) -> submit -> adminCreateWorktime.
+/** ===== Helpers ===== */
+const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
+  if (!value) return "--";
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format(pattern) : String(value);
+};
+
+const formatDate = (value, pattern = "DD/MM/YYYY") => {
+  if (!value) return "--";
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format(pattern) : String(value);
+};
+
+const formatCurrency = (value, currency = "VND") => {
+  if (value === null || value === undefined || value === "") return "--";
+  const numeric = typeof value === "number" ? value : Number.parseFloat(value);
+  if (Number.isNaN(numeric)) return "--";
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(numeric) + " VND"
+  );
+};
+
+const normalizeUpper = (val) =>
+  val && typeof val === "string" ? val.toUpperCase() : val;
+
+const formatArrayText = (items) => {
+  if (!Array.isArray(items) || !items.length)
+    return "Không có KOL nào được chọn";
+  return items
+    .map((x) => x?.displayName || x?.name || x?.id)
+    .filter(Boolean)
+    .join(", ");
+};
+
+/** ===== Repeat type label ===== */
+const REPEAT_TYPE_LABEL = {
+  WEEKLY: "Hàng tuần",
+  DAILY: "Hàng ngày",
+  MONTHLY: "Hàng tháng",
+  ONCE: "Một lần",
+  NONE: "Không lặp",
+};
+const formatRepeatType = (value) => {
+  if (value === null || value === undefined || value === "") return "--";
+  const raw = String(value).trim();
+  const upper = normalizeUpper(raw);
+  return REPEAT_TYPE_LABEL[upper] ?? raw;
+};
+
+// mapping nhỏ cho status campaign
+const CAMPAIGN_STATUS_LABEL = {
+  REQUESTED: "Đang yêu cầu",
+  NEGOTIATING: "Đang thương lượng",
+  ACCEPTED: "Đã chấp nhận",
+  REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  IN_PROGRESS: "Đang triển khai",
+  COMPLETED: "Hoàn tất",
+};
+
+const CAMPAIGN_STATUS_COLOR = {
+  REQUESTED: "gold",
+  NEGOTIATING: "purple",
+  ACCEPTED: "green",
+  REJECTED: "red",
+  CANCELLED: "default",
+  IN_PROGRESS: "geekblue",
+  COMPLETED: "blue",
+};
+
+/** Label + Color cho trạng thái hợp đồng */
+const CONTRACT_STATUS_LABEL = {
+  REQUESTED: "Đang yêu cầu",
+  NEGOTIATING: "Đang thương lượng",
+  ACCEPTED: "Đã chấp nhận",
+  REJECTED: "Đã từ chối",
+  CANCELLED: "Đã hủy",
+  IN_PROGRESS: "Đang thực hiện",
+  COMPLETED: "Hoàn tất",
+};
+
+const getStatusColor = (status) => {
+  if (!status) return "default";
+  return STATUS_TAG_COLOR[status] ?? CAMPAIGN_STATUS_COLOR[status] ?? "default";
+};
+
+/** ===== Worktime status ===== */
+const WORKTIME_STATUS_LABEL = {
+  AVAILABLE: "Sẵn sàng",
+  ASSIGNED: "Đã gán",
+  IN_PROGRESS: "Đang thực hiện",
+  DELIVERED: "Đã giao",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  PENDING_ASSIGNMENT: "Chưa có KOL",
+};
+
+const WORKTIME_STATUS_COLOR = {
+  AVAILABLE: "processing",
+  ASSIGNED: "blue",
+  IN_PROGRESS: "processing",
+  DELIVERED: "gold",
+  COMPLETED: "success",
+  CANCELLED: "error",
+  PENDING_ASSIGNMENT: "default",
+};
+
+/** ===== Worktime role (kolRole) =====
+ *  KOL = Host chính
+ *  LIVE = Trợ live
  */
+const WORKTIME_ROLE_LABEL = {
+  KOL: "Host chính",
+  LIVE: "Trợ live",
+};
+
+const WORKTIME_ROLE_COLOR = {
+  KOL: "geekblue",
+  LIVE: "purple",
+};
+
 export default function BookingCampaignSchedule() {
   const { campaignId: campaignIdParam } = useParams();
   const location = useLocation();
-  const [form] = Form.useForm();
+  const navigate = useNavigate();
+  const screens = useBreakpoint();
 
-  // Nếu màn trước truyền bookingRequestId & campaignName qua state
   const prefilledBookingRequestId = location.state?.bookingRequestId || "";
   const prefilledCampaignName = location.state?.campaignName || "";
 
@@ -61,37 +197,184 @@ export default function BookingCampaignSchedule() {
     prefilledBookingRequestId
   );
 
-  // Danh sách slot rảnh & slot đang chọn
-  const [freeSlots, setFreeSlots] = useState([]);
-  const [loadingFreeSlots, setLoadingFreeSlots] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const [freeSlotKolFilter, setFreeSlotKolFilter] = useState(undefined);
-
-  // Bộ lọc cho "Lịch đăng ký của KOL / trợ live"
-  // 👉 mặc định: xem theo THÁNG hiện tại
-  const [worktimeFilterMode, setWorktimeFilterMode] = useState("month"); // all | day | week | month
+  // Filter table
+  const [worktimeFilterMode, setWorktimeFilterMode] = useState("month");
   const [worktimeFilterDate, setWorktimeFilterDate] = useState(dayjs());
 
-  // ===== disabledDate cho khoảng thời gian tìm lịch rảnh: chỉ từ hôm nay trở đi =====
-  const disabledSearchDate = (current) => {
-    if (!current) return false;
-    return current < dayjs().startOf("day");
+  // Inline edit
+  const [editForm] = Form.useForm();
+  const [editingKey, setEditingKey] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [localOverrides, setLocalOverrides] = useState({});
+
+  // ✅ auto-open dropdown KOL (edit)
+  const [editKolDropdownOpen, setEditKolDropdownOpen] = useState(false);
+
+  // Create modal
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createForm] = Form.useForm();
+
+  // Create: KOL options
+  const [kolOptions, setKolOptions] = useState([]);
+  const [kolLoading, setKolLoading] = useState(false);
+  const [slotByKolId, setSlotByKolId] = useState({});
+
+  // Edit: KOL options
+  const [editKolOptions, setEditKolOptions] = useState([]);
+  const [editKolLoading, setEditKolLoading] = useState(false);
+  const [editSlotByKolId, setEditSlotByKolId] = useState({});
+
+  // ✅ Thu gọn / mở rộng phần “Thông tin Booking Campaign”
+  const [campaignInfoCollapsed, setCampaignInfoCollapsed] = useState(false);
+
+  // ✅ loading khi xóa
+  const [deletingId, setDeletingId] = useState(null);
+
+  // ISO without milliseconds
+  const toIsoNoMs = (d) =>
+    dayjs(d)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, "Z");
+
+  const getRowKey = (r) =>
+    r?.scheduledWorkTimeId ||
+    r?.kolWorkTimeId ||
+    r?.id ||
+    `${r?.startAt}_${r?.endAt}`;
+
+  const getScheduledId = (r) =>
+    r?.scheduledWorkTimeId || r?.id || r?.kolWorkTimeId || null;
+
+  const isEditing = (record) => getRowKey(record) === editingKey;
+
+  const normalizeList = (resp) => {
+    if (!resp) return [];
+    const candidates = [
+      resp?.content,
+      resp?.data?.content,
+      resp?.data,
+      resp?.result,
+      resp,
+    ];
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c;
+      if (Array.isArray(c?.content)) return c.content;
+      if (Array.isArray(c?.data)) return c.data;
+    }
+    return [];
   };
 
-  // ===== LẤY BOOKING DETAIL THEO campaignId ĐỂ SUY RA bookingRequestId (NẾU CHƯA CÓ SẴN) =====
+  // ✅ disabledTime: chỉ cho chọn trong khoảng 1–3 giờ
+  const makeDisabledTimeMax3Hours = (form, fieldName = "timeRange") => {
+    return (_date, type) => {
+      const range = form.getFieldValue(fieldName) || [];
+      const start = Array.isArray(range) ? range[0] : null;
+      const end = Array.isArray(range) ? range[1] : null;
+
+      const startHour = start ? dayjs(start).hour() : null;
+      const endHour = end ? dayjs(end).hour() : null;
+
+      let minHour = 0;
+      let maxHour = 23;
+
+      if (type === "start") {
+        if (endHour != null) {
+          minHour = Math.max(0, endHour - 3);
+          maxHour = Math.max(minHour, endHour - 1);
+        } else {
+          minHour = 0;
+          maxHour = 22;
+        }
+      } else {
+        if (startHour != null) {
+          minHour = Math.min(23, startHour + 1);
+          maxHour = Math.min(23, startHour + 3);
+        } else {
+          minHour = 1;
+          maxHour = 23;
+        }
+      }
+
+      const disabledHours = () => {
+        const res = [];
+        for (let h = 0; h < 24; h++) {
+          if (h < minHour || h > maxHour) res.push(h);
+        }
+        return res;
+      };
+
+      const disabledMinutes = () => {
+        const res = [];
+        for (let m = 0; m < 60; m++) if (m !== 0) res.push(m);
+        return res;
+      };
+
+      return { disabledHours, disabledMinutes };
+    };
+  };
+
+  // ✅ VALIDATOR: để lỗi hiện dưới ô TimeRange
+  const makeTimeRangeValidator = (form) => async (_rule, range) => {
+    const workDate = form.getFieldValue("workDate");
+
+    if (!workDate) return Promise.resolve();
+    if (!Array.isArray(range) || range.length !== 2) return Promise.resolve();
+
+    const [startTime, endTime] = range;
+    if (!startTime || !endTime) return Promise.resolve();
+
+    const base = dayjs(workDate).startOf("day");
+    const startAt = base
+      .hour(dayjs(startTime).hour())
+      .minute(0)
+      .second(0)
+      .millisecond(0);
+
+    const endAt = base
+      .hour(dayjs(endTime).hour())
+      .minute(0)
+      .second(0)
+      .millisecond(0);
+
+    if (!endAt.isAfter(startAt)) {
+      return Promise.reject(
+        new Error("Giờ kết thúc phải lớn hơn giờ bắt đầu.")
+      );
+    }
+
+    const diff = endAt.diff(startAt, "minute");
+    if (diff < 60)
+      return Promise.reject(new Error("Lịch làm việc phải tối thiểu 1 giờ."));
+    if (diff > 180)
+      return Promise.reject(new Error("Lịch làm việc phải tối đa 3 giờ."));
+
+    return Promise.resolve();
+  };
+
+  /** ===== Booking detail ===== */
   const {
     data: bookingDetailResp,
     isLoading: loadingBookingDetail,
+    isFetching: fetchingBookingDetail,
     error: errorBookingDetail,
+    refetch: refetchBookingDetail,
   } = useQuery({
     queryKey: ["admin-campaign-booking-detail", campaignIdParam],
     queryFn: () => adminGetCampaignBookingDetail(campaignIdParam),
-    enabled: !!campaignIdParam && !prefilledBookingRequestId,
+    enabled: !!campaignIdParam,
     retry: false,
     refetchOnWindowFocus: false,
   });
 
   const bookingDetail = bookingDetailResp?.data ?? bookingDetailResp ?? null;
+
+  const campaignDisplayName =
+    prefilledCampaignName ||
+    bookingDetail?.campaignName ||
+    bookingDetail?.name ||
+    bookingDetail?.title ||
+    "";
 
   const bookingRequestsFromCampaign = useMemo(
     () =>
@@ -101,32 +384,27 @@ export default function BookingCampaignSchedule() {
     [bookingDetail?.bookingRequests]
   );
 
-  // Auto-fill bookingRequestId nếu chưa có mà API detail trả về bookingRequests
+  // ===== suy ra bookingRequestId nếu chưa có =====
   useEffect(() => {
     if (prefilledBookingRequestId) return;
-
     if (!bookingRequestId && bookingRequestsFromCampaign.length > 0) {
       const first = bookingRequestsFromCampaign[0];
-      if (first?.id) {
-        const id = String(first.id);
-        setBookingRequestId(id);
-        form.setFieldsValue({ bookingRequestId: id });
-      }
+      if (first?.id) setBookingRequestId(String(first.id));
     }
   }, [
     prefilledBookingRequestId,
     bookingRequestId,
     bookingRequestsFromCampaign,
-    form,
   ]);
 
-  // ===== Load worktimes by bookingRequestId =====
+  // ===== Worktimes by bookingRequestId =====
   const {
     data: worktimeResp,
     isFetching: loadingWorktimes,
     refetch: refetchWorktimes,
+    error: errorWorktimes,
   } = useQuery({
-    queryKey: ["admin-worktimes-by-booking", bookingRequestId],
+    queryKey: ["admin-scheduled-worktimes-by-booking", bookingRequestId],
     queryFn: async () => {
       if (!bookingRequestId) return null;
       return adminGetWorktimesByBooking(bookingRequestId);
@@ -136,18 +414,23 @@ export default function BookingCampaignSchedule() {
     refetchOnWindowFocus: false,
   });
 
-  const worktimeList = useMemo(() => {
-    if (!worktimeResp) return [];
-    const content = worktimeResp?.content ?? [];
-    return Array.isArray(content) ? content : [];
-  }, [worktimeResp]);
+  const worktimeListRaw = useMemo(
+    () => normalizeList(worktimeResp),
+    [worktimeResp]
+  );
 
-  // Áp dụng filter theo ngày / tuần / tháng cho lịch đăng ký
+  const worktimeList = useMemo(() => {
+    return (worktimeListRaw || []).map((r) => {
+      const k = getRowKey(r);
+      const ov = localOverrides?.[k];
+      return ov ? { ...r, ...ov } : r;
+    });
+  }, [worktimeListRaw, localOverrides]);
+
   const visibleWorktimes = useMemo(() => {
     if (!worktimeList || worktimeList.length === 0) return [];
-    if (worktimeFilterMode === "all" || !worktimeFilterDate) {
+    if (worktimeFilterMode === "all" || !worktimeFilterDate)
       return worktimeList;
-    }
 
     const ref = worktimeFilterDate;
 
@@ -156,18 +439,13 @@ export default function BookingCampaignSchedule() {
       const start = dayjs(w.startAt);
       if (!start.isValid()) return false;
 
-      if (worktimeFilterMode === "day") {
-        // theo NGÀY: so sánh cùng ngày
-        return start.isSame(ref, "day");
-      }
+      if (worktimeFilterMode === "day") return start.isSame(ref, "day");
 
       if (worktimeFilterMode === "week") {
-        // theo TUẦN: tuần chứa ngày ref (Chủ Nhật -> Thứ Bảy)
         const refDayStart = ref.startOf("day");
-        const dow = refDayStart.day(); // 0 (CN) - 6 (Th7)
+        const dow = refDayStart.day();
         const weekStart = refDayStart.subtract(dow, "day");
         const weekEnd = weekStart.add(7, "day");
-
         return (
           (start.isSame(weekStart) || start.isAfter(weekStart)) &&
           start.isBefore(weekEnd)
@@ -175,7 +453,6 @@ export default function BookingCampaignSchedule() {
       }
 
       if (worktimeFilterMode === "month") {
-        // theo THÁNG: cùng tháng/năm
         return start.year() === ref.year() && start.month() === ref.month();
       }
 
@@ -183,302 +460,721 @@ export default function BookingCampaignSchedule() {
     });
   }, [worktimeList, worktimeFilterMode, worktimeFilterDate]);
 
-  // ===== OPTION KOL / TRỢ LIVE TỪ DANH SÁCH SLOT RẢNH =====
-  const freeSlotKolOptions = useMemo(() => {
-    const map = new Map();
-    freeSlots.forEach((slot) => {
-      if (slot.kolId) {
-        const key = String(slot.kolId);
-        if (!map.has(key)) {
-          map.set(key, slot.kolName || key);
-        }
-      }
-    });
-    return Array.from(map.entries()).map(([value, label]) => ({
-      value,
-      label,
-    }));
-  }, [freeSlots]);
+  // ===== build start/end from date + timeRange =====
+  const buildStartEndFromDateAndRange = (workDate, timeRange) => {
+    if (!workDate) throw new Error("Vui lòng chọn ngày thực hiện.");
+    if (!Array.isArray(timeRange) || timeRange.length !== 2)
+      throw new Error("Vui lòng chọn khoảng giờ.");
 
-  // Dữ liệu hiển thị cho bảng slot rảnh: có filter theo KOL
-  const filteredFreeSlots = useMemo(() => {
-    if (!freeSlotKolFilter) return freeSlots;
-    return freeSlots.filter(
-      (slot) => String(slot.kolId) === String(freeSlotKolFilter)
-    );
-  }, [freeSlots, freeSlotKolFilter]);
+    const [startTime, endTime] = timeRange;
+    if (!startTime || !endTime) throw new Error("Vui lòng chọn đủ giờ.");
 
-  // ===== TÌM LỊCH RẢNH DỰA TRÊN searchRange (dùng startDate/endDate) =====
-  const handleSearchFreeSlots = async () => {
-    try {
-      const range = form.getFieldValue("searchRange");
-      if (!Array.isArray(range) || range.length !== 2) {
-        message.warning("Vui lòng chọn khoảng thời gian muốn tìm lịch rảnh.");
-        return;
-      }
+    const base = dayjs(workDate).startOf("day");
+    const startAt = base
+      .hour(dayjs(startTime).hour())
+      .minute(0)
+      .second(0)
+      .millisecond(0);
 
-      const [start, end] = range;
+    const endAt = base
+      .hour(dayjs(endTime).hour())
+      .minute(0)
+      .second(0)
+      .millisecond(0);
 
-      // swagger: startDate, endDate (date-time)
-      const startDateIso = dayjs(start).toISOString();
-      const endDateIso = dayjs(end).toISOString();
+    if (!endAt.isAfter(startAt)) throw new Error("Giờ kết thúc > giờ bắt đầu.");
 
-      setLoadingFreeSlots(true);
+    const diff = endAt.diff(startAt, "minute");
+    if (diff < 60) throw new Error("Lịch làm việc phải tối thiểu 1 giờ.");
+    if (diff > 180) throw new Error("Lịch làm việc phải tối đa 3 giờ.");
 
-      // 1) Gọi API lấy slot rảnh
-      const list = await adminSearchFreeSlots({
-        startDate: startDateIso,
-        endDate: endDateIso,
-        page: 0,
-        size: 100,
-      });
-
-      const qStart = dayjs(startDateIso);
-      const qEnd = dayjs(endDateIso);
-
-      // 2) FE lọc lại: status AVAILABLE + có giao với khoảng đang tìm
-      const filtered = (list || []).filter((slot) => {
-        const status = String(slot.status || "").toUpperCase();
-        if (status !== "AVAILABLE") return false;
-
-        if (!slot.startAt || !slot.endAt) return false;
-
-        const s = dayjs(slot.startAt);
-        const e = dayjs(slot.endAt);
-        if (!s.isValid() || !e.isValid()) return false;
-
-        // Có giao nhau với [qStart, qEnd]
-        const overlap = s.isBefore(qEnd) && e.isAfter(qStart);
-        return overlap;
-      });
-
-      setFreeSlots(filtered);
-      setSelectedSlot(null);
-      setFreeSlotKolFilter(undefined);
-
-      form.setFieldsValue({
-        kolDisplay: undefined,
-        kolId: undefined,
-        availabilityId: undefined,
-        timeRange: undefined,
-        workDate: undefined,
-        freeSlotKolId: undefined,
-      });
-    } catch (e) {
-      console.error("Search free slots failed:", e);
-      const beMsg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "Không tìm được lịch rảnh, vui lòng thử lại.";
-      message.error(beMsg);
-    } finally {
-      setLoadingFreeSlots(false);
-    }
+    return { startAt, endAt };
   };
 
-  // ===== SUBMIT TẠO WORKTIME =====
-  const handleCreateWorktime = async (values) => {
-    try {
-      const id =
-        bookingRequestId ||
-        prefilledBookingRequestId ||
-        values.bookingRequestId?.trim();
+  // ===== fetch KOL free slots cover range =====
+  const fetchAvailableKolsFor = async ({
+    workDate,
+    timeRange,
+    signal,
+    size = 500,
+  }) => {
+    const { startAt, endAt } = buildStartEndFromDateAndRange(
+      workDate,
+      timeRange
+    );
 
-      if (!id) {
-        message.warning(
-          "Booking Request ID chưa được xác định. Vui lòng quay lại trang trước hoặc đảm bảo campaign đã có booking."
-        );
-        return;
-      }
+    const dayStart = dayjs(workDate).startOf("day");
+    const dayEnd = dayjs(workDate).endOf("day");
 
-      if (!selectedSlot) {
-        message.warning("Vui lòng chọn một slot rảnh trước khi tạo lịch.");
-        return;
-      }
+    const list = await adminSearchFreeSlots({
+      startDate: toIsoNoMs(dayStart),
+      endDate: toIsoNoMs(dayEnd),
+      page: 0,
+      size,
+      signal,
+    });
 
-      const workDate = values.workDate;
-      const timeRange = values.timeRange;
+    const map = {};
+    for (const slot of list || []) {
+      const st = normalizeUpper(slot?.status);
+      if (st !== "AVAILABLE") continue;
 
-      if (!workDate) {
-        message.warning("Vui lòng chọn ngày làm việc.");
-        return;
-      }
+      const s = slot?.startAt ? dayjs(slot.startAt) : null;
+      const e = slot?.endAt ? dayjs(slot.endAt) : null;
+      if (!s?.isValid() || !e?.isValid()) continue;
 
-      if (!Array.isArray(timeRange) || timeRange.length !== 2) {
-        message.warning("Vui lòng chọn khoảng giờ làm việc.");
-        return;
-      }
+      const covers =
+        (s.isSame(startAt) || s.isBefore(startAt)) &&
+        (e.isSame(endAt) || e.isAfter(endAt));
+      if (!covers) continue;
 
-      const [startTime, endTime] = timeRange;
-      if (!startTime || !endTime) {
-        message.warning("Vui lòng chọn đủ giờ bắt đầu và giờ kết thúc.");
-        return;
-      }
+      const kolId = slot?.kolId ? String(slot.kolId) : null;
+      if (!kolId) continue;
 
-      // Combine ngày + giờ, phút luôn = 00
-      const baseDate = dayjs(workDate).startOf("day");
-      const startAt = baseDate
-        .hour(startTime.hour())
-        .minute(0)
-        .second(0)
-        .millisecond(0);
+      if (!map[kolId]) map[kolId] = slot;
+    }
 
-      const endAt = baseDate
-        .hour(endTime.hour())
-        .minute(0)
-        .second(0)
-        .millisecond(0);
+    const options = Object.entries(map)
+      .map(([kolId, slot]) => ({
+        value: kolId,
+        label: slot?.kolName || "KOL",
+      }))
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)));
 
-      if (!endAt.isAfter(startAt)) {
-        message.error("Giờ kết thúc phải lớn hơn giờ bắt đầu.");
-        return;
-      }
+    return { options, slotMap: map };
+  };
 
-      const diffMinutes = endAt.diff(startAt, "minute");
-      if (diffMinutes < 60) {
-        message.error("Một lần tạo lịch tối thiểu là 1 giờ.");
-        return;
-      }
-      if (diffMinutes > 180) {
-        message.error("Một lần tạo lịch tối đa là 3 giờ.");
-        return;
-      }
+  // ===== Inline edit handlers =====
+  const startEdit = (record) => {
+    const key = getRowKey(record);
 
-      const slotStart = dayjs(selectedSlot.startAt);
-      const slotEnd = dayjs(selectedSlot.endAt);
+    const currentKolId = record?.kolId ? String(record.kolId) : null;
+    const currentKolLabel =
+      record?.kolName ||
+      record?.kol?.fullName ||
+      record?.kol?.name ||
+      (currentKolId ? "KOL tham gia" : "");
 
-      if (startAt.isBefore(slotStart) || endAt.isAfter(slotEnd)) {
+    setEditKolOptions(
+      currentKolId
+        ? [{ value: currentKolId, label: currentKolLabel || "KOL tham gia" }]
+        : []
+    );
+    setEditSlotByKolId({});
+
+    setEditingRecord(record);
+    setEditingKey(key);
+
+    const s = record?.startAt ? dayjs(record.startAt) : null;
+    const e = record?.endAt ? dayjs(record.endAt) : null;
+
+    editForm.setFieldsValue({
+      workDate: s?.isValid() ? s : dayjs(),
+      timeRange: s?.isValid() && e?.isValid() ? [s, e] : undefined,
+      note: record?.note ?? null,
+      kolId: currentKolId || undefined,
+    });
+
+    setEditKolDropdownOpen(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingKey(null);
+    setEditingRecord(null);
+    editForm.resetFields();
+    setEditKolOptions([]);
+    setEditSlotByKolId({});
+    setEditKolDropdownOpen(false);
+  };
+
+  const watchedEditWorkDate = Form.useWatch("workDate", editForm);
+  const watchedEditTimeRange = Form.useWatch("timeRange", editForm);
+
+  useEffect(() => {
+    if (!editingKey) return;
+
+    if (
+      !watchedEditWorkDate ||
+      !Array.isArray(watchedEditTimeRange) ||
+      watchedEditTimeRange.length !== 2 ||
+      !watchedEditTimeRange[0] ||
+      !watchedEditTimeRange[1]
+    ) {
+      setEditSlotByKolId({});
+      setEditKolOptions([]);
+      setEditKolDropdownOpen(false);
+      return;
+    }
+
+    let canceled = false;
+    const controller = new AbortController();
+
+    const timer = setTimeout(async () => {
+      try {
+        setEditKolLoading(true);
+        setEditKolDropdownOpen(true);
+
+        const { options, slotMap } = await fetchAvailableKolsFor({
+          workDate: watchedEditWorkDate,
+          timeRange: watchedEditTimeRange,
+          signal: controller.signal,
+          size: 500,
+        });
+
+        if (canceled) return;
+
+        const currentKolIdRaw = editForm.getFieldValue("kolId");
+        const currentKolId =
+          currentKolIdRaw != null && currentKolIdRaw !== ""
+            ? String(currentKolIdRaw)
+            : editingRecord?.kolId
+            ? String(editingRecord.kolId)
+            : null;
+
+        let rangeChanged = true;
+        try {
+          const { startAt, endAt } = buildStartEndFromDateAndRange(
+            watchedEditWorkDate,
+            watchedEditTimeRange
+          );
+          const newStartIso = toIsoNoMs(startAt);
+          const newEndIso = toIsoNoMs(endAt);
+
+          const oldStartIso = editingRecord?.startAt
+            ? toIsoNoMs(dayjs(editingRecord.startAt))
+            : null;
+          const oldEndIso = editingRecord?.endAt
+            ? toIsoNoMs(dayjs(editingRecord.endAt))
+            : null;
+
+          if (oldStartIso && oldEndIso) {
+            rangeChanged =
+              newStartIso !== oldStartIso || newEndIso !== oldEndIso;
+          }
+        } catch (_err) {
+          rangeChanged = true;
+        }
+
+        setEditSlotByKolId(slotMap);
+
+        if (rangeChanged) {
+          setEditKolOptions(options);
+
+          if (
+            (currentKolId && !slotMap?.[currentKolId]) ||
+            (options?.length || 0) === 0
+          ) {
+            editForm.setFieldsValue({ kolId: undefined });
+          }
+
+          setEditKolDropdownOpen(true);
+        } else {
+          const currentKolLabel =
+            editingRecord?.kolName ||
+            editingRecord?.kol?.fullName ||
+            editingRecord?.kol?.name ||
+            (currentKolId ? "KOL đã gán" : "");
+
+          const finalOptions = [...options];
+          if (
+            currentKolId &&
+            !finalOptions.some((o) => String(o.value) === currentKolId)
+          ) {
+            finalOptions.unshift({
+              value: currentKolId,
+              label: currentKolLabel || "KOL đã gán",
+            });
+          }
+
+          setEditKolOptions(finalOptions);
+          setEditKolDropdownOpen(true);
+        }
+      } catch (e) {
+        if (canceled) return;
         message.error(
-          "Khoảng thời gian tạo lịch phải nằm trong khoảng rảnh đã chọn."
+          e?.message || "Không tải được danh sách KOL rảnh (edit)."
         );
+        setEditSlotByKolId({});
+        setEditKolOptions([]);
+        setEditKolDropdownOpen(false);
+      } finally {
+        if (!canceled) setEditKolLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      canceled = true;
+      controller.abort();
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingKey, watchedEditWorkDate, watchedEditTimeRange]);
+
+  const saveEdit = async (record) => {
+    try {
+      const key = getRowKey(record);
+      const values = await editForm.validateFields();
+
+      const { startAt, endAt } = buildStartEndFromDateAndRange(
+        values.workDate,
+        values.timeRange
+      );
+
+      const scheduledWorkTimeId = getScheduledId(record);
+      if (!scheduledWorkTimeId) {
+        message.error("Không tìm thấy scheduledWorkTimeId để cập nhật.");
         return;
       }
 
-      const kolId = selectedSlot.kolId;
-      if (!kolId) {
-        message.warning("Không xác định được KOL / trợ live từ slot đã chọn.");
-        return;
-      }
+      const selectedKolId = values?.kolId ? String(values.kolId) : null;
 
-      const availabilityId = values.availabilityId || selectedSlot.id || null;
-
-      const payload = {
-        bookingRequestId: id,
-        availabilityId,
-        kolId,
-        startAt: startAt.toISOString(),
-        endAt: endAt.toISOString(),
+      const basePayload = {
+        scheduledWorkTimeId,
+        startAt: toIsoNoMs(startAt),
+        endAt: toIsoNoMs(endAt),
         note: values.note || null,
       };
 
-      await adminCreateWorktime(payload);
-      message.success("Tạo lịch làm việc thành công.");
+      let availabilityId;
+      if (selectedKolId) {
+        const slot = editSlotByKolId?.[selectedKolId];
+        if (!slot?.id) {
+          message.error(
+            "KOL này không có slot AVAILABLE cover đúng khoảng giờ. Vui lòng chọn KOL khác."
+          );
+          return;
+        }
+        availabilityId = slot.id;
+      }
 
-      setBookingRequestId(id);
-      form.setFieldsValue({ bookingRequestId: id });
+      await adminEditScheduledWorktime({
+        ...basePayload,
+        ...(selectedKolId && availabilityId
+          ? { kolId: selectedKolId, availabilityId }
+          : {}),
+      });
 
-      // reload worktimes
-      refetchWorktimes();
+      setLocalOverrides((prev) => ({
+        ...prev,
+        [key]: {
+          startAt: basePayload.startAt,
+          endAt: basePayload.endAt,
+          note: basePayload.note,
+        },
+      }));
+
+      message.success(
+        selectedKolId
+          ? "Đã cập nhật lịch & KOL cho ca làm việc."
+          : "Đã cập nhật lịch làm việc."
+      );
+
+      setEditingKey(null);
+      setEditingRecord(null);
+      editForm.resetFields();
+      setEditKolOptions([]);
+      setEditSlotByKolId({});
+      setEditKolDropdownOpen(false);
+      await refetchWorktimes();
     } catch (e) {
-      console.error("Create worktime failed:", e);
-      const beMsg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "Tạo lịch thất bại, vui lòng kiểm tra lại.";
-      message.error(beMsg);
+      if (e?.errorFields?.length) return;
+      message.error(e?.message || "Cập nhật thất bại.");
     }
   };
 
-  // ===== COLUMNS TABLE WORKTIME (đã bỏ cột ID) =====
+  // ✅ Xóa worktime
+  const handleDeleteWorktime = async (record) => {
+    const scheduledWorkTimeId = getScheduledId(record);
+    if (!scheduledWorkTimeId) {
+      message.error("Không tìm thấy scheduledWorkTimeId để xóa.");
+      return;
+    }
+
+    try {
+      setDeletingId(String(scheduledWorkTimeId));
+      await adminDeleteScheduledWorktime(scheduledWorkTimeId);
+
+      // dọn override nếu có
+      const key = getRowKey(record);
+      setLocalOverrides((prev) => {
+        if (!prev?.[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+
+      // nếu đang edit đúng dòng đó thì cancel
+      if (isEditing(record)) cancelEdit();
+
+      message.success("Đã xóa lịch làm việc.");
+      await refetchWorktimes();
+    } catch (e) {
+      message.error(e?.message || "Xóa lịch làm việc thất bại.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // ===== Create modal handlers =====
+  const openCreateModal = () => {
+    if (!bookingRequestId) {
+      message.warning("Chưa xác định được Booking Request ID.");
+      return;
+    }
+
+    setCreateOpen(true);
+    setKolOptions([]);
+    setSlotByKolId({});
+    setKolLoading(false);
+
+    createForm.resetFields();
+    createForm.setFieldsValue({
+      workDate: dayjs(),
+      timeRange: undefined,
+      kolId: undefined,
+      note: null,
+    });
+  };
+
+  const closeCreateModal = () => {
+    setCreateOpen(false);
+    setKolOptions([]);
+    setSlotByKolId({});
+    setKolLoading(false);
+    createForm.resetFields();
+  };
+
+  const watchedWorkDate = Form.useWatch("workDate", createForm);
+  const watchedTimeRange = Form.useWatch("timeRange", createForm);
+
+  useEffect(() => {
+    if (!createOpen) return;
+
+    if (
+      !watchedWorkDate ||
+      !Array.isArray(watchedTimeRange) ||
+      watchedTimeRange.length !== 2 ||
+      !watchedTimeRange[0] ||
+      !watchedTimeRange[1]
+    ) {
+      setKolOptions([]);
+      setSlotByKolId({});
+      return;
+    }
+
+    let canceled = false;
+    const controller = new AbortController();
+
+    const timer = setTimeout(async () => {
+      try {
+        setKolLoading(true);
+
+        const { options, slotMap } = await fetchAvailableKolsFor({
+          workDate: watchedWorkDate,
+          timeRange: watchedTimeRange,
+          signal: controller.signal,
+          size: 500,
+        });
+
+        if (canceled) return;
+
+        setSlotByKolId(slotMap);
+        setKolOptions(options);
+
+        const currentKolId = createForm.getFieldValue("kolId");
+        if (currentKolId && !slotMap?.[String(currentKolId)]) {
+          createForm.setFieldsValue({ kolId: undefined });
+        }
+      } catch (e) {
+        if (canceled) return;
+        message.error(e?.message || "Không tải được danh sách KOL rảnh.");
+        setKolOptions([]);
+        setSlotByKolId({});
+      } finally {
+        if (!canceled) setKolLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      canceled = true;
+      controller.abort();
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createOpen, watchedWorkDate, watchedTimeRange]);
+
+  const handleCreate = async () => {
+    try {
+      const values = await createForm.validateFields();
+
+      const { startAt, endAt } = buildStartEndFromDateAndRange(
+        values.workDate,
+        values.timeRange
+      );
+
+      const chosenKolId = values.kolId ? String(values.kolId) : null;
+      const chosenSlot = chosenKolId ? slotByKolId?.[chosenKolId] : null;
+
+      const payload = {
+        bookingRequestId,
+        startAt: toIsoNoMs(startAt),
+        endAt: toIsoNoMs(endAt),
+        note: values.note || null,
+        ...(chosenKolId ? { kolId: chosenKolId } : {}),
+        ...(chosenSlot?.id ? { availabilityId: chosenSlot.id } : {}),
+      };
+
+      setCreateSaving(true);
+      await adminCreateWorktime(payload);
+
+      message.success("Tạo lịch làm việc thành công.");
+      closeCreateModal();
+      await refetchWorktimes();
+    } catch (e) {
+      if (e?.errorFields?.length) return;
+      message.error(e?.message || "Tạo lịch thất bại.");
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setWorktimeFilterMode("month");
+    setWorktimeFilterDate(dayjs());
+    setEditingKey(null);
+    setEditingRecord(null);
+    editForm.resetFields();
+    setEditKolOptions([]);
+    setEditSlotByKolId({});
+    setEditKolDropdownOpen(false);
+
+    await Promise.allSettled([refetchBookingDetail(), refetchWorktimes()]);
+    message.success("Đã làm mới.");
+  };
+
+  const shiftFilterDate = (dir) => {
+    if (worktimeFilterMode === "all") return;
+
+    const base = worktimeFilterDate ? dayjs(worktimeFilterDate) : dayjs();
+    const unit =
+      worktimeFilterMode === "day"
+        ? "day"
+        : worktimeFilterMode === "week"
+        ? "week"
+        : "month";
+
+    setWorktimeFilterDate(base.add(dir, unit));
+  };
+
+  // ===== Worktime table columns =====
   const worktimeColumns = [
     {
+      title: "STT",
+      key: "stt",
+      width: 70,
+      align: "center",
+      render: (_v, _r, index) => index + 1,
+    },
+    {
+      title: "Ngày thực hiện",
+      key: "workDateCol",
+      width: 150,
+      render: (_v, record) => {
+        if (!isEditing(record)) {
+          const s = record?.startAt ? dayjs(record.startAt) : null;
+          return s?.isValid() ? s.format("DD/MM/YYYY") : "--";
+        }
+        return (
+          <Form.Item
+            name="workDate"
+            rules={[{ required: true, message: "Chọn ngày" }]}
+            style={{ marginBottom: 0 }}
+            validateTrigger={["onChange", "onBlur"]}
+          >
+            <DatePicker className="w-full" format="DD/MM/YYYY" />
+          </Form.Item>
+        );
+      },
+    },
+    {
+      title: "Giờ thực hiện",
+      key: "workTimeCol",
+      width: 240,
+      render: (_v, record) => {
+        if (!isEditing(record)) {
+          const s = record?.startAt ? dayjs(record.startAt) : null;
+          const e = record?.endAt ? dayjs(record.endAt) : null;
+          if (!s?.isValid() || !e?.isValid()) return "--";
+          return `${s.format("HH:mm")} - ${e.format("HH:mm")}`;
+        }
+        return (
+          <Form.Item
+            name="timeRange"
+            dependencies={["workDate"]}
+            rules={[
+              { required: true, message: "Chọn khoảng giờ" },
+              { validator: makeTimeRangeValidator(editForm) },
+            ]}
+            style={{ marginBottom: 0 }}
+            validateTrigger={["onChange", "onBlur"]}
+          >
+            <TimeRangePicker
+              format="HH"
+              minuteStep={60}
+              className="w-full"
+              placeholder={["Giờ bắt đầu", "Giờ kết thúc"]}
+              hideDisabledOptions
+              disabledTime={makeDisabledTimeMax3Hours(editForm, "timeRange")}
+            />
+          </Form.Item>
+        );
+      },
+    },
+    {
+      title: "Vai trò",
+      dataIndex: "kolRole",
+      key: "kolRole",
+      width: 140,
+      render: (v) => {
+        const role = normalizeUpper(v);
+        if (!role) return "--";
+        return (
+          <Tag color={WORKTIME_ROLE_COLOR[role] ?? "default"}>
+            {WORKTIME_ROLE_LABEL[role] ?? role}
+          </Tag>
+        );
+      },
+    },
+    {
       title: "KOL",
-      dataIndex: "kolId",
-      key: "kolId",
-      width: 200,
-      render: (v) => v || "--",
-    },
-    {
-      title: "Bắt đầu",
-      dataIndex: "startAt",
-      key: "startAt",
-      render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "--"),
-      width: 180,
-    },
-    {
-      title: "Kết thúc",
-      dataIndex: "endAt",
-      key: "endAt",
-      render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "--"),
-      width: 180,
-    },
-    {
-      title: "Ghi chú",
-      dataIndex: "note",
-      key: "note",
-      render: (v) => v || "--",
-      ellipsis: true,
-    },
-  ];
+      key: "kol",
+      width: 240,
+      render: (_v, record) => {
+        if (!isEditing(record)) {
+          return (
+            record?.kolName ||
+            record?.kol?.fullName ||
+            record?.kol?.name ||
+            "--"
+          );
+        }
 
-  // ===== COLUMNS TABLE FREE SLOTS =====
-  const freeSlotColumns = [
-    {
-      title: "KOL / Trợ live",
-      dataIndex: "kolName",
-      key: "kolName",
-      width: 220,
-      render: (v) => v || "--",
-    },
-    {
-      title: "Bắt đầu rảnh",
-      dataIndex: "startAt",
-      key: "startAt",
-      width: 180,
-      render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "--"),
-    },
-    {
-      title: "Kết thúc rảnh",
-      dataIndex: "endAt",
-      key: "endAt",
-      width: 180,
-      render: (v) => (v ? dayjs(v).format("DD/MM/YYYY HH:mm") : "--"),
+        return (
+          <Form.Item name="kolId" style={{ marginBottom: 0 }}>
+            <Select
+              showSearch
+              allowClear
+              loading={editKolLoading}
+              open={editKolDropdownOpen}
+              onDropdownVisibleChange={(open) => setEditKolDropdownOpen(open)}
+              placeholder={
+                editKolLoading
+                  ? "Đang tải KOL rảnh..."
+                  : "Chọn KOL cho lịch làm việc"
+              }
+              options={editKolOptions}
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                String(option?.label || "")
+                  .toLowerCase()
+                  .includes(String(input || "").toLowerCase())
+              }
+              notFoundContent={
+                editKolLoading ? "Đang tải..." : "Không có KOL rảnh"
+              }
+            />
+          </Form.Item>
+        );
+      },
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 120,
+      width: 160,
       render: (v) => {
-        const s = String(v || "AVAILABLE").toUpperCase();
-        return s === "AVAILABLE" ? "Sẵn Sàng" : v || "Sẵn Sàng";
+        const s = normalizeUpper(v);
+        if (!s) return "--";
+        return (
+          <Tag color={WORKTIME_STATUS_COLOR[s] ?? "default"}>
+            {WORKTIME_STATUS_LABEL[s] ?? s}
+          </Tag>
+        );
       },
     },
     {
+      title: "Ghi chú",
+      dataIndex: "note",
+      key: "note",
+      render: (_v, record) => {
+        if (!isEditing(record)) return record?.note || "--";
+        return (
+          <Form.Item name="note" style={{ marginBottom: 0 }}>
+            <Input placeholder="Ghi chú" />
+          </Form.Item>
+        );
+      },
+      ellipsis: true,
+    },
+    {
       title: "Thao tác",
-      key: "action",
-      width: 120,
-      render: (_, record) => (
-        <Button
-          type={selectedSlot?.id === record.id ? "primary" : "default"}
-          onClick={() => {
-            setSelectedSlot(record);
-            form.setFieldsValue({
-              kolDisplay: record.kolName,
-              kolId: record.kolId,
-              availabilityId: record.id,
-              workDate: dayjs(record.startAt),
-              // Gợi ý sẵn giờ, nhưng cũng ép phút = 00
-              timeRange: [
-                dayjs(record.startAt).minute(0).second(0),
-                dayjs(record.endAt).minute(0).second(0),
-              ],
-            });
-          }}
-        >
-          {selectedSlot?.id === record.id ? "Đang chọn" : "Chọn"}
-        </Button>
-      ),
+      key: "actions",
+      width: 240,
+      fixed: "right",
+      render: (_v, record) => {
+        const editing = isEditing(record);
+        const scheduledId = getScheduledId(record);
+        const isDeletingThis =
+          scheduledId != null && String(scheduledId) === String(deletingId);
+
+        if (editing) {
+          return (
+            <Space>
+              <Button
+                type="primary"
+                icon={<Save size={16} />}
+                onClick={() => saveEdit(record)}
+              >
+                Lưu
+              </Button>
+              <Button icon={<X size={16} />} onClick={cancelEdit}>
+                Hủy
+              </Button>
+            </Space>
+          );
+        }
+
+        return (
+          <Space>
+            <Button
+              icon={<Pencil size={16} />}
+              onClick={() => startEdit(record)}
+              disabled={editingKey !== null || isDeletingThis}
+            >
+              Sửa
+            </Button>
+
+            <Popconfirm
+              title="Xóa lịch làm việc này?"
+              description="Hành động này không thể hoàn tác."
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDeleteWorktime(record)}
+              disabled={editingKey !== null || !scheduledId || isDeletingThis}
+            >
+              <Button
+                danger
+                icon={<Trash2 size={16} />}
+                loading={isDeletingThis}
+                disabled={editingKey !== null || !scheduledId}
+              >
+                Xóa
+              </Button>
+            </Popconfirm>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -486,263 +1182,231 @@ export default function BookingCampaignSchedule() {
     <ConfigProvider locale={viVN}>
       <div className="h-full flex flex-col gap-4 p-4 md:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="border-2 border-gray-300 p-2 rounded-md w-fit">
-              <CalendarRange className="text-gray-500" size={20} />
-            </div>
-            <div>
-              <h1 className="text-[18px] font-bold uppercase">Lịch làm việc</h1>
-              <p className="text-[14px] text-gray-600">
-                Tạo và xem lịch làm việc theo Booking Request, dựa trên lịch
-                rảnh của KOL / trợ live.
-              </p>
-              {prefilledCampaignName && (
-                <Text type="secondary">Campaign: {prefilledCampaignName}</Text>
-              )}
-            </div>
-          </div>
-
-          <Space>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Space size="middle" wrap>
             <Button
-              type="primary"
-              onClick={() => {
-                form.resetFields();
-                setBookingRequestId("");
-                setFreeSlots([]);
-                setSelectedSlot(null);
-                setFreeSlotKolFilter(undefined);
-                // Reset filter về mặc định: xem theo tháng hiện tại
-                setWorktimeFilterMode("month");
-                setWorktimeFilterDate(dayjs());
-              }}
+              icon={<ArrowLeft size={16} />}
+              onClick={() => navigate("/admin/management-booking-campaigns")}
+            >
+              Quay lại danh sách
+            </Button>
+
+            <Button
+              icon={<CalendarRange size={16} />}
+              onClick={handleRefresh}
+              loading={fetchingBookingDetail}
             >
               Làm mới
             </Button>
           </Space>
+
+          <div className="text-right">
+            <h1 className="text-[18px] font-bold uppercase">Lịch làm việc</h1>
+            {campaignDisplayName && (
+              <Text type="secondary">
+                Campaign: <Text strong>{campaignDisplayName}</Text>
+              </Text>
+            )}
+          </div>
         </div>
 
-        {/* FORM TÌM SLOT RẢNH + TẠO LỊCH */}
-        <Card bordered={false} className="shadow-sm">
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleCreateWorktime}
-            initialValues={{ bookingRequestId: prefilledBookingRequestId }}
-          >
-            {/* BookingRequestId + khoảng thời gian muốn tìm lịch rảnh */}
-            <Row gutter={[12, 12]}>
-              <Col xs={24} md={8}>
-                <Form.Item label="Booking Request ID" name="bookingRequestId">
-                  <Input disabled placeholder="Booking Request ID" />
-                </Form.Item>
-              </Col>
+        {/* ✅ Thông tin Booking Campaign (có thu gọn) */}
+        <Card
+          className="shadow-sm"
+          bordered={false}
+          title={
+            <Space>
+              <FileText size={18} />
+              <span>Thông tin Booking Campaign</span>
+            </Space>
+          }
+          extra={
+            <Button
+              size="small"
+              type="default"
+              icon={
+                campaignInfoCollapsed ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronUp size={16} />
+                )
+              }
+              onClick={() => setCampaignInfoCollapsed((p) => !p)}
+            >
+              {campaignInfoCollapsed ? "Mở rộng" : "Thu gọn"}
+            </Button>
+          }
+          loading={loadingBookingDetail}
+        >
+          {campaignInfoCollapsed ? null : errorBookingDetail ? (
+            <Alert
+              type="error"
+              showIcon
+              message="Không thể tải chi tiết booking campaign."
+              description={String(errorBookingDetail?.message ?? "")}
+            />
+          ) : bookingRequestsFromCampaign.length ? (
+            bookingRequestsFromCampaign.map((record, index) => {
+              const bookingStatus = normalizeUpper(record?.status);
 
-              <Col xs={24} md={16}>
-                <Form.Item
-                  label="Khoảng thời gian muốn tìm lịch rảnh"
-                  name="searchRange"
-                  tooltip="Chọn khoảng thời gian mong muốn, hệ thống sẽ trả về các KOL / trợ live rảnh trong khoảng đó"
-                  rules={[
-                    {
-                      required: true,
-                      message:
-                        "Vui lòng chọn khoảng thời gian muốn tìm lịch rảnh.",
-                    },
-                  ]}
+              const bookingStatusLabel =
+                bookingStatus === "NEGOTIATING"
+                  ? CAMPAIGN_STATUS_LABEL.NEGOTIATING
+                  : BOOKING_STATUS_LABEL[bookingStatus] ??
+                    bookingStatus ??
+                    "--";
+
+              const bookingStatusColor =
+                bookingStatus === "NEGOTIATING"
+                  ? CAMPAIGN_STATUS_COLOR.NEGOTIATING
+                  : STATUS_TAG_COLOR[bookingStatus] ?? "default";
+
+              const contractStatus = normalizeUpper(record?.contractStatus);
+              const contractStatusLabel =
+                CONTRACT_STATUS_LABEL[contractStatus] ?? contractStatus ?? "--";
+              const contractStatusColor = getStatusColor(contractStatus);
+
+              const kolsForBooking = Array.isArray(record?.campaignKols)
+                ? record.campaignKols
+                : Array.isArray(record?.kols)
+                ? record.kols
+                : [];
+
+              const livesForBooking = Array.isArray(record?.campaignLives)
+                ? record.campaignLives
+                : Array.isArray(record?.lives)
+                ? record.lives
+                : [];
+
+              // ✅ NEW: địa điểm livestream (fallback nhiều key)
+              const livestreamAddress =
+                record?.livestreamAddress ??
+                record?.liveStreamAddress ??
+                record?.livestream_address ??
+                record?.live_address ??
+                record?.campaign?.livestreamAddress ??
+                record?.campaign?.liveStreamAddress ??
+                null;
+
+              return (
+                <Card
+                  key={record?.id ?? index}
+                  type="inner"
+                  className="mb-4 last:mb-0"
+                  title={`Booking ${record?.bookingNumber ?? `#${index + 1}`}`}
                 >
-                  <RangePicker
-                    showTime={{
-                      format: "HH",
-                      minuteStep: 60,
-                    }}
-                    format="DD/MM/YYYY HH:00"
-                    className="w-full"
-                    placeholder={["Bắt đầu", "Kết thúc"]}
-                    disabledDate={disabledSearchDate}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
+                  <Descriptions
+                    bordered
+                    size="middle"
+                    column={screens.lg ? 3 : screens.md ? 2 : 1}
+                    styles={{ label: { width: 200 } }}
+                  >
+                    <Descriptions.Item label="Trạng thái">
+                      {bookingStatus ? (
+                        <Tag color={bookingStatusColor}>
+                          {bookingStatusLabel}
+                        </Tag>
+                      ) : (
+                        "--"
+                      )}
+                    </Descriptions.Item>
 
-            <Row gutter={[12, 12]}>
-              <Col xs={24} md={8}>
-                <Button
-                  type="primary"
-                  onClick={handleSearchFreeSlots}
-                  loading={loadingFreeSlots}
-                  style={{ backgroundColor: "#10B981", borderColor: "#10B981" }}
-                >
-                  Tìm KOL / trợ live rảnh
-                </Button>
-              </Col>
-            </Row>
+                    {contractStatus && (
+                      <Descriptions.Item label="Trạng thái hợp đồng">
+                        <Tag color={contractStatusColor}>
+                          {contractStatusLabel}
+                        </Tag>
+                      </Descriptions.Item>
+                    )}
 
-            {/* Bảng slot rảnh + CHỌN KOL FILTER Ở TRÊN */}
-            {freeSlots.length > 0 && (
-              <Card
-                className="mt-4"
-                size="small"
-                title="Lịch rảnh của KOL / trợ live trong khoảng đã chọn"
-              >
-                <Row gutter={[12, 12]} className="mb-3">
-                  <Col xs={24} md={8}>
-                    <Form.Item
-                      label="Chọn KOL / trợ live để hiển thị lịch rảnh"
-                      name="freeSlotKolId"
+                    <Descriptions.Item
+                      label="Mục tiêu chiến dịch"
+                      span={screens.lg ? 3 : 1}
                     >
-                      <Select
-                        allowClear
-                        placeholder="Tất cả KOL / trợ live"
-                        options={freeSlotKolOptions}
-                        onChange={(val) =>
-                          setFreeSlotKolFilter(val || undefined)
-                        }
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {record?.campaignObjective ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
 
-                <Table
-                  dataSource={filteredFreeSlots}
-                  columns={freeSlotColumns}
-                  rowKey={(r) => r.id}
-                  pagination={false}
-                  scroll={{ x: "auto" }}
-                />
-              </Card>
-            )}
+                    {/* ✅ NEW FIELD */}
+                    <Descriptions.Item
+                      label="Địa điểm livestream"
+                      span={screens.lg ? 3 : 1}
+                    >
+                      <Text style={{ whiteSpace: "pre-wrap" }}>
+                        {livestreamAddress ?? "--"}
+                      </Text>
+                    </Descriptions.Item>
 
-            {/* Thông tin slot đã chọn + cấu hình time cụ thể */}
-            <div className="mt-6 border-t pt-4">
-              <h2 className="text-base font-semibold mb-2">
-                Cấu hình thời gian cụ thể cho lịch làm việc
-              </h2>
+                    <Descriptions.Item label="Ngày bắt đầu chiến dịch">
+                      {formatDate(record?.startDate)}
+                    </Descriptions.Item>
 
-              <Row gutter={[12, 12]}>
-                {/* KOL đã chọn (readonly) */}
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    label="KOL / trợ live"
-                    name="kolDisplay"
-                    tooltip="Được chọn từ bảng slot rảnh bên trên"
-                  >
-                    <Input disabled placeholder="Chưa chọn slot rảnh nào" />
-                  </Form.Item>
+                    <Descriptions.Item label="Ngày kết thúc">
+                      {formatDate(record?.endDate)}
+                    </Descriptions.Item>
 
-                  {/* hidden fields để submit */}
-                  <Form.Item name="kolId" hidden>
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="availabilityId" hidden>
-                    <Input />
-                  </Form.Item>
-                </Col>
+                    <Descriptions.Item label="Tổng số giờ">
+                      {record?.hours != null ? `${record.hours} giờ` : "--"}
+                    </Descriptions.Item>
 
-                {/* Ngày làm việc */}
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    label="Ngày làm việc"
-                    name="workDate"
-                    rules={[{ required: true, message: "Chọn ngày làm việc" }]}
-                  >
-                    <DatePicker
-                      className="w-full"
-                      format="DD/MM/YYYY"
-                      placeholder="Chọn ngày"
-                    />
-                  </Form.Item>
-                </Col>
+                    <Descriptions.Item label="Đơn giá">
+                      {formatCurrency(record?.unitPrice)}
+                    </Descriptions.Item>
 
-                {/* Khoảng giờ tạo lịch (chỉ chọn giờ, phút = 00) */}
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    label="Khoảng giờ tạo lịch"
-                    name="timeRange"
-                    rules={[
-                      { required: true, message: "Chọn khoảng giờ" },
-                      () => ({
-                        validator(_, value) {
-                          if (!value || value.length !== 2) {
-                            return Promise.resolve();
-                          }
-                          const [startTime, endTime] = value || [];
-                          if (!startTime || !endTime) {
-                            return Promise.resolve();
-                          }
-                          if (!dayjs(endTime).isAfter(dayjs(startTime))) {
-                            return Promise.reject(
-                              new Error(
-                                "Giờ kết thúc phải lớn hơn giờ bắt đầu."
-                              )
-                            );
-                          }
-                          const diffMinutes = endTime.diff(startTime, "minute");
-                          if (diffMinutes < 60) {
-                            return Promise.reject(
-                              new Error("Một lần tạo lịch tối thiểu là 1 giờ.")
-                            );
-                          }
-                          if (diffMinutes > 180) {
-                            return Promise.reject(
-                              new Error("Một lần tạo lịch tối đa là 3 giờ.")
-                            );
-                          }
-                          return Promise.resolve();
-                        },
-                      }),
-                    ]}
-                  >
-                    <TimeRangePicker
-                      format="HH"
-                      minuteStep={60}
-                      className="w-full"
-                      placeholder={["Giờ bắt đầu", "Giờ kết thúc"]}
-                    />
-                  </Form.Item>
-                </Col>
+                    <Descriptions.Item label="Giảm giá (%)">
+                      {formatCurrency(record?.discount)}
+                    </Descriptions.Item>
 
-                {/* Ghi chú + nút tạo lịch */}
-                <Col xs={24} md={8}>
-                  <Form.Item label="Ghi chú" name="note">
-                    <Input placeholder="Ghi chú (không bắt buộc)" />
-                  </Form.Item>
+                    <Descriptions.Item label="Tổng tiền (VND)">
+                      {formatCurrency(record?.totalAmount)}
+                    </Descriptions.Item>
 
-                  <div className="flex items-center justify-end">
-                    <Button htmlType="submit" type="primary" icon={<Plus />}>
-                      Tạo lịch
-                    </Button>
-                  </div>
-                </Col>
-              </Row>
-            </div>
+                    <Descriptions.Item label="Người tạo (email)">
+                      <Text copyable>{record?.createdByEmail ?? "--"}</Text>
+                    </Descriptions.Item>
 
-            {/* Thông báo load booking detail */}
-            {loadingBookingDetail && !prefilledBookingRequestId && (
-              <Alert
-                className="mt-2"
-                type="info"
-                showIcon
-                message="Đang lấy Booking Request ID từ Campaign..."
-              />
-            )}
-            {errorBookingDetail && !prefilledBookingRequestId && (
-              <Alert
-                className="mt-2"
-                type="error"
-                showIcon
-                message="Không thể lấy Booking Request ID từ Campaign."
-                description={String(errorBookingDetail?.message ?? "")}
-              />
-            )}
-          </Form>
+                    <Descriptions.Item label="Host chính tham gia">
+                      {formatArrayText(kolsForBooking)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Trợ Live tham gia">
+                      {formatArrayText(livesForBooking)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Tạo lúc">
+                      {formatDateTime(record?.createdAt)}
+                    </Descriptions.Item>
+
+                    <Descriptions.Item label="Cập nhật lúc">
+                      {formatDateTime(record?.updatedAt)}
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              );
+            })
+          ) : (
+            <Empty description="Không có booking nào trong campaign này" />
+          )}
         </Card>
 
-        {/* Bảng lịch đã tạo */}
+        {/* Worktimes */}
         <Card
           bordered={false}
           className="flex-1 shadow-sm"
-          title="Lịch đăng ký của KOL / trợ live"
+          title={
+            <div className="flex items-center justify-between gap-3">
+              <span>Danh sách lịch làm việc Campaign</span>
+              <Button
+                type="primary"
+                icon={<Plus size={16} />}
+                onClick={openCreateModal}
+                disabled={!bookingRequestId}
+              >
+                Thêm lịch làm việc
+              </Button>
+            </div>
+          }
         >
           {!bookingRequestId ? (
             <Alert
@@ -754,21 +1418,14 @@ export default function BookingCampaignSchedule() {
           ) : (
             <>
               <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <Text strong>
-                  Danh sách lịch cho Booking: {bookingRequestId}
-                </Text>
-
                 <Space size="small" wrap>
                   <Select
                     value={worktimeFilterMode}
                     onChange={(val) => {
                       setWorktimeFilterMode(val);
-                      if (val === "all") {
-                        setWorktimeFilterDate(null);
-                      } else if (!worktimeFilterDate) {
-                        // nếu đang null -> set mặc định ngày hiện tại
+                      if (val === "all") setWorktimeFilterDate(null);
+                      else if (!worktimeFilterDate)
                         setWorktimeFilterDate(dayjs());
-                      }
                     }}
                     style={{ width: 150 }}
                     options={[
@@ -778,35 +1435,164 @@ export default function BookingCampaignSchedule() {
                       { value: "month", label: "Theo tháng" },
                     ]}
                   />
+
                   {worktimeFilterMode !== "all" && (
-                    <DatePicker
-                      picker={worktimeFilterMode === "month" ? "month" : "date"}
-                      allowClear={false}
-                      placeholder={
-                        worktimeFilterMode === "day"
-                          ? "Chọn ngày"
-                          : worktimeFilterMode === "week"
-                          ? "Chọn ngày trong tuần"
-                          : "Chọn tháng"
-                      }
-                      value={worktimeFilterDate}
-                      onChange={(val) => setWorktimeFilterDate(val || dayjs())}
-                    />
+                    <Space size={6}>
+                      <Tooltip title="Trước đó">
+                        <Button
+                          size="small"
+                          shape="circle"
+                          icon={<ChevronLeft size={16} />}
+                          onClick={() => shiftFilterDate(-1)}
+                        />
+                      </Tooltip>
+
+                      <DatePicker
+                        picker={
+                          worktimeFilterMode === "month" ? "month" : "date"
+                        }
+                        allowClear={false}
+                        value={worktimeFilterDate}
+                        onChange={(val) =>
+                          setWorktimeFilterDate(val || dayjs())
+                        }
+                      />
+
+                      <Tooltip
+                        title={
+                          worktimeFilterMode === "day"
+                            ? "Ngày hôm sau"
+                            : worktimeFilterMode === "week"
+                            ? "Tuần sau"
+                            : "Tháng sau"
+                        }
+                      >
+                        <Button
+                          size="small"
+                          shape="circle"
+                          icon={<ChevronRight size={16} />}
+                          onClick={() => shiftFilterDate(1)}
+                        />
+                      </Tooltip>
+                    </Space>
                   )}
                 </Space>
               </div>
 
-              <Table
-                dataSource={visibleWorktimes}
-                columns={worktimeColumns}
-                rowKey={(r) => r.id || `${r.startAt}_${r.endAt}`}
-                loading={loadingWorktimes}
-                pagination={false}
-                scroll={{ x: "auto" }}
-              />
+              {errorWorktimes && (
+                <Alert
+                  className="mb-3"
+                  type="error"
+                  showIcon
+                  message="Không thể tải danh sách lịch."
+                  description={String(errorWorktimes?.message ?? "")}
+                />
+              )}
+
+              <Form form={editForm} component={false}>
+                <Table
+                  dataSource={visibleWorktimes}
+                  columns={worktimeColumns}
+                  rowKey={(r) => getRowKey(r)}
+                  loading={loadingWorktimes}
+                  pagination={false}
+                  scroll={{ x: 1850 }}
+                />
+              </Form>
             </>
           )}
         </Card>
+
+        {/* Create modal */}
+        <Modal
+          open={createOpen}
+          title="Thêm lịch làm việc"
+          onCancel={closeCreateModal}
+          onOk={handleCreate}
+          okText="Tạo"
+          confirmLoading={createSaving}
+          destroyOnClose
+        >
+          <Form form={createForm} layout="vertical">
+            <Row gutter={[12, 12]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Ngày thực hiện"
+                  name="workDate"
+                  rules={[{ required: true, message: "Chọn ngày thực hiện" }]}
+                  validateTrigger={["onChange", "onBlur"]}
+                >
+                  <DatePicker className="w-full" format="DD/MM/YYYY" />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Giờ thực hiện"
+                  name="timeRange"
+                  dependencies={["workDate"]}
+                  rules={[
+                    { required: true, message: "Chọn giờ thực hiện" },
+                    { validator: makeTimeRangeValidator(createForm) },
+                  ]}
+                  validateTrigger={["onChange", "onBlur"]}
+                >
+                  <TimeRangePicker
+                    format="HH"
+                    minuteStep={60}
+                    className="w-full"
+                    placeholder={["Giờ bắt đầu", "Giờ kết thúc"]}
+                    hideDisabledOptions
+                    disabledTime={makeDisabledTimeMax3Hours(
+                      createForm,
+                      "timeRange"
+                    )}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item
+              label="Chọn KOL / trợ live cho ca làm việc"
+              name="kolId"
+              tooltip="Bạn có thể chọn KOL đã đăng ký lịch trong khoảng giờ này để gán cho ca làm việc."
+            >
+              <Select
+                showSearch
+                allowClear
+                loading={kolLoading}
+                placeholder={
+                  !watchedWorkDate || !watchedTimeRange
+                    ? "Chọn ngày và giờ trước"
+                    : kolLoading
+                    ? "Đang tải danh sách KOL đã đăng ký..."
+                    : "Chọn KOL"
+                }
+                options={kolOptions}
+                optionFilterProp="label"
+                filterOption={(input, option) =>
+                  String(option?.label || "")
+                    .toLowerCase()
+                    .includes(String(input || "").toLowerCase())
+                }
+                notFoundContent={
+                  kolLoading
+                    ? "Đang tải..."
+                    : "Không có KOL nào đăng ký lịch trong khoảng giờ này"
+                }
+              />
+            </Form.Item>
+
+            <Form.Item label="Ghi chú" name="note">
+              <Input placeholder="Ghi chú" />
+            </Form.Item>
+
+            <Text type="secondary">
+              Giới hạn thời gian: Lịch làm việc phải tối thiểu 1 giờ, tối đa 3
+              giờ.
+            </Text>
+          </Form>
+        </Modal>
       </div>
     </ConfigProvider>
   );

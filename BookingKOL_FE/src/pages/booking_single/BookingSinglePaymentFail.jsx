@@ -16,6 +16,12 @@ const BookingSinglePaymentFail = () => {
   const location = useLocation();
   const [countdown, setCountdown] = useState(15);
 
+  const isExpired = location.state?.reason === "EXPIRED";
+  const titleText = isExpired ? "Đơn đã quá hạn" : "Yêu cầu đặt lịch đã bị hủy";
+  const descriptionText = isExpired
+    ? "Đơn đã quá 15 phút nhưng chưa Xác nhận & Thanh toán nên đã chuyển sang trạng thái quá hạn và không thể tiếp tục thanh toán."
+    : "Bạn đã hủy yêu cầu đặt lịch.";
+
   useEffect(() => {
     if (!location.state?.bookingRequest) {
       navigate("/", { replace: true });
@@ -100,7 +106,7 @@ const BookingSinglePaymentFail = () => {
                 variant="h5"
                 sx={{ fontWeight: 700, color: BOOKING_FLOW_STYLE.textPrimary }}
               >
-                Yêu cầu đặt lịch đã bị hủy
+                {titleText}
               </Typography>
               <Typography
                 sx={{
@@ -109,8 +115,7 @@ const BookingSinglePaymentFail = () => {
                   mx: "auto",
                 }}
               >
-                Bạn đã hủy yêu cầu đặt lịch. Hệ thống sẽ tự động chuyển bạn về
-                trang chủ sau{" "}
+                {descriptionText} Hệ thống sẽ tự động chuyển bạn về trang chủ sau{" "}
                 <Typography component="span" sx={{ fontWeight: 600 }}>
                   {countdown} giây
                 </Typography>

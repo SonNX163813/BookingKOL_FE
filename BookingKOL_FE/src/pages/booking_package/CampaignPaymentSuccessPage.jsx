@@ -14,14 +14,13 @@ import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
     maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+  }).format(Number(value) || 0) + " VND";
 
 const CampaignPaymentSuccessPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const bookingRequest = location.state?.bookingRequest ?? null;
   const paymentInfo = location.state?.payment ?? null;
   const campaignInfo = location.state?.campaign ?? null;
   const scheduleInfo = location.state?.paymentSchedule ?? null;
@@ -57,9 +56,10 @@ const CampaignPaymentSuccessPage = () => {
     };
   }, [campaignId, navigate, paymentInfo]);
 
-  if (!paymentInfo) {
-    return null;
-  }
+  const amount = paymentInfo?.amount;
+  const transferContent = paymentInfo?.transferContent;
+  const contractNumber = bookingRequest?.contractNumber;
+  const contractId = paymentInfo?.contractId;
 
   const campaignName =
     campaignInfo?.name ??
@@ -78,23 +78,34 @@ const CampaignPaymentSuccessPage = () => {
         { label: "Chiến dịch", value: campaignName },
         {
           label: "Số tiền",
-          value: formatCurrency(paymentInfo.amount),
+          value: formatCurrency(amount),
         },
         {
           label: "Nội dung chuyển khoản",
-          value: paymentInfo.transferContent,
+          value: transferContent,
         },
         {
           label: "Mã hợp đồng",
-          value: paymentInfo.contractNumber ?? paymentInfo.contractId ?? "--",
+          value: contractNumber ?? contractId ?? "--",
         },
         {
           label: "Đợt thanh toán",
           value: installmentLabel,
         },
       ].filter((row) => Boolean(row.value)),
-    [campaignName, installmentLabel, paymentInfo]
+    [
+      amount,
+      campaignName,
+      contractId,
+      contractNumber,
+      installmentLabel,
+      transferContent,
+    ]
   );
+
+  if (!paymentInfo) {
+    return null;
+  }
 
   const handleBackToCampaign = () => {
     if (campaignId) {
@@ -155,8 +166,9 @@ const CampaignPaymentSuccessPage = () => {
                 }}
               >
                 Cảm ơn bạn đã hoàn tất thanh toán.
-                {campaignId ? " Hệ thống sẽ đưa bạn về trang chi tiết chiến dịch" : " Hệ thống sẽ đưa bạn về danh sách chiến dịch"}
-                {" "}
+                {campaignId
+                  ? " Hệ thống sẽ đưa bạn về trang chi tiết chiến dịch"
+                  : " Hệ thống sẽ đưa bạn về danh sách chiến dịch"}{" "}
                 sau <strong>{countdown}s</strong>.
               </Typography>
             </Stack>
@@ -175,7 +187,10 @@ const CampaignPaymentSuccessPage = () => {
               <Stack spacing={2}>
                 <Typography
                   variant="subtitle1"
-                  sx={{ fontWeight: 600, color: BOOKING_FLOW_STYLE.textPrimary }}
+                  sx={{
+                    fontWeight: 600,
+                    color: BOOKING_FLOW_STYLE.textPrimary,
+                  }}
                 >
                   Thông tin giao dịch
                 </Typography>
@@ -236,7 +251,9 @@ const CampaignPaymentSuccessPage = () => {
               <Button
                 fullWidth
                 variant="outlined"
-                onClick={() => navigate("/don-booking-chien-dich", { replace: true })}
+                onClick={() =>
+                  navigate("/don-booking-chien-dich", { replace: true })
+                }
                 sx={{
                   textTransform: "none",
                   fontWeight: 600,

@@ -1,8 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
-import { Alert, Button, Card, Empty, Skeleton, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
+  Empty,
+  Grid,
+  Skeleton,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
 import {
   ArrowLeft,
   CalendarRange,
@@ -21,19 +32,44 @@ import {
   PAYMENT_STATUS_LABEL,
   PAYMENT_STATUS_COLOR,
 } from "../../constants/mySingleBookingStatuses";
-import { initiateCampaignPayment } from "../../services/booking/BookingServices";
+import {
+  completeUserWorkTime,
+  getUserBookingStatus,
+  initiateCampaignPayment,
+} from "../../services/booking/BookingServices";
+import { useGetWorktimeLivestreamMetrics } from "../../hook/user/booking/useGetWorktimeLivestreamMetrics";
+import { useConfirmMyWorktimeLivestreamMetrics } from "../../hook/user/booking/useConfirmMyWorktimeLivestreamMetrics";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
+
+const LIVESTREAM_METRIC_LABELS = [
+  { key: "revenue", label: "Tổng doanh thu" },
+  { key: "gpm", label: "GPM" },
+  { key: "avgOrderValue", label: "Giá trị TB mỗi đơn" },
+  { key: "totalOrders", label: "Tổng đơn hàng" },
+  { key: "buyers", label: "Số người mua" },
+  { key: "productsSold", label: "Các mặt hàng được bán" },
+  { key: "totalViews", label: "Tổng lượt xem" },
+  { key: "liveViewsOver1min", label: "Lượt xem live > 1 phút" },
+  { key: "viewsUnder1min", label: "Lượt xem < 1 phút" },
+  { key: "pcu", label: "PCU (đồng xem cao nhất)" },
+  { key: "avgViewDuration", label: "Thời gian xem TB (giây)" },
+  { key: "commentsIn1min", label: "BL trong 1 phút" },
+  { key: "totalComments", label: "Tổng bình luận" },
+  { key: "productClickRate", label: "Tỷ lệ click SP" },
+  { key: "orderConversionRate", label: "Tỷ lệ chuyển đổi đơn" },
+];
 
 const formatCurrency = (value, currency = "VND") => {
   if (value === null || value === undefined) return "--";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "--";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(numeric);
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(numeric) + " VND"
+  );
 };
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
@@ -78,14 +114,131 @@ const extractUrlsFromText = (text) => {
   return Array.from(new Set(normalized));
 };
 
+const resolveBookingRequestId = (request) => {
+  if (!request) return null;
+  const candidates = [
+    request?.bookingRequestId,
+    request?.id,
+    request?.bookingRequest?.id,
+    request?.bookingNumber,
+    request?.bookingId,
+  ];
+  const firstValue = candidates.find(
+    (value) => typeof value === "string" && value.trim().length > 0
+  );
+  return firstValue ?? null;
+};
+
+const resolveWorkTimeId = (workTime) =>
+  workTime?.id ??
+  workTime?.workTimeId ??
+  workTime?.work_time_id ??
+  workTime?.availabilityId ??
+  null;
+
+const composeWorktimeDuration = (workTime) => {
+  const start = workTime?.startAt ?? workTime?.startTime;
+  const end = workTime?.endAt ?? workTime?.endTime;
+  if (!start && !end) return "--";
+  const startLabel = formatDateTime(start);
+  const endLabel = formatDateTime(end);
+  if (startLabel === "--") return endLabel;
+  if (endLabel === "--") return startLabel;
+  const sameDay =
+    dayjs(start).isValid() &&
+    dayjs(end).isValid() &&
+    dayjs(start).isSame(end, "day");
+  return sameDay
+    ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} → ${dayjs(end).format(
+        "HH:mm"
+      )}`
+    : `${startLabel} → ${endLabel}`;
+};
+
+const formatBoolean = (value) => {
+  if (value === null || value === undefined) return "--";
+  return value ? "Yes" : "No";
+};
+
+const formatLivestreamMetricValue = (key, value) => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  if (key === "revenue" || key === "avgOrderValue") {
+    return formatCurrency(value);
+  }
+
+  if (key === "isConfirmed") {
+    return formatBoolean(value);
+  }
+
+  if (key === "createdAt" || key === "confirmedAt") {
+    return formatDateTime(value);
+  }
+
+  return value;
+};
+
+const isMissingLivestreamMetricError = (error) => {
+  const response = error?.response;
+  if (!response) {
+    return false;
+  }
+
+  const { status, data } = response;
+  if (![400, 404].includes(status)) {
+    return false;
+  }
+
+  const rawMessage = data?.message;
+  const messages = Array.isArray(rawMessage)
+    ? rawMessage
+    : typeof rawMessage === "string"
+    ? [rawMessage]
+    : [];
+
+  const normalizedMessages = messages
+    .filter((message) => typeof message === "string")
+    .map((message) => message.toLowerCase());
+
+  const keywords = ["livestream metric", "không tìm thấy", "not found"];
+  const hasMissingMetricMessage = normalizedMessages.some((message) =>
+    keywords.some((keyword) => message.includes(keyword))
+  );
+
+  const hasDataProperty = Object.prototype.hasOwnProperty.call(
+    data ?? {},
+    "data"
+  );
+  const isEmptyPayload = hasDataProperty && data?.data === null;
+
+  if (hasMissingMetricMessage) {
+    return true;
+  }
+
+  if (isEmptyPayload && normalizedMessages.length === 0) {
+    return true;
+  }
+
+  return false;
+};
+
 const CampaignBookingDetailPage = () => {
   const { campaignId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const screens = useBreakpoint();
   const [contractPreview, setContractPreview] = useState(null);
   const [initiatingScheduleId, setInitiatingScheduleId] = useState(null);
+  const [completingWorkTimeId, setCompletingWorkTimeId] = useState(null);
+  const [confirmingWorktimeId, setConfirmingWorktimeId] = useState(null);
   const initiatePaymentMutation = useMutation({
     mutationFn: ({ paymentScheduleId }) =>
       initiateCampaignPayment(paymentScheduleId),
+  });
+  const completeWorkTimeMutation = useMutation({
+    mutationFn: ({ workTimeId }) => completeUserWorkTime(workTimeId),
   });
 
   const {
@@ -118,11 +271,109 @@ const CampaignBookingDetailPage = () => {
     [detail?.bookingRequests]
   );
 
+  const bookingStatusQueries = useQueries({
+    queries: bookingRequests.map((request) => {
+      const requestId = resolveBookingRequestId(request);
+      return {
+        queryKey: ["booking-request-status", requestId],
+        queryFn: () => getUserBookingStatus(requestId),
+        enabled: Boolean(requestId),
+        retry: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      };
+    }),
+  });
+
+  const bookingStatusMap = useMemo(() => {
+    const map = new Map();
+    bookingRequests.forEach((request, index) => {
+      const requestId = resolveBookingRequestId(request);
+      if (!requestId) return;
+      const query = bookingStatusQueries[index];
+      if (!query) return;
+      map.set(requestId, {
+        ...query,
+        statusData: query?.data?.data ?? query?.data ?? null,
+      });
+    });
+    return map;
+  }, [bookingRequests, bookingStatusQueries]);
+
+  const worktimeIds = useMemo(() => {
+    const ids = [];
+    const seen = new Set();
+
+    bookingStatusQueries.forEach((query) => {
+      const workTimes = Array.isArray(query?.data?.data?.workTimes)
+        ? query.data.data.workTimes
+        : Array.isArray(query?.data?.workTimes)
+        ? query.data.workTimes
+        : [];
+
+      workTimes.forEach((workTime) => {
+        const id = resolveWorkTimeId(workTime);
+
+        if (id !== null && id !== undefined) {
+          const normalized = String(id).trim();
+
+          if (normalized && !seen.has(normalized)) {
+            seen.add(normalized);
+            ids.push(id);
+          }
+        }
+      });
+    });
+
+    return ids;
+  }, [bookingStatusQueries]);
+
+  const {
+    worktimeLivestreamMetricsMap,
+    worktimeLivestreamMetricQueries,
+    resolvedWorktimeIds,
+    isLoadingWorktimeLivestreamMetrics,
+    isFetchingWorktimeLivestreamMetrics,
+  } = useGetWorktimeLivestreamMetrics(worktimeIds, {
+    enabled: worktimeIds.length > 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const findMetricQueryByWorktimeId = useCallback(
+    (worktimeId) => {
+      if (worktimeId === null || worktimeId === undefined) {
+        return null;
+      }
+      const normalized = String(worktimeId);
+      const index = resolvedWorktimeIds.findIndex(
+        (id) => String(id) === normalized
+      );
+      return index >= 0 ? worktimeLivestreamMetricQueries[index] : null;
+    },
+    [resolvedWorktimeIds, worktimeLivestreamMetricQueries]
+  );
+
+  const {
+    isConfirmingWorktimeLivestreamMetrics,
+    handleConfirmWorktimeLivestreamMetrics,
+  } = useConfirmMyWorktimeLivestreamMetrics();
+
   const isInitialLoading = isGettingCampaignDetail && !detail;
 
   const handleBack = useCallback(() => {
     navigate("/don-booking-chien-dich");
   }, [navigate]);
+
+  const handleRefreshAll = useCallback(() => {
+    refetchCampaignDetail();
+    bookingStatusQueries.forEach((query) => {
+      if (typeof query?.refetch === "function") {
+        query.refetch();
+      }
+    });
+  }, [bookingStatusQueries, refetchCampaignDetail]);
 
   const handleOpenContractPreview = useCallback((request) => {
     if (!request) return;
@@ -225,6 +476,50 @@ const CampaignBookingDetailPage = () => {
       }
     },
     [detail, initiatePaymentMutation, navigate]
+  );
+
+  const handleCompleteWorkTime = useCallback(
+    async ({ workTimeId, bookingRequestId }) => {
+      if (!workTimeId) {
+        toast.error("Không tìm thấy ca làm việc hợp lệ.");
+        return;
+      }
+
+      try {
+        setCompletingWorkTimeId(workTimeId);
+        await completeWorkTimeMutation.mutateAsync({ workTimeId });
+        if (bookingRequestId) {
+          queryClient.invalidateQueries({
+            queryKey: ["booking-request-status", bookingRequestId],
+          });
+        }
+        refetchCampaignDetail();
+      } catch (error) {
+        //
+      } finally {
+        setCompletingWorkTimeId(null);
+      }
+    },
+    [completeWorkTimeMutation, queryClient, refetchCampaignDetail]
+  );
+
+  const handleConfirmMetrics = useCallback(
+    async (worktimeId, query) => {
+      if (worktimeId === null || worktimeId === undefined) return;
+      setConfirmingWorktimeId(worktimeId);
+      try {
+        await handleConfirmWorktimeLivestreamMetrics(worktimeId);
+        if (query?.refetch) {
+          await query.refetch();
+        }
+        await refetchCampaignDetail();
+      } catch (error) {
+        //
+      } finally {
+        setConfirmingWorktimeId(null);
+      }
+    },
+    [handleConfirmWorktimeLivestreamMetrics, refetchCampaignDetail]
   );
 
   const renderNameList = (names, emptyLabel) =>
@@ -335,14 +630,14 @@ const CampaignBookingDetailPage = () => {
                     </Tag>
 
                     {/* Trạng thái giao dịch thanh toán */}
-                    {paymentStatus ? (
+                    {/* {paymentStatus ? (
                       <Tag
                         color={PAYMENT_STATUS_COLOR[paymentStatus] ?? "blue"}
                         className="rounded-full px-3 py-1 text-xs font-semibold"
                       >
                         {PAYMENT_STATUS_LABEL[paymentStatus] ?? paymentStatus}
                       </Tag>
-                    ) : null}
+                    ) : null} */}
                   </div>
 
                   <div className="mt-3 grid gap-3 text-slate-600 sm:grid-cols-2">
@@ -384,6 +679,323 @@ const CampaignBookingDetailPage = () => {
             }
           )}
         </div>
+      </div>
+    );
+  };
+
+  const renderWorkTimes = (request) => {
+    const bookingRequestId = resolveBookingRequestId(request);
+    if (!bookingRequestId) return null;
+
+    const statusEntry = bookingStatusMap.get(bookingRequestId);
+    const isStatusLoading =
+      statusEntry?.isPending || statusEntry?.isLoading || false;
+    const isStatusFetching = statusEntry?.isFetching || false;
+    const statusError = statusEntry?.error;
+    const statusData = statusEntry?.statusData;
+    const workTimes = Array.isArray(statusData?.workTimes)
+      ? statusData.workTimes
+      : [];
+
+    const renderContent = () => {
+      // Lỗi lấy trạng thái công việc
+      if (statusError) {
+        return (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải trạng thái công việc"
+            description={statusError?.message}
+            className="rounded-xl border border-red-200/60 bg-white/90"
+          />
+        );
+      }
+
+      // Đang tải lần đầu, chưa có dữ liệu
+      if (isStatusLoading && !workTimes.length) {
+        return <Skeleton active paragraph={{ rows: 3 }} />;
+      }
+
+      // Không có ca làm việc
+      if (!workTimes.length) {
+        return (
+          <p className="text-sm text-slate-500">
+            Chưa có ca làm việc nào cho booking này.
+          </p>
+        );
+      }
+
+      return (
+        <div className="space-y-3">
+          {workTimes.map((workTime) => {
+            const workTimeId = resolveWorkTimeId(workTime);
+            const workTimeStatus =
+              typeof workTime?.status === "string"
+                ? workTime.status.toUpperCase()
+                : workTime?.status;
+            const statusMeta = resolveStatusMeta(workTimeStatus);
+            const canComplete =
+              workTimeId &&
+              workTimeStatus &&
+              !["COMPLETED", "CANCELLED", "PENDING"].includes(workTimeStatus);
+            const isCompleting =
+              completingWorkTimeId === workTimeId &&
+              completeWorkTimeMutation?.isPending;
+
+            return (
+              <div
+                key={workTimeId ?? workTime?.startAt ?? workTime?.startTime}
+                className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-900">
+                    Ca làm việc
+                  </span>
+                  <Tag
+                    color={statusMeta.color}
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                  >
+                    {statusMeta.label}
+                  </Tag>
+                  {workTime?.kolName ? (
+                    <span className="text-xs text-slate-500">
+                      Host: {workTime.kolName}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Thời gian
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-900">
+                      {composeWorktimeDuration(workTime)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Ghi chú
+                    </p>
+                    <p className="mt-1 text-slate-900">
+                      {workTime?.note ?? "--"}
+                    </p>
+                  </div>
+                </div>
+
+                {canComplete ? (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="primary"
+                      loading={isCompleting}
+                      className="!h-9 !rounded-lg !px-4 text-sm font-semibold"
+                      onClick={() =>
+                        handleCompleteWorkTime({
+                          workTimeId,
+                          bookingRequestId,
+                        })
+                      }
+                    >
+                      Hoàn tất công việc
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <CalendarRange size={16} />
+          <span>Tiến trình công việc</span>
+          {isStatusFetching ? (
+            <Tag color="processing" className="rounded-full px-3 py-1 text-xs">
+              Đang cập nhật
+            </Tag>
+          ) : null}
+        </div>
+        {renderContent()}
+      </div>
+    );
+  };
+
+  const renderLivestreamMetrics = (request) => {
+    const bookingRequestId = resolveBookingRequestId(request);
+    if (!bookingRequestId) return null;
+
+    const statusEntry = bookingStatusMap.get(bookingRequestId);
+    const isStatusLoading =
+      statusEntry?.isPending || statusEntry?.isLoading || false;
+    const statusError = statusEntry?.error;
+    const statusData = statusEntry?.statusData;
+    const workTimes = Array.isArray(statusData?.workTimes)
+      ? statusData.workTimes
+      : [];
+
+    const renderMetricContent = () => {
+      if (statusError) {
+        return (
+          <Alert
+            type="error"
+            showIcon
+            message="KhA'ng th ¯Ÿ t §œi ca livestream"
+            description={statusError?.message}
+            className="rounded-xl border border-red-200/60 bg-white/90"
+          />
+        );
+      }
+
+      if (isStatusLoading && !workTimes.length) {
+        return <Skeleton active paragraph={{ rows: 3 }} />;
+      }
+
+      if (!workTimes.length) {
+        return <Empty description="Chưa có thông tin thống kê Livestream" />;
+      }
+
+      return (
+        <Space direction="vertical" size="middle" className="w-full">
+          {workTimes.map((workTime) => {
+            const workTimeId = resolveWorkTimeId(workTime);
+            const metrics =
+              (worktimeLivestreamMetricsMap.get(workTimeId) ?? null) || null;
+            const queryState = findMetricQueryByWorktimeId(workTimeId);
+            const metricsError = queryState?.error;
+            const errorMessage =
+              metricsError?.response?.data?.message ?? metricsError?.message;
+            const isMetricsMissing =
+              metricsError && isMissingLivestreamMetricError(metricsError);
+            const normalizedMetrics = isMetricsMissing ? null : metrics;
+            const isMetricsLoading =
+              !!(queryState?.isPending || queryState?.isFetching) ||
+              (!queryState &&
+                (isLoadingWorktimeLivestreamMetrics ||
+                  isFetchingWorktimeLivestreamMetrics));
+            const shouldShowMetricsError = Boolean(
+              metricsError && !isMetricsMissing
+            );
+            const isButtonLoading =
+              confirmingWorktimeId === workTimeId &&
+              isConfirmingWorktimeLivestreamMetrics;
+            const showConfirmTag =
+              typeof normalizedMetrics?.isConfirmed === "boolean";
+            const isConfirmedValue = showConfirmTag
+              ? normalizedMetrics.isConfirmed
+              : Boolean(normalizedMetrics?.confirmedAt);
+
+            return (
+              <div
+                key={workTimeId ?? workTime?.startAt ?? workTime?.startTime}
+                className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} />
+                    <span className="text-sm font-semibold text-slate-900">
+                      Ca livestream {workTimeId ?? ""}
+                    </span>
+                  </div>
+                  <Space size="small" wrap>
+                    {showConfirmTag ? (
+                      <Tag color={isConfirmedValue ? "green" : "orange"}>
+                        {isConfirmedValue ? "Đã xác nhận" : "Chưa xác nhận"}
+                      </Tag>
+                    ) : null}
+                    {normalizedMetrics?.confirmedAt ? (
+                      <Text type="secondary">
+                        Xác nhận lúc:{" "}
+                        {formatDateTime(normalizedMetrics.confirmedAt)}
+                      </Text>
+                    ) : null}
+                  </Space>
+                </div>
+
+                {isMetricsLoading ? (
+                  <Skeleton active paragraph={{ rows: 6 }} />
+                ) : shouldShowMetricsError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="Không thể tải thống kê livestream"
+                    description={
+                      errorMessage ? String(errorMessage) : undefined
+                    }
+                  />
+                ) : normalizedMetrics ? (
+                  <>
+                    <Descriptions
+                      bordered
+                      size="middle"
+                      column={screens.lg ? 3 : screens.md ? 2 : 1}
+                      labelStyle={{ width: 220 }}
+                    >
+                      {LIVESTREAM_METRIC_LABELS.map(({ key, label }) => (
+                        <Descriptions.Item key={key} label={label}>
+                          {formatLivestreamMetricValue(
+                            key,
+                            normalizedMetrics?.[key]
+                          )}
+                        </Descriptions.Item>
+                      ))}
+                    </Descriptions>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <Space size="small" wrap>
+                        {normalizedMetrics?.createdAt ? (
+                          <Text type="secondary">
+                            Cập nhật lúc:{" "}
+                            {formatDateTime(normalizedMetrics.createdAt)}
+                          </Text>
+                        ) : null}
+                        {normalizedMetrics?.confirmedAt ? (
+                          <Text type="secondary">
+                            Xác nhận lúc:{" "}
+                            {formatDateTime(normalizedMetrics.confirmedAt)}
+                          </Text>
+                        ) : null}
+                      </Space>
+                      {normalizedMetrics?.confirmedAt === null ? (
+                        <Button
+                          type="primary"
+                          ghost
+                          onClick={() =>
+                            handleConfirmMetrics(workTimeId, queryState)
+                          }
+                          loading={isButtonLoading}
+                          disabled={
+                            isButtonLoading ||
+                            isMetricsLoading ||
+                            !normalizedMetrics ||
+                            workTimeId === null ||
+                            workTimeId === undefined
+                          }
+                        >
+                          Xác nhận thống kê
+                        </Button>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <Empty description="Chưa có thống kê livestream" />
+                )}
+              </div>
+            );
+          })}
+        </Space>
+      );
+    };
+
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Sparkles size={16} />
+          <span>Thống kê livestream</span>
+        </div>
+        {renderMetricContent()}
       </div>
     );
   };
@@ -470,7 +1082,7 @@ const CampaignBookingDetailPage = () => {
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Host chính sau đàm phán
+              Host chính ưu tiên tham gia
             </p>
             {renderNameList(
               negotiatedKolNames,
@@ -479,7 +1091,7 @@ const CampaignBookingDetailPage = () => {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Trợ Live tham gia sau đàm phán
+              Trợ Live ưu tiên tham gia
             </p>
             {renderNameList(
               negotiatedLiveNames,
@@ -491,6 +1103,10 @@ const CampaignBookingDetailPage = () => {
         <div className="mt-6">
           {renderPaymentSchedules(request?.paymentSchedules, request)}
         </div>
+
+        <div className="mt-6">{renderWorkTimes(request)}</div>
+
+        <div className="mt-6">{renderLivestreamMetrics(request)}</div>
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <Button
@@ -525,7 +1141,7 @@ const CampaignBookingDetailPage = () => {
             </Button>
             <Button
               icon={<RefreshCcw size={16} />}
-              onClick={() => refetchCampaignDetail()}
+              onClick={handleRefreshAll}
               loading={isFetchingCampaignDetail}
               className="ml-auto !h-11 !rounded-xl !border-slate-200 !bg-white hover:!border-indigo-500/60 hover:!text-indigo-600"
             >
@@ -612,6 +1228,62 @@ const CampaignBookingDetailPage = () => {
                         {detail?.createdByEmail ?? "--"}
                       </p>
                     </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Số giờ livestream
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.livestreamHours ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Kiểu lặp
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.repeatType ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Địa điểm livestream
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.livestreamAddress ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Địa chỉ người đặt
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.permanentAddress ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Tên người đặt
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.ordererFullName ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Số điện thoại người đặt
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.ordererPhone ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Mã thuế
+                      </p>
+                      <p className="mt-1 text-base text-slate-900">
+                        {detail?.taxCode ?? "--"}
+                      </p>
+                    </div>
                   </div>
                 </section>
 
@@ -672,7 +1344,7 @@ const CampaignBookingDetailPage = () => {
                         className="mx-auto mb-3 text-indigo-500"
                       />
                       <p className="text-sm font-medium text-slate-600">
-                        Chưa có đơn booking nào
+                        Chưa có đơn nào cho chiến dịch này.
                       </p>
                       <p className="text-xs text-slate-500">
                         Khi có kết quả đàm phán, chi tiết sẽ được hiển thị tại

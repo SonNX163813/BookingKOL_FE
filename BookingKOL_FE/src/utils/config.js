@@ -6,7 +6,7 @@
 // export const BASE_URL = BASE.endsWith("/api") ? `${BASE}/v1` : `${BASE}`;
 
 // src/utils/config.js
-export const BASE_URL = "https://voga.io.vn/api";
+export const BASE_URL = "https://nexuslive.io.vn/api";
 
 // export const BASE_URL = "http://localhost:8080/api";
 

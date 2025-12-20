@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Container, Typography, Stack, IconButton } from "@mui/material";
+import { Box, Container, Stack } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import CourseHeroSection from "../../../components/home/course/CourseHeroSection";
@@ -17,8 +17,6 @@ import {
 import { slugify } from "../../../utils/slugify";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
   maximumFractionDigits: 0,
 });
 
@@ -29,6 +27,7 @@ const BASE_QUERY_PARAMS = {
 };
 
 const DEFAULT_FILTER_VALUES = Object.freeze({
+  name: "", // ✅ thêm trường name
   minPrice: "",
   maxPrice: "",
   minDiscount: "",
@@ -37,6 +36,7 @@ const DEFAULT_FILTER_VALUES = Object.freeze({
 });
 
 const FILTER_FIELDS = [
+  "name", // ✅ thêm
   "minPrice",
   "maxPrice",
   "minDiscount",
@@ -64,6 +64,11 @@ const sanitizeFilters = (rawFilters) => {
     ...BASE_QUERY_PARAMS,
     sortDir: filters.sortDir === "desc" ? "desc" : "asc",
   };
+
+  // ✅ name
+  if (filters.name && filters.name.trim()) {
+    params.name = filters.name.trim();
+  }
 
   const minPrice = parseNumericInput(filters.minPrice);
   if (minPrice !== undefined && minPrice >= 0) {
@@ -193,15 +198,27 @@ const CourseLivesteam = () => {
         "Nâng cao khả năng livestream và chiến lược tăng trưởng bền vững.";
       const slug = slugify(name) || "khoa-hoc";
 
+      const price = Number.isFinite(Number(course?.price))
+        ? Number(course.price)
+        : undefined;
+
+      const currentPrice = Number.isFinite(Number(course?.currentPrice))
+        ? Number(course.currentPrice)
+        : undefined;
+
+      const discount = Number.isFinite(Number(course?.discount))
+        ? Number(course.discount)
+        : 0;
+
       return {
         id: course?.id,
         name,
         slug,
-        priceLabel: Number.isFinite(Number(course?.price))
-          ? currencyFormatter.format(Number(course.price))
-          : "Liên hệ",
         description,
         cover: cover ?? hotkolimg,
+        price,
+        currentPrice,
+        discount,
       };
     });
   }, [courses]);
@@ -243,8 +260,8 @@ const CourseLivesteam = () => {
           opacity: 0.65,
         }}
       />
+
       <Container
-        // maxWidth="xl"
         maxWidth={false}
         sx={{
           position: "relative",
@@ -275,13 +292,13 @@ const CourseLivesteam = () => {
               }}
             >
               {/* <CourseHeroSection
-            onExploreTopCourse={() =>
-              handleNavigateDetail(topCourse?.id, topCourse?.slug)
-            }
-            hasCourses={decoratedCourses.length > 0}
-            loading={loading}
-            onManualRefresh={handleRetry}
-          /> */}
+                onExploreTopCourse={() =>
+                  handleNavigateDetail(topCourse?.id, topCourse?.slug)
+                }
+                hasCourses={decoratedCourses.length > 0}
+                loading={loading}
+                onManualRefresh={handleRetry}
+              /> */}
               <CourseFilters
                 filters={formFilters}
                 onFilterInputChange={handleFilterInputChange}
@@ -309,27 +326,12 @@ const CourseLivesteam = () => {
         </Stack>
       </Container>
 
+      {/* ✅ Snackbar báo lỗi */}
       {/* <AppSnackbar
         open={showErrorSnackbar}
         onClose={() => setShowErrorSnackbar(false)}
         severity="error"
-        message={error ?? "Không thể kết nối tới máy chủ"}
-        action={
-          <IconButton
-            size="small"
-            aria-label="thử lại"
-            color="inherit"
-            onClick={() => {
-              setShowErrorSnackbar(false);
-              handleRetry();
-            }}
-            sx={{ mr: 1 }}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              Thử lại
-            </Typography>
-          </IconButton>
-        }
+        message={error}
       /> */}
     </Box>
   );

@@ -48,10 +48,12 @@ const ContractDocPreview = ({ url }) => {
         await renderAsync(buffer, previewRef.current, undefined, {
           className: "docx-preview-content",
           inWrapper: true,
-          ignoreWidth: true,
+          ignoreWidth: false,
           ignoreHeight: true,
-          breakPages: false,
+          breakPages: true,
+          ignoreLastRenderedPageBreak: false,
         });
+
         if (isMounted) {
           setStatus("ready");
         }
@@ -102,6 +104,14 @@ const ContractDocPreview = ({ url }) => {
             color: BOOKING_FLOW_STYLE.textPrimary,
           },
           "& .docx p": { color: BOOKING_FLOW_STYLE.textPrimary },
+          "& p[class^='docx-preview-content-num'] > span:empty": {
+            display: "none",
+          },
+
+          // Nếu muốn ẩn luôn container p
+          "& p[class^='docx-preview-content-num']:has(span:empty)": {
+            display: "none",
+          },
         }}
       />
     </Box>
@@ -115,6 +125,8 @@ const ContractTermsDialog = ({
   onScroll,
   formatCurrency,
   acknowledgementRequired = true,
+  onAcceptTerms,
+  initialAccepted = false,
 }) => {
   const hasContract = Boolean(contract);
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
@@ -127,12 +139,12 @@ const ContractTermsDialog = ({
 
   useEffect(() => {
     if (!open) {
-      setHasReachedBottom(!requireAcknowledgement);
-      setAcceptedTerms(!requireAcknowledgement);
+      setHasReachedBottom(initialAccepted || !requireAcknowledgement);
+      setAcceptedTerms(initialAccepted || !requireAcknowledgement);
       return;
     }
 
-    if (!requireAcknowledgement) {
+    if (!requireAcknowledgement || initialAccepted) {
       setHasReachedBottom(true);
       setAcceptedTerms(true);
       return;
@@ -140,7 +152,7 @@ const ContractTermsDialog = ({
 
     setHasReachedBottom(false);
     setAcceptedTerms(false);
-  }, [open, contract?.id, requireAcknowledgement]);
+  }, [open, contract?.id, requireAcknowledgement, initialAccepted]);
 
   const handleContentScroll = (event) => {
     if (externalScrollHandler) {
@@ -167,8 +179,17 @@ const ContractTermsDialog = ({
     }
   };
 
-  const handleCloseClick = () => {
+  const handleIconClose = () => {
+    if (typeof onClose === "function") {
+      onClose();
+    }
+  };
+
+  const handleAgreeClick = () => {
     if (requireAcknowledgement && !acceptedTerms) return;
+    if (contract?.id && typeof onAcceptTerms === "function") {
+      onAcceptTerms(contract.id);
+    }
     if (typeof onClose === "function") {
       onClose();
     }
@@ -203,9 +224,8 @@ const ContractTermsDialog = ({
           </DialogTitle>
 
           <IconButton
-            onClick={handleCloseClick}
+            onClick={handleIconClose}
             aria-label="Đóng"
-            disabled={requireAcknowledgement && !acceptedTerms}
             sx={{
               position: "absolute",
               right: 12,
@@ -259,7 +279,8 @@ const ContractTermsDialog = ({
                         color: BOOKING_FLOW_STYLE.accent,
                       }}
                     >
-                      {BOOKING_STATUS_LABEL?.[contract.status] || contract.status}
+                      {BOOKING_STATUS_LABEL?.[contract.status] ||
+                        contract.status}
                     </Box>
                   </Typography>
 
@@ -369,7 +390,7 @@ const ContractTermsDialog = ({
 
           <DialogActions sx={{ px: 3, py: 2, backgroundColor: "#fafbff" }}>
             <Button
-              onClick={handleCloseClick}
+              onClick={handleAgreeClick}
               disabled={requireAcknowledgement && !acceptedTerms}
               sx={{
                 textTransform: "none",
@@ -377,7 +398,7 @@ const ContractTermsDialog = ({
                 borderRadius: "12px",
               }}
             >
-              {requireAcknowledgement ? "Đồng ý" : "Đóng"}
+              {requireAcknowledgement ? "Đóng" : "Đóng"}
             </Button>
           </DialogActions>
         </>

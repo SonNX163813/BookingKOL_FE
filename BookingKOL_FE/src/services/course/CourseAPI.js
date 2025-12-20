@@ -1,6 +1,7 @@
 import { get, patch, post } from "../../config/axios-config";
 import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 const COURSE_LIST_ALLOWED_PARAMS = new Set([
+  "name",
   "minPrice",
   "maxPrice",
   "minDiscount",

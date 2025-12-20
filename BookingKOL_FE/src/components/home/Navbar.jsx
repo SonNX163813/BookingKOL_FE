@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -24,6 +24,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import logoweb from "../../assets/logocty.png";
 import { useAuth } from "../../context/AuthContext";
 import NotificationBell from "../common/NotificationBell";
+import { getMyUserProfile } from "../../services/user/UserService";
 
 const navItems = [
   { label: "Trang chủ", to: "/" },
@@ -32,9 +33,9 @@ const navItems = [
     label: "Các gói dịch vụ",
     hasDropdown: true,
     subItems: [
-      { label: "Danh sách KOL", to: "/danh-sach-kol" },
-      { label: "Danh sách khóa đào tạo livestream", to: "/danh-sach-khoa-hoc" },
-      { label: "Danh sách gói chiến dịch", to: "/goi-chien-dich" },
+      { label: "Dịch vụ LiveStream chuyên nghiệp", to: "/danh-sach-kol" },
+      { label: "Dịch vụ đào tạo LiveStream", to: "/danh-sach-khoa-hoc" },
+      { label: "Dịch vụ thuê theo gói", to: "/goi-chien-dich" },
     ],
   },
   { label: "Blog", to: "/blog" },
@@ -55,10 +56,50 @@ const Navbar = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md")); // <960
   const trigger = useScrollTrigger({ disableHysteresis: true, threshold: 8 });
   const navigate = useNavigate();
+  const [profile, setProfile] = useState(null);
 
   const auth = useAuth?.() || {};
   const { token, user, logout } = auth;
   const loggedIn = !!token;
+
+  const fetchProfile = useCallback(
+    async (signal) => {
+      if (!loggedIn) return null;
+      try {
+        const data = await getMyUserProfile({ signal });
+        setProfile(data);
+        return data;
+      } catch (error) {
+        if (signal?.aborted) return null;
+        console.error("Failed to load user profile:", error);
+        return null;
+      }
+    },
+    [loggedIn]
+  );
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setProfile(null);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    fetchProfile(controller.signal);
+
+    return () => controller.abort();
+  }, [fetchProfile, loggedIn]);
+
+  useEffect(() => {
+    const handleProfileUpdated = () => {
+      const controller = new AbortController();
+      fetchProfile(controller.signal);
+    };
+
+    window.addEventListener("user-profile-updated", handleProfileUpdated);
+    return () =>
+      window.removeEventListener("user-profile-updated", handleProfileUpdated);
+  }, [fetchProfile]);
 
   // hamburger
   const handleMenuOpen = (e) => setAnchorEl(e.currentTarget);
@@ -134,11 +175,20 @@ const Navbar = () => {
     "&:hover": { bgcolor: "rgba(15,23,42,0.04)" },
   };
 
+  const displayUser = profile || user || {};
+
   const fullName =
-    user?.fullName || user?.name || user?.username || "Tài khoản";
+    displayUser?.fullName ||
+    displayUser?.name ||
+    displayUser?.username ||
+    "Tài khoản";
   const shortName =
     fullName?.trim()?.split(/\s+/)?.slice(-1)?.[0] || "Tài khoản";
-  const avatarUrl = user?.avatarUrl || user?.avatar || user?.imageUrl || "";
+  const avatarUrl =
+    displayUser?.avatarUrl ||
+    displayUser?.avatar ||
+    displayUser?.imageUrl ||
+    "";
   const initial = (fullName?.[0] || "U").toUpperCase();
 
   return (
@@ -209,7 +259,10 @@ const Navbar = () => {
                       endIcon={<KeyboardArrowDownIcon />}
                       sx={{
                         px: 1.5,
+
+                        // ✅ CHỈ CHỈNH ĐẬM CHO "CÁC GÓI DỊCH VỤ"
                         fontWeight: 600,
+
                         textTransform: "none",
                         fontSize: "0.975rem",
                         borderRadius: 2,
@@ -313,7 +366,7 @@ const Navbar = () => {
                       >
                         {initial}
                       </Avatar>
-                      {shortName}
+                      {fullName}
                     </Button>
                   </>
                 )}
@@ -353,7 +406,7 @@ const Navbar = () => {
                   <>
                     <NotificationBell loggedIn={loggedIn} />
                     {/* Mobile: click mở (không hover) */}
-                    <Button
+                    {/* <Button
                       onClick={handleAccountClick}
                       sx={{ ...accountBtnSx, px: 1 }}
                     >
@@ -365,7 +418,7 @@ const Navbar = () => {
                         {initial}
                       </Avatar>
                       {shortName}
-                    </Button>
+                    </Button> */}
                   </>
                 )}
 
@@ -407,6 +460,16 @@ const Navbar = () => {
           },
         }}
       >
+        <Button onClick={handleAccountClick} sx={{ ...accountBtnSx, px: 1 }}>
+          <Avatar
+            src={avatarUrl}
+            alt={fullName}
+            sx={{ width: 26, height: 26, fontSize: 13 }}
+          >
+            {initial}
+          </Avatar>
+          {shortName}
+        </Button>
         {navItems.map((item) =>
           item.hasDropdown ? (
             <Box key={item.label}>
@@ -481,7 +544,11 @@ const Navbar = () => {
                     },
                   }}
                 >
-                  <ListItemText primary={subItem.label} />
+                  {/* ✅ CHỈ CHỈNH ĐẬM CHO CHỮ SUB-ITEM DỊCH VỤ (DESKTOP DROPDOWN) */}
+                  <ListItemText
+                    primary={subItem.label}
+                    primaryTypographyProps={{ fontWeight: 700 }}
+                  />
                 </ListItemButton>
               </ListItem>
             ))}

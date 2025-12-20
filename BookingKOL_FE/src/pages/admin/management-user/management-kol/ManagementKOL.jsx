@@ -9,8 +9,8 @@ import {
   CalendarRange,
   CalendarDays,
   CheckCircle2,
-  BarChart3, // Icon thống kê
-  Star, // Icon xem đánh giá
+  BarChart3,
+  Star,
 } from "lucide-react";
 
 import {
@@ -44,6 +44,27 @@ const viNormalize = (s) =>
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 
+// ✅ yêu cầu:
+// - tổng chữ số (nguyên + thập phân) tối đa = 13
+// - thập phân tối đa = 2
+// - không cho nhập ký tự đặc biệt
+const MAX_TOTAL_DIGITS = 13;
+const MAX_DEC_DIGITS = 2;
+
+const analyzeDisplay = (displayStr) => {
+  const raw = String(displayStr ?? "")
+    .replace(/đ|vnđ/gi, "")
+    .replace(/\s/g, "");
+
+  const commaCount = (raw.match(/,/g) || []).length;
+  const [left = "", right = ""] = raw.split(",", 2);
+
+  const intDigits = left.replace(/\D/g, "");
+  const decDigits = right.replace(/\D/g, "");
+
+  return { commaCount, intDigits, decDigits };
+};
+
 const ManagementKOL = () => {
   const navigate = useNavigate();
 
@@ -56,20 +77,19 @@ const ManagementKOL = () => {
   const [minRating, setMinRating] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // ✅ helper text dưới ô minBookingPrice
+  const [minPriceExtra, setMinPriceExtra] = useState("");
+
+  // ✅ helper text dưới ô search (max 100 ký tự, không show 0/100)
+  const [searchExtra, setSearchExtra] = useState("");
+
   // Category
   const [categoryId, setCategoryId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // Dữ liệu từ BE khi không lọc category
   const { isLoadingGetALlKol, ResponseGetAllKol, refetchGetAllKol } =
-    useGetAllKol(
-      page,
-      size,
-      searchMinBookingPrice,
-      minRating,
-      searchValue // -> BE param 'search' (displayName)
-    );
+    useGetAllKol(page, size, searchMinBookingPrice, minRating, searchValue);
 
   const totalElements = ResponseGetAllKol?.data?.totalElements ?? 0;
 
@@ -126,13 +146,11 @@ const ManagementKOL = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId, page, size]);
 
-  // Nguồn dữ liệu thô
   const rawList = useMemo(() => {
     if (categoryId) return listByCategory ?? [];
     return ResponseGetAllKol?.data?.content ?? [];
   }, [categoryId, listByCategory, ResponseGetAllKol]);
 
-  // Lọc FE (contains + bỏ dấu)
   const filteredData = useMemo(() => {
     const needle = viNormalize(searchValue);
     const minPrice = Number(searchMinBookingPrice || 0);
@@ -185,35 +203,33 @@ const ManagementKOL = () => {
     }
   };
 
-  // 👉 Nút lịch: Admin xem lịch KOL (mặc định view=month)
   const handleOpenSchedule = (record) => {
     navigate(`/admin/kols/${record?.id}/schedule?view=month`);
   };
 
-  // 👉 Nút lịch sử booking của KOL
   const handleOpenBookingHistory = (record) => {
     navigate(`/admin/kols/${record?.id}/bookings`);
   };
 
-  // 👉 Nút xem metric / thống kê hiệu suất KOL
   const handleOpenMetrics = (record) => {
     navigate(`/admin/kols/${record?.id}/metrics`);
   };
 
-  // 👉 Nút xem đánh giá / feedback của KOL
   const handleOpenReviews = (record) => {
     if (!record?.id) return;
     navigate(`/admin/feedbacks/kol/${record.id}`, {
-      state: {
-        kolName: record.displayName, // 👈 truyền displayName sang
-      },
+      state: { kolName: record.displayName },
     });
   };
 
   const handleSearch = (values) => {
     const vSearch = values?.search?.trim() || undefined;
+
     const raw = values?.minBookingPrice;
-    const num = raw ? Number(String(raw)) : undefined;
+    const num =
+      raw !== undefined && raw !== null && raw !== ""
+        ? Number(String(raw))
+        : undefined;
 
     setSearchValue(vSearch);
     setSearchMinBookingPrice(Number.isFinite(num) ? num : undefined);
@@ -222,6 +238,8 @@ const ManagementKOL = () => {
 
   const resetForm = () => {
     form.resetFields();
+    setMinPriceExtra("");
+    setSearchExtra("");
     setSearchValue(undefined);
     setSearchMinBookingPrice(undefined);
     setMinRating(null);
@@ -238,6 +256,102 @@ const ManagementKOL = () => {
   const handlePageSizeChange = (_currentPage, pageSizeNumber) => {
     if (page !== 0) setPage(0);
     if (pageSizeNumber !== size) setSize(pageSizeNumber);
+  };
+
+  // ✅ chặn nhập ký tự đặc biệt, + chặn vượt giới hạn digit
+  const handleMinPriceKeyDown = (e) => {
+    const allowKeys = [
+      "Backspace",
+      "Delete",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Tab",
+      "Home",
+      "End",
+      "Enter",
+    ];
+    if (allowKeys.includes(e.key)) return;
+
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      ["a", "c", "v", "x"].includes(e.key.toLowerCase())
+    )
+      return;
+
+    const isDigit = /^[0-9]$/.test(e.key);
+    const isComma = e.key === ",";
+
+    if (!isDigit && !isComma) {
+      e.preventDefault();
+      return;
+    }
+
+    const input = e.currentTarget;
+    const raw = String(input.value ?? "");
+    const start = input.selectionStart ?? raw.length;
+    const end = input.selectionEnd ?? raw.length;
+
+    const next = raw.slice(0, start) + e.key + raw.slice(end);
+    const { commaCount, intDigits, decDigits } = analyzeDisplay(next);
+
+    if (commaCount > 1) {
+      e.preventDefault();
+      return;
+    }
+
+    if (isComma && intDigits.length === 0) {
+      e.preventDefault();
+      return;
+    }
+
+    if (decDigits.length > MAX_DEC_DIGITS) {
+      e.preventDefault();
+      return;
+    }
+
+    const totalDigits = intDigits.length + decDigits.length;
+
+    if (totalDigits > MAX_TOTAL_DIGITS) {
+      e.preventDefault();
+      setMinPriceExtra("Tối đa 13 chữ số (bao gồm cả phần thập phân).");
+      return;
+    }
+
+    if (totalDigits === MAX_TOTAL_DIGITS)
+      setMinPriceExtra("Đã đạt tối đa 13 chữ số.");
+    else setMinPriceExtra("");
+  };
+
+  const handleMinPricePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData?.getData("text") ?? "";
+
+    const cleaned = String(text)
+      .replace(/đ|vnđ/gi, "")
+      .replace(/\s/g, "")
+      .replace(/[^\d,]/g, "");
+
+    const firstComma = cleaned.indexOf(",");
+    let intPart = firstComma >= 0 ? cleaned.slice(0, firstComma) : cleaned;
+    let decPart = firstComma >= 0 ? cleaned.slice(firstComma + 1) : "";
+
+    intPart = intPart.replace(/\D/g, "");
+    decPart = decPart.replace(/\D/g, "").slice(0, MAX_DEC_DIGITS);
+
+    intPart = intPart.slice(0, MAX_TOTAL_DIGITS);
+    const remain = Math.max(0, MAX_TOTAL_DIGITS - intPart.length);
+    const decLimit = Math.min(MAX_DEC_DIGITS, remain);
+    decPart = decPart.slice(0, decLimit);
+
+    const canonical = decPart ? `${intPart}.${decPart}` : intPart;
+    form.setFieldValue("minBookingPrice", canonical);
+
+    const totalDigits = intPart.length + decPart.length;
+    setMinPriceExtra(
+      totalDigits === MAX_TOTAL_DIGITS ? "Đã đạt tối đa 13 chữ số." : ""
+    );
   };
 
   const columns = [
@@ -276,8 +390,25 @@ const ManagementKOL = () => {
         );
       },
     },
-    { title: "Tên KOL", key: "displayName", dataIndex: "displayName" },
-
+    {
+      title: "Tên KOL",
+      key: "displayName",
+      dataIndex: "displayName",
+      width: 400,
+      render: (text) => (
+        <div
+          style={{
+            maxWidth: 400,
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            lineHeight: 1.4,
+          }}
+        >
+          {text || "N/A"}
+        </div>
+      ),
+    },
     {
       title: "Chuyên mục",
       key: "categories",
@@ -312,7 +443,6 @@ const ManagementKOL = () => {
       width: 480,
       render: (record) => (
         <div className="w-full flex justify-center gap-2">
-          {/* Xem portfolio */}
           <Tooltip title="Xem portfolio">
             <Button
               onClick={() => handleViewDetail(record)}
@@ -322,7 +452,6 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* Sửa thông tin */}
           <Tooltip title="Sửa thông tin">
             <Button
               onClick={() => handleEdit(record)}
@@ -332,7 +461,6 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* Lịch sử booking */}
           <Tooltip title="Lịch sử booking">
             <Button
               onClick={() => handleOpenBookingHistory(record)}
@@ -349,7 +477,6 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* Thống kê / Metric */}
           <Tooltip title="Thống kê hiệu suất KOL">
             <Button
               onClick={() => handleOpenMetrics(record)}
@@ -359,7 +486,6 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* Xem đánh giá */}
           <Tooltip title="Xem đánh giá / phản hồi">
             <Button
               onClick={() => handleOpenReviews(record)}
@@ -369,7 +495,6 @@ const ManagementKOL = () => {
             </Button>
           </Tooltip>
 
-          {/* Xem lịch làm việc (mặc định tháng) */}
           <Tooltip title="Xem lịch làm việc">
             <Button
               onClick={() => handleOpenSchedule(record)}
@@ -405,46 +530,118 @@ const ManagementKOL = () => {
           className="flex gap-3 flex-wrap"
           onFinish={handleSearch}
         >
-          <Form.Item name="search">
+          {/* ✅ Search max 100 ký tự, không show 0/100, có thông báo khi đạt 100 */}
+          <Form.Item
+            name="search"
+            extra={
+              searchExtra ? (
+                <div className="text-amber-600 text-xs mt-1">{searchExtra}</div>
+              ) : null
+            }
+          >
             <Input
-              className="h-12!"
-              placeholder="Tìm tên KOL (chứa ký tự)"
-              onPressEnter={() => form.submit()}
+              className="!h-12"
+              placeholder="Tìm tên KOL"
+              maxLength={100}
               allowClear
+              onChange={(e) => {
+                const v = e.target.value ?? "";
+                setSearchExtra(
+                  v.length === 100 ? "Đã đạt tối đa 100 ký tự." : ""
+                );
+              }}
+              onPressEnter={() => form.submit()}
             />
           </Form.Item>
 
           <Form.Item
             name="minBookingPrice"
+            extra={
+              minPriceExtra ? (
+                <div className="text-amber-600 text-xs mt-1">
+                  {minPriceExtra}
+                </div>
+              ) : null
+            }
             rules={[
               {
                 validator: (_, value) => {
                   if (value === undefined || value === "" || value === null) {
+                    setMinPriceExtra("");
                     return Promise.resolve();
                   }
-                  const num = Number(String(value).replace(/\D/g, ""));
+
+                  const s = String(value); // canonical: "1234.56"
+                  const [intRaw = "", decRaw = ""] = s.split(".");
+                  const intDigits = intRaw.replace(/\D/g, "");
+                  const decDigits = decRaw.replace(/\D/g, "");
+
+                  if (!intDigits) return Promise.reject("Chỉ nhập số.");
+                  if (decDigits.length > MAX_DEC_DIGITS)
+                    return Promise.reject("Tối đa 2 chữ số thập phân.");
+
+                  const totalDigits = intDigits.length + decDigits.length;
+                  if (totalDigits > MAX_TOTAL_DIGITS)
+                    return Promise.reject(
+                      "Tối đa 13 chữ số (bao gồm cả phần thập phân)."
+                    );
+
+                  const num = Number(s);
                   if (!Number.isFinite(num))
                     return Promise.reject("Chỉ nhập số.");
+
                   if (num < 10000) return Promise.reject("Tối thiểu 10.000 đ.");
-                  if (num >= 1000000000)
-                    return Promise.reject("Nhỏ hơn 1.000.000.000 đ.");
+
+                  setMinPriceExtra(
+                    totalDigits === MAX_TOTAL_DIGITS
+                      ? "Đã đạt tối đa 13 chữ số."
+                      : ""
+                  );
+
                   return Promise.resolve();
                 },
               },
             ]}
           >
             <InputNumber
-              className="!h-12 !w-64"
+              className="!w-64 !h-12 [&_.ant-input-number-input-wrap]:!h-12 [&_.ant-input-number-input]:!h-12 [&_.ant-input-number-input]:!leading-[46px]"
               placeholder="Giá booking tối thiểu"
               controls={false}
               stringMode
-              formatter={(val) => {
-                if (!val) return "";
-                const v = String(val).replace(/[^\d]/g, "");
-                return v.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " đ";
-              }}
-              parser={(val) => (val ? val.replace(/[^\d]/g, "") : "")}
+              inputMode="decimal"
+              onKeyDown={handleMinPriceKeyDown}
+              onPaste={handleMinPricePaste}
               onPressEnter={() => form.submit()}
+              formatter={(val) => {
+                if (val === undefined || val === null || val === "") return "";
+                const s = String(val); // canonical "1234.56"
+                const [intPart = "", decPart = ""] = s.split(".");
+                const intFmt = intPart
+                  .replace(/\D/g, "")
+                  .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                return decPart ? `${intFmt},${decPart} đ` : `${intFmt} đ`;
+              }}
+              parser={(val) => {
+                if (!val) return "";
+                const raw = String(val)
+                  .replace(/đ|vnđ/gi, "")
+                  .replace(/\s/g, "")
+                  .replace(/[^\d,]/g, "");
+
+                const firstComma = raw.indexOf(",");
+                let intPart = firstComma >= 0 ? raw.slice(0, firstComma) : raw;
+                let decPart = firstComma >= 0 ? raw.slice(firstComma + 1) : "";
+
+                intPart = intPart.replace(/\D/g, "");
+                decPart = decPart.replace(/\D/g, "");
+
+                intPart = intPart.slice(0, MAX_TOTAL_DIGITS);
+                const remain = Math.max(0, MAX_TOTAL_DIGITS - intPart.length);
+                const decLimit = Math.min(MAX_DEC_DIGITS, remain);
+                decPart = decPart.slice(0, decLimit);
+
+                return decPart ? `${intPart}.${decPart}` : intPart;
+              }}
             />
           </Form.Item>
 
@@ -452,7 +649,7 @@ const ManagementKOL = () => {
             placeholder="Đánh giá tối thiểu"
             value={minRating}
             onChange={(v) => {
-              setMinRating(v);
+              setMinRating(v ?? null);
               setPage(0);
             }}
             className="w-48 !h-12"
@@ -487,7 +684,7 @@ const ManagementKOL = () => {
           <Form.Item>
             <Button
               htmlType="submit"
-              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+              className="!h-12 !bg-[#fa7833] !text-white !font-bold"
             >
               <Search size={16} /> Tìm kiếm
             </Button>
@@ -496,7 +693,7 @@ const ManagementKOL = () => {
           <Form.Item>
             <Button
               onClick={resetForm}
-              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+              className="!h-12 !bg-[#fa7833] !text-white !font-bold"
             >
               <Trash2 size={16} /> Xóa tìm kiếm
             </Button>
@@ -505,17 +702,18 @@ const ManagementKOL = () => {
           <Form.Item>
             <Button
               onClick={handleCreateKol}
-              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+              className="!h-12 !bg-[#fa7833] !text-white !font-bold"
             >
               <Plus size={18} />
               Tạo KOL
             </Button>
           </Form.Item>
+
           <Form.Item>
             <Button
               onClick={handleExportKol}
               loading={isExporting}
-              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+              className="!h-12 !bg-[#fa7833] !text-white !font-bold"
             >
               Xuất dữ liệu KOL
             </Button>
@@ -524,6 +722,7 @@ const ManagementKOL = () => {
       </div>
 
       <Table
+        tableLayout="fixed"
         columns={columns}
         dataSource={filteredData}
         loading={tableLoading}

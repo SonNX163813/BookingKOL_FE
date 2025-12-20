@@ -100,24 +100,24 @@ const ManagementBlog = () => {
 
   const handleUploadThumbnail = async (blogId, file) => {
     if (!blogId) {
-      message.warning("Khong tim thay blog id.");
+      message.warning("Không tìm thấy blog id.");
       return;
     }
     if (!file) {
-      message.warning("Vui long chon file anh.");
+      message.warning("Vui lòng chọn file hợp lệ.");
       return;
     }
 
     try {
       setThumbnailUploadingId(blogId);
       await adminUploadBlogThumbnail(blogId, file);
-      message.success("Cap nhat thumbnail thanh cong.");
+      message.success("Cập nhật thumbnail thành công.");
       fetchBlogs(page, size);
     } catch (error) {
       const errorMsg =
         error?.response?.data?.message ||
         error?.message ||
-        "Khong the cap nhat thumbnail. Vui long thu lai.";
+        "Không thể cập nhật thumbnail. Vui lòng thử lại.";
       message.error(errorMsg);
     } finally {
       setThumbnailUploadingId(null);
@@ -126,20 +126,20 @@ const ManagementBlog = () => {
 
   const handleRemoveThumbnail = async (blogId) => {
     if (!blogId) {
-      message.warning("Khong tim thay blog id.");
+      message.warning("Không tìm thấy blog id.");
       return;
     }
 
     try {
       setThumbnailRemovingId(blogId);
       await adminDeleteBlogThumbnail(blogId);
-      message.success("Da xoa thumbnail cua blog.");
+      message.success("Đã xóa thumbnail của blog.");
       fetchBlogs(page, size);
     } catch (error) {
       const errorMsg =
         error?.response?.data?.message ||
         error?.message ||
-        "Khong the xoa thumbnail. Vui long thu lai.";
+        "Không thể xóa thumbnail. Vui lòng thử lại.";
       message.error(errorMsg);
     } finally {
       setThumbnailRemovingId(null);

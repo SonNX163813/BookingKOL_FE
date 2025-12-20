@@ -9,8 +9,6 @@ import {
   Divider,
   Stack,
   Typography,
-  Snackbar,
-  Alert,
   CircularProgress,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -31,7 +29,46 @@ dayjs.locale("vi");
 
 const MIN_GAP_MINUTES = 60;
 const MIN_DURATION_MINUTES = 60;
-const MIN_DATE = dayjs().add(7, "day").startOf("day");
+
+/** Compute min selectable date + min start hour on that min date (match BE: now + 7 days exact time) */
+function computeMinRule() {
+  const now = dayjs();
+  const minAllowed = now.add(7, "day"); // BE rule (exact 7 days)
+
+  // Base min date is that day (startOf day)
+  let minDate = minAllowed.startOf("day");
+
+  // Because UI selects only hours (minute=0), we must round up to next hour if now has minutes/seconds
+  let firstHour = minAllowed.hour();
+  const hasMinutePart =
+    minAllowed.minute() !== 0 ||
+    minAllowed.second() !== 0 ||
+    minAllowed.millisecond() !== 0;
+
+  if (hasMinutePart) firstHour += 1;
+
+  // If rounding pushes hour >= 24 => shift to next day 00:00
+  if (firstHour >= 24) {
+    minDate = minDate.add(1, "day").startOf("day");
+    firstHour = 0;
+  }
+
+  // Ensure there is at least one valid start hour on minDate given MIN_DURATION (avoid end spilling to next day)
+  const latestStart = minDate
+    .hour(23)
+    .minute(0)
+    .second(0)
+    .millisecond(0)
+    .subtract(MIN_DURATION_MINUTES, "minute");
+
+  // If firstHour is later than latestStart hour => no valid slot on that minDate, bump minDate to next day
+  if (firstHour > latestStart.hour()) {
+    minDate = minDate.add(1, "day").startOf("day");
+    firstHour = 0;
+  }
+
+  return { minDate, firstStartHourOnMinDate: firstHour };
+}
 
 // ===== Helpers auth =====
 function readJSON(raw) {
@@ -87,21 +124,6 @@ const dayOfWeekLabel = (d) => {
   if (w === 0) return "CN";
   return `T${w + 1}`;
 };
-
-function extractApiMessage(err) {
-  const data = err?.response?.data;
-  if (!data) return "";
-  if (typeof data?.message === "string") return data.message;
-  if (Array.isArray(data?.message) && data.message.length)
-    return data.message[0];
-  if (typeof data === "string") return data;
-  return "";
-}
-
-const labelOf = (date, start, end) =>
-  `${start?.format("HH:mm")}–${end?.format("HH:mm")}, ${date?.format(
-    "DD/MM/YYYY"
-  )}`;
 
 /* ===== Helpers cho blocked ranges (từ timeline) ===== */
 const isCancelled = (st) => String(st || "").toUpperCase() === "CANCELLED";
@@ -162,6 +184,10 @@ export default function KolWorkRegistrationMui({
 }) {
   const { kolId: kolIdParam } = useParams();
 
+  const minRule = React.useMemo(() => computeMinRule(), []);
+  const MIN_DATE = minRule.minDate;
+  const MIN_FIRST_HOUR = minRule.firstStartHourOnMinDate;
+
   const [resolvedUserId, setResolvedUserId] = React.useState(null);
   const [resolvedKolId, setResolvedKolId] = React.useState(null);
   const [resolving, setResolving] = React.useState(true);
@@ -181,11 +207,15 @@ export default function KolWorkRegistrationMui({
   // ✅ flow: thêm ca => chỉ có start, end chọn sau; tự mở end picker
   const [openEndIdx, setOpenEndIdx] = React.useState(null);
 
-  const [snack, setSnack] = React.useState({
-    open: false,
-    type: "success",
-    message: "",
-  });
+  const isMinSelectableDay = React.useMemo(() => {
+    return !!pickedDate && pickedDate.isSame(MIN_DATE, "day");
+  }, [pickedDate, MIN_DATE]);
+
+  const minStartTimeForPickedDay = React.useMemo(() => {
+    if (!pickedDate) return null;
+    if (!pickedDate.isSame(MIN_DATE, "day")) return null;
+    return pickedDate.hour(MIN_FIRST_HOUR).minute(0).second(0).millisecond(0);
+  }, [pickedDate, MIN_DATE, MIN_FIRST_HOUR]);
 
   /* -------- Resolve userId + kolId -------- */
   React.useEffect(() => {
@@ -270,6 +300,7 @@ export default function KolWorkRegistrationMui({
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kolIdParam, isAdmin, adminKolId]);
 
   /* -------- Blocked (từ timeline) -------- */
@@ -397,7 +428,6 @@ export default function KolWorkRegistrationMui({
     return pickedDate.hour(val.hour()).minute(0).second(0).millisecond(0);
   };
 
-  // latest start = 23:00 - duration (vì chọn theo giờ)
   const latestStartTime = React.useMemo(() => {
     if (!pickedDate) return null;
     return pickedDate
@@ -412,16 +442,9 @@ export default function KolWorkRegistrationMui({
   const addShift = () => {
     if (!pickedDate) return;
 
-    // ✅ nếu ca trước chưa có end -> bắt chọn end trước khi thêm ca mới
     if (shifts.length) {
       const last = shifts[shifts.length - 1];
       if (!last?.start || !last?.end) {
-        setSnack({
-          open: true,
-          type: "error",
-          message:
-            "Vui lòng chọn giờ kết thúc cho ca trước rồi mới thêm ca mới.",
-        });
         setOpenEndIdx(shifts.length - 1);
         return;
       }
@@ -429,44 +452,50 @@ export default function KolWorkRegistrationMui({
 
     let start = pickedDate.hour(9).minute(0).second(0).millisecond(0);
 
+    // ✅ nếu là ngày min, default start >= minStartHour
+    if (isMinSelectableDay && minStartTimeForPickedDay) {
+      const h = Math.max(9, minStartTimeForPickedDay.hour());
+      start = pickedDate.hour(h).minute(0).second(0).millisecond(0);
+    }
+
     if (shifts.length) {
       const last = shifts[shifts.length - 1];
-      // last.end chắc chắn đã có theo check trên
       start = last.end.add(MIN_GAP_MINUTES, "minute").minute(0).second(0);
     }
 
-    // ✅ chỉ set start, end để null (user chọn sau)
     const newShift = { start, end: null };
 
     setShifts((s) => {
       const next = [...s, newShift];
-      // ✅ tự mở end picker của ca mới
       setOpenEndIdx(next.length - 1);
       return next;
     });
   };
 
-  // ✅ flow: chọn start trước -> end phải chọn sau (không auto-fill end)
   const updateShift = (idx, field, val) => {
     setShifts((arr) =>
       arr.map((s, i) => {
         if (i !== idx) return s;
 
-        // clear
         if (!val) {
           if (field === "start") return { ...s, start: null, end: null };
           return { ...s, end: null };
         }
 
-        const nextTime = normalizeAtPickedDate(val);
+        let nextTime = normalizeAtPickedDate(val);
         if (!nextTime) return s;
 
+        // ✅ clamp start on min day to >= minStartTimeForPickedDay
+        if (field === "start" && minStartTimeForPickedDay) {
+          if (nextTime.isBefore(minStartTimeForPickedDay)) {
+            nextTime = minStartTimeForPickedDay;
+          }
+        }
+
         if (field === "start") {
-          // đổi start => reset end (để user chọn lại theo start mới)
           return { ...s, start: nextTime, end: null };
         }
 
-        // chọn END sau (chỉ cho chọn khi đã có start)
         if (!s.start) return { ...s, end: null };
 
         const start = dayjs(s.start);
@@ -492,10 +521,10 @@ export default function KolWorkRegistrationMui({
     });
   };
 
-  /* -------- Validate -------- */
-  const validate = () => {
-    if (!pickedDate) return "Vui lòng chọn ngày đăng ký (≥ 7 ngày).";
-    if (!shifts.length) return "Vui lòng thêm ít nhất 1 ca.";
+  /* -------- Disable submit if invalid (no UI message) -------- */
+  const validationError = React.useMemo(() => {
+    if (!pickedDate) return "NO_DATE";
+    if (!shifts.length) return "NO_SHIFT";
 
     const sorted = [...shifts].sort((a, b) =>
       a.start && b.start ? a.start.diff(b.start) : 0
@@ -503,18 +532,22 @@ export default function KolWorkRegistrationMui({
 
     for (let i = 0; i < sorted.length; i++) {
       const s = sorted[i];
-      if (!s.start || !s.end)
-        return "Vui lòng chọn đủ giờ bắt đầu và giờ kết thúc cho từng ca.";
+      if (!s.start || !s.end) return "MISSING_TIME";
+
+      // ✅ min day rule: start must be >= minStartTimeForPickedDay
+      if (
+        minStartTimeForPickedDay &&
+        s.start.isBefore(minStartTimeForPickedDay)
+      )
+        return "BE_MIN_7D_TIME";
 
       const duration = s.end.diff(s.start, "minute");
-      if (duration < MIN_DURATION_MINUTES)
-        return `Mỗi ca phải tối thiểu ${MIN_DURATION_MINUTES} phút.`;
+      if (duration < MIN_DURATION_MINUTES) return "DURATION_TOO_SHORT";
 
       if (i > 0) {
         const prev = sorted[i - 1];
         const gap = s.start.diff(prev.end, "minute");
-        if (gap < MIN_GAP_MINUTES)
-          return `Khoảng cách giữa các ca phải ≥ ${MIN_GAP_MINUTES} phút.`;
+        if (gap < MIN_GAP_MINUTES) return "GAP_TOO_SHORT";
       }
 
       const sIv = {
@@ -524,102 +557,13 @@ export default function KolWorkRegistrationMui({
       const hit = blocked.find((b) =>
         overlaps(sIv.startISO, sIv.endISO, b.startISO, b.endISO)
       );
-      if (hit) {
-        return (
-          `Ca ${i + 1} (${labelOf(pickedDate, s.start, s.end)}) ` +
-          `nằm trong khoảng không khả dụng do lịch đã đặt (bao gồm đệm ±${MIN_GAP_MINUTES}’).`
-        );
-      }
+      if (hit) return "OVERLAP_BLOCKED";
     }
+
     return null;
-  };
+  }, [pickedDate, shifts, blocked, minStartTimeForPickedDay]);
 
-  /* -------- Submit -------- */
-  const handleSave = async () => {
-    const err = validate();
-    if (err) {
-      setSnack({ open: true, type: "error", message: err });
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      if (isAdmin) {
-        if (!resolvedKolId)
-          throw new Error("Không xác định được KOL ID để tạo lịch.");
-        await adminRegisterKolSchedule({ kolId: resolvedKolId, shifts });
-      } else {
-        if (!resolvedUserId)
-          throw new Error("Không xác định được User ID của KOL.");
-
-        const result = await registerKolAvailabilities({
-          kolId: resolvedUserId, // backend: /schedule/{userId}
-          date: pickedDate,
-          shifts,
-        });
-
-        if (Array.isArray(result)) {
-          const bad = result.find(
-            (x) =>
-              typeof x?.status === "number" &&
-              x.status !== 201 &&
-              x.status !== 200
-          );
-          if (bad) {
-            const beMsg =
-              (Array.isArray(bad?.message) && bad.message[0]) ||
-              bad?.message ||
-              "Khoảng thời gian này đã bị trùng với lịch làm việc khác";
-            throw new Error(beMsg);
-          }
-        }
-      }
-
-      setSnack({
-        open: true,
-        type: "success",
-        message: isAdmin
-          ? "Tạo lịch làm việc thành công!"
-          : "Đăng ký ca làm thành công!",
-      });
-      setShifts([]);
-      setOpenEndIdx(null);
-
-      if (resolvedKolId) await reloadMonthSchedule();
-      if (onSuccess) onSuccess();
-    } catch (e) {
-      const httpStatus = e?.response?.status;
-      const appStatus = e?.appStatus;
-      const isConflict =
-        httpStatus === 400 ||
-        httpStatus === 409 ||
-        appStatus === 400 ||
-        appStatus === 409;
-
-      if (isConflict) {
-        const beMsg = extractApiMessage(e);
-        const friendly =
-          e?.message ||
-          beMsg ||
-          `Khoảng thời gian này bị trùng với lịch khác hoặc vi phạm đệm ±${MIN_GAP_MINUTES}’.`;
-        setSnack({ open: true, type: "error", message: friendly });
-      } else {
-        console.error(e);
-        setSnack({
-          open: true,
-          type: "error",
-          message:
-            e?.message ||
-            "Không thể đăng ký ca làm. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
-        });
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const loadingUI = resolving || (!isAdmin && !resolvedUserId);
+  const canSubmit = !!pickedDate && shifts.length > 0 && !validationError;
 
   const canAddShift = React.useMemo(() => {
     if (!pickedDate || saving) return false;
@@ -627,6 +571,41 @@ export default function KolWorkRegistrationMui({
     const last = shifts[shifts.length - 1];
     return !!(last?.start && last?.end);
   }, [pickedDate, saving, shifts]);
+
+  /* -------- Submit (no UI message; backend/interceptor handles) -------- */
+  const handleSave = async () => {
+    if (!canSubmit) return;
+
+    try {
+      setSaving(true);
+
+      if (isAdmin) {
+        if (!resolvedKolId) return;
+        await adminRegisterKolSchedule({ kolId: resolvedKolId, shifts });
+      } else {
+        if (!resolvedUserId) return;
+
+        await registerKolAvailabilities({
+          kolId: resolvedUserId, // backend: /schedule/{userId}
+          date: pickedDate,
+          shifts,
+        });
+      }
+
+      setShifts([]);
+      setOpenEndIdx(null);
+
+      if (resolvedKolId) await reloadMonthSchedule();
+      if (onSuccess) onSuccess();
+    } catch (e) {
+      // no UI message
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadingUI = resolving || (!isAdmin && !resolvedUserId);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
@@ -724,6 +703,8 @@ export default function KolWorkRegistrationMui({
                       ? sh.end.add(-MIN_DURATION_MINUTES, "minute")
                       : null;
 
+                    const minStartTime = minStartTimeForPickedDay || undefined;
+
                     return (
                       <Stack
                         key={idx}
@@ -747,6 +728,7 @@ export default function KolWorkRegistrationMui({
                           ampm={false}
                           views={["hours"]}
                           format="HH:mm"
+                          minTime={minStartTime}
                           maxTime={maxStartTime || latestStartTime || undefined}
                           disabled={saving}
                         />
@@ -802,7 +784,7 @@ export default function KolWorkRegistrationMui({
                   <Button
                     variant="contained"
                     onClick={handleSave}
-                    disabled={!pickedDate || !shifts.length || saving}
+                    disabled={!canSubmit || saving || loadingBlocked}
                     startIcon={saving ? <CircularProgress size={18} /> : null}
                   >
                     {saving
@@ -825,16 +807,16 @@ export default function KolWorkRegistrationMui({
               }}
             >
               <Typography fontWeight={700} mb={1}>
-                Lịch rảnh trong tháng {monthAnchor.format("MM/YYYY")}
+                Lịch đã đăng ký trong tháng {monthAnchor.format("MM/YYYY")}
               </Typography>
 
               {loadingMonthSchedule ? (
                 <Typography color="text.secondary">
-                  Đang tải lịch rảnh...
+                  Đang tải lịch đã đăng ký...
                 </Typography>
               ) : !monthScheduleByDay.length ? (
                 <Typography color="text.secondary">
-                  Chưa có khoảng rảnh nào trong tháng này.
+                  Chưa có đã đăng ký nào trong tháng này.
                 </Typography>
               ) : (
                 <Stack spacing={0.75}>
@@ -868,22 +850,6 @@ export default function KolWorkRegistrationMui({
             </Card>
           </>
         )}
-
-        <Snackbar
-          open={snack.open}
-          autoHideDuration={snack.type === "error" ? 6000 : 3000}
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert
-            onClose={() => setSnack((s) => ({ ...s, open: false }))}
-            severity={snack.type}
-            variant="filled"
-            sx={{ width: "100%" }}
-          >
-            {snack.message}
-          </Alert>
-        </Snackbar>
       </Box>
     </LocalizationProvider>
   );

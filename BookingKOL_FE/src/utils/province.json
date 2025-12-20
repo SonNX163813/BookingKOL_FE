@@ -1,0 +1,894 @@
+[
+  {
+    "name": "Thành phố Hà Nội",
+    "code": 1,
+    "division_type": "thành phố trung ương",
+    "codename": "ha_noi",
+    "phone_code": 24,
+
+    "wards": [
+      {
+        "name": "Phường Hoàn Kiếm",
+        "code": 1,
+        "division_type": "phường",
+        "codename": "phuong_hoan_kiem",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Cửa Nam",
+        "code": 2,
+        "division_type": "phường",
+        "codename": "phuong_cua_nam",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Ba Đình",
+        "code": 3,
+        "division_type": "phường",
+        "codename": "phuong_ba_dinh",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Ngọc Hà",
+        "code": 4,
+        "division_type": "phường",
+        "codename": "phuong_ngoc_ha",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Giảng Võ",
+        "code": 5,
+        "division_type": "phường",
+        "codename": "phuong_giang_vo",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Hai Bà Trưng",
+        "code": 6,
+        "division_type": "phường",
+        "codename": "phuong_hai_ba_trung",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Vĩnh Tuy",
+        "code": 7,
+        "division_type": "phường",
+        "codename": "phuong_vinh_tuy",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Bạch Mai",
+        "code": 8,
+        "division_type": "phường",
+        "codename": "phuong_bach_mai",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Đống Đa",
+        "code": 9,
+        "division_type": "phường",
+        "codename": "phuong_dong_da",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Kim Liên",
+        "code": 10,
+        "division_type": "phường",
+        "codename": "phuong_kim_lien",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Văn Miếu - Quốc Tử Giám",
+        "code": 11,
+        "division_type": "phường",
+        "codename": "phuong_van_mieu_quoc_tu_giam",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Láng",
+        "code": 12,
+        "division_type": "phường",
+        "codename": "phuong_lang",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Ô Chợ Dừa",
+        "code": 13,
+        "division_type": "phường",
+        "codename": "phuong_o_cho_dua",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Hồng Hà",
+        "code": 14,
+        "division_type": "phường",
+        "codename": "phuong_hong_ha",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Lĩnh Nam",
+        "code": 15,
+        "division_type": "phường",
+        "codename": "phuong_linh_nam",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Hoàng Mai",
+        "code": 16,
+        "division_type": "phường",
+        "codename": "phuong_hoang_mai",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Vĩnh Hưng",
+        "code": 17,
+        "division_type": "phường",
+        "codename": "phuong_vinh_hung",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Tương Mai",
+        "code": 18,
+        "division_type": "phường",
+        "codename": "phuong_tuong_mai",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Định Công",
+        "code": 19,
+        "division_type": "phường",
+        "codename": "phuong_dinh_cong",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Hoàng Liệt",
+        "code": 20,
+        "division_type": "phường",
+        "codename": "phuong_hoang_liet",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Yên Sở",
+        "code": 21,
+        "division_type": "phường",
+        "codename": "phuong_yen_so",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Thanh Xuân",
+        "code": 22,
+        "division_type": "phường",
+        "codename": "phuong_thanh_xuan",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Khương Đình",
+        "code": 23,
+        "division_type": "phường",
+        "codename": "phuong_khuong_dinh",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Phương Liệt",
+        "code": 24,
+        "division_type": "phường",
+        "codename": "phuong_phuong_liet",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Cầu Giấy",
+        "code": 25,
+        "division_type": "phường",
+        "codename": "phuong_cau_giay",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Nghĩa Đô",
+        "code": 26,
+        "division_type": "phường",
+        "codename": "phuong_nghia_do",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Yên Hòa",
+        "code": 27,
+        "division_type": "phường",
+        "codename": "phuong_yen_hoa",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Tây Hồ",
+        "code": 28,
+        "division_type": "phường",
+        "codename": "phuong_tay_ho",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Phú Thượng",
+        "code": 29,
+        "division_type": "phường",
+        "codename": "phuong_phu_thuong",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Tây Tựu",
+        "code": 30,
+        "division_type": "phường",
+        "codename": "phuong_tay_tuu",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Phú Diễn",
+        "code": 31,
+        "division_type": "phường",
+        "codename": "phuong_phu_dien",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Xuân Đỉnh",
+        "code": 32,
+        "division_type": "phường",
+        "codename": "phuong_xuan_dinh",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Đông Ngạc",
+        "code": 33,
+        "division_type": "phường",
+        "codename": "phuong_dong_ngac",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Thượng Cát",
+        "code": 34,
+        "division_type": "phường",
+        "codename": "phuong_thuong_cat",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Từ Liêm",
+        "code": 35,
+        "division_type": "phường",
+        "codename": "phuong_tu_liem",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Xuân Phương",
+        "code": 36,
+        "division_type": "phường",
+        "codename": "phuong_xuan_phuong",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Tây Mỗ",
+        "code": 37,
+        "division_type": "phường",
+        "codename": "phuong_tay_mo",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Đại Mỗ",
+        "code": 38,
+        "division_type": "phường",
+        "codename": "phuong_dai_mo",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Long Biên",
+        "code": 39,
+        "division_type": "phường",
+        "codename": "phuong_long_bien",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Bồ Đề",
+        "code": 40,
+        "division_type": "phường",
+        "codename": "phuong_bo_de",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Việt Hưng",
+        "code": 41,
+        "division_type": "phường",
+        "codename": "phuong_viet_hung",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Phúc Lợi",
+        "code": 42,
+        "division_type": "phường",
+        "codename": "phuong_phuc_loi",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Hà Đông",
+        "code": 43,
+        "division_type": "phường",
+        "codename": "phuong_ha_dong",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Dương Nội",
+        "code": 44,
+        "division_type": "phường",
+        "codename": "phuong_duong_noi",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Yên Nghĩa",
+        "code": 45,
+        "division_type": "phường",
+        "codename": "phuong_yen_nghia",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Phú Lương",
+        "code": 46,
+        "division_type": "phường",
+        "codename": "phuong_phu_luong",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Kiến Hưng",
+        "code": 47,
+        "division_type": "phường",
+        "codename": "phuong_kien_hung",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thanh Trì",
+        "code": 48,
+        "division_type": "xã",
+        "codename": "xa_thanh_tri",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Đại Thanh",
+        "code": 49,
+        "division_type": "xã",
+        "codename": "xa_dai_thanh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Nam Phù",
+        "code": 50,
+        "division_type": "xã",
+        "codename": "xa_nam_phu",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Ngọc Hồi",
+        "code": 51,
+        "division_type": "xã",
+        "codename": "xa_ngoc_hoi",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Thanh Liệt",
+        "code": 52,
+        "division_type": "phường",
+        "codename": "phuong_thanh_liet",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thượng Phúc",
+        "code": 53,
+        "division_type": "xã",
+        "codename": "xa_thuong_phuc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thường Tín",
+        "code": 54,
+        "division_type": "xã",
+        "codename": "xa_thuong_tin",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Chương Dương",
+        "code": 55,
+        "division_type": "xã",
+        "codename": "xa_chuong_duong",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hồng Vân",
+        "code": 56,
+        "division_type": "xã",
+        "codename": "xa_hong_van",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phú Xuyên",
+        "code": 57,
+        "division_type": "xã",
+        "codename": "xa_phu_xuyen",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phượng Dực",
+        "code": 58,
+        "division_type": "xã",
+        "codename": "xa_phuong_duc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Chuyên Mỹ",
+        "code": 59,
+        "division_type": "xã",
+        "codename": "xa_chuyen_my",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Đại Xuyên",
+        "code": 60,
+        "division_type": "xã",
+        "codename": "xa_dai_xuyen",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thanh Oai",
+        "code": 61,
+        "division_type": "xã",
+        "codename": "xa_thanh_oai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Bình Minh",
+        "code": 62,
+        "division_type": "xã",
+        "codename": "xa_binh_minh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Tam Hưng",
+        "code": 63,
+        "division_type": "xã",
+        "codename": "xa_tam_hung",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Dân Hòa",
+        "code": 64,
+        "division_type": "xã",
+        "codename": "xa_dan_hoa",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Vân Đình",
+        "code": 65,
+        "division_type": "xã",
+        "codename": "xa_van_dinh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Ứng Thiên",
+        "code": 66,
+        "division_type": "xã",
+        "codename": "xa_ung_thien",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hòa Xá",
+        "code": 67,
+        "division_type": "xã",
+        "codename": "xa_hoa_xa",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Ứng Hòa",
+        "code": 68,
+        "division_type": "xã",
+        "codename": "xa_ung_hoa",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Mỹ Đức",
+        "code": 69,
+        "division_type": "xã",
+        "codename": "xa_my_duc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hồng Sơn",
+        "code": 70,
+        "division_type": "xã",
+        "codename": "xa_hong_son",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phúc Sơn",
+        "code": 71,
+        "division_type": "xã",
+        "codename": "xa_phuc_son",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hương Sơn",
+        "code": 72,
+        "division_type": "xã",
+        "codename": "xa_huong_son",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Chương Mỹ",
+        "code": 73,
+        "division_type": "phường",
+        "codename": "phuong_chuong_my",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phú Nghĩa",
+        "code": 74,
+        "division_type": "xã",
+        "codename": "xa_phu_nghia",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Xuân Mai",
+        "code": 75,
+        "division_type": "xã",
+        "codename": "xa_xuan_mai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Trần Phú",
+        "code": 76,
+        "division_type": "xã",
+        "codename": "xa_tran_phu",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hòa Phú",
+        "code": 77,
+        "division_type": "xã",
+        "codename": "xa_hoa_phu",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Quảng Bị",
+        "code": 78,
+        "division_type": "xã",
+        "codename": "xa_quang_bi",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Minh Châu",
+        "code": 79,
+        "division_type": "xã",
+        "codename": "xa_minh_chau",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Quảng Oai",
+        "code": 80,
+        "division_type": "xã",
+        "codename": "xa_quang_oai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Vật Lại",
+        "code": 81,
+        "division_type": "xã",
+        "codename": "xa_vat_lai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Cổ Đô",
+        "code": 82,
+        "division_type": "xã",
+        "codename": "xa_co_do",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Bất Bạt",
+        "code": 83,
+        "division_type": "xã",
+        "codename": "xa_bat_bat",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Suối Hai",
+        "code": 84,
+        "division_type": "xã",
+        "codename": "xa_suoi_hai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Ba Vì",
+        "code": 85,
+        "division_type": "xã",
+        "codename": "xa_ba_vi",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Yên Bài",
+        "code": 86,
+        "division_type": "xã",
+        "codename": "xa_yen_bai",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Sơn Tây",
+        "code": 87,
+        "division_type": "phường",
+        "codename": "phuong_son_tay",
+        "province_code": 1
+      },
+      {
+        "name": "Phường Tùng Thiện",
+        "code": 88,
+        "division_type": "phường",
+        "codename": "phuong_tung_thien",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Đoài Phương",
+        "code": 89,
+        "division_type": "xã",
+        "codename": "xa_doai_phuong",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phúc Thọ",
+        "code": 90,
+        "division_type": "xã",
+        "codename": "xa_phuc_tho",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phúc Lộc",
+        "code": 91,
+        "division_type": "xã",
+        "codename": "xa_phuc_loc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hát Môn",
+        "code": 92,
+        "division_type": "xã",
+        "codename": "xa_hat_mon",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thạch Thất",
+        "code": 93,
+        "division_type": "xã",
+        "codename": "xa_thach_that",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hạ Bằng",
+        "code": 94,
+        "division_type": "xã",
+        "codename": "xa_ha_bang",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Tây Phương",
+        "code": 95,
+        "division_type": "xã",
+        "codename": "xa_tay_phuong",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hòa Lạc",
+        "code": 96,
+        "division_type": "xã",
+        "codename": "xa_hoa_lac",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Yên Xuân",
+        "code": 97,
+        "division_type": "xã",
+        "codename": "xa_yen_xuan",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Quốc Oai",
+        "code": 98,
+        "division_type": "xã",
+        "codename": "xa_quoc_oai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hưng Đạo",
+        "code": 99,
+        "division_type": "xã",
+        "codename": "xa_hung_dao",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Kiều Phú",
+        "code": 100,
+        "division_type": "xã",
+        "codename": "xa_kieu_phu",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phú Cát",
+        "code": 101,
+        "division_type": "xã",
+        "codename": "xa_phu_cat",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Hoài Đức",
+        "code": 102,
+        "division_type": "xã",
+        "codename": "xa_hoai_duc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Dương Hòa",
+        "code": 103,
+        "division_type": "xã",
+        "codename": "xa_duong_hoa",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Sơn Đồng",
+        "code": 104,
+        "division_type": "xã",
+        "codename": "xa_son_dong",
+        "province_code": 1
+      },
+      {
+        "name": "Xã An Khánh",
+        "code": 105,
+        "division_type": "xã",
+        "codename": "xa_an_khanh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Đan Phượng",
+        "code": 106,
+        "division_type": "xã",
+        "codename": "xa_dan_phuong",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Ô Diên",
+        "code": 107,
+        "division_type": "xã",
+        "codename": "xa_o_dien",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Liên Minh",
+        "code": 108,
+        "division_type": "xã",
+        "codename": "xa_lien_minh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Gia Lâm",
+        "code": 109,
+        "division_type": "xã",
+        "codename": "xa_gia_lam",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thuận An",
+        "code": 110,
+        "division_type": "xã",
+        "codename": "xa_thuan_an",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Bát Tràng",
+        "code": 111,
+        "division_type": "xã",
+        "codename": "xa_bat_trang",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phù Đổng",
+        "code": 112,
+        "division_type": "xã",
+        "codename": "xa_phu_dong",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thư Lâm",
+        "code": 113,
+        "division_type": "xã",
+        "codename": "xa_thu_lam",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Đông Anh",
+        "code": 114,
+        "division_type": "xã",
+        "codename": "xa_dong_anh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Phúc Thịnh",
+        "code": 115,
+        "division_type": "xã",
+        "codename": "xa_phuc_thinh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Thiên Lộc",
+        "code": 116,
+        "division_type": "xã",
+        "codename": "xa_thien_loc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Vĩnh Thanh",
+        "code": 117,
+        "division_type": "xã",
+        "codename": "xa_vinh_thanh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Mê Linh",
+        "code": 118,
+        "division_type": "xã",
+        "codename": "xa_me_linh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Yên Lãng",
+        "code": 119,
+        "division_type": "xã",
+        "codename": "xa_yen_lang",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Tiến Thắng",
+        "code": 120,
+        "division_type": "xã",
+        "codename": "xa_tien_thang",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Quang Minh",
+        "code": 121,
+        "division_type": "xã",
+        "codename": "xa_quang_minh",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Sóc Sơn",
+        "code": 122,
+        "division_type": "xã",
+        "codename": "xa_soc_son",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Đa Phúc",
+        "code": 123,
+        "division_type": "xã",
+        "codename": "xa_da_phuc",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Nội Bài",
+        "code": 124,
+        "division_type": "xã",
+        "codename": "xa_noi_bai",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Trung Giã",
+        "code": 125,
+        "division_type": "xã",
+        "codename": "xa_trung_gia",
+        "province_code": 1
+      },
+      {
+        "name": "Xã Kim Anh",
+        "code": 126,
+        "division_type": "xã",
+        "codename": "xa_kim_anh",
+        "province_code": 1
+      }
+    ]
+  }
+]

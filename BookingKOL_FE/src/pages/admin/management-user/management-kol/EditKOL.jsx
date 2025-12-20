@@ -71,6 +71,10 @@ const toDigits = (s) => (s ?? "").toString().replace(/\D/g, ""); // giữ 0-9
 const addDots = (digits) =>
   digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
 
+// ===== NEW LIMITS =====
+const MAX_TEXT_LEN = 100;
+const MAX_PRICE_DIGITS = 13;
+
 export default function EditKOL() {
   const { kolId } = useParams();
 
@@ -93,6 +97,20 @@ export default function EditKOL() {
   const dobMonth = Form.useWatch("dobMonth", form);
   const dobYear = Form.useWatch("dobYear", form);
   const dobDay = Form.useWatch("dobDay", form);
+
+  // WATCH for max-length info under inputs
+  const displayNameWatch = Form.useWatch("displayName", form) ?? "";
+  const countryWatch = Form.useWatch("country", form) ?? "";
+  const minBookingPriceWatch = Form.useWatch("minBookingPrice", form) ?? "";
+
+  const displayNameAtMax =
+    typeof displayNameWatch === "string" &&
+    displayNameWatch.length >= MAX_TEXT_LEN;
+  const countryAtMax =
+    typeof countryWatch === "string" && countryWatch.length >= MAX_TEXT_LEN;
+
+  const priceDigitsLen = toDigits(minBookingPriceWatch).length;
+  const priceAtMax = priceDigitsLen >= MAX_PRICE_DIGITS;
 
   const dayCount = useMemo(() => {
     if (!dobMonth || !dobYear) return 31;
@@ -451,13 +469,28 @@ export default function EditKOL() {
                 <Form.Item
                   label="Tên hiển thị"
                   name="displayName"
+                  extra={
+                    displayNameAtMax ? (
+                      <span style={{ color: "#faad14" }}>
+                        Bạn đã nhập tối đa {MAX_TEXT_LEN} ký tự.
+                      </span>
+                    ) : null
+                  }
                   rules={[
                     { required: true, message: "Vui lòng nhập tên hiển thị" },
-                    { min: 2, max: 60, message: "Độ dài 2–60 ký tự" },
+                    {
+                      min: 2,
+                      max: MAX_TEXT_LEN,
+                      message: `Độ dài 2–${MAX_TEXT_LEN} ký tự`,
+                    },
                     notOnlySpacesRule("Tên không được chỉ gồm khoảng trắng"),
                   ]}
                 >
-                  <Input className="!h-12" placeholder="Tên hiển thị" />
+                  <Input
+                    className="!h-12"
+                    placeholder="Tên hiển thị"
+                    maxLength={MAX_TEXT_LEN} // ✅ đạt tối đa thì không cho nhập thêm
+                  />
                 </Form.Item>
 
                 <Row gutter={16}>
@@ -603,12 +636,26 @@ export default function EditKOL() {
                     <Form.Item
                       label="Quốc gia"
                       name="country"
+                      extra={
+                        countryAtMax ? (
+                          <span style={{ color: "#faad14" }}>
+                            Bạn đã nhập tối đa {MAX_TEXT_LEN} ký tự.
+                          </span>
+                        ) : null
+                      }
                       rules={[
-                        { max: 50, message: "Tối đa 50 ký tự" },
+                        {
+                          max: MAX_TEXT_LEN,
+                          message: `Tối đa ${MAX_TEXT_LEN} ký tự`,
+                        },
                         notOnlySpacesRule("Quốc gia không hợp lệ"),
                       ]}
                     >
-                      <Input className="!h-12" placeholder="VD: Việt Nam" />
+                      <Input
+                        className="!h-12"
+                        placeholder="VD: Việt Nam"
+                        maxLength={MAX_TEXT_LEN} // ✅ đạt tối đa thì không cho nhập thêm
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -666,26 +713,21 @@ export default function EditKOL() {
           >
             <Row gutter={16}>
               <Col xs={24} md={8}>
-                {/* GIÁ BOOKING TỐI THIỂU — giống phần Giá gốc khoá học */}
+                {/* GIÁ BOOKING TỐI THIỂU */}
                 <Form.Item
                   label="Giá booking theo giờ (VNĐ)"
                   name="minBookingPrice"
-                  validateTrigger="onChange"
+                  extra={
+                    priceAtMax ? (
+                      <span style={{ color: "#faad14" }}>
+                        Bạn đã nhập tối đa {MAX_PRICE_DIGITS} chữ số.
+                      </span>
+                    ) : null
+                  }
                   getValueFromEvent={(e) => {
                     const raw = e?.target?.value ?? "";
-                    // Cảnh báo nếu có ký tự không phải số hoặc dấu chấm phân tách
-                    if (/[^0-9.]/.test(raw)) {
-                      message.warning(
-                        "Chỉ được nhập số (0–9). Ký tự khác sẽ bị bỏ."
-                      );
-                    }
-                    // Lấy số thuần và giới hạn 9 chữ số
                     const digits = toDigits(raw);
-                    const clipped = digits.slice(0, 9);
-                    if (digits.length > 9) {
-                      message.warning("Chỉ nhập tối đa 9 chữ số.");
-                    }
-                    // Hiển thị với dấu chấm ngăn cách nghìn
+                    const clipped = digits.slice(0, MAX_PRICE_DIGITS); // ✅ tối đa 13 số
                     return addDots(clipped);
                   }}
                   rules={[
@@ -697,10 +739,15 @@ export default function EditKOL() {
                             new Error("Vui lòng nhập giá tối thiểu")
                           );
                         }
-                        if (!/^\d{1,9}$/.test(digits)) {
-                          // đúng 1..9 chữ số
+                        if (
+                          !new RegExp(`^\\d{1,${MAX_PRICE_DIGITS}}$`).test(
+                            digits
+                          )
+                        ) {
                           return Promise.reject(
-                            new Error("Chỉ được nhập tối đa 9 chữ số")
+                            new Error(
+                              `Chỉ được nhập tối đa ${MAX_PRICE_DIGITS} chữ số`
+                            )
                           );
                         }
                         const n = Number(digits);
@@ -723,7 +770,9 @@ export default function EditKOL() {
                     inputMode="numeric"
                     pattern="\d*"
                     onKeyDown={(e) => {
-                      // Chặn mọi phím không phải số và các phím điều hướng/hệ thống cho phép
+                      // ✅ Không chặn các tổ hợp copy/paste/select-all
+                      if (e.ctrlKey || e.metaKey) return;
+
                       const allowKeys = [
                         "Backspace",
                         "Delete",

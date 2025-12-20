@@ -51,7 +51,7 @@ const formatCurrency = (value) => {
   if (value === null || value === undefined) return "--";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "--";
-  return `${new Intl.NumberFormat("vi-VN").format(numeric)} ₫`;
+  return `${new Intl.NumberFormat("vi-VN").format(numeric)} VND`;
 };
 
 const composeBudgetRange = (targetPrice) => {
@@ -77,6 +77,12 @@ const composeCampaignDuration = (start, end) => {
     return startLabel;
   }
   return `${startLabel} → ${endLabel}`;
+};
+
+const safeDisplay = (value, placeholder = "--") => {
+  if (value === null || value === undefined) return placeholder;
+  if (typeof value === "string" && value.trim() === "") return placeholder;
+  return value;
 };
 
 const PACKAGE_STATUS_FILTER_OPTIONS = BOOKING_STATUS_OPTIONS.filter((option) =>
@@ -374,7 +380,8 @@ const HistoryBookingPackagePage = () => {
       // const hasKolSchedule = kolWorktimes.length > 0;
 
       const canCancelBookingRequest =
-        normalizedCampaignStatus === "ACCEPTED" && bookingRequestId;
+        (normalizedCampaignStatus === "ACCEPTED" && bookingRequestId) ||
+        (normalizedCampaignStatus === "REQUESTED" && bookingRequestId);
       //  &&
       // hasKolSchedule;
 
@@ -465,7 +472,7 @@ const HistoryBookingPackagePage = () => {
               Xem chi tiết
             </Button>
           ) : null}
-          {canCancelContract ? (
+          {/* {canCancelContract ? (
             <Button
               danger
               style={{
@@ -481,8 +488,8 @@ const HistoryBookingPackagePage = () => {
             >
               Hủy hợp đồng
             </Button>
-          ) : null}
-          {canCancelBookingRequest ? (
+          ) : null} */}
+          {/* {canCancelBookingRequest ? (
             <Button
               danger
               style={{
@@ -498,14 +505,14 @@ const HistoryBookingPackagePage = () => {
             >
               Hủy đơn
             </Button>
-          ) : null}
+          ) : null} */}
         </div>
       );
     },
     [
       handleAcceptContract,
       openRejectModal,
-      handleCancelContract,
+      // handleCancelContract,
       handleCancelBookingRequest,
       handleViewCampaignDetail,
       isSigningContract,
@@ -791,9 +798,9 @@ const HistoryBookingPackagePage = () => {
                           >
                             Gói {record?.packageName ?? "--"}
                           </Tag>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                          {/* <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
                             {composeBudgetRange(record?.targetPrice)}
-                          </span>
+                          </span> */}
                         </div>
 
                         <div className="grid gap-3 text-sm text-slate-600">
@@ -828,6 +835,48 @@ const HistoryBookingPackagePage = () => {
                             </span>
                             <span className="text-right font-semibold text-indigo-600">
                               {record?.objective ?? "--"}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số giờ live (giờ)
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.livestreamHours)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Kiểu lặp</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.repeatType)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Địa điểm livestream
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.livestreamAddress)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Người đặt</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.ordererFullName)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">
+                              Số điện thoại người đặt
+                            </span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.ordererPhone)}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-slate-500">Mã thuế</span>
+                            <span className="text-right font-medium text-slate-900">
+                              {safeDisplay(record?.taxCode)}
                             </span>
                           </div>
                         </div>

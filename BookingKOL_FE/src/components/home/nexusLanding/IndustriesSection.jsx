@@ -1,148 +1,229 @@
-import React, { useMemo, useState } from "react";
-import {
-  Box,
-  Button,
-  Chip,
-  Container,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from "@mui/material";
-import CategoryIcon from "@mui/icons-material/Category";
-import ViewListIcon from "@mui/icons-material/ViewList";
-import { industriesGroups } from "./data";
+// src/components/home/nexusLanding/IndustriesSection.jsx
+import React from "react";
+import { Box, Button, Container, Typography } from "@mui/material";
+
+import BarChartIcon from "@mui/icons-material/BarChart";
+import SettingsSuggestOutlinedIcon from "@mui/icons-material/SettingsSuggestOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
+import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
+import UpgradeOutlinedIcon from "@mui/icons-material/UpgradeOutlined";
+
+/** ✅ style copy từ CEOMessage */
+const PRIMARY = { color: "#0b4aa2" };
+const TITLE_FONT = {
+  fontWeight: 700,
+  letterSpacing: 0.2,
+  fontSize: { xs: 28, md: 32 },
+  lineHeight: 1.12,
+};
+const BODY_FONT = {
+  color: "rgba(15, 23, 42, 0.65)",
+  lineHeight: 1.65,
+  fontSize: { xs: 14.5, md: 16 },
+};
+
+const GREEN = "#5bb2ecff";
+const ORANGE = "#5bb2ecff";
 
 const sectionSx = {
-  // mx: { xs: 2, md: 4 },
-  // borderRadius: { xs: 3, md: 4 },
+  position: "relative",
   overflow: "hidden",
-  // backgroundColor: "#ffffff",
-  // backgroundImage: `
-  //   radial-gradient(circle at 16% 18%, rgba(141, 226, 237, 0.55), rgba(255, 255, 255, 0) 58%),
-  //   radial-gradient(circle at 84% 0%, rgba(147, 206, 246, 0.5), rgba(255, 255, 255, 0) 55%),
-  //   radial-gradient(circle at 50% 100%, rgba(74, 116, 218, 0.25), rgba(255, 255, 255, 0.9) 70%)
-  // `,
-  // boxShadow: "0 18px 42px rgba(74, 116, 218, 0.12)",
   color: "#0f172a",
+  background: "transparent", // ✅ dùng background của HomePage
 };
 
-const toggleGroupSx = {
-  backgroundColor: "rgba(255, 255, 255, 0.84)",
-  borderRadius: "999px",
-  p: 0.5,
-  boxShadow: "0 16px 30px rgba(74, 116, 218, 0.12)",
-  border: "1px solid rgba(147, 206, 246, 0.35)",
-  "& .MuiToggleButton-root": {
-    borderRadius: "999px !important",
-    px: 2.75,
-    textTransform: "none",
-    fontWeight: 600,
-    color: "#0f172a",
+const cardSx = {
+  borderRadius: { xs: 3, md: 4 },
+  overflow: "hidden",
+  padding: { xs: 2.5, md: 3 },
+  backgroundColor: "#fff",
+  border: "1px solid rgba(148,163,184,0.25)",
+  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.08)",
+  transition:
+    "transform .50s ease, box-shadow .50s ease, border-color .50s ease",
+  "&::after": {
+    content: '""',
+    position: "absolute",
+    left: 0,
+    bottom: 0,
+    width: "100%",
+    height: 6,
+    backgroundColor: GREEN,
+    borderBottomLeftRadius: { xs: 3, md: 4 },
+    borderBottomRightRadius: { xs: 3, md: 4 },
   },
-  "& .MuiToggleButton-root.Mui-selected": {
-    backgroundImage:
-      "radial-gradient(circle at 50% 50%, rgba(141, 226, 237, 0.65), rgba(147, 206, 246, 0.35))",
-    color: "#0f172a",
+  "&:hover": {
+    transform: "translateY(-4px)",
+    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.14)",
+    borderColor: "rgba(56,189,248,0.9)",
   },
 };
 
-const chipSx = {
-  px: 1.75,
-  py: 0.6,
-  borderRadius: "999px",
-  fontWeight: 500,
-  fontSize: "0.95rem",
-  backgroundColor: "rgba(255, 255, 255, 0.92)",
-  // backgroundImage:
-  //   "radial-gradient(circle at top, rgba(147, 206, 246, 0.35), rgba(255, 255, 255, 0.9))",
-  color: "#0f172a",
-  border: "1px solid rgba(147, 206, 246, 0.45)",
-  boxShadow: "0 10px 20px rgba(74, 116, 218, 0.12)",
+const iconSx = {
+  fontSize: 32,
+  color: ORANGE,
+  marginBottom: 1.5,
 };
 
-const buttonSx = {
-  borderRadius: "14px",
-  px: 3,
-  backgroundImage: "linear-gradient(135deg, #4a74da, #93cef6)",
-  boxShadow: "0px 16px 28px rgba(74, 116, 218, 0.2)",
-};
+const services = [
+  {
+    id: "1",
+    title: "Hiểu ngành – phân tích ",
+    desc: "Khi nhận được các yêu cầu này của doanh nghiệp, cán bộ chuyên môn sẽ phân tích bài toán nhằm đưa ra phương án tối ưu cho việc điều chỉnh mở rộng.",
+    icon: BarChartIcon,
+  },
+  {
+    id: "2",
+    title: "Setup – nhân sự – vận hành",
+    desc: "Phần lớn thời gian giai đoạn này khách hàng sẽ làm việc trực tiếp với đội ngũ kỹ thuật để từng bước giải quyết các bài toán đã thống nhất từ ban đầu.",
+    icon: SettingsSuggestOutlinedIcon,
+  },
+  {
+    id: "3",
+    title: "Sản xuất & tổ chức ",
+    desc: 'Với phương châm "Dịch vụ chuyên nghiệp, Hậu mãi chu đáo" chúng tôi cam kết chất lượng dịch vụ trước và sau bán hàng.',
+    icon: VerifiedUserOutlinedIcon,
+  },
+  {
+    id: "4",
+    title: "Báo cáo thời gian thực ",
+    desc: "Thiết lập bộ phận chăm sóc khách hàng chuyên nghiệp, xử lý và hỗ trợ theo các yêu cầu phát sinh, chăm sóc định kỳ.",
+    icon: SupportAgentOutlinedIcon,
+  },
+  {
+    id: "5",
+    title: "Tối ưu liên tục ",
+    desc: "Với cấu trúc linh hoạt, hệ thống dễ dàng bổ sung tính năng mới khi doanh nghiệp mở rộng quy mô sản xuất kinh doanh.",
+    icon: UpgradeOutlinedIcon,
+  },
+];
 
-const IndustriesSection = () => {
-  const [activeGroup, setActiveGroup] = useState(
-    industriesGroups[0]?.key ?? ""
-  );
-
-  const currentGroup = useMemo(
-    () =>
-      industriesGroups.find((group) => group.key === activeGroup) ??
-      industriesGroups[0],
-    [activeGroup]
-  );
-
-  if (!currentGroup) {
-    return null;
-  }
-
+export default function IndustriesSection() {
   return (
-    <Box component="section" id="industries" sx={sectionSx}>
-      <Container maxWidth="1300px" sx={{ py: { xs: 8, md: 10 } }}>
-        <Stack
-          spacing={3}
-          sx={{ alignItems: "center", textAlign: "center", color: "#0f172a" }}
+    <Box component="section" sx={sectionSx}>
+      <Container
+        maxWidth={false}
+        sx={{
+          maxWidth: 1560,
+          mx: "auto",
+          px: { xs: 2, md: 3 },
+          py: { xs: 6, md: 12 },
+        }}
+      >
+        {/* ===== TIÊU ĐỀ TRÊN CÙNG (fade-up) ===== */}
+        <Box
+          sx={{
+            textAlign: "center",
+            mb: { xs: 4, md: 6 },
+          }}
         >
           <Typography
-            variant="overline"
             sx={{
-              fontSize: "1rem",
-              letterSpacing: 2,
-              color: "rgba(15, 23, 42, 0.55)",
+              ...TITLE_FONT,
+              ...PRIMARY,
+              willChange: "transform, opacity",
+              animation: "indTitleIn 0.75s cubic-bezier(.2,.8,.2,1) both",
+              "@keyframes indTitleIn": {
+                from: {
+                  opacity: 0,
+                  transform: "translateY(18px)",
+                },
+                to: {
+                  opacity: 1,
+                  transform: "translateY(0)",
+                },
+              },
             }}
           >
-            Ngành hàng & lĩnh vực
+            Quy trình vận hành Livestream Commerce
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            Linh hoạt triển khai đa ngành
-          </Typography>
-          <ToggleButtonGroup
-            value={activeGroup}
-            exclusive
-            onChange={(_, value) => value && setActiveGroup(value)}
-            sx={toggleGroupSx}
-          >
-            {industriesGroups.map((group) => (
-              <ToggleButton key={group.key} value={group.key}>
-                {group.key === "services" ? (
-                  <ViewListIcon sx={{ mr: 1 }} />
-                ) : (
-                  <CategoryIcon sx={{ mr: 1 }} />
-                )}
-                {group.label}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        </Stack>
+        </Box>
 
-        <Stack
-          direction="row"
-          flexWrap="wrap"
-          spacing={2}
-          useFlexGap
-          sx={{ mt: 4, justifyContent: "center" }}
+        {/* ===== 5 BOX THẺ NGANG (stagger fade-up) ===== */}
+        <Box
+          sx={{
+            display: "grid",
+            gap: { xs: 2.5, md: 3 },
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, minmax(0, 1fr))",
+              md: "repeat(5, minmax(0, 1fr))",
+            },
+          }}
         >
-          {currentGroup.items.map((item) => (
-            <Chip key={item} label={item} sx={chipSx} />
-          ))}
-        </Stack>
+          {services.map((service, idx) => {
+            const Icon = service.icon;
+            const delay = 0.1 + idx * 0.06; // stagger nhẹ từng card
 
-        <Stack alignItems="center" sx={{ mt: 4 }}>
-          <Button component="a" href="#cases" variant="contained" sx={buttonSx}>
-            Xem case theo ngành của bạn
-          </Button>
-        </Stack>
+            return (
+              <Box
+                key={service.id}
+                sx={{
+                  willChange: "transform, opacity",
+                  animation: "indCardIn 0.8s cubic-bezier(.16,1,.3,1) both",
+                  animationDelay: `${delay}s`,
+                  "@keyframes indCardIn": {
+                    from: {
+                      opacity: 0,
+                      transform: "translateY(28px) scale(0.96)",
+                    },
+                    to: {
+                      opacity: 1,
+                      transform: "translateY(0) scale(1)",
+                    },
+                  },
+                }}
+              >
+                {/* Wrapper tạo tỉ lệ “vuông” gần 1:1 */}
+                <Box
+                  sx={{
+                    position: "relative",
+                    width: "100%",
+                    pt: "110%", // 100% = vuông
+                  }}
+                >
+                  <Box
+                    sx={{
+                      ...cardSx,
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <Icon sx={iconSx} />
+
+                    <Typography
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 16,
+                        mb: 0.8,
+                        color: "#111827",
+                      }}
+                    >
+                      {service.title}
+                    </Typography>
+
+                    <Typography
+                      sx={{
+                        ...BODY_FONT,
+                        mt: 0.5,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 5,
+                        WebkitBoxOrient: "vertical",
+                      }}
+                    >
+                      {service.desc}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
       </Container>
     </Box>
   );
-};
-
-export default IndustriesSection;
+}

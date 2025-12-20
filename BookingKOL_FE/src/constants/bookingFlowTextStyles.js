@@ -41,15 +41,19 @@ export const BOOKING_FLOW_TEXT = {
   messages: {
     selectPackage: "Vui lòng chọn gói dịch vụ và thời lượng.",
     selectSchedule: "Vui lòng chọn ngày và khung giờ.",
-    infoInvalid: "Vui long dien day du thong tin truoc khi tiep tuc.",
+    infoInvalid: "Vui lòng điền đầy đủ thông tin liên hệ hợp lệ.",
     slotTaken:
       "Khung giờ này vừa được người khác đặt. Vui lòng chọn khung giờ khác.",
     dayFull: "Ngày này đã kín lịch. Vui lòng chọn thời điểm khác.",
+    attachmentFormat:
+      "Chỉ hỗ trợ các định dạng: .xlsx, .xls, .doc, .docx, .pdf và ảnh (jpg, png...).",
     attachmentHint:
       "Có thể đính kèm tối đa {limit} tệp (mỗi tệp tối đa {size}MB).",
     attachmentSize: "Mỗi tệp không được vượt quá {size}MB.",
     attachmentLimit: "Bạn chỉ có thể đính kèm tối đa {limit} tệp.",
     attachmentDuplicate: "Tệp này đã được đính kèm trước đó.",
+    attachmentTypeInvalid:
+      "Định dạng tệp không được hỗ trợ. Vui lòng chỉ chọn các định dạng: .xlsx, .xls, .doc, .docx, .pdf, .jpg, .jpeg, .png.",
     scheduleTimeMissing:
       "Không thể xác định khung giờ đã chọn. Vui lòng tải lại và thử lại.",
     paymentFailed: "Không thể tạo đặt lịch. Vui lòng thử lại sau.",

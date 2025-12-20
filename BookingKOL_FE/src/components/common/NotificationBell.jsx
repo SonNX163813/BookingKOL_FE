@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Badge,
   Box,
@@ -21,18 +22,65 @@ import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import {
   deleteAllNotifications,
   fetchNotifications,
+  getNotificationIdentity,
   markAllNotificationsAsRead,
 } from "../../services/notification/notificationService";
-import { toast } from "react-toastify";
 
 const formatTimestamp = (value) => {
   if (!value) return "";
 
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return String(value);
+  // Parse dd/MM/yyyy HH:mm:ss theo giờ Việt Nam (UTC+7)
+  const parseVietnamTime = (raw) => {
+    if (raw instanceof Date) return raw;
+    if (typeof raw === "number") return new Date(raw);
 
+    if (typeof raw === "string") {
+      const normalized = raw.replace("T", " ").trim();
+      const match = normalized.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/
+      );
+
+      if (match) {
+        const [, day, month, year, hour, minute, second] = match;
+        const utcTime = Date.UTC(
+          Number(year),
+          Number(month) - 1,
+          Number(day),
+          Number(hour) - 7, // convert từ UTC+7 sang UTC
+          Number(minute),
+          Number(second || 0)
+        );
+        return new Date(utcTime);
+      }
+
+      const parsed = new Date(normalized);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+
+    return null;
+  };
+
+  const date = parseVietnamTime(value);
+  if (!date) return String(value);
+
+  const formatAbsoluteVi = (d) =>
+    new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    }).format(d);
+
+  const time = date.getTime();
   const now = Date.now();
   const diffMs = now - time;
+
+  if (diffMs < 0) return formatAbsoluteVi(date);
+
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffSeconds / 60);
   const diffHours = Math.floor(diffMinutes / 60);
@@ -47,7 +95,6 @@ const formatTimestamp = (value) => {
   if (diffMonths < 12) return `${diffMonths} tháng trước`;
   return `${diffYears} năm trước`;
 };
-const MAX_FAILURES = 3;
 const MAX_BACKOFF = 5 * 60 * 1000;
 
 const NotificationBell = ({
@@ -59,12 +106,12 @@ const NotificationBell = ({
   transformOrigin = { vertical: "top", horizontal: "right" },
   menuPaperSx,
 }) => {
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
   const failureCountRef = useRef(0);
-  const toastMutedRef = useRef(false);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item?.read).length,
@@ -106,12 +153,8 @@ const NotificationBell = ({
       if (!loggedIn) {
         setNotifications([]);
         failureCountRef.current = 0;
-        toastMutedRef.current = false;
         return;
       }
-
-      // ❌ BỎ đoạn này đi, để không dừng hẳn
-      // if (failureCountRef.current >= MAX_FAILURES) return;
 
       if (initial) setLoading(true);
 
@@ -119,10 +162,7 @@ const NotificationBell = ({
         const data = await fetchNotifications();
         if (!mounted) return;
 
-        // ✅ thành công → reset đếm lỗi
         failureCountRef.current = 0;
-
-        toastMutedRef.current = false;
 
         const list = Array.isArray(data)
           ? data
@@ -131,25 +171,11 @@ const NotificationBell = ({
           : [];
 
         setNotifications(list);
-
-        // thành công → gọi lại với pollInterval bình thường
         scheduleNext(pollInterval);
       } catch (error) {
         console.error("Lỗi khi tải thông báo", error);
-
-        // tăng số lần lỗi
         failureCountRef.current += 1;
 
-        // ✅ CHỈ show toast trong 3 lần đầu
-        // if (!toastMutedRef.current && failureCountRef.current <= MAX_FAILURES) {
-        //   toast.error("Không thể tải thông báo, vui lòng thử lại sau.");
-        // }
-
-        if (failureCountRef.current > MAX_FAILURES) {
-          toastMutedRef.current = true;
-        }
-
-        // vẫn tiếp tục backoff & poll tiếp
         const backoffDelay = Math.min(
           pollInterval * 2 ** failureCountRef.current,
           MAX_BACKOFF
@@ -224,6 +250,65 @@ const NotificationBell = ({
     await handleMarkAllAsRead();
   };
 
+  const handleNotificationClick = (item) => {
+    if (!item) return;
+
+    const identity = getNotificationIdentity();
+    const role = identity?.role ? String(identity.role).toLowerCase() : "";
+
+    const type = item?.type ? String(item.type).toLowerCase() : "";
+    const requestId = item?.requestId ?? item?.bookingRequestId ?? item?.id;
+    const campaignId = item?.campaignId ?? item?.bookingCampaignId ?? item?.id;
+
+    const closeMenu = () => setAnchorEl(null);
+
+    if (!role) {
+      closeMenu();
+      return;
+    }
+
+    // Admin routes
+    if (role.includes("admin")) {
+      if (type === "bookingrequestcampaign") {
+        if (!campaignId) return;
+        navigate(`/admin/management-booking-campaigns/${campaignId}`);
+        closeMenu();
+        return;
+      }
+
+      // bookingrequestsingle / bookingrequest / default -> single request detail
+      if (type === "bookingrequestsingle") {
+        if (!requestId) return;
+        navigate(`/admin/management-booking-requests/${requestId}`);
+        closeMenu();
+        return;
+      }
+    }
+
+    // KOL routes (all types go to single request detail)
+    if (role.includes("kol")) {
+      if (!requestId) return;
+      navigate(`/kol/booking/single-requests/detail/${requestId}`);
+      closeMenu();
+      return;
+    }
+
+    if (role.includes("user")) {
+      if (type === "bookingrequestsingle" || type === "bookingrequest") {
+        if (!requestId) return;
+        navigate(`/don-booking-kol/${requestId}`);
+        closeMenu();
+        return;
+      }
+      if (type === "bookingrequestcampaign") {
+        if (!campaignId) return;
+        navigate(`/don-booking-chien-dich/${campaignId}`);
+        closeMenu();
+        return;
+      }
+    }
+  };
+
   return (
     <>
       <Tooltip title="Thông báo">
@@ -270,7 +355,6 @@ const NotificationBell = ({
         keepMounted
         anchorOrigin={anchorOrigin}
         transformOrigin={transformOrigin}
-        // ✅ Thay thế hoàn toàn PaperProps + MenuListProps
         slotProps={{
           paper: {
             sx: {
@@ -299,8 +383,6 @@ const NotificationBell = ({
             justifyContent: "space-between",
             gap: 1,
             p: 2,
-            // background: "linear-gradient(135deg,#0ea5e9,#6366f1)",
-            // color: "#fff",
           }}
         >
           <Box>
@@ -440,6 +522,7 @@ const NotificationBell = ({
                 <ListItemButton
                   key={item?.id || item?.notificationId || index}
                   alignItems="flex-start"
+                  onClick={() => handleNotificationClick(item)}
                   sx={{
                     py: 1.35,
                     gap: 1.25,

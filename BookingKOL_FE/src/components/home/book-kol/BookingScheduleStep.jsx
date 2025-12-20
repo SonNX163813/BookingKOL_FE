@@ -179,15 +179,16 @@ const BookingScheduleStep = ({
       const start = dayjs(startAt);
       const end = dayjs(endAt);
       if (!start.isValid() || !end.isValid() || !end.isAfter(start)) return;
-
+      const blockStart = start.subtract(1, "hour"); // ✅ +1h phía trước
+      const blockEnd = end.add(1, "hour");
       // Block all held hours (include end hour) + 1 rest hour right after endAt
-      let cursor = start.clone();
-      while (cursor.isSame(end, "hour") || cursor.isBefore(end)) {
+      let cursor = blockStart.clone();
+      while (cursor.isSame(blockEnd, "hour") || cursor.isBefore(blockEnd)) {
         addHour(cursor);
         cursor = cursor.add(1, "hour");
       }
 
-      addHour(end.add(1, "hour"));
+      // addHour(end.add(1, "hour"));
     });
 
     return map;

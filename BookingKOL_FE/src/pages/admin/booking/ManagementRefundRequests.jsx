@@ -71,12 +71,16 @@ const resolvePaymentStatusMeta = (status) => {
   };
 };
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+const formatCurrency = (value) => {
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
@@ -234,13 +238,14 @@ const ManagementRefundRequests = () => {
 
   const columns = useMemo(
     () => [
-      // {
-      //   title: "Mã hoàn tiền",
-      //   dataIndex: "id",
-      //   key: "id",
-      //   render: (value) => value ?? "--",
-      //   // width: 220,
-      // },
+      // ✅ đưa "Mã hợp đồng" lên cột đầu
+      {
+        title: "Mã hợp đồng",
+        dataIndex: "contract",
+        key: "contract",
+        render: (contract) => extractContractLabel(contract),
+        // width: 160,
+      },
       {
         title: "Số tiền",
         dataIndex: "amount",
@@ -261,13 +266,6 @@ const ManagementRefundRequests = () => {
           );
         },
         // width: 140,
-      },
-      {
-        title: "Mã hợp đồng",
-        dataIndex: "contract",
-        key: "contract",
-        render: (contract) => extractContractLabel(contract),
-        // width: 160,
       },
       {
         title: "Số tài khoản",
@@ -406,6 +404,7 @@ const ManagementRefundRequests = () => {
           />
         </div>
       </Card>
+
       <Drawer
         title="Chi tiết yêu cầu hoàn tiền"
         width={640}

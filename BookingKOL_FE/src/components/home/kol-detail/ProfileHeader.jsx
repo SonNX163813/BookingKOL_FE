@@ -30,10 +30,30 @@ import PricingPanel from "./PricingPanel";
 import { useAuth } from "../../../context/AuthContext";
 
 const statsConfig = [
-  { key: "followers", label: "Người theo dõi", icon: PeopleAltRoundedIcon },
-  { key: "fans", label: "Lượt xem TikTok", icon: FavoriteRoundedIcon },
-  { key: "orders", label: "Đơn hàng", icon: ShoppingBagRoundedIcon },
-  { key: "rating", label: "Đánh giá", icon: StarRoundedIcon },
+  {
+    key: "followers",
+    label: "Người theo dõi",
+    icon: PeopleAltRoundedIcon,
+    getValue: (stats) => `125430`,
+  },
+  {
+    key: "fans",
+    label: "Lượt xem TikTok",
+    icon: FavoriteRoundedIcon,
+    getValue: (stats) => `3.86M`,
+  },
+  {
+    key: "orders",
+    label: "Đơn hàng",
+    icon: ShoppingBagRoundedIcon,
+    getValue: (stats) => `250+`,
+  },
+  {
+    key: "rating",
+    label: "Đánh giá",
+    icon: StarRoundedIcon,
+    getValue: (stats) => (stats.rating ? `${stats.rating}` : "Chưa có"),
+  },
 ];
 
 const textPrimary = "#2f3c8c";
@@ -435,12 +455,14 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                       <Typography
                         component="h1"
                         sx={{
-                          fontSize: { xs: "2rem", md: "2.5rem", lg: "3rem" },
+                          fontSize: { xs: "2rem", md: "2rem", lg: "2.2rem" },
                           fontWeight: 700,
                           color: textPrimary,
-                          letterSpacing: "0.01em",
                           lineHeight: 1.2,
                           mb: 0,
+                          whiteSpace: "normal", // cho phép xuống dòng
+                          wordBreak: "break-word", // cắt từ dài
+                          overflowWrap: "break-word",
                         }}
                       >
                         {kolName}
@@ -594,12 +616,13 @@ const ProfileHeader = ({ kol = {}, pricing, platforms, onBook }) => {
                       <Typography
                         variant="h6"
                         sx={{
+                          mt: "auto", // 👈 ĐẨY XUỐNG CUỐI
                           color: textPrimary,
                           fontWeight: 700,
                           fontSize: { xs: "1.1rem", md: "1.25rem" },
                         }}
                       >
-                        {stats[key] ?? "--"}
+                        {config.value ?? config.getValue?.(stats) ?? "--"}
                       </Typography>
                     </MotionBox>
                   );

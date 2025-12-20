@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Container, Typography, Stack, Button } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   adaptCourseMedia,
   createCoursePurchase,
@@ -13,10 +13,10 @@ import CoursePurchaseContactDialog from "../../../components/home/course-detail/
 import CourseDetailOverview from "../../../components/home/course-detail/CourseDetailOverview";
 import CourseDetailLoading from "../../../components/home/course-detail/CourseDetailLoading";
 import CourseDetailEmpty from "../../../components/home/course-detail/CourseDetailEmpty";
+import { useAuth } from "../../../context/AuthContext";
+import { toast } from "react-toastify";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
   maximumFractionDigits: 0,
 });
 
@@ -25,7 +25,11 @@ const sanitizeContactValue = (value) =>
 
 const CourseLivesteamDetail = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { courseId, courseName: courseSlug } = useParams();
+  const auth = useAuth?.() || {};
+  const { user, token } = auth;
+  const isAuthenticated = Boolean(user && token);
   const fallbackCourseName = useMemo(() => {
     if (!courseSlug) {
       return null;
@@ -99,15 +103,15 @@ const CourseLivesteamDetail = () => {
     };
 
     if (!email) {
-      errors.email = "Vui long nhap email.";
+      errors.email = "Vui lòng nhập email.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = "Email khong hop le.";
+      errors.email = "Email không hợp lệ.";
     }
 
     if (!phone) {
-      errors.phone = "Vui long nhap so dien thoai.";
+      errors.phone = "Vui lòng nhập số điện thoại.";
     } else if (!/^\+?\d{8,15}$/.test(phone.replace(/\s+/g, ""))) {
-      errors.phone = "So dien thoai khong hop le.";
+      errors.phone = "Số điện thoại không hợp lệ.";
     }
 
     return {
@@ -172,14 +176,21 @@ const CourseLivesteamDetail = () => {
     } finally {
       setCreatingPurchase(false);
     }
-  }, [contactInfo, course, coursePackageId, creatingPurchase, navigate, validateContact]);
+  }, [
+    contactInfo,
+    course,
+    coursePackageId,
+    creatingPurchase,
+    navigate,
+    validateContact,
+  ]);
 
   const priceLabel = useMemo(() => {
     if (!course?.currentPrice) {
       return "Liên hệ";
     }
 
-    return currencyFormatter.format(Number(course.currentPrice));
+    return currencyFormatter.format(Number(course.currentPrice)) + " VND";
   }, [course]);
 
   const media = useMemo(() => adaptCourseMedia(course ?? {}), [course]);
@@ -195,6 +206,26 @@ const CourseLivesteamDetail = () => {
     () => Boolean(course?.isAvailable && coursePackageId),
     [course?.isAvailable, coursePackageId]
   );
+
+  const handlePurchaseIntent = useCallback(() => {
+    if (!isAuthenticated) {
+      toast.info("Vui lòng đăng nhập để tiếp tục.");
+      navigate("/login", { replace: false, state: { from: location } });
+      return;
+    }
+
+    if (!canPurchaseCourse) {
+      return;
+    }
+
+    handleOpenContactDialog();
+  }, [
+    canPurchaseCourse,
+    handleOpenContactDialog,
+    isAuthenticated,
+    location,
+    navigate,
+  ]);
 
   const coverImage = useMemo(() => media.cover ?? hotkolimg, [media]);
 
@@ -297,9 +328,7 @@ const CourseLivesteamDetail = () => {
                 discountChip={discountChip}
                 coverImage={coverImage}
                 onSeeOtherPackages={handleBack}
-                onPurchase={
-                  canPurchaseCourse ? handleOpenContactDialog : undefined
-                }
+                onPurchase={handlePurchaseIntent}
                 purchaseDisabled={!canPurchaseCourse}
                 purchaseLoading={creatingPurchase}
               />
@@ -328,5 +357,3 @@ const CourseLivesteamDetail = () => {
 };
 
 export default CourseLivesteamDetail;
-
-

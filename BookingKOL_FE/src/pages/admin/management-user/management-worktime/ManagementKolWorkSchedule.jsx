@@ -1,5 +1,5 @@
 // src/pages/admin/management-user/management-worktime/ManagementKolWorkSchedule.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -8,24 +8,62 @@ import {
   Table,
   Tag,
   Typography,
-  Popconfirm,
   message,
+  DatePicker,
+  Segmented,
+  Modal,
+  Form,
+  Row,
+  Col,
+  Select,
+  Upload,
+  ConfigProvider,
+  Alert,
+  Pagination,
 } from "antd";
+import viVN from "antd/locale/vi_VN";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import "dayjs/locale/vi";
 import { Eye, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { get, post } from "../../../../config/axios-config";
-import { API_PATHS } from "../../../../constants/apiPath"; // ✅ chỉnh path nếu khác
+import { get, post, api } from "../../../../config/axios-config";
+import { API_PATHS } from "../../../../constants/apiPath";
+import { adminCreateBookingSingleRequest } from "../../../../services/admin/AdminBookingSingleRequestAPI";
+import {
+  getKolProfiles,
+  resolveAvatarUrl,
+} from "../../../../services/kol/KolAPI";
+
+// ✅ LẤY USER LIST GIỐNG ManagementCustomer (nhưng bỏ search UI)
+import { useGetAllBrands } from "../../../../hook/admin/management-user/useGetAllBrands";
+
+dayjs.locale("vi");
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
+
+const MAX_KEYWORD_LEN = 100;
+
+// ✅ build url xem file theo id (đổi theo BE nếu khác) - dùng cho avatar fallback
+const FILE_VIEW_BUILDER =
+  API_PATHS?.FILE?.view ||
+  API_PATHS?.FILE?.getById ||
+  API_PATHS?.FILE?.download ||
+  ((id) => `/v1/files/${encodeURIComponent(id)}`);
 
 const STATUS_META = {
   PENDING: { label: "Chờ duyệt", color: "gold" },
   APPROVED: { label: "Đã duyệt", color: "green" },
   REJECT: { label: "Từ chối", color: "red" },
   REJECTED: { label: "Từ chối", color: "red" },
+};
+
+// ✅ mapping role label theo yêu cầu
+const ROLE_LABEL_VI = {
+  KOL: "Host chính",
+  LIVE: "Trợ live",
 };
 
 const safeText = (v) =>
@@ -43,9 +81,7 @@ function normalizeList(payload) {
     payload?.data?.content,
   ];
 
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c;
-  }
+  for (const c of candidates) if (Array.isArray(c)) return c;
   return [];
 }
 
@@ -58,7 +94,107 @@ function extractErrMsg(err) {
   );
 }
 
-/** ✅ GET: danh sách yêu cầu huỷ */
+function pickKolId(row) {
+  return row?.kolId || row?.kol?.id || row?.kol?.kolId || null;
+}
+
+function getCancelRowId(r) {
+  return (
+    r?.id ||
+    r?.cancelRequestId ||
+    r?.requestId ||
+    r?.cancelId ||
+    r?.cancelReqId ||
+    null
+  );
+}
+
+function getCancelWorkTimeId(r) {
+  return (
+    r?.workTimeId || r?.worktimeId || r?.work_time_id || r?.workTime?.id || null
+  );
+}
+
+function pickFirst(obj, paths = []) {
+  for (const p of paths) {
+    const parts = String(p).split(".");
+    let cur = obj;
+    let ok = true;
+    for (const k of parts) {
+      if (cur && Object.prototype.hasOwnProperty.call(cur, k)) cur = cur[k];
+      else {
+        ok = false;
+        break;
+      }
+    }
+    if (ok && cur !== null && cur !== undefined && cur !== "") return cur;
+  }
+  return undefined;
+}
+
+function formatDateTime(v) {
+  if (!v) return "";
+  const d = dayjs(v);
+  if (!d.isValid()) return safeText(v);
+  return d.format("DD/MM/YYYY HH:mm");
+}
+
+function formatDateOnly(v) {
+  if (!v) return "";
+  const d = dayjs(v);
+  if (!d.isValid()) return safeText(v);
+  return d.format("DD/MM/YYYY");
+}
+
+function formatTimeOnly(v) {
+  if (!v) return "";
+  const d = dayjs(v);
+  if (d.isValid()) return d.format("HH:mm");
+  if (typeof v === "string" && /^\d{1,2}:\d{2}/.test(v)) return v.slice(0, 5);
+  return safeText(v);
+}
+
+function getTimeRange(row) {
+  const start =
+    row?.startAt ||
+    row?.startTime ||
+    row?.fromTime ||
+    row?.startDateTime ||
+    row?.beginAt;
+
+  const end =
+    row?.endAt ||
+    row?.endTime ||
+    row?.toTime ||
+    row?.endDateTime ||
+    row?.finishAt;
+
+  const s = formatTimeOnly(start);
+  const e = formatTimeOnly(end);
+
+  if (s && e) return `${s} - ${e}`;
+  return s || e || "";
+}
+
+function toIso(v) {
+  if (!v) return "";
+  const d = dayjs(v);
+  if (d.isValid()) return d.toISOString();
+  return typeof v === "string" ? v : "";
+}
+
+// ✅ DatePicker: chỉ cho chọn phút = 00, giây = 00
+// ❗ FIX OK bị disable: không disable giây 0
+const disabledTimeOnlyHour = () => ({
+  disabledMinutes: () =>
+    Array.from({ length: 60 }, (_, i) => i).filter((m) => m !== 0),
+  disabledSeconds: () =>
+    Array.from({ length: 60 }, (_, i) => i).filter((s) => s !== 0),
+});
+
+// =====================
+// API: CANCEL REQUESTS
+// =====================
 async function adminGetAllCancelRequests({ signal } = {}) {
   const url =
     API_PATHS?.CANCEL_ADMIN?.getAll || "/v1/requests/admin/cancel/all";
@@ -71,100 +207,27 @@ async function adminGetAllCancelRequests({ signal } = {}) {
   return res?.data ?? null;
 }
 
-/** ✅ GET: danh sách KOL (phân trang) */
-async function adminGetKolsPage({ page = 0, size = 200, signal } = {}) {
-  const base = API_PATHS?.MANAGEMENT_USER?.managementKOL || "/v1/admin/kol/all";
-  const res = await get({
-    url: `${base}?page=${page}&size=${size}`,
-    config: signal ? { signal } : undefined,
-  });
-  return res?.data ?? null;
-}
+// =====================
+// API: REGISTER AVAILABILITY  ✅ /availabilities/admin/add
+// =====================
+const API_ADD_REGISTER_AVAILABILITY =
+  API_PATHS?.SCHEDULER_ADMIN?.adminAddAvailability ||
+  "/v1/availabilities/admin/add";
 
-/** ✅ build map tên KOL theo các kolId cần dùng (ẩn ID trên UI) */
-async function buildKolMapByIds(kolIds, { signal } = {}) {
-  const need = new Set((kolIds || []).filter(Boolean));
-  const map = new Map();
-  if (need.size === 0) return map;
-
-  const size = 200;
-  const maxPages = 50;
-  let page = 0;
-
-  while (page < maxPages && need.size > 0) {
-    const payload = await adminGetKolsPage({ page, size, signal });
-
-    const content = Array.isArray(payload?.content)
-      ? payload.content
-      : Array.isArray(payload?.data?.content)
-      ? payload.data.content
-      : Array.isArray(payload)
-      ? payload
-      : [];
-
-    for (const k of content) {
-      const id = k?.id;
-      if (!id) continue;
-
-      if (need.has(id)) {
-        map.set(id, {
-          id,
-          fullName: (k?.fullName || k?.name || k?.displayName || "").trim(),
-          email: (k?.email || "").trim(),
-          phone: (k?.phone || k?.phoneNumber || "").trim(),
-        });
-        need.delete(id);
-      }
-    }
-
-    const totalPages =
-      payload?.totalPages ?? payload?.data?.totalPages ?? undefined;
-    const last = payload?.last ?? payload?.data?.last ?? undefined;
-
-    if (last === true) break;
-    if (typeof totalPages === "number" && page >= totalPages - 1) break;
-    if (!content.length) break;
-
-    page += 1;
-  }
-
-  return map;
-}
-
-/**
- * ✅ 2 API “Thêm lịch …” (bạn chỉnh lại đúng BE nếu khác)
- * - Thêm lịch làm việc: WORKTIME_ADMIN.create
- * - Thêm lịch đăng ký: SCHEDULER_ADMIN.adminSchedule (nếu BE bạn là POST)
- */
-const API_ADD_WORKTIME =
-  API_PATHS?.WORKTIME_ADMIN?.create ||
-  "/v1/availabilities/admin/worktime/create";
-
-const API_ADD_REGISTER_SCHEDULE =
-  API_PATHS?.SCHEDULER_ADMIN?.adminSchedule ||
-  "/v1/availabilities/admin/schedule";
-
-async function adminAddWorktime(payload, { signal } = {}) {
+async function adminAddRegisterAvailability(payload, { signal } = {}) {
   const res = await post({
-    url: API_ADD_WORKTIME,
+    url: API_ADD_REGISTER_AVAILABILITY,
     data: payload,
     config: signal ? { signal } : undefined,
   });
   return res?.data ?? null;
 }
 
-async function adminAddRegisterSchedule(payload, { signal } = {}) {
-  const res = await post({
-    url: API_ADD_REGISTER_SCHEDULE,
-    data: payload,
-    config: signal ? { signal } : undefined,
-  });
-  return res?.data ?? null;
-}
-
-/** ✅ GET: xem chi tiết booking theo workTimeId */
+// =====================
+// API: BOOKING DETAIL BY workTimeId
+// =====================
 async function adminGetBookingDetailByWorkTimeId(workTimeId, { signal } = {}) {
-  if (!workTimeId) throw new Error("workTimeId is required");
+  if (!workTimeId) throw new Error("workTimeId là bắt buộc");
 
   const builder =
     API_PATHS?.BOOKING_REQUEST?.getDetailByWorkTime ||
@@ -178,53 +241,387 @@ async function adminGetBookingDetailByWorkTimeId(workTimeId, { signal } = {}) {
   return res?.data ?? null;
 }
 
+// =====================
+// TAB 1 - KOL TIMELINE ALL
+// =====================
+const PATH_KOL_TIMELINE_ALL =
+  API_PATHS?.SCHEDULER_ADMIN?.kolTimelineAll ||
+  "/v1/availabilities/time-line/kol/all";
+
+async function adminGetKolTimelineAll({
+  startDate,
+  endDate,
+  page = 0,
+  size = 100,
+  signal,
+} = {}) {
+  const params = { page, size };
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+
+  const res = await api.get(PATH_KOL_TIMELINE_ALL, {
+    params,
+    ...(signal ? { signal } : {}),
+  });
+
+  const raw = res?.data ?? res;
+  const list = Array.isArray(raw?.data)
+    ? raw.data
+    : Array.isArray(raw)
+    ? raw
+    : [];
+
+  return list;
+}
+
+// ✅ resolve avatar từ fileUsageDtos (fallback nếu resolveAvatarUrl chưa handle id-only)
+function resolveAvatarFromFileUsageDtos(profile) {
+  const list = Array.isArray(profile?.fileUsageDtos)
+    ? profile.fileUsageDtos
+    : [];
+  const preferred = list[0];
+  if (!preferred) return "";
+
+  const url =
+    preferred?.url ||
+    preferred?.fileUrl ||
+    preferred?.path ||
+    preferred?.filePath ||
+    preferred?.downloadUrl ||
+    preferred?.previewUrl ||
+    preferred?.file?.url ||
+    preferred?.file?.fileUrl ||
+    preferred?.file?.path;
+
+  if (typeof url === "string" && url.trim()) return url.trim();
+
+  const fileId = preferred?.id || preferred?.fileId || preferred?.file?.id;
+  if (fileId) return FILE_VIEW_BUILDER(fileId);
+
+  return "";
+}
+
+function resolveKolAvatarSafe(profile) {
+  const byUtil = resolveAvatarUrl?.(profile);
+  if (byUtil) return byUtil;
+
+  const byDtos = resolveAvatarFromFileUsageDtos(profile);
+  if (byDtos) return byDtos;
+
+  return profile?.avatarUrl || profile?.avatar || "";
+}
+
 export default function ManagementKolWorkSchedule() {
   const navigate = useNavigate();
 
-  const [keyword, setKeyword] = useState("");
-  const [selectedRow, setSelectedRow] = useState(null);
+  const [activeTab, setActiveTab] = useState("registered");
+
+  // TAB 1
+  const [scheduleKeyword, setScheduleKeyword] = useState("");
+  const [range, setRange] = useState(null);
+
+  // TAB 2
+  const [cancelKeyword, setCancelKeyword] = useState("");
+  const [selectedCancelRow, setSelectedCancelRow] = useState(null);
   const [viewingWorktimeId, setViewingWorktimeId] = useState(null);
 
-  const cancelQuery = useQuery({
-    queryKey: ["admin-cancel-requests"],
-    queryFn: ({ signal }) => adminGetAllCancelRequests({ signal }),
+  // ✅ Modal thêm lịch làm việc
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createForm] = Form.useForm();
+
+  // watch startAt để disable endAt theo startAt
+  const startAtWatch = Form.useWatch("startAt", createForm);
+
+  // ✅ KOL select options (hiển thị avatar + displayName) - ALL ROLE
+  const [kolSelectOptions, setKolSelectOptions] = useState([]);
+  const [kolSelectLoading, setKolSelectLoading] = useState(false);
+
+  // =========================
+  // ✅ USERS: dùng hook giống ManagementCustomer (BỎ SEARCH, chỉ phân trang)
+  // =========================
+  const [userPage, setUserPage] = useState(0);
+  const [userSize, setUserSize] = useState(50);
+
+  const {
+    isLoadingGetAllBrands: userLoading,
+    ResponseGetAllBrands: usersResponse,
+    refetchGetAllBrands: refetchUsers,
+  } = useGetAllBrands(userPage, userSize, undefined);
+
+  const userList = usersResponse?.data?.content || [];
+  const userTotal = usersResponse?.data?.totalElements || 0;
+
+  const userMapRef = useRef({}); // id -> user (tích lũy các page đã load)
+
+  useEffect(() => {
+    const next = { ...(userMapRef.current || {}) };
+    (userList || []).forEach((u) => {
+      const id = u?.userId || u?.id;
+      if (!id) return;
+      next[String(id)] = u;
+    });
+    userMapRef.current = next;
+  }, [userList]);
+
+  const userOptions = useMemo(() => {
+    return (userList || [])
+      .map((u) => {
+        const id = u?.userId || u?.id;
+        if (!id) return null;
+
+        const fullName = u?.fullName || u?.displayName || u?.name || "";
+        const email = u?.email || "";
+        const phone = u?.phone || "";
+
+        const labelMain = fullName || email || phone || String(id);
+        const labelSub = [email, phone].filter(Boolean).join(" • ");
+
+        return {
+          value: String(id),
+          label: (
+            <div className="flex flex-col leading-tight">
+              <span className="font-medium">{labelMain}</span>
+              {labelSub ? (
+                <span className="text-xs text-gray-500">{labelSub}</span>
+              ) : null}
+            </div>
+          ),
+        };
+      })
+      .filter(Boolean);
+  }, [userList]);
+
+  const onUserChange = (userId) => {
+    const u = userId ? userMapRef.current?.[String(userId)] : null;
+    if (!u) return;
+
+    createForm.setFieldsValue({
+      fullName: u?.fullName || u?.displayName || u?.name || "",
+      phone: u?.phone || "",
+      email: u?.email || "",
+    });
+  };
+
+  // ✅ Attachments theo BookingFlow: giữ File local, không upload trước
+  const [fileList, setFileList] = useState([]);
+
+  const attachedFiles = useMemo(() => {
+    return (fileList || []).map((f) => f?.originFileObj).filter(Boolean); // File[]
+  }, [fileList]);
+
+  // =========================
+  // ✅ RULE: chỉ chọn từ hôm nay + giờ hiện tại trở đi (phút = 00)
+  // =========================
+  const disabledDateFromToday = (current) => {
+    if (!current) return false;
+    return current.isBefore(dayjs().startOf("day"));
+  };
+
+  // do phút fix = 00:
+  // - nếu now có phút > 0 thì giờ hiện tại (HH:00) đã qua -> phải lên giờ + 1
+  // - nếu đang 23:xx -> minHour có thể = 24 => disable toàn bộ giờ hôm nay
+  const minHourFromNow = () => {
+    const now = dayjs();
+    const needNextHour = now.minute() > 0 || now.second() > 0;
+    return now.hour() + (needNextHour ? 1 : 0); // 0..24
+  };
+
+  const disabledTimeStart = (current) => {
+    const base = disabledTimeOnlyHour();
+    if (!current) return base;
+
+    const isToday = dayjs(current).isSame(dayjs(), "day");
+    if (!isToday) return base;
+
+    const minH = minHourFromNow();
+    return {
+      ...base,
+      disabledHours: () =>
+        Array.from({ length: 24 }, (_, h) => h).filter((h) => h < minH),
+    };
+  };
+
+  const disabledDateEnd = (current) => {
+    if (!current) return false;
+
+    const today = dayjs().startOf("day");
+    const startDay = startAtWatch ? dayjs(startAtWatch).startOf("day") : null;
+
+    const minDay = startDay && startDay.isAfter(today) ? startDay : today;
+
+    // nếu startAt là 23:00 thì endAt không thể cùng ngày
+    if (
+      startAtWatch &&
+      dayjs(current).isSame(dayjs(startAtWatch), "day") &&
+      dayjs(startAtWatch).hour() >= 23
+    ) {
+      return true;
+    }
+
+    return dayjs(current).isBefore(minDay);
+  };
+
+  const disabledTimeEnd = (current) => {
+    const base = disabledTimeOnlyHour();
+    if (!current) return base;
+
+    let minH = 0;
+
+    // rule theo "hiện tại"
+    if (dayjs(current).isSame(dayjs(), "day")) {
+      minH = Math.max(minH, minHourFromNow());
+    }
+
+    // rule theo startAt: end phải sau start (tối thiểu +1 giờ vì phút = 00)
+    if (startAtWatch && dayjs(current).isSame(dayjs(startAtWatch), "day")) {
+      minH = Math.max(minH, dayjs(startAtWatch).hour() + 1);
+    }
+
+    return {
+      ...base,
+      disabledHours: () =>
+        Array.from({ length: 24 }, (_, h) => h).filter((h) => h < minH),
+    };
+  };
+
+  // ===== load KOL options: HIỂN THỊ TẤT CẢ ROLE (label role theo yêu cầu) =====
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+
+    const fetchProfiles = async () => {
+      try {
+        setKolSelectLoading(true);
+
+        const res = await getKolProfiles({
+          signal: controller.signal,
+          params: { page: 0, size: 500 },
+        });
+
+        if (ignore) return;
+
+        const list =
+          (Array.isArray(res?.content) && res.content) ||
+          (Array.isArray(res?.data?.content) && res.data.content) ||
+          (Array.isArray(res?.data) && res.data) ||
+          [];
+
+        const opts = list.map((item) => {
+          const id = item?.id;
+          const name =
+            item?.displayName ||
+            item?.fullName ||
+            item?.username ||
+            item?.email ||
+            item?.phone ||
+            id;
+
+          const avatar = resolveKolAvatarSafe(item);
+
+          const roleRaw = String(item?.role || "").toUpperCase();
+          const roleLabel = ROLE_LABEL_VI[roleRaw] || roleRaw || "UNKNOWN";
+          const secondary = item?.email || item?.phone || "";
+
+          return {
+            value: id,
+            label: (
+              <div className="flex items-center gap-2">
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt={name || "User"}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-gray-200" />
+                )}
+                <div className="flex flex-col leading-tight">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{name}</span>
+                    <Tag style={{ marginInlineEnd: 0 }} color="blue">
+                      {roleLabel}
+                    </Tag>
+                  </div>
+                  {secondary ? (
+                    <span className="text-xs text-gray-500">{secondary}</span>
+                  ) : null}
+                </div>
+              </div>
+            ),
+          };
+        });
+
+        setKolSelectOptions(opts);
+      } catch (err) {
+        if (!ignore) {
+          console.error("Fetch profiles error:", err);
+          message.error("Không tải được danh sách KOL/Users");
+          setKolSelectOptions([]);
+        }
+      } finally {
+        if (!ignore) setKolSelectLoading(false);
+      }
+    };
+
+    fetchProfiles();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, []);
+
+  // ===== TAB 1 QUERY =====
+  const startDate = useMemo(() => {
+    if (!range?.[0]) return undefined;
+    return range[0].format("YYYY-MM-DD");
+  }, [range]);
+
+  const endDate = useMemo(() => {
+    if (!range?.[1]) return undefined;
+    return range[1].format("YYYY-MM-DD");
+  }, [range]);
+
+  const timelineQuery = useQuery({
+    queryKey: ["admin-kol-timeline-all", startDate, endDate],
+    queryFn: ({ signal }) =>
+      adminGetKolTimelineAll({
+        startDate,
+        endDate,
+        page: 0,
+        size: 200,
+        signal,
+      }),
     staleTime: 15_000,
+    enabled: activeTab === "registered",
   });
 
-  const cancelList = useMemo(
-    () => normalizeList(cancelQuery.data),
-    [cancelQuery.data]
+  const timelineList = useMemo(
+    () => normalizeList(timelineQuery.data),
+    [timelineQuery.data]
   );
 
-  const kolIdsInCancel = useMemo(() => {
-    const s = new Set();
-    for (const r of cancelList) if (r?.kolId) s.add(r.kolId);
-    return Array.from(s);
-  }, [cancelList]);
+  const filteredTimelineRows = useMemo(() => {
+    const kw = scheduleKeyword.trim().toLowerCase();
+    if (!kw) return timelineList;
 
-  const kolMapQuery = useQuery({
-    queryKey: ["admin-kol-map-by-ids", kolIdsInCancel.join("|")],
-    queryFn: ({ signal }) => buildKolMapByIds(kolIdsInCancel, { signal }),
-    enabled: kolIdsInCancel.length > 0,
-    staleTime: 60_000,
-  });
-
-  const kolMap = kolMapQuery.data || new Map();
-
-  const rows = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-    if (!kw) return cancelList;
-
-    return cancelList.filter((r) => {
-      const info = kolMap.get(r?.kolId);
+    return timelineList.filter((r) => {
       const haystack = [
         r?.id,
-        r?.reason,
+        r?.availabilityId,
+        r?.workTimeId,
+        r?.scheduledWorkTimeId,
+        r?.bookingRequestId,
         r?.status,
-        r?.adminNote,
-        info?.fullName,
-        info?.email,
-        info?.phone,
+        r?.type,
+        r?.note,
+        r?.platform,
+        r?.startAt,
+        r?.endAt,
+        r?.kolName,
+        r?.kol?.fullName,
+        r?.kol?.name,
       ]
         .filter(Boolean)
         .join(" ")
@@ -232,22 +629,159 @@ export default function ManagementKolWorkSchedule() {
 
       return haystack.includes(kw);
     });
-  }, [cancelList, keyword, kolMap]);
+  }, [timelineList, scheduleKeyword]);
 
-  const addWorktimeMutation = useMutation({
-    mutationFn: (payload) => adminAddWorktime(payload),
-    onSuccess: () => {
-      message.success("Đã gọi API thêm lịch làm việc.");
-      cancelQuery.refetch();
-    },
-    onError: (err) => message.error(extractErrMsg(err)),
+  const timelineColumns = useMemo(
+    () => [
+      {
+        title: "STT",
+        key: "__idx",
+        width: 70,
+        render: (_, __, idx) => idx + 1,
+      },
+      {
+        title: "KOL",
+        key: "kol",
+        width: 320,
+        render: (_, r) => {
+          const name = r?.kolName || r?.kol?.fullName || r?.kol?.name || "";
+          const sub = r?.kol?.email || r?.email || r?.phone || "";
+          return (
+            <div>
+              <div style={{ fontWeight: 600 }}>{name}</div>
+              {sub ? (
+                <div style={{ fontSize: 12, color: "#6b7280" }}>{sub}</div>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        title: "Ngày",
+        key: "date",
+        width: 150,
+        render: (_, r) => (
+          <span>{formatDateOnly(r?.startAt || r?.date || r?.createdAt)}</span>
+        ),
+      },
+      {
+        title: "Khung giờ",
+        key: "timeRange",
+        width: 140,
+        render: (_, r) => <span>{getTimeRange(r)}</span>,
+      },
+      {
+        title: "Ngày tạo",
+        key: "createdAt",
+        width: 180,
+        render: (_, r) => formatDateTime(r?.createdAt),
+      },
+    ],
+    []
+  );
+
+  // ===== TAB 2 QUERY =====
+  const cancelQuery = useQuery({
+    queryKey: ["admin-cancel-requests"],
+    queryFn: ({ signal }) => adminGetAllCancelRequests({ signal }),
+    staleTime: 15_000,
+    enabled: activeTab === "cancel",
   });
 
-  const addRegisterMutation = useMutation({
-    mutationFn: (payload) => adminAddRegisterSchedule(payload),
+  const cancelList = useMemo(
+    () => normalizeList(cancelQuery.data),
+    [cancelQuery.data]
+  );
+
+  const filteredCancelRows = useMemo(() => {
+    const kw = cancelKeyword.trim().toLowerCase();
+    if (!kw) return cancelList;
+
+    return cancelList.filter((r) => {
+      const haystack = [
+        getCancelRowId(r),
+        getCancelWorkTimeId(r),
+        r?.reason,
+        r?.status,
+        r?.adminNote,
+        r?.kolName,
+        r?.kol?.fullName,
+        r?.kol?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(kw);
+    });
+  }, [cancelList, cancelKeyword]);
+
+  // ✅ Mutation tạo lịch làm việc (single request) - sẽ gửi multipart/FormData ở service
+  const createSingleBookingMutation = useMutation({
+    mutationFn: async ({ payload, signal }) =>
+      adminCreateBookingSingleRequest(payload, { signal }),
     onSuccess: () => {
-      message.success("Đã gọi API thêm lịch đăng ký.");
+      message.success("Tạo lịch làm việc thành công.");
+      setCreateOpen(false);
       cancelQuery.refetch();
+      timelineQuery.refetch();
+    },
+    onError: (err) => message.error(extractErrMsg(err)),
+    onSettled: () => setCreateLoading(false),
+  });
+
+  // ✅ Mutation: thêm lịch đăng ký (availability) theo API mới
+  const addRegisterMutation = useMutation({
+    mutationFn: async ({ cancelRow, signal }) => {
+      const workTimeId = getCancelWorkTimeId(cancelRow);
+      if (!workTimeId) throw new Error("Dòng đang chọn không có workTimeId.");
+
+      const detail = await adminGetBookingDetailByWorkTimeId(workTimeId, {
+        signal,
+      });
+
+      const kolId = String(
+        pickKolId(cancelRow) || pickFirst(detail, ["kolId", "kol.id"]) || ""
+      );
+      if (!kolId) throw new Error("Không lấy được kolId để thêm lịch đăng ký.");
+
+      const startAtRaw =
+        pickFirst(detail, [
+          "startAt",
+          "workTime.startAt",
+          "scheduledWorkTime.startAt",
+          "scheduledWorkTimes.0.startAt",
+          "workTimes.0.startAt",
+        ]) ||
+        cancelRow?.startAt ||
+        cancelRow?.startTime;
+
+      const endAtRaw =
+        pickFirst(detail, [
+          "endAt",
+          "workTime.endAt",
+          "scheduledWorkTime.endAt",
+          "scheduledWorkTimes.0.endAt",
+          "workTimes.0.endAt",
+        ]) ||
+        cancelRow?.endAt ||
+        cancelRow?.endTime;
+
+      const startAt = toIso(startAtRaw);
+      const endAt = toIso(endAtRaw);
+
+      if (!startAt || !endAt)
+        throw new Error("Không lấy được startAt/endAt để thêm lịch đăng ký.");
+
+      return adminAddRegisterAvailability(
+        { kolId, startAt, endAt },
+        { signal }
+      );
+    },
+    onSuccess: () => {
+      message.success("Đã thêm lịch đăng ký.");
+      cancelQuery.refetch();
+      timelineQuery.refetch();
     },
     onError: (err) => message.error(extractErrMsg(err)),
   });
@@ -256,7 +790,6 @@ export default function ManagementKolWorkSchedule() {
     mutationFn: ({ workTimeId }) =>
       adminGetBookingDetailByWorkTimeId(workTimeId),
     onSuccess: (data) => {
-      // ✅ cố gắng lấy bookingRequestId từ response
       const requestId =
         data?.id ||
         data?.bookingRequestId ||
@@ -277,19 +810,156 @@ export default function ManagementKolWorkSchedule() {
   });
 
   const isAnyActionLoading =
-    addWorktimeMutation.isPending ||
+    createSingleBookingMutation.isPending ||
     addRegisterMutation.isPending ||
-    viewDetailMutation.isPending;
+    viewDetailMutation.isPending ||
+    createLoading;
 
-  const canAction = !!selectedRow?.id;
+  const ensureCancelRowSelected = () => {
+    if (activeTab !== "cancel") {
+      message.warning(
+        "Vui lòng chuyển sang tab 'Danh sách yêu cầu huỷ đơn' và chọn 1 dòng."
+      );
+      return null;
+    }
+    if (!selectedCancelRow) {
+      message.warning("Bạn chưa chọn dòng nào trong danh sách yêu cầu huỷ.");
+      return null;
+    }
+    const workTimeId = getCancelWorkTimeId(selectedCancelRow);
+    if (!workTimeId) {
+      message.warning("Dòng đang chọn không có workTimeId.");
+      return null;
+    }
+    return selectedCancelRow;
+  };
 
-  const buildPayloadFromSelected = () => ({
-    cancelRequestId: selectedRow?.id,
-    kolId: selectedRow?.kolId,
-    workTimeId: selectedRow?.workTimeId,
-  });
+  // ✅ MỞ POPUP tạo lịch làm việc
+  const openCreateModal = async () => {
+    setCreateOpen(true);
+    setCreateLoading(false);
 
-  const columns = useMemo(
+    setFileList([]);
+    createForm.resetFields();
+
+    setUserPage(0);
+    setUserSize(50);
+    refetchUsers?.();
+
+    createForm.setFieldsValue({
+      userId: undefined,
+      kolId: undefined,
+      fullName: "",
+      phone: "",
+      email: "",
+      startAt: null,
+      endAt: null,
+      platform: "",
+      description: "",
+      location: "",
+    });
+  };
+
+  const closeCreateModal = () => {
+    setCreateOpen(false);
+    setCreateLoading(false);
+    createForm.resetFields();
+    setFileList([]);
+  };
+
+  // ✅ Submit tạo lịch làm việc (single request) - attachedFiles là File[]
+  const handleCreate = async () => {
+    try {
+      const values = await createForm.validateFields();
+
+      const start = values?.startAt ? dayjs(values.startAt) : null;
+      const end = values?.endAt ? dayjs(values.endAt) : null;
+
+      if (!start?.isValid() || !end?.isValid()) {
+        message.error("Thời gian bắt đầu/kết thúc không hợp lệ.");
+        return;
+      }
+      if (!end.isAfter(start)) {
+        message.error("Thời gian kết thúc phải lớn hơn thời gian bắt đầu.");
+        return;
+      }
+
+      // ✅ đảm bảo startAt >= now (theo rule phút=00)
+      const now = dayjs();
+      const minStartTodayHour = minHourFromNow();
+      if (start.isSame(now, "day")) {
+        const minStart = now.startOf("day").hour(minStartTodayHour).minute(0);
+        if (start.isBefore(minStart)) {
+          message.error("Chỉ được chọn từ thời điểm hiện tại trở đi.");
+          return;
+        }
+      }
+      if (start.isBefore(now.startOf("day"))) {
+        message.error("Không được chọn ngày trước hôm nay.");
+        return;
+      }
+
+      setCreateLoading(true);
+
+      const payload = {
+        bookingSingleReqByAdmin: {
+          userId: String(values.userId),
+          kolId: String(values.kolId),
+          fullName: safeText(values.fullName),
+          phone: safeText(values.phone),
+          email: safeText(values.email),
+          startAt: start.minute(0).second(0).millisecond(0).toISOString(),
+          endAt: end.minute(0).second(0).millisecond(0).toISOString(),
+          platform: safeText(values.platform),
+          description: safeText(values.description),
+          location: safeText(values.location),
+        },
+        attachedFiles, // ✅ File[]
+      };
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      try {
+        await createSingleBookingMutation.mutateAsync({
+          payload,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e) {
+      if (e?.errorFields?.length) return;
+      message.error(e?.message || "Tạo lịch thất bại.");
+      setCreateLoading(false);
+    }
+  };
+
+  // ✅ CLICK: thêm lịch đăng ký theo API mới
+  const onClickAddRegister = () => {
+    const row = ensureCancelRowSelected();
+    if (!row) return;
+
+    Modal.confirm({
+      title: "Thêm lịch đăng ký",
+      content: "Thêm lịch đăng ký (availability) cho dòng đang chọn?",
+      okText: "Thêm",
+      cancelText: "Hủy",
+      onOk: async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        try {
+          await addRegisterMutation.mutateAsync({
+            cancelRow: row,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+    });
+  };
+
+  const cancelColumns = useMemo(
     () => [
       {
         title: "STT",
@@ -302,15 +972,11 @@ export default function ManagementKolWorkSchedule() {
         key: "kol",
         width: 320,
         render: (_, r) => {
-          const info = kolMap.get(r?.kolId);
-          const name = (info?.fullName || "").trim();
-          const email = (info?.email || "").trim();
-          const phone = (info?.phone || "").trim();
-          const sub = email || phone;
-
+          const name = r?.kolName || r?.kol?.fullName || r?.kol?.name || "";
+          const sub = r?.kol?.email || r?.email || r?.phone || "";
           return (
             <div>
-              <div style={{ fontWeight: 600 }}>{name || ""}</div>
+              <div style={{ fontWeight: 600 }}>{name}</div>
               {sub ? (
                 <div style={{ fontSize: 12, color: "#6b7280" }}>{sub}</div>
               ) : null}
@@ -368,25 +1034,24 @@ export default function ManagementKolWorkSchedule() {
         width: 120,
         fixed: "right",
         render: (_, record) => {
+          const wtId = getCancelWorkTimeId(record);
+
           const loadingThisRow =
             viewDetailMutation.isPending &&
             viewingWorktimeId &&
-            viewingWorktimeId === record?.workTimeId;
+            viewingWorktimeId === wtId;
 
           return (
             <div className="w-full flex justify-center">
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
-
-                  const workTimeId = record?.workTimeId;
-                  if (!workTimeId) {
+                  if (!wtId) {
                     message.error("Không có workTimeId để xem chi tiết.");
                     return;
                   }
-
-                  setViewingWorktimeId(workTimeId);
-                  viewDetailMutation.mutate({ workTimeId });
+                  setViewingWorktimeId(wtId);
+                  viewDetailMutation.mutate({ workTimeId: wtId });
                 }}
                 className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all flex items-center justify-center"
               >
@@ -401,92 +1066,432 @@ export default function ManagementKolWorkSchedule() {
         },
       },
     ],
-    [kolMap, viewDetailMutation.isPending, viewingWorktimeId]
+    [viewDetailMutation.isPending, viewingWorktimeId]
   );
 
+  const isScheduleKeywordMax =
+    (scheduleKeyword || "").length >= MAX_KEYWORD_LEN;
+  const isCancelKeywordMax = (cancelKeyword || "").length >= MAX_KEYWORD_LEN;
+
   return (
-    <Card style={{ borderRadius: 12 }}>
-      <Space direction="vertical" size={12} style={{ width: "100%" }}>
-        <div>
-          <Title level={4} style={{ marginBottom: 0 }}>
-            Danh sách yêu cầu huỷ đơn
-          </Title>
-        </div>
+    <ConfigProvider locale={viVN}>
+      <Card style={{ borderRadius: 12 }}>
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <div>
+            <Title level={4} style={{ marginBottom: 8 }}>
+              Quản lý lịch KOL
+            </Title>
 
-        <Space wrap style={{ width: "100%", justifyContent: "space-between" }}>
-          <Space wrap>
-            <Input
-              placeholder="Tìm theo tên KOL / mã yêu cầu / lý do / trạng thái..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              style={{ width: 520, maxWidth: "100%" }}
-              allowClear
-            />
-            <Button
-              onClick={() => {
-                cancelQuery.refetch();
-                kolMapQuery.refetch?.();
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
               }}
-              disabled={isAnyActionLoading}
-              loading={cancelQuery.isFetching || kolMapQuery.isFetching}
             >
-              Làm mới
-            </Button>
-          </Space>
+              <Segmented
+                options={[
+                  { label: "Lịch KOL đã đăng ký", value: "registered" },
+                  { label: "Danh sách yêu cầu huỷ đơn", value: "cancel" },
+                ]}
+                value={activeTab}
+                onChange={(v) => {
+                  setActiveTab(v);
+                  if (v !== "cancel") setSelectedCancelRow(null);
+                }}
+              />
 
-          <Space wrap>
-            <Popconfirm
-              title="Gọi API thêm lịch làm việc cho dòng đang chọn?"
-              okText="Gọi"
-              cancelText="Hủy"
-              onConfirm={() =>
-                addWorktimeMutation.mutate(buildPayloadFromSelected())
-              }
-              disabled={!canAction || isAnyActionLoading}
-            >
-              <Button
-                type="primary"
-                disabled={!canAction || isAnyActionLoading}
-                loading={addWorktimeMutation.isPending}
-              >
-                Thêm lịch làm việc
-              </Button>
-            </Popconfirm>
+              <Space wrap>
+                <Button
+                  type="primary"
+                  onClick={openCreateModal}
+                  disabled={isAnyActionLoading}
+                  loading={createLoading}
+                >
+                  Thêm lịch làm việc
+                </Button>
 
-            <Popconfirm
-              title="Gọi API thêm lịch đăng ký cho dòng đang chọn?"
-              okText="Gọi"
-              cancelText="Hủy"
-              onConfirm={() =>
-                addRegisterMutation.mutate(buildPayloadFromSelected())
-              }
-              disabled={!canAction || isAnyActionLoading}
-            >
-              <Button
-                disabled={!canAction || isAnyActionLoading}
-                loading={addRegisterMutation.isPending}
+                <Button
+                  onClick={onClickAddRegister}
+                  disabled={isAnyActionLoading}
+                  loading={addRegisterMutation.isPending}
+                >
+                  Thêm lịch đăng ký
+                </Button>
+              </Space>
+            </div>
+          </div>
+
+          {activeTab === "registered" ? (
+            <Space direction="vertical" size={12} style={{ width: "100%" }}>
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: "#fafafa",
+                  border: "1px solid #f0f0f0",
+                }}
               >
-                Thêm lịch đăng ký
-              </Button>
-            </Popconfirm>
-          </Space>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ minWidth: 260 }}>
+                    <RangePicker
+                      value={range}
+                      onChange={(v) => setRange(v)}
+                      allowClear
+                      style={{ width: "100%" }}
+                      placeholder={["Từ ngày", "Đến ngày"]}
+                      format="DD/MM/YYYY"
+                    />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 280 }}>
+                    <Input
+                      placeholder="Tìm theo tên KOL..."
+                      value={scheduleKeyword}
+                      maxLength={MAX_KEYWORD_LEN}
+                      showCount={false}
+                      onChange={(e) => {
+                        const next = e?.target?.value ?? "";
+                        setScheduleKeyword(
+                          next.length > MAX_KEYWORD_LEN
+                            ? next.slice(0, MAX_KEYWORD_LEN)
+                            : next
+                        );
+                      }}
+                      style={{ width: "100%" }}
+                      allowClear
+                    />
+                    {isScheduleKeywordMax ? (
+                      <Text
+                        type="danger"
+                        style={{ display: "block", marginTop: 4, fontSize: 12 }}
+                      >
+                        Đã đạt tối đa {MAX_KEYWORD_LEN} ký tự.
+                      </Text>
+                    ) : null}
+                  </div>
+
+                  <Button
+                    onClick={() => timelineQuery.refetch()}
+                    loading={timelineQuery.isFetching}
+                    disabled={isAnyActionLoading}
+                  >
+                    Làm mới
+                  </Button>
+                </div>
+              </div>
+
+              <Table
+                rowKey={(r) =>
+                  r?.id ||
+                  r?.availabilityId ||
+                  `${pickKolId(r)}-${r?.startAt || ""}-${r?.endAt || ""}`
+                }
+                columns={timelineColumns}
+                dataSource={filteredTimelineRows}
+                loading={timelineQuery.isLoading}
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 1200 }}
+              />
+            </Space>
+          ) : (
+            <Space direction="vertical" size={12} style={{ width: "100%" }}>
+              <Space
+                wrap
+                style={{ width: "100%", justifyContent: "space-between" }}
+              >
+                <Space wrap>
+                  <div style={{ width: 520, maxWidth: "100%" }}>
+                    <Input
+                      placeholder="Tìm theo tên KOL / mã yêu cầu / lý do / trạng thái..."
+                      value={cancelKeyword}
+                      maxLength={MAX_KEYWORD_LEN}
+                      showCount={false}
+                      onChange={(e) => {
+                        const next = e?.target?.value ?? "";
+                        setCancelKeyword(
+                          next.length > MAX_KEYWORD_LEN
+                            ? next.slice(0, MAX_KEYWORD_LEN)
+                            : next
+                        );
+                      }}
+                      style={{ width: "100%" }}
+                      allowClear
+                    />
+                    {isCancelKeywordMax ? (
+                      <Text
+                        type="danger"
+                        style={{ display: "block", marginTop: 4, fontSize: 12 }}
+                      >
+                        Đã đạt tối đa {MAX_KEYWORD_LEN} ký tự.
+                      </Text>
+                    ) : null}
+                  </div>
+
+                  <Button
+                    onClick={() => cancelQuery.refetch()}
+                    disabled={isAnyActionLoading}
+                    loading={cancelQuery.isFetching}
+                  >
+                    Làm mới
+                  </Button>
+                </Space>
+              </Space>
+
+              <Table
+                rowKey={(r) =>
+                  getCancelRowId(r) ||
+                  getCancelWorkTimeId(r) ||
+                  `${pickKolId(r)}-${r?.createdAt || ""}`
+                }
+                columns={cancelColumns}
+                dataSource={filteredCancelRows}
+                loading={cancelQuery.isLoading}
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 1200 }}
+                onRow={(record) => ({
+                  onClick: () => setSelectedCancelRow(record),
+                })}
+                rowClassName={(record) =>
+                  getCancelRowId(record) &&
+                  getCancelRowId(record) === getCancelRowId(selectedCancelRow)
+                    ? "bg-slate-50"
+                    : ""
+                }
+              />
+            </Space>
+          )}
+
+          {/* Popup tạo lịch làm việc */}
+          <Modal
+            open={createOpen}
+            title="Thêm lịch làm việc"
+            onCancel={closeCreateModal}
+            onOk={handleCreate}
+            okText="Tạo"
+            cancelText="Hủy"
+            confirmLoading={createSingleBookingMutation.isPending}
+            destroyOnClose
+            maskClosable={!createSingleBookingMutation.isPending}
+          >
+            <Form form={createForm} layout="vertical" disabled={createLoading}>
+              {/* ✅ userId: CHỈ LIST, KHÔNG SEARCH */}
+              <Form.Item
+                label="Khách hàng (User)"
+                name="userId"
+                rules={[
+                  { required: true, message: "Vui lòng chọn khách hàng" },
+                ]}
+              >
+                <Select
+                  allowClear
+                  loading={userLoading}
+                  placeholder={userLoading ? "Đang tải..." : "Chọn khách hàng"}
+                  options={userOptions}
+                  showSearch={false}
+                  filterOption={false}
+                  notFoundContent={
+                    userLoading ? "Đang tải..." : "Không có user"
+                  }
+                  onChange={onUserChange}
+                />
+              </Form.Item>
+
+              {/* ✅ Pagination user (để lật trang danh sách) */}
+              <div style={{ marginTop: -6, marginBottom: 12 }}>
+                <Pagination
+                  current={userPage + 1}
+                  pageSize={userSize}
+                  pageSizeOptions={["10", "20", "50", "100"]}
+                  onChange={(pageNumber, sizeNumber) => {
+                    setUserPage(pageNumber - 1);
+                    setUserSize(sizeNumber);
+                  }}
+                  total={userTotal}
+                  showSizeChanger
+                />
+              </div>
+
+              {/* ✅ KOL list tất cả role (CHỈ LIST, KHÔNG SEARCH) */}
+              <Form.Item
+                label="Chọn người thực hiện"
+                name="kolId"
+                rules={[
+                  { required: true, message: "Vui lòng chọn người thực hiện" },
+                ]}
+              >
+                <Select
+                  allowClear
+                  placeholder={
+                    kolSelectLoading
+                      ? "Đang tải danh sách..."
+                      : "Chọn người thực hiện"
+                  }
+                  loading={kolSelectLoading}
+                  options={kolSelectOptions}
+                  showSearch={false}
+                  filterOption={false}
+                  notFoundContent={
+                    kolSelectLoading ? "Đang tải..." : "Không có dữ liệu"
+                  }
+                />
+              </Form.Item>
+
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Họ và tên"
+                    name="fullName"
+                    rules={[
+                      { required: true, message: "Vui lòng nhập họ tên" },
+                    ]}
+                  >
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Số điện thoại"
+                    name="phone"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập số điện thoại",
+                      },
+                    ]}
+                  >
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: "Vui lòng nhập email" },
+                  { type: "email", message: "Email không hợp lệ" },
+                ]}
+              >
+                <Input />
+              </Form.Item>
+
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    label="Bắt đầu"
+                    name="startAt"
+                    rules={[
+                      { required: true, message: "Chọn thời gian bắt đầu" },
+                    ]}
+                  >
+                    <DatePicker
+                      className="w-full"
+                      disabledDate={disabledDateFromToday}
+                      showTime={{
+                        format: "HH:mm",
+                        minuteStep: 60,
+                        showSecond: false,
+                        defaultValue: dayjs().minute(0).second(0),
+                      }}
+                      disabledTime={disabledTimeStart}
+                      format="DD/MM/YYYY HH:mm"
+                      inputReadOnly
+                      onChange={(val) => {
+                        if (!val) return;
+                        const d = dayjs(val).minute(0).second(0).millisecond(0);
+                        createForm.setFieldValue("startAt", d);
+
+                        // nếu endAt <= startAt thì clear để chọn lại
+                        const endVal = createForm.getFieldValue("endAt");
+                        if (endVal && !dayjs(endVal).isAfter(d)) {
+                          createForm.setFieldValue("endAt", null);
+                        }
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Kết thúc"
+                    name="endAt"
+                    rules={[
+                      { required: true, message: "Chọn thời gian kết thúc" },
+                    ]}
+                  >
+                    <DatePicker
+                      className="w-full"
+                      disabledDate={disabledDateEnd}
+                      showTime={{
+                        format: "HH:mm",
+                        minuteStep: 60,
+                        showSecond: false,
+                        defaultValue: dayjs().minute(0).second(0),
+                      }}
+                      disabledTime={disabledTimeEnd}
+                      format="DD/MM/YYYY HH:mm"
+                      inputReadOnly
+                      onChange={(val) => {
+                        if (!val) return;
+                        const d = dayjs(val).minute(0).second(0).millisecond(0);
+                        createForm.setFieldValue("endAt", d);
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item label="Nền tảng" name="platform">
+                <Input />
+              </Form.Item>
+
+              <Form.Item label="Mô tả" name="description">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+
+              <Form.Item label="Địa điểm" name="location">
+                <Input />
+              </Form.Item>
+
+              {/* ✅ Upload theo BookingFlow: chỉ chọn file, không upload trước */}
+              <Form.Item label="Tệp đính kèm">
+                <Upload
+                  multiple
+                  fileList={fileList}
+                  beforeUpload={() => false} // ✅ quan trọng
+                  onChange={({ fileList: fl }) => setFileList(fl)}
+                  onRemove={(file) => {
+                    setFileList((prev) =>
+                      prev.filter((f) => f.uid !== file.uid)
+                    );
+                    return true;
+                  }}
+                >
+                  <Button>Chọn tệp</Button>
+                </Upload>
+              </Form.Item>
+
+              {!userLoading && userOptions.length === 0 ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Không có dữ liệu user"
+                  description="Hook useGetAllBrands trả về rỗng. Kiểm tra lại BE endpoint mà hook đang gọi."
+                />
+              ) : null}
+            </Form>
+          </Modal>
         </Space>
-
-        <Table
-          rowKey={(r) => r?.id}
-          columns={columns}
-          dataSource={rows}
-          loading={cancelQuery.isLoading || kolMapQuery.isLoading}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 1200 }}
-          onRow={(record) => ({
-            onClick: () => setSelectedRow(record),
-          })}
-          rowClassName={(record) =>
-            record?.id && record.id === selectedRow?.id ? "bg-slate-50" : ""
-          }
-        />
-      </Space>
-    </Card>
+      </Card>
+    </ConfigProvider>
   );
 }

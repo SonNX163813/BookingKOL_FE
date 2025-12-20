@@ -25,6 +25,13 @@ export const createBookingPackage = async (value) => {
     startDate: value.startDate,
     endDate: value.endDate,
     recurrencePattern: value.recurrencePattern,
+    repeatType: value?.repeatType ?? undefined,
+    livestreamHours: value?.livestreamHours ?? undefined,
+    livestreamAddress: value?.livestreamAddress ?? undefined,
+    permanentAddress: value?.permanentAddress ?? undefined,
+    ordererFullName: value?.ordererFullName ?? undefined,
+    ordererPhone: value?.ordererPhone ?? undefined,
+    taxCode: value?.taxCode ?? undefined,
     liveIds: value?.liveIds ?? undefined,
     kolIds: value?.kolIds ?? undefined,
     attachments: value?.attachment ?? value?.attachments ?? undefined,
@@ -39,6 +46,25 @@ export const createBookingPackage = async (value) => {
   formData.append("startDate", new Date(value.startDate).toISOString());
   formData.append("endDate", new Date(value.endDate).toISOString());
   formData.append("recurrencePattern", value.recurrencePattern ? "WEEKLY" : "");
+  formData.append("repeatType", value.repeatType ?? "");
+  if (value?.livestreamHours !== undefined && value?.livestreamHours !== null) {
+    formData.append("livestreamHours", value.livestreamHours);
+  }
+  if (value?.livestreamAddress) {
+    formData.append("livestreamAddress", value.livestreamAddress);
+  }
+  if (value?.permanentAddress) {
+    formData.append("permanentAddress", value.permanentAddress);
+  }
+  if (value?.ordererFullName) {
+    formData.append("ordererFullName", value.ordererFullName);
+  }
+  if (value?.ordererPhone) {
+    formData.append("ordererPhone", value.ordererPhone);
+  }
+  if (value?.taxCode) {
+    formData.append("taxCode", value.taxCode);
+  }
   if (value?.liveIds) {
     formData.append("liveIds", value.liveIds);
   }
@@ -180,5 +206,27 @@ export const checkCampaignPaymentStatus = async (
     url: CLIENT_API_PATHS.BOOKINGPACKAGE.checkCampaignPaymentStatus(
       contractPaymentScheduleId
     ),
+  });
+};
+
+export const getUserBookingStatus = async (bookingRequestId) => {
+  if (!bookingRequestId) {
+    throw new Error("bookingRequestId is required to fetch booking status");
+  }
+
+  return get({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.getUserBookingStatus(
+      bookingRequestId
+    ),
+  });
+};
+
+export const completeUserWorkTime = async (workTimeId) => {
+  if (!workTimeId) {
+    throw new Error("workTimeId is required to complete work time");
+  }
+
+  return update({
+    url: CLIENT_API_PATHS.BOOKINGPACKAGE.completeWorkTime(workTimeId),
   });
 };

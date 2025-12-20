@@ -1,13 +1,5 @@
 // src/pages/admin/course/ManagementCourse.jsx
-import {
-  Search,
-  Trash2,
-  Eye,
-  Plus,
-  Pencil,
-  Power,
-  EyeClosed,
-} from "lucide-react";
+import { Search, Trash2, Eye, Plus, Pencil, Check, X } from "lucide-react";
 import {
   Button,
   Card,
@@ -20,7 +12,7 @@ import {
   Image,
   Typography,
   Divider,
-  Select, // <== THÊM
+  Select,
   message,
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
@@ -31,21 +23,59 @@ import {
   adminCourseDelete,
   adminCourseUpdate,
 } from "../../../services/admin/AdminAPI";
-import { CheckCircle, XCircle } from "lucide-react";
 
 const { Title, Text } = Typography;
 
-// helpers
+// ====== constants ======
+const MAX_SEARCH_LEN = 100;
+const MAX_PRICE_DIGITS = 13;
+
+// ====== helpers ======
 const formatVND = (n) =>
   typeof n === "number" && Number.isFinite(n)
     ? n.toLocaleString("vi-VN") + " VNĐ"
     : "—";
+
 const calcFinal = (price, discount) => {
   const p = Number(price);
   const d = Number(discount);
   if (!Number.isFinite(p)) return null;
   const rate = Number.isFinite(d) ? Math.min(Math.max(d, 0), 100) : 0;
   return Math.round(p * (1 - rate / 100));
+};
+
+const sanitizeDigits = (v, maxLen = MAX_PRICE_DIGITS) =>
+  String(v ?? "")
+    .replace(/[^\d]/g, "")
+    .slice(0, maxLen);
+
+const formatDots = (digits) => {
+  const s = String(digits ?? "");
+  if (!s) return "";
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
+const normalizeMoneyInput = (v) =>
+  formatDots(sanitizeDigits(v, MAX_PRICE_DIGITS));
+
+const toUndef = (v) => {
+  const s = typeof v === "string" ? v.trim() : v;
+  return s === "" || s === null || s === undefined ? undefined : s;
+};
+
+const blockNonDigitKey = (e) => {
+  const allowed = [
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "Tab",
+    "Home",
+    "End",
+  ];
+  if (allowed.includes(e.key)) return;
+  if (e.ctrlKey || e.metaKey) return; // copy/paste/select all
+  if (!/^\d$/.test(e.key)) e.preventDefault();
 };
 
 const ManagementCourse = () => {
@@ -57,7 +87,7 @@ const ManagementCourse = () => {
   const [searchValue, setSearchValue] = useState(undefined);
   const [searchMinPrice, setSearchMinPrice] = useState(undefined);
   const [searchMaxPrice, setSearchMaxPrice] = useState(undefined);
-  const [searchIsAvailable, setSearchIsAvailable] = useState(undefined); // <== THÊM
+  const [searchIsAvailable, setSearchIsAvailable] = useState(undefined);
 
   const navigate = useNavigate();
 
@@ -79,6 +109,28 @@ const ManagementCourse = () => {
 
   const dataResponse = ResponseGetAllCourse?.data?.content || [];
 
+  // ===== watch form values for "max" warning =====
+  const searchText = Form.useWatch("search", form);
+  const minPriceText = Form.useWatch("minPrice", form);
+  const maxPriceText = Form.useWatch("maxPrice", form);
+
+  const reachedSearchMax = useMemo(
+    () => (searchText?.length ?? 0) >= MAX_SEARCH_LEN,
+    [searchText]
+  );
+
+  const minDigitsLen = useMemo(
+    () => sanitizeDigits(minPriceText, MAX_PRICE_DIGITS).length,
+    [minPriceText]
+  );
+  const maxDigitsLen = useMemo(
+    () => sanitizeDigits(maxPriceText, MAX_PRICE_DIGITS).length,
+    [maxPriceText]
+  );
+
+  const reachedMinMax = minDigitsLen >= MAX_PRICE_DIGITS;
+  const reachedMaxMax = maxDigitsLen >= MAX_PRICE_DIGITS;
+
   // ===== Modal state =====
   const [openView, setOpenView] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -86,11 +138,15 @@ const ManagementCourse = () => {
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
   const handleSearch = (value) => {
-    setSearchValue(value.search);
-    setSearchMinPrice(value.minPrice);
-    setSearchMaxPrice(value.maxPrice);
+    setSearchValue(toUndef(value.search));
 
-    // Chuyển giá trị từ Select sang đúng kiểu boolean hoặc undefined
+    // ✅ gửi lên API dạng digits (không có dấu .)
+    const minDigits = sanitizeDigits(value.minPrice, MAX_PRICE_DIGITS);
+    const maxDigits = sanitizeDigits(value.maxPrice, MAX_PRICE_DIGITS);
+
+    setSearchMinPrice(minDigits || undefined);
+    setSearchMaxPrice(maxDigits || undefined);
+
     let mapped;
     if (value.status === "true") mapped = true;
     else if (value.status === "false") mapped = false;
@@ -105,13 +161,11 @@ const ManagementCourse = () => {
     setSearchValue(undefined);
     setSearchMinPrice(undefined);
     setSearchMaxPrice(undefined);
-    setSearchIsAvailable(undefined); // về mặc định lấy tất cả
+    setSearchIsAvailable(undefined);
     setPage(0);
   };
 
-  const handleCreateCourse = () => {
-    navigate("/admin/create-course");
-  };
+  const handleCreateCourse = () => navigate("/admin/create-course");
 
   const handleOpenView = (record) => {
     setSelectedCourse(record);
@@ -244,12 +298,7 @@ const ManagementCourse = () => {
       ),
       width: "6%",
     },
-    {
-      title: "Tên khóa học",
-      key: "name",
-      dataIndex: "name",
-      width: "20%",
-    },
+    { title: "Tên khóa học", key: "name", dataIndex: "name", width: "20%" },
     {
       title: "Mô tả",
       key: "description",
@@ -300,13 +349,13 @@ const ManagementCourse = () => {
       align: "center",
       render: (record) => (
         <div className="flex justify-center gap-2">
-          <Button
+          {/* <Button
             onClick={() => handleOpenView(record)}
             className="!h-10 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
             title="Xem nhanh"
           >
             <Eye size={18} className="font-semibold" />
-          </Button>
+          </Button> */}
           <Button
             onClick={() => handleEdit(record)}
             className="!h-10 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
@@ -314,22 +363,25 @@ const ManagementCourse = () => {
           >
             <Pencil size={18} className="font-semibold" />
           </Button>
+
+          {/* ✅ Bật/Tắt: dùng X & V (Check) */}
           <Button
             onClick={() => handleToggleStatus(record)}
             loading={updatingStatusId === record.id}
-            className={`!h-10 !border-none transition-all ${
+            className={`!h-10 !border-none transition-all !text-white ${
               record.isAvailable
-                ? "!bg-green-600 hover:!bg-green-700 !text-white"
+                ? "!bg-green-600 hover:!bg-green-700"
                 : "!bg-gray-400 hover:!bg-gray-500"
             }`}
-            title="Bật/Tắt trạng thái"
+            title={record.isAvailable ? "Ẩn khóa học" : "Bật khóa học"}
           >
             {record.isAvailable ? (
-              <Eye size={20} className="text-white" />
+              <X size={20} className="text-white" />
             ) : (
-              <EyeClosed size={20} className="text-white" />
+              <Check size={20} className="text-white" />
             )}
           </Button>
+
           <Button
             onClick={() => handleDeleteCourse(record)}
             loading={deletingCourseId === record.id}
@@ -347,6 +399,7 @@ const ManagementCourse = () => {
   return (
     <div className="relative h-full">
       {contextHolder}
+
       <div className="flex gap-2 items-center">
         <div className="border-2 p-2 border-gray-300">
           <SchoolOutlined className="text-gray-400" />
@@ -362,21 +415,83 @@ const ManagementCourse = () => {
           form={form}
           className="flex gap-3"
           onFinish={handleSearch}
-          initialValues={{ status: "all" }} // <== MẶC ĐỊNH: Tất cả
+          initialValues={{ status: "all" }}
         >
-          <Form.Item name="search">
-            <Input className="h-12!" placeholder="Tìm tên khóa học" />
+          {/* ✅ Tên khóa học: max 100 + thông báo khi đạt max */}
+          <Form.Item
+            name="search"
+            help={reachedSearchMax ? `Tối đa ${MAX_SEARCH_LEN} ký tự.` : null}
+            validateStatus={reachedSearchMax ? "warning" : ""}
+            rules={[
+              {
+                max: MAX_SEARCH_LEN,
+                message: `Tối đa ${MAX_SEARCH_LEN} ký tự.`,
+              },
+            ]}
+          >
+            <Input
+              className="!h-12"
+              placeholder="Tìm tên khóa học"
+              maxLength={MAX_SEARCH_LEN}
+            />
           </Form.Item>
 
-          <Form.Item name="minPrice">
-            <Input className="h-12!" placeholder="Tìm với giá trị nhỏ nhất" />
+          {/* ✅ Min price: nhập kiểu 1.000.000, tối đa 13 chữ số, không nhập chữ/ký tự đặc biệt */}
+          <Form.Item
+            name="minPrice"
+            normalize={normalizeMoneyInput}
+            help={reachedMinMax ? `Tối đa ${MAX_PRICE_DIGITS} chữ số.` : null}
+            validateStatus={reachedMinMax ? "warning" : ""}
+            rules={[
+              {
+                validator: (_, v) => {
+                  if (!v) return Promise.resolve();
+                  const digits = sanitizeDigits(v, MAX_PRICE_DIGITS);
+                  if (digits.length > MAX_PRICE_DIGITS)
+                    return Promise.reject(
+                      new Error(`Tối đa ${MAX_PRICE_DIGITS} chữ số.`)
+                    );
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <Input
+              className="!h-12"
+              placeholder="Tìm với giá trị nhỏ nhất"
+              inputMode="numeric"
+              onKeyDown={blockNonDigitKey}
+            />
           </Form.Item>
 
-          <Form.Item name="maxPrice">
-            <Input className="h-12!" placeholder="Tìm với giá trị lớn nhất" />
+          {/* ✅ Max price: nhập kiểu 1.000.000, tối đa 13 chữ số, không nhập chữ/ký tự đặc biệt */}
+          <Form.Item
+            name="maxPrice"
+            normalize={normalizeMoneyInput}
+            help={reachedMaxMax ? `Tối đa ${MAX_PRICE_DIGITS} chữ số.` : null}
+            validateStatus={reachedMaxMax ? "warning" : ""}
+            rules={[
+              {
+                validator: (_, v) => {
+                  if (!v) return Promise.resolve();
+                  const digits = sanitizeDigits(v, MAX_PRICE_DIGITS);
+                  if (digits.length > MAX_PRICE_DIGITS)
+                    return Promise.reject(
+                      new Error(`Tối đa ${MAX_PRICE_DIGITS} chữ số.`)
+                    );
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <Input
+              className="!h-12"
+              placeholder="Tìm với giá trị lớn nhất"
+              inputMode="numeric"
+              onKeyDown={blockNonDigitKey}
+            />
           </Form.Item>
 
-          {/* ====== Bộ lọc Trạng thái ====== */}
           <Form.Item name="status">
             <Select
               className="min-w-[160px]"
@@ -390,16 +505,17 @@ const ManagementCourse = () => {
 
           <Form.Item>
             <Button
+              className="!h-12 !bg-[#fa7833] !text-white !font-bold"
               htmlType="submit"
-              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
             >
               <Search size={16} /> Tìm kiếm
             </Button>
           </Form.Item>
+
           <Form.Item>
             <Button
               onClick={resetForm}
-              className="h-12! bg-[#fa7833]! text-[white]! font-bold!"
+              className="!h-12 !bg-[#fa7833] !text-white !font-bold"
             >
               <Trash2 size={16} /> Xóa tìm kiếm
             </Button>
@@ -407,7 +523,7 @@ const ManagementCourse = () => {
         </Form>
 
         <Button
-          className=" bg-[#fa7833]! text-[white]! h-12! font-bold!"
+          className="!bg-[#fa7833] !text-white !h-12 !font-bold"
           onClick={handleCreateCourse}
         >
           <Plus size={16} />
@@ -415,15 +531,13 @@ const ManagementCourse = () => {
         </Button>
       </div>
 
-      <div>
-        <Table
-          columns={columns}
-          dataSource={dataResponse}
-          loading={isLoadingGetAllCourse}
-          pagination={false}
-          rowKey="id"
-        />
-      </div>
+      <Table
+        columns={columns}
+        dataSource={dataResponse}
+        loading={isLoadingGetAllCourse}
+        pagination={false}
+        rowKey="id"
+      />
 
       <div className="!my-4 py-5">
         <Pagination

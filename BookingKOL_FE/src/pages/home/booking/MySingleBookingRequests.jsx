@@ -105,10 +105,8 @@ const composeExecutionTime = (record) => {
 const formatCurrency = (value) =>
   value
     ? new Intl.NumberFormat("vi-VN", {
-        style: "currency",
-        currency: "VND",
         maximumFractionDigits: 0,
-      }).format(value)
+      }).format(value) + " VND"
     : "--";
 
 const deriveRowKey = (record) =>
@@ -547,8 +545,12 @@ const MySingleBookingRequests = () => {
       const normalizedContractStatus = contractStatusSource
         ? contractStatusSource.toString().toUpperCase()
         : null;
-      const isRefundable = normalizedPaymentStatus === "PAID";
-      // &&        normalizedContractStatus !== "WAIT_FOR_REFUND";
+      const isRefundable =
+        normalizedPaymentStatus === "PAID" &&
+        normalizedContractStatus !== "COMPLETED" &&
+        normalizedContractStatus !== "WAIT_FOR_REFUND" &&
+        normalizedContractStatus !== "CANCELLED";
+
       const isPaymentPending = normalizedPaymentStatus === "PENDING";
       const isProcessingPaymentCancelThisRow =
         isCancellingMySingleBookingPayment &&
@@ -1003,7 +1005,14 @@ const MySingleBookingRequests = () => {
                             <span className="text-slate-500">Ghi chú</span>
                           </div>
                           {description ? (
-                            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <div
+                              className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                              style={{
+                                maxWidth: "100%",
+                                height: "auto",
+                                wordBreak: "break-word",
+                              }}
+                            >
                               {description}
                             </div>
                           ) : null}

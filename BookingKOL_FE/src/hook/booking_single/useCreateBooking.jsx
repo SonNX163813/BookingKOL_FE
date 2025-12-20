@@ -6,8 +6,8 @@ export const useCreateBooking = (
   onSuccessCallBack,
   {
     onError: onErrorCallBack,
-    successToastMessage = "Tao booking thanh cong.",
-    errorToastMessage = "Co loi xay ra, vui long thu lai sau it phut.",
+    successToastMessage = "Tạo đặt lịch thành công.",
+    errorToastMessage = "Có lỗi xảy ra, vui lòng thử lại sau ít phút.",
   } = {}
 ) => {
   const {

@@ -39,12 +39,14 @@ const STATUS_OPTIONS = [
 ];
 
 const formatCurrency = (value) => {
-  const formatter = new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  });
-  return formatter.format(Number(value) || 0);
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
 };
 
 const formatDateTime = (value) => {
@@ -236,13 +238,13 @@ const ManagementTransactions = () => {
         width: 150,
         render: (value) => formatCurrency(value),
       },
-      {
-        title: "Mã tham chiếu",
-        dataIndex: "referenceNumber",
-        key: "referenceNumber",
-        ellipsis: true,
-        render: (value) => value || "--",
-      },
+      // {
+      //   title: "Mã tham chiếu",
+      //   dataIndex: "referenceNumber",
+      //   key: "referenceNumber",
+      //   ellipsis: true,
+      //   render: (value) => value || "--",
+      // },
       {
         title: "Trạng thái",
         dataIndex: "status",
@@ -253,13 +255,13 @@ const ManagementTransactions = () => {
           return <Tag color={meta.color}>{meta.label}</Tag>;
         },
       },
-      {
-        title: "Mã thanh toán",
-        dataIndex: "paymentId",
-        key: "paymentId",
-        ellipsis: true,
-        render: (value) => value || "--",
-      },
+      // {
+      //   title: "Mã thanh toán",
+      //   dataIndex: "paymentId",
+      //   key: "paymentId",
+      //   ellipsis: true,
+      //   render: (value) => value || "--",
+      // },
       {
         title: "Hành động",
         key: "actions",
@@ -456,11 +458,11 @@ const ManagementTransactions = () => {
             <Descriptions.Item label="Thời gian tạo">
               {formatDateTime(detailData.createdAt)}
             </Descriptions.Item>
-            <Descriptions.Item label="Dữ liệu gốc">
+            {/* <Descriptions.Item label="Dữ liệu gốc">
               <pre className="bg-gray-100 rounded p-2 text-xs whitespace-pre-wrap">
                 {detailData.body || "--"}
               </pre>
-            </Descriptions.Item>
+            </Descriptions.Item> */}
           </Descriptions>
         ) : (
           <Empty description="Không có dữ liệu" />

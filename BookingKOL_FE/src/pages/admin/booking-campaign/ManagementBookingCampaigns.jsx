@@ -23,8 +23,6 @@ import {
   RotateCcw,
   Search,
   Pencil,
-  Plus,
-  FileDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -105,6 +103,10 @@ export default function ManagementBookingCampaigns() {
     executionRange: undefined,
   });
 
+  // ✅ watch keyword để hiện thông báo khi đạt 100 ký tự
+  const searchValue = Form.useWatch("search", form);
+  const isSearchMax = (searchValue?.length ?? 0) >= 100;
+
   const sortParam =
     sorter?.field && sorter?.order
       ? `${sorter.field},${sorter.order === "ascend" ? "asc" : "desc"}`
@@ -163,8 +165,9 @@ export default function ManagementBookingCampaigns() {
       if (
         packageType &&
         String(r?.packageType || "").toLowerCase() !== packageType
-      )
+      ) {
         return false;
+      }
 
       if (s) {
         const bucket = [
@@ -213,10 +216,6 @@ export default function ManagementBookingCampaigns() {
     });
     setPage(0);
   };
-
-  const goCreate = useCallback(() => {
-    navigate(`/admin/bookings/create`);
-  }, [navigate]);
 
   const goDetail = useCallback(
     (r) => {
@@ -370,6 +369,14 @@ export default function ManagementBookingCampaigns() {
             "REJECTED",
           ].includes(st);
 
+          // ✅ Nếu đang thương lượng => đổi text "Tạo Booking" -> "Sửa Booking"
+          const bookingBtnText =
+            st === "NEGOTIATING" ? "Sửa Booking" : "Tạo Booking";
+          const bookingBtnTitle =
+            st === "NEGOTIATING"
+              ? "Sửa booking từ campaign"
+              : "Tạo booking từ campaign";
+
           return (
             <Space wrap>
               <Button
@@ -397,9 +404,9 @@ export default function ManagementBookingCampaigns() {
                   onClick={() => goEdit(r)}
                   icon={<Pencil size={16} />}
                   className="!h-9 !px-3 !rounded-xl !bg-emerald-500 !text-white !border-none hover:!bg-emerald-600 flex items-center"
-                  title="Tạo booking từ campaign"
+                  title={bookingBtnTitle}
                 >
-                  Tạo Booking
+                  {bookingBtnText}
                 </Button>
               )}
             </Space>
@@ -438,7 +445,13 @@ export default function ManagementBookingCampaigns() {
             onFinish={handleFilter}
             className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
           >
-            <Form.Item label="Từ khóa" name="search">
+            <Form.Item
+              label="Từ khóa"
+              name="search"
+              rules={[{ max: 100, message: "Từ khóa tối đa 100 ký tự." }]}
+              validateStatus={isSearchMax ? "warning" : undefined}
+              help={isSearchMax ? "Đã đạt tối đa 100 ký tự." : undefined}
+            >
               <Input
                 allowClear
                 placeholder="Tên chiến dịch / Email / Gói..."
@@ -471,41 +484,38 @@ export default function ManagementBookingCampaigns() {
               />
             </Form.Item>
 
-            {/* ✅ Nút Xuất dữ liệu nằm ngang hàng với Tìm kiếm/Đặt lại/Làm mới */}
-            <Form.Item className="lg:col-span-4 md:col-span-2 !mb-0" label=" ">
-              <div className="flex justify-start">
-                <Space size="middle" wrap={false}>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={<Search size={16} />}
-                  >
-                    Tìm kiếm
-                  </Button>
+            {/* ✅ 4 nút giống ManagementBookingRequests */}
+            <div className="lg:col-span-4 md:col-span-2 col-span-1 flex justify-start">
+              <Space size="middle" wrap>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<Search size={16} />}
+                >
+                  Tìm kiếm
+                </Button>
 
-                  <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
-                    Đặt lại
-                  </Button>
+                <Button icon={<RotateCcw size={16} />} onClick={handleReset}>
+                  Đặt lại
+                </Button>
 
-                  <Button
-                    icon={<RefreshCcw size={16} />}
-                    onClick={() => refetch()}
-                    loading={isFetching}
-                  >
-                    Làm mới
-                  </Button>
+                <Button
+                  icon={<RefreshCcw size={16} />}
+                  onClick={() => refetch()}
+                  loading={isFetching}
+                >
+                  Làm mới
+                </Button>
 
-                  <Button
-                    onClick={handleExportExcel}
-                    loading={isExporting}
-                    icon={<FileDown size={16} />}
-                    className="!bg-blue-600 !text-white !border-none hover:!bg-blue-700"
-                  >
-                    Xuất dữ liệu
-                  </Button>
-                </Space>
-              </div>
-            </Form.Item>
+                <Button
+                  type="primary"
+                  onClick={handleExportExcel}
+                  loading={isExporting}
+                >
+                  Xuất dữ liệu booking campaign
+                </Button>
+              </Space>
+            </div>
           </Form>
         </Card>
 

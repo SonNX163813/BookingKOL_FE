@@ -31,6 +31,8 @@ import {
   BOOKING_STATUS_LABEL,
   BOOKING_STATUS_OPTIONS,
   STATUS_TAG_COLOR,
+  PAYMENT_STATUS_LABEL,
+  PAYMENT_STATUS_COLOR,
 } from "../../../constants/mySingleBookingStatuses";
 
 dayjs.extend(localeData);
@@ -49,12 +51,16 @@ const SERVER_DATE_FORMAT = "YYYY-MM-DD";
 
 const REQUEST_NUMBER_MAX = 20;
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(Number(value) || 0);
+const formatCurrency = (value) => {
+  if (value == null) return "";
+  const number = Number(value) || 0;
+
+  return (
+    new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(number) + " VND"
+  );
+};
 
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
@@ -138,6 +144,20 @@ const getPrimaryPayment = (record) => {
   const contract = getPrimaryContract(record);
   if (!contract?.paymentDTO) return null;
   return contract.paymentDTO;
+};
+
+const getNormalizedPaymentStatus = (record) => {
+  const payment = getPrimaryPayment(record);
+  const raw =
+    payment?.status ??
+    payment?.paymentStatus ??
+    payment?.state ??
+    record?.paymentStatus ??
+    record?.paymentStatusName ??
+    null;
+
+  if (!raw) return null;
+  return String(raw).toUpperCase();
 };
 
 const ManagementBookingRequests = () => {
@@ -302,6 +322,23 @@ const ManagementBookingRequests = () => {
           );
         },
       },
+
+      /** ✅ NEW: Payment status column */
+      {
+        title: "Thanh toán",
+        key: "paymentStatus",
+        width: 190,
+        render: (_, record) => {
+          const normalized = getNormalizedPaymentStatus(record);
+          if (!normalized) return "--";
+
+          const label = PAYMENT_STATUS_LABEL[normalized] ?? normalized;
+          const color = PAYMENT_STATUS_COLOR[normalized] ?? "default";
+
+          return <Tag color={color}>{label}</Tag>;
+        },
+      },
+
       {
         title: "Thời gian thực hiện",
         key: "time",

@@ -294,7 +294,7 @@ const ReviewsSection = ({
                   ))}
                 </Stack>
 
-                <Button
+                {/* <Button
                   variant="contained"
                   startIcon={<EditRoundedIcon />}
                   sx={{
@@ -317,7 +317,7 @@ const ReviewsSection = ({
                   aria-label="Viết đánh giá"
                 >
                   Viết đánh giá
-                </Button>
+                </Button> */}
               </Stack>
             </Box>
           </Box>

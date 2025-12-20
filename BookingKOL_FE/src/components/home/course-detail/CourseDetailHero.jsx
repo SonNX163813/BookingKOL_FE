@@ -157,7 +157,7 @@ const CourseDetailHero = ({
             >
               {purchaseLoading ? "Đang xử lý..." : "Mua gói"}
             </Button>
-            <Button
+            {/* <Button
               variant="outlined"
               size="large"
               endIcon={<LaunchRoundedIcon />}
@@ -176,7 +176,7 @@ const CourseDetailHero = ({
               }}
             >
               Xem gói khác
-            </Button>
+            </Button> */}
           </Stack>
         </Stack>
       </Box>

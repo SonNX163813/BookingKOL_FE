@@ -5,13 +5,11 @@ import { Menu } from "antd";
 import {
   StackedBarChartOutlined,
   BarChartOutlined,
-  SettingsOutlined,
   FolderOutlined,
   PersonOutlined,
   VerifiedUserOutlined,
   LocalOfferOutlined,
   CategoryOutlined,
-  AppsOutlined,
   AccountCircleOutlined,
   SchoolOutlined,
   PlayCircleOutline,
@@ -31,68 +29,71 @@ const MainLayoutAdmin = () => {
     }
   }, [pathname]);
 
-  const location = useLocation();
-
   // Ánh xạ path → key
   const pathKeyMap = [
     { pattern: /^\/admin(\/)?$/, key: "admin" },
+
     {
       pattern: /^\/admin\/management-log-chat-ai(\/)?$/,
       key: "management-log-chat-ai",
     },
+
+    { pattern: /^\/admin\/management-kol(\/)?$/, key: "management-kol" },
+    // ✅ NEW: bạn có route này trong routerAdmin
     {
-      pattern: /^\/admin\/management-kol(\/)?$/,
-      key: "management-kol",
+      pattern: /^\/admin\/management-kol-work-schedule(\/)?$/,
+      key: "management-kol-work-schedule",
     },
+
     {
       pattern: /^\/admin\/management-customer(\/|$)/,
       key: "management-customer",
     },
+
     {
       pattern: /^\/admin\/management-category(\/)?$/,
       key: "management-category",
     },
+
+    { pattern: /^\/admin\/management-course(\/)?$/, key: "management-course" },
+    { pattern: /^\/admin\/create-course(\/)?$/, key: "management-course" },
+
+    // ✅ FIX: route thực tế là edit-detail-course/:id (không phải view-detail-course)
+    { pattern: /^\/admin\/edit-detail-course(\/|$)/, key: "management-course" },
+
+    // ✅ FIX: thêm route lịch sử mua khóa học để highlight đúng
     {
-      pattern: /^\/admin\/management-course(\/)?$/,
-      key: "management-course",
+      pattern: /^\/admin\/management-course-history(\/)?$/,
+      key: "management-course-history",
     },
-    {
-      pattern: /^\/admin\/create-course(\/)?$/,
-      key: "management-course",
-    },
-    {
-      pattern: /^\/admin\/view-detail-course(\/)?$/,
-      key: "management-course",
-    },
+
     {
       pattern: /^\/admin\/management-booking-requests(\/)?$/,
       key: "management-booking-requests",
     },
-    {
-      pattern: /^\/admin\/management-blogs(\/)?$/,
-      key: "management-blogs",
-    },
-    // NEW: highlight cho trang Campaign (kể cả các route con sau này)
+    { pattern: /^\/admin\/management-blogs(\/|$)/, key: "management-blogs" },
+
     {
       pattern: /^\/admin\/management-booking-campaigns(\/|$)/,
       key: "management-booking-campaigns",
     },
+
     {
       pattern: /^\/admin\/management-refunds(\/)?$/,
       key: "management-refunds",
     },
   ];
 
-  const getSelectedKey = (pathname) => {
+  const getSelectedKey = (p) => {
     for (const { pattern, key } of pathKeyMap) {
-      if (pattern.test(pathname)) return key;
+      if (pattern.test(p)) return key;
     }
     return "admin";
   };
 
-  const selectedKey = getSelectedKey(location.pathname);
-  const [collapsed, setCollapsed] = useState(false);
+  const selectedKey = getSelectedKey(pathname);
 
+  const [collapsed, setCollapsed] = useState(false);
   const toggleMenu = () => setCollapsed(!collapsed);
 
   const menuItems = [
@@ -111,8 +112,6 @@ const MainLayoutAdmin = () => {
           icon: <VerifiedUserOutlined />,
           label: <Link to="management-kol">Quản lý KOL</Link>,
         },
-
-        // ✅ NEW: dưới Quản lý KOL
         {
           key: "management-kol-work-schedule",
           icon: <CalendarMonthOutlined />,
@@ -122,7 +121,6 @@ const MainLayoutAdmin = () => {
             </Link>
           ),
         },
-
         {
           key: "management-customer",
           icon: <AccountCircleOutlined />,
@@ -130,7 +128,6 @@ const MainLayoutAdmin = () => {
         },
       ],
     },
-
     {
       key: "management-booking",
       icon: <EventNoteOutlined />,
@@ -140,16 +137,15 @@ const MainLayoutAdmin = () => {
           key: "management-booking-requests",
           icon: <CalendarMonthOutlined />,
           label: (
-            <Link to="management-booking-requests">Quản lý booking lẻ</Link>
+            <Link to="management-booking-requests">Quản lý đơn đặt lẻ</Link>
           ),
         },
-        // NEW: nút vào trang Campaign
         {
           key: "management-booking-campaigns",
           icon: <BarChartOutlined />,
           label: (
             <Link to="management-booking-campaigns">
-              Quản lý booking Campaign
+              Quản lý đơn đặt chiến dịch
             </Link>
           ),
         },
@@ -170,12 +166,6 @@ const MainLayoutAdmin = () => {
           icon: <CategoryOutlined />,
           label: <Link to="management-category">Quản lý lĩnh vực</Link>,
         },
-        // {
-        //   key: "management-abc",
-        //   icon: <AppsOutlined />,
-        //   // label: <Link to="/management-category">Quản lý nền tảng</Link>,
-        //   label: "Quản lý nền tảng",
-        // },
       ],
     },
     {
@@ -204,19 +194,6 @@ const MainLayoutAdmin = () => {
       icon: <ArticleOutlined />,
       label: <Link to="management-blogs">Quản lý blog</Link>,
     },
-
-    // {
-    //   key: "management-refund",
-    //   icon: <MonetizationOnOutlined />,
-    //   label: "Quản lý tiền",
-    //   children: [],
-    // },
-    // {
-    //   key: "management-history",
-    //   icon: <FolderOutlined />,
-    //   label: "Quản lý lịch sử",
-    //   children: [],
-    // },
     {
       key: "management",
       icon: <FolderOutlined />,
@@ -229,13 +206,6 @@ const MainLayoutAdmin = () => {
         },
       ],
     },
-
-    // {
-    //   key: "settings",
-    //   icon: <SettingsOutlined />,
-    //   label: "Cài đặt",
-    //   children: [],
-    // },
   ];
 
   return (
