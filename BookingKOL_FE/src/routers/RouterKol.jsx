@@ -13,7 +13,7 @@ import KolWorkRegistration from "../pages/kol/KolWorkRegistration";
 import KolSingleRequest from "../pages/kol/KolSingleRequest";
 import KolSingleRequestDetail from "../pages/kol/KolSingleRequestDetail";
 import KolScheduleChange from "../pages/kol/KolScheduleChange";
-
+import KolCampaignWorktimeDetail from "../pages/kol/KolCampaignWorktimeDetail";
 export const routerKOL = [
   {
     path: "/kol",
@@ -42,6 +42,10 @@ export const routerKOL = [
       {
         path: "booking/single-requests/detail/:requestId",
         element: <KolSingleRequestDetail />,
+      },
+      {
+        path: "booking/campaign-worktimes/detail/:workTimeId",
+        element: <KolCampaignWorktimeDetail />,
       },
     ],
   },

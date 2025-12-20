@@ -72,7 +72,7 @@ const addDots = (digits) =>
   digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
 
 // ===== NEW LIMITS =====
-const MAX_TEXT_LEN = 100;
+const MAX_TEXT_LEN = 30;
 const MAX_PRICE_DIGITS = 13;
 
 export default function EditKOL() {
