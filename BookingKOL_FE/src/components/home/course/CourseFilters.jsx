@@ -49,8 +49,6 @@ const CourseFilters = ({
         border: "1px solid rgba(74, 116, 218, 0.18)",
         boxShadow: "0 24px 60px rgba(15, 23, 42, 0.12)",
         backdropFilter: "blur(8px)",
-        // background:
-        //   "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,247,255,0.92) 100%)",
         backgroundColor: "#ffffff",
         p: { xs: 3, md: 4 },
       }}
@@ -62,8 +60,6 @@ const CourseFilters = ({
           inset: 0,
           pointerEvents: "none",
           opacity: 0.75,
-          // background:
-          //   "radial-gradient(circle at 10% 15%, rgba(74, 116, 218, 0.16), transparent 55%), radial-gradient(circle at 90% 20%, rgba(255, 161, 218, 0.12), transparent 60%)",
         }}
       />
       <Stack spacing={3.5} sx={{ position: "relative", zIndex: 1 }}>
@@ -74,22 +70,25 @@ const CourseFilters = ({
           >
             Quản lý khóa học
           </Typography>
-          {/* <Typography
-            variant="h5"
-            sx={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}
-          >
-            Tinh chỉnh gói học theo nhu cầu của bạn
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: "rgba(15, 23, 42, 0.7)", lineHeight: 1.6 }}
-          >
-            Lọc nhanh theo ngân sách và ưu đãi để luôn nhìn thấy những gói phù
-            hợp nhất với mục tiêu livestream hiện tại.
-          </Typography> */}
         </Stack>
 
         <Stack spacing={3}>
+          {/* ✅ Thêm filter theo tên */}
+          <Box sx={inputsGrid}>
+            <TextField
+              label="Tên khóa học"
+              placeholder="Nhập tên khóa học..."
+              type="text"
+              size="medium"
+              value={filters.name ?? ""}
+              onChange={onFilterInputChange("name")}
+              fullWidth
+              sx={fieldStyles}
+              inputProps={{ maxLength: 200 }}
+            />
+          </Box>
+
+          {/* (Bạn có thể bật lại các block min/max price, discount nếu muốn) */}
           {/* <Box sx={inputsGrid}>
             <TextField
               label="Giá tối thiểu (VND)"
@@ -111,9 +110,9 @@ const CourseFilters = ({
               fullWidth
               sx={fieldStyles}
             />
-          </Box> */}
+          </Box>
 
-          {/* <Box sx={inputsGrid}>
+          <Box sx={inputsGrid}>
             <TextField
               label="Giảm giá tối thiểu (%)"
               type="number"

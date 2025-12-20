@@ -21,7 +21,7 @@ export const phoneRule = {
       ? Promise.resolve()
       : Promise.reject(
           new Error(
-            "Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng Việt Nam, ví dụ: 0912345678 hoặc +84912345678"
+            "Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng Việt Nam, ví dụ: 0912345678"
           )
         );
   },
