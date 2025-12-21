@@ -116,6 +116,23 @@ const CAMPAIGN_STATUS_COLOR = {
   COMPLETED: "blue",
 };
 
+/** ✅ NEW: packageType label ngay trong file */
+const PACKAGE_TYPE_LABEL = {
+  normal: "Gói thường",
+  vip: "Gói VIP",
+};
+const normalizePackageType = (value) => {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw === "vip") return "vip";
+  return "normal"; // default
+};
+const formatPackageType = (value) => {
+  const key = normalizePackageType(value);
+  return PACKAGE_TYPE_LABEL[key] ?? key;
+};
+
 /** Tag render */
 const createTagRender = (options) => (tagProps) => {
   const { value, closable, onClose } = tagProps;
@@ -930,7 +947,6 @@ export default function EditBookingCampain() {
           }
         }
 
-        // ✅ NEW: tạo xong -> quay lại trang list yêu cầu
         message.success("Tạo yêu cầu chiến dịch thành công ");
         navigate(BOOKING_CAMPAIGN_LIST_PATH, { replace: true });
         return;
@@ -1124,6 +1140,12 @@ export default function EditBookingCampain() {
                   <Descriptions.Item label="Tên Campaign">
                     {campaignInfo?.name ?? "--"}
                   </Descriptions.Item>
+
+                  {/* ✅ NEW: packageType */}
+                  <Descriptions.Item label="Gói dịch vụ">
+                    {formatPackageType(campaignInfo?.packageType ?? "normal")}
+                  </Descriptions.Item>
+
                   <Descriptions.Item label="Thời gian">
                     {formatDate(campaignInfo?.startDate)} -{" "}
                     {formatDate(campaignInfo?.endDate)}
@@ -1152,6 +1174,12 @@ export default function EditBookingCampain() {
                   <Descriptions.Item label="Tên Campaign">
                     {campaignInfo?.name ?? "--"}
                   </Descriptions.Item>
+
+                  {/* ✅ NEW: packageType */}
+                  <Descriptions.Item label="Gói dịch vụ">
+                    {formatPackageType(campaignInfo?.packageType ?? "normal")}
+                  </Descriptions.Item>
+
                   <Descriptions.Item label="Họ và tên người đặt">
                     {campaignInfo?.ordererFullName ?? "--"}
                   </Descriptions.Item>
