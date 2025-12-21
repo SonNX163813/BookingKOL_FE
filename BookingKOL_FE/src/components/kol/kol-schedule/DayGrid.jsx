@@ -1,3 +1,4 @@
+// src/components/kol/kol-schedule/DayGrid.jsx
 import React, { useMemo, useState } from "react";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -255,6 +256,7 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                           .toLowerCase()
                           .includes("book");
                       const hhmm = (t) => (t ? t.slice(0, 5) : "");
+
                       return (
                         <div
                           key={item.id}
@@ -279,18 +281,22 @@ export default function DayGrid({ range, dayDuties, fromDate }) {
                             className="h-full w-full rounded-xl p-2 text-white overflow-hidden border-2 border-white/60 shadow-sm"
                             style={{ backgroundColor: item.colorCode }}
                           >
-                            <p className="font-bold text-xs truncate text-white">
-                              {isBooking ? item.description : "Lịch rảnh"}
-                            </p>
+                            {/* ✅ SỬA HIỂN THỊ: "Đã đặt lịch từ 13:00 – 14:00" */}
                             {isBooking ? (
-                              <p className="text-xs text-white truncate mt-0.5">
-                                {hhmm(item.startTime)} – {hhmm(item.endTime)}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-white truncate mt-0.5">
-                                Rảnh từ {hhmm(item.startTime)} đến{" "}
+                              <p className="font-bold text-xs truncate text-white">
+                                {item.description} từ {hhmm(item.startTime)} –{" "}
                                 {hhmm(item.endTime)}
                               </p>
+                            ) : (
+                              <>
+                                <p className="font-bold text-xs truncate text-white">
+                                  Lịch rảnh
+                                </p>
+                                <p className="text-xs text-white truncate mt-0.5">
+                                  Rảnh từ {hhmm(item.startTime)} đến{" "}
+                                  {hhmm(item.endTime)}
+                                </p>
+                              </>
                             )}
                           </div>
                         </div>

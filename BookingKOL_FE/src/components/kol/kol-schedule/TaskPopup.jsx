@@ -1,24 +1,82 @@
-import React, { useEffect, useState } from "react";
+// src/components/kol/kol-schedule/TaskPopup.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import { Modal, Spin } from "antd";
 import { IoCloseOutline } from "react-icons/io5";
 import { CiClock2 } from "react-icons/ci";
 import { GoGoal } from "react-icons/go";
 import dayjs from "dayjs";
-import { getKolMySingleRequestDetail } from "../../../services/kol/KolAPI";
-import { getAvailabilityTimelineById } from "../../../services/kol/AvailabilityAPI";
+import { useNavigate } from "react-router-dom";
+
+// ✅ NEW: gọi API detail theo kolWorkTimeId
+import { getBookingRequestByWorktimeId } from "../../../services/kol/ScheduleAPI";
+
+/** ✅ SINGLE booking status label (theo bạn gửi) */
+const BOOKING_STATUS_OPTIONS = [
+  { label: "Chờ Thanh Toán", value: "DRAFT" },
+  { label: "Đã yêu cầu", value: "REQUESTED" },
+  { label: "Đang thực hiện", value: "IN_PROGRESS" },
+  { label: "Đã hoàn thành", value: "COMPLETED" },
+  { label: "Đã hết hạn", value: "EXPIRED" },
+  { label: "Đã hủy", value: "CANCELLED" },
+  { label: "Đang chờ thực hiện", value: "PAID" },
+  { label: "Đang chờ thực hiện", value: "ACCEPTED" },
+  { label: "Đã hoàn tiền", value: "REFUNDED" },
+];
+
+const SINGLE_STATUS_LABEL = BOOKING_STATUS_OPTIONS.reduce((acc, it) => {
+  acc[String(it.value || "").toUpperCase()] = it.label;
+  return acc;
+}, {});
+
+/** ✅ CAMPAIGN (worktime) status label (theo bạn gửi) */
+const CAMPAIGN_STATUS_LABEL = {
+  AVAILABLE: "Sẵn sàng",
+  ASSIGNED: "Đã gán",
+  IN_PROGRESS: "Đang thực hiện",
+  DELIVERED: "Đã giao",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  PENDING_ASSIGNMENT: "Chưa có KOL",
+  PENDING: "Chờ thực hiện",
+};
+
+const getStatusLabel = (bookingType, status) => {
+  const type = String(bookingType || "").toUpperCase();
+  const k = String(status || "").toUpperCase();
+
+  if (!k) return "—";
+
+  // CAMPAIGN dùng map riêng
+  if (type === "CAMPAIGN") return CAMPAIGN_STATUS_LABEL[k] || k;
+
+  // SINGLE dùng BOOKING_STATUS_OPTIONS
+  return SINGLE_STATUS_LABEL[k] || k;
+};
+
+/** ✅ BOOKING TYPE label (SINGLE/CAMPAIGN -> Tiếng Việt) */
+const BOOKING_TYPE_LABEL = {
+  SINGLE: "Đơn lẻ",
+  CAMPAIGN: "Chiến dịch",
+};
+
+const getBookingTypeLabel = (type) => {
+  const k = String(type || "").toUpperCase();
+  return BOOKING_TYPE_LABEL[k] || (type ? String(type) : "—");
+};
 
 export default function TaskPopup({
   isDisplay,
   goalDetails,
   dayInfo,
   onClose,
-  // ✅ NEW: cho phép set zIndex khi popup bị “đè”
   zIndex = 5000,
-  // ✅ NEW: trong case đang có overlay khác (Xem thêm), có thể tắt mask của modal này
   mask = true,
+  readOnly,
 }) {
+  const navigate = useNavigate();
+
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detail, setDetail] = useState(null);
+  const [detailRaw, setDetailRaw] = useState(null);
   const [err, setErr] = useState("");
 
   const hhmm = (t) => (t ? t.slice(0, 5) : "");
@@ -29,70 +87,78 @@ export default function TaskPopup({
       .includes("book");
 
   const titleText = isBooking
-    ? goalDetails?.description || "Booking"
+    ? goalDetails?.description || "Đã đặt lịch"
     : "Lịch rảnh";
+
+  const kolWorkTimeId =
+    goalDetails?.kolWorkTimeId || goalDetails?.workTimeId || null;
+
+  // ✅ chuẩn hoá 2 shape CAMPAIGN / SINGLE để render dễ
+  const detail = useMemo(() => {
+    const r = detailRaw || null;
+    if (!r) return null;
+
+    const bookingType = String(r?.bookingType || "SINGLE").toUpperCase();
+
+    if (bookingType === "CAMPAIGN") {
+      return {
+        bookingType: "CAMPAIGN",
+        requestNumber: r?.requestNumber,
+        // status CAMPAIGN = status worktime/campaign
+        status: r?.status,
+        bookingStatus: r?.bookingStatus,
+        bookingRequestId: r?.bookingRequestId,
+        startAt: r?.startAt,
+        endAt: r?.endAt,
+        description: r?.description,
+        livestreamAddress: r?.livestreamAddress,
+        campaignId: r?.campaignId,
+        campaignName: r?.campaignName,
+        campaignObjective: r?.campaignObjective,
+        campaignStartDate: r?.campaignStartDate,
+        campaignEndDate: r?.campaignEndDate,
+      };
+    }
+
+    // SINGLE
+    return {
+      bookingType: "SINGLE",
+      id: r?.id,
+      requestNumber: r?.requestNumber,
+      status: r?.status,
+      startAt: r?.startAt,
+      endAt: r?.endAt,
+      description: r?.description,
+      platform: r?.platform,
+      location: r?.location,
+      fullName: r?.fullName || r?.user?.fullName,
+      phone: r?.phone || r?.user?.phone,
+      email: r?.email || r?.user?.email,
+      attachedFiles: r?.attachedFiles || [],
+      contracts: r?.contracts || [],
+    };
+  }, [detailRaw]);
 
   useEffect(() => {
     let mounted = true;
-    setDetail(null);
+    setDetailRaw(null);
     setErr("");
 
     if (!isDisplay || !isBooking) return;
-
-    const availabilityId =
-      goalDetails?.availabilityId ||
-      goalDetails?.parentId ||
-      goalDetails?.availabilityTimelineId ||
-      null;
-
-    const requestId =
-      goalDetails?.bookingRequestId || goalDetails?.requestId || null;
 
     (async () => {
       try {
         setLoadingDetail(true);
 
-        if (availabilityId) {
-          const rec = await getAvailabilityTimelineById(availabilityId);
-          if (!mounted) return;
-
-          const firstWork = Array.isArray(rec?.workTimes)
-            ? rec.workTimes[0]
-            : null;
-
-          const normalized = {
-            source: "availability",
-            id: rec?.id,
-            status: firstWork?.status || rec?.status,
-            requestNumber: rec?.requestNumber || rec?.bookingCode || null,
-            customerName: rec?.customerName || rec?.brandName || null,
-            price: rec?.price ?? null,
-            note: rec?.note ?? null,
-            startAt: firstWork?.startAt || rec?.startAt || null,
-            endAt: firstWork?.endAt || rec?.endAt || null,
-          };
-
-          setDetail(normalized);
-          return;
+        if (!kolWorkTimeId) {
+          throw new Error(
+            "Không tìm thấy kolWorkTimeId/workTimeId để xem chi tiết."
+          );
         }
 
-        if (requestId) {
-          const rec = await getKolMySingleRequestDetail(requestId);
-          if (!mounted) return;
-
-          setDetail({
-            source: "request",
-            id: rec?.id,
-            status: rec?.status,
-            requestNumber: rec?.requestNumber,
-            customerName: rec?.customerName || rec?.brandName || null,
-            price: rec?.price ?? null,
-            note: rec?.note ?? null,
-            startAt: rec?.startAt || null,
-            endAt: rec?.endAt || null,
-          });
-          return;
-        }
+        const res = await getBookingRequestByWorktimeId(kolWorkTimeId);
+        if (!mounted) return;
+        setDetailRaw(res || null);
       } catch (e) {
         if (mounted) setErr(e?.message || "Không tải được chi tiết.");
       } finally {
@@ -103,15 +169,21 @@ export default function TaskPopup({
     return () => {
       mounted = false;
     };
-  }, [
-    isDisplay,
-    isBooking,
-    goalDetails?.availabilityId,
-    goalDetails?.parentId,
-    goalDetails?.availabilityTimelineId,
-    goalDetails?.bookingRequestId,
-    goalDetails?.requestId,
-  ]);
+  }, [isDisplay, isBooking, kolWorkTimeId]);
+
+  const handleGoDetail = () => {
+    if (!detail) return;
+
+    if (detail.bookingType === "SINGLE" && detail.id) {
+      navigate(`/kol/single-requests/detail/${detail.id}`);
+      return;
+    }
+
+    if (detail.bookingType === "CAMPAIGN" && detail.campaignId) {
+      // TODO: route campaign detail theo dự án bạn
+      return;
+    }
+  };
 
   if (!isDisplay) return null;
 
@@ -125,10 +197,8 @@ export default function TaskPopup({
       keyboard
       destroyOnClose
       centered
-      width={"min(92vw, 500px)"}
-      // ✅ quan trọng: nâng zIndex để nằm trên overlay “Xem thêm”
+      width={"min(92vw, 520px)"}
       zIndex={zIndex}
-      // ✅ tuỳ chọn: tránh bị tối 2 lớp khi đang có overlay khác
       mask={mask}
       styles={{
         content: {
@@ -163,6 +233,7 @@ export default function TaskPopup({
               {dayInfo?.year}
             </span>
           </div>
+
           <div className="font-semibold">
             {isBooking
               ? `${hhmm(goalDetails?.startTime)} - ${hhmm(
@@ -176,9 +247,10 @@ export default function TaskPopup({
 
         <div className="mt-4 flex items-center gap-2 text-[15px]">
           <GoGoal className="text-xl text-gray-600" />
-          <span className="font-medium">Mục tiêu:</span>
+          <span className="font-medium">Note:</span>
           <span className="font-semibold">
-            {goalDetails?.goalsTitle || (isBooking ? "Booking" : "Lịch rảnh")}
+            {goalDetails?.goalsTitle ||
+              (isBooking ? "Đã được đặt lịch" : "Lịch rảnh")}
           </span>
         </div>
 
@@ -191,55 +263,121 @@ export default function TaskPopup({
               </div>
             ) : err ? (
               <div className="text-red-500 text-sm">{err}</div>
+            ) : !detail ? (
+              <div className="text-gray-500 text-sm">Không có dữ liệu.</div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3 text-[14px]">
                   <div>
-                    <div className="text-gray-500">Mã đơn</div>
+                    <div className="text-gray-500">Loại</div>
                     <div className="font-semibold">
-                      {detail?.requestNumber || "—"}
+                      {getBookingTypeLabel(detail.bookingType)}
                     </div>
                   </div>
+
                   <div>
                     <div className="text-gray-500">Trạng thái</div>
-                    <div className="font-semibold">{detail?.status || "—"}</div>
+                    <div className="font-semibold">
+                      {/* ✅ CAMPAIGN dùng CAMPAIGN_STATUS_LABEL, SINGLE dùng BOOKING_STATUS_OPTIONS */}
+                      {getStatusLabel(
+                        detail.bookingType,
+                        // nếu BE trả status campaign ở bookingStatus thì vẫn bắt được
+                        detail.status || detail.bookingStatus
+                      )}
+                    </div>
                   </div>
+
+                  <div>
+                    <div className="text-gray-500">Mã đơn</div>
+                    <div className="font-semibold">
+                      {detail.requestNumber || "—"}
+                    </div>
+                  </div>
+
+                  {/* <div>
+                    <div className="text-gray-500">WorkTime ID</div>
+                    <div className="font-semibold">{kolWorkTimeId || "—"}</div>
+                  </div> */}
+
                   <div>
                     <div className="text-gray-500">Bắt đầu</div>
                     <div className="font-semibold">
-                      {detail?.startAt
+                      {detail.startAt
                         ? dayjs(detail.startAt).format("HH:mm DD/MM/YYYY")
                         : "—"}
                     </div>
                   </div>
+
                   <div>
                     <div className="text-gray-500">Kết thúc</div>
                     <div className="font-semibold">
-                      {detail?.endAt
+                      {detail.endAt
                         ? dayjs(detail.endAt).format("HH:mm DD/MM/YYYY")
                         : "—"}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-gray-500">Khách hàng</div>
-                    <div className="font-semibold">
-                      {detail?.customerName || "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500">Giá trị</div>
-                    <div className="font-semibold">
-                      {detail?.price != null ? `${detail.price}` : "—"}
-                    </div>
-                  </div>
+
+                  {detail.bookingType === "CAMPAIGN" ? (
+                    <>
+                      <div className="col-span-2">
+                        <div className="text-gray-500">Chiến dịch</div>
+                        <div className="font-semibold">
+                          {detail.campaignName || "—"}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2">
+                        <div className="text-gray-500">Mục tiêu</div>
+                        <div className="font-semibold">
+                          {detail.campaignObjective ||
+                            detail.description ||
+                            "—"}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2">
+                        <div className="text-gray-500">Địa chỉ livestream</div>
+                        <div className="font-semibold">
+                          {detail.livestreamAddress || "—"}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="text-gray-500">Khách hàng</div>
+                        <div className="font-semibold">
+                          {detail.fullName || "—"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-gray-500">Nền tảng</div>
+                        <div className="font-semibold">
+                          {detail.platform || "—"}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2">
+                        <div className="text-gray-500">Địa điểm</div>
+                        <div className="font-semibold">
+                          {detail.location || "—"}
+                        </div>
+                      </div>
+
+                      {/* <div className="col-span-2">
+                        <div className="text-gray-500">Tệp đính kèm</div>
+                        <div className="font-semibold">
+                          {detail.attachedFiles?.length ?? 0}
+                        </div>
+                      </div> */}
+                    </>
+                  )}
                 </div>
 
-                {detail?.note && (
-                  <div className="mt-3">
-                    <div className="text-gray-500 text-[13px]">Ghi chú</div>
-                    <div className="text-[14px]">{detail.note}</div>
-                  </div>
-                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  {/* <Button type="primary" onClick={handleGoDetail}>Xem chi tiết</Button> */}
+                </div>
               </>
             )}
           </div>

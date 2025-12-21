@@ -116,10 +116,16 @@ const CAMPAIGN_STATUS_COLOR = {
   COMPLETED: "blue",
 };
 
-/** ✅ NEW: Package type label ngay trong file */
+/** ✅ Package type label ngay trong file */
 const PACKAGE_TYPE_LABEL = {
   normal: "Gói thường",
   vip: "Gói VIP",
+};
+
+/** ✅ NEW: Màu cho package type (để gắn cạnh Booking1) */
+const PACKAGE_TYPE_COLOR = {
+  normal: "blue",
+  vip: "magenta", // bạn có thể đổi sang "gold" nếu muốn VIP nổi hơn
 };
 
 const normalizePackageType = (value) => {
@@ -373,7 +379,7 @@ const BookingCampaignDetail = () => {
                       {campaignInfo?.livestreamHours ?? "--"}
                     </Descriptions.Item>
 
-                    {/* ✅ NEW: packageType */}
+                    {/* ✅ packageType */}
                     <Descriptions.Item label="Gói dịch vụ">
                       {formatPackageType(campaignInfo?.packageType ?? "normal")}
                     </Descriptions.Item>
@@ -389,7 +395,7 @@ const BookingCampaignDetail = () => {
                       {campaignInfo?.name ?? "--"}
                     </Descriptions.Item>
 
-                    {/* ✅ NEW: packageType */}
+                    {/* ✅ packageType */}
                     <Descriptions.Item label="Gói dịch vụ">
                       {formatPackageType(campaignInfo?.packageType ?? "normal")}
                     </Descriptions.Item>
@@ -585,13 +591,16 @@ const BookingCampaignDetail = () => {
                   record?.campaign?.liveStreamAddress ??
                   null;
 
-                // ✅ NEW: packageType per booking (fallback normal)
+                // ✅ packageType per booking (fallback normal)
                 const packageType =
                   record?.packageType ??
                   record?.campaignPackageType ??
                   record?.campaign?.packageType ??
                   campaignInfo?.packageType ??
                   "normal";
+
+                // ✅ NEW: key để lấy màu + label
+                const pkgKey = normalizePackageType(packageType);
 
                 const schedules = (
                   Array.isArray(record?.paymentSchedules)
@@ -626,14 +635,26 @@ const BookingCampaignDetail = () => {
                     )
                   : null;
 
+                const bookingTitleText = `Booking ${
+                  record?.bookingNumber ?? `#${index + 1}`
+                }`;
+
                 return (
                   <Card
                     key={record?.id ?? index}
                     type="inner"
                     className="mb-4 last:mb-0"
-                    title={`Booking ${
-                      record?.bookingNumber ?? `#${index + 1}`
-                    }`}
+                    title={
+                      <Space size={8} wrap>
+                        <span>{bookingTitleText}</span>
+                        <Tag
+                          color={PACKAGE_TYPE_COLOR[pkgKey] ?? "default"}
+                          className="!m-0"
+                        >
+                          {formatPackageType(pkgKey)}
+                        </Tag>
+                      </Space>
+                    }
                   >
                     <Descriptions
                       bordered
@@ -655,10 +676,10 @@ const BookingCampaignDetail = () => {
                         {formatRepeatType(record?.repeatType)}
                       </Descriptions.Item>
 
-                      {/* ✅ NEW: packageType */}
-                      <Descriptions.Item label="Gói dịch vụ">
-                        {formatPackageType(packageType)}
-                      </Descriptions.Item>
+                      {/* ✅ packageType vẫn giữ trong detail nếu bạn muốn */}
+                      {/* <Descriptions.Item label="Gói dịch vụ">
+                        {formatPackageType(pkgKey)}
+                      </Descriptions.Item> */}
 
                       <Descriptions.Item
                         label="Mục tiêu chiến dịch"
