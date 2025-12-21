@@ -9,6 +9,8 @@ import {
   Descriptions,
   Empty,
   Grid,
+  Input,
+  Modal,
   Skeleton,
   Space,
   Tag,
@@ -36,9 +38,12 @@ import {
   completeUserWorkTime,
   getUserBookingStatus,
   initiateCampaignPayment,
+  rejectUserContract,
+  signUserContract,
 } from "../../services/booking/BookingServices";
 import { useGetWorktimeLivestreamMetrics } from "../../hook/user/booking/useGetWorktimeLivestreamMetrics";
 import { useConfirmMyWorktimeLivestreamMetrics } from "../../hook/user/booking/useConfirmMyWorktimeLivestreamMetrics";
+import { BOOKING_FLOW_STYLE } from "../../constants/bookingFlowTextStyles";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -268,6 +273,9 @@ const CampaignBookingDetailPage = () => {
   const [initiatingScheduleId, setInitiatingScheduleId] = useState(null);
   const [completingWorkTimeId, setCompletingWorkTimeId] = useState(null);
   const [confirmingWorktimeId, setConfirmingWorktimeId] = useState(null);
+  const [rejectModalInfo, setRejectModalInfo] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectReasonError, setRejectReasonError] = useState("");
   const initiatePaymentMutation = useMutation({
     mutationFn: ({ paymentScheduleId }) =>
       initiateCampaignPayment(paymentScheduleId),
@@ -285,6 +293,27 @@ const CampaignBookingDetailPage = () => {
   } = useGetCampaignBookingDetail(campaignId);
 
   const detail = campaignDetailResponse?.data;
+
+  const closeRejectModal = useCallback(() => {
+    setRejectModalInfo(null);
+    setRejectReason("");
+    setRejectReasonError("");
+  }, []);
+
+  const signContractMutation = useMutation({
+    mutationFn: signUserContract,
+    onSuccess: () => {
+      refetchCampaignDetail();
+    },
+  });
+
+  const rejectContractMutation = useMutation({
+    mutationFn: rejectUserContract,
+    onSuccess: () => {
+      closeRejectModal();
+      refetchCampaignDetail();
+    },
+  });
 
   const statusMeta = useMemo(
     () => resolveStatusMeta(detail?.status),
@@ -396,6 +425,12 @@ const CampaignBookingDetailPage = () => {
   } = useConfirmMyWorktimeLivestreamMetrics();
 
   const isInitialLoading = isGettingCampaignDetail && !detail;
+  const isRejectModalOpen = Boolean(rejectModalInfo);
+  const rejectCampaignName =
+    rejectModalInfo?.campaignName ?? detail?.name ?? "--";
+  const isSigningContract = signContractMutation.isPending;
+  const isRejectingContract = rejectContractMutation.isPending;
+  const isAnyActionLoading = isSigningContract || isRejectingContract;
 
   const handleBack = useCallback(() => {
     navigate("/don-booking-chien-dich");
@@ -556,6 +591,68 @@ const CampaignBookingDetailPage = () => {
     },
     [handleConfirmWorktimeLivestreamMetrics, refetchCampaignDetail]
   );
+
+  const handleAcceptContract = useCallback(
+    (request) => {
+      const contractId = request?.contractId;
+      const bookingRequestId = resolveBookingRequestId(request);
+      if (!contractId || !bookingRequestId || isAnyActionLoading) {
+        return;
+      }
+      signContractMutation.mutate({
+        contractId,
+        bookingRequestId,
+      });
+    },
+    [isAnyActionLoading, signContractMutation]
+  );
+
+  const openRejectModal = useCallback(
+    (request) => {
+      const contractId = request?.contractId;
+      const bookingRequestId = resolveBookingRequestId(request);
+      if (!contractId || !bookingRequestId || isAnyActionLoading) {
+        return;
+      }
+      setRejectModalInfo({
+        contractId,
+        bookingRequestId,
+        campaignName: request?.campaignName ?? detail?.name ?? "--",
+      });
+      setRejectReason("");
+      setRejectReasonError("");
+    },
+    [detail?.name, isAnyActionLoading]
+  );
+
+  const handleRejectReasonChange = (event) => {
+    if (rejectReasonError) {
+      setRejectReasonError("");
+    }
+    setRejectReason(event?.target?.value ?? "");
+  };
+
+  const handleRejectSubmit = useCallback(async () => {
+    if (!rejectModalInfo?.contractId || !rejectModalInfo?.bookingRequestId) {
+      setRejectReasonError("Thiếu thông tin hợp đồng, vui lòng tải lại trang.");
+      return;
+    }
+    const normalizedReason = rejectReason.trim();
+    if (!normalizedReason) {
+      setRejectReasonError("Vui lòng nhập lý do từ chối hợp đồng.");
+      return;
+    }
+    await rejectContractMutation.mutateAsync({
+      contractId: rejectModalInfo.contractId,
+      bookingRequestId: rejectModalInfo.bookingRequestId,
+      reason: normalizedReason,
+    });
+  }, [rejectContractMutation, rejectModalInfo, rejectReason]);
+
+  const handleRejectModalCancel = () => {
+    if (rejectContractMutation.isPending) return;
+    closeRejectModal();
+  };
 
   const renderNameList = (names, emptyLabel) =>
     names.length ? (
@@ -1067,12 +1164,27 @@ const CampaignBookingDetailPage = () => {
       typeof request?.contractStatus === "string"
         ? request.contractStatus.toUpperCase()
         : request?.contractStatus;
+    const bookingRequestId = resolveBookingRequestId(request);
+    const campaignStatusSource =
+      request?.campaignStatus ?? request?.status ?? request?.bookingStatus;
+    const normalizedCampaignStatus =
+      typeof campaignStatusSource === "string"
+        ? campaignStatusSource.toUpperCase()
+        : "";
+    const isTerminalStatus = ["COMPLETED", "CANCELLED"].includes(
+      normalizedCampaignStatus
+    );
     const negotiatedKolNames = extractNames(request?.kols);
     const negotiatedLiveNames = extractNames(request?.lives);
     const canPreviewContract =
       (typeof request?.contractFileUrl === "string" &&
         request.contractFileUrl.trim().length > 0) ||
       (Array.isArray(request?.termLinks) && request.termLinks.length > 0);
+    const canManageContract =
+      !isTerminalStatus &&
+      normalizedCampaignStatus === "NEGOTIATING" &&
+      request?.contractId &&
+      bookingRequestId;
 
     return (
       <Card
@@ -1170,6 +1282,40 @@ const CampaignBookingDetailPage = () => {
         <div className="mt-6">{renderLivestreamMetrics(request)}</div>
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
+          {canManageContract ? (
+            <>
+              <Button
+                type="primary"
+                style={{
+                  color: "#ffffff",
+                  height: "2.5rem",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  borderRadius: "16px",
+                  backgroundColor: BOOKING_FLOW_STYLE.accent,
+                }}
+                onClick={() => handleAcceptContract(request)}
+                loading={isSigningContract}
+                disabled={isRejectingContract}
+              >
+                Chấp nhận hợp đồng
+              </Button>
+              <Button
+                danger
+                style={{
+                  height: "2.5rem",
+                  borderRadius: "16px",
+                  backgroundColor: "#fef2f2",
+                  color: "#dc2626",
+                  fontWeight: 600,
+                }}
+                onClick={() => openRejectModal(request)}
+                disabled={isSigningContract}
+              >
+                Từ chối hợp đồng
+              </Button>
+            </>
+          ) : null}
           <Button
             icon={<FileText size={16} />}
             className="!h-11 !rounded-xl !border-slate-200 !bg-white !px-5 font-semibold hover:!border-indigo-500/60 hover:!text-indigo-600"
@@ -1297,14 +1443,14 @@ const CampaignBookingDetailPage = () => {
                         {detail?.livestreamHours ?? "--"}
                       </p>
                     </div>
-                    <div>
+                    {/* <div>
                       <p className="text-xs uppercase tracking-wide text-slate-500">
                         Kiểu lặp
                       </p>
                       <p className="mt-1 text-base text-slate-900">
                         {detail?.repeatType ?? "--"}
                       </p>
-                    </div>
+                    </div> */}
                     <div>
                       <p className="text-xs uppercase tracking-wide text-slate-500">
                         Địa điểm livestream
@@ -1434,6 +1580,46 @@ const CampaignBookingDetailPage = () => {
         formatCurrency={formatCurrency}
         acknowledgementRequired={false}
       />
+
+      <Modal
+        centered
+        title="Từ chối hợp đồng"
+        open={isRejectModalOpen}
+        onOk={handleRejectSubmit}
+        onCancel={handleRejectModalCancel}
+        okText="Từ chối hợp đồng"
+        cancelText="Hủy"
+        maskClosable={!rejectContractMutation.isPending}
+        confirmLoading={rejectContractMutation.isPending}
+        styles={{
+          content: { borderRadius: 20 },
+          header: { borderRadius: "20px 20px 0 0" },
+        }}
+      >
+        <p className="mb-4 text-sm text-slate-600">
+          Nhập lý do từ chối cho chiến dịch{" "}
+          <span className="font-semibold text-slate-900">
+            {rejectCampaignName}
+          </span>
+          .
+        </p>
+        <Input.TextArea
+          rows={4}
+          maxLength={1000}
+          showCount
+          value={rejectReason}
+          onChange={handleRejectReasonChange}
+          placeholder="Ví dụ: Điều khoản chưa phù hợp với ngân sách..."
+          style={{
+            borderRadius: 12,
+            padding: "10px 12px",
+            marginBottom: 20,
+          }}
+        />
+        {rejectReasonError ? (
+          <p className="mt-2 text-sm text-red-500">{rejectReasonError}</p>
+        ) : null}
+      </Modal>
     </>
   );
 };

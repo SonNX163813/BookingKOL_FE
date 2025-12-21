@@ -1237,7 +1237,7 @@ const ServicePackageBookingFormPage = () => {
             </Form.Item>
           </div>
 
-          <Form.Item
+          {/* <Form.Item
             label="Kiểu lặp"
             name="repeatSelection"
             required
@@ -1281,7 +1281,7 @@ const ServicePackageBookingFormPage = () => {
 
           <Form.Item name="repeatType" hidden>
             <Input />
-          </Form.Item>
+          </Form.Item> */}
 
           {/* FORM TẢI TỆP MUI */}
           <Form.Item
@@ -1505,9 +1505,9 @@ const ServicePackageBookingFormPage = () => {
               {/* <Descriptions.Item label="Tần suất triển khai">
                 {campaignData.recurrencePattern}
               </Descriptions.Item> */}
-              <Descriptions.Item label="Kiểu lặp">
+              {/* <Descriptions.Item label="Kiểu lặp">
                 {campaignData.repeatType || "Không lặp"}
-              </Descriptions.Item>
+              </Descriptions.Item> */}
               <Descriptions.Item label="Số giờ live">
                 {campaignData.livestreamHours ?? "--"}
               </Descriptions.Item>
