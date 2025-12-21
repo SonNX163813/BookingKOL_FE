@@ -477,16 +477,6 @@ export default function KolCampaignWorktimeDetail() {
                       </div>
                     </div>
                   </Space>
-
-                  {/* <div className="flex gap-2 flex-wrap md:justify-end">
-                    <Tag color={workMeta?.color ?? "default"}>
-                      {workMeta?.label ?? workStatus ?? "--"}
-                    </Tag>
-                    <Tag color={bookingMeta?.color ?? "default"}>
-                      {bookingMeta?.label ?? bookingStatus ?? "--"}
-                    </Tag>
-                    <Tag color="purple">Book theo chiến dịch</Tag>
-                  </div> */}
                 </div>
               </Card>
 
@@ -531,6 +521,16 @@ export default function KolCampaignWorktimeDetail() {
                     <Tag color={bookingMeta?.color ?? "default"}>
                       {bookingMeta?.label ?? bookingStatus ?? "--"}
                     </Tag>
+                  </Descriptions.Item>
+
+                  {/* ✅ NEW: Livestream Address */}
+                  <Descriptions.Item
+                    label="Địa điểm livestream"
+                    span={screens.lg ? 3 : screens.md ? 2 : 1}
+                  >
+                    <Text style={{ whiteSpace: "pre-wrap" }}>
+                      {record?.livestreamAddress ?? "--"}
+                    </Text>
                   </Descriptions.Item>
 
                   <Descriptions.Item
