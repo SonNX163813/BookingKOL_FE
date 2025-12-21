@@ -73,6 +73,12 @@ const shouldSilenceAuthlessError = (error) => {
   return !hasAuthToken();
 };
 
+// Keep notification polling fully silent (e.g., after logout a stray call might hit 401)
+const isNotificationRequest = (error) => {
+  const url = String(error?.config?.url ?? "");
+  return /\/notification\//i.test(url);
+};
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
@@ -101,6 +107,11 @@ api.interceptors.response.use(
 
     // ✅ NEW: không toast nhưng VẪN reject để caller catch -> return null (ẩn UI)
     if (shouldSilenceCancelDetailToast(error)) {
+      return Promise.reject(error);
+    }
+
+    // ƒo. Notification bell/polling: never toast on these requests
+    if (isNotificationRequest(error)) {
       return Promise.reject(error);
     }
 

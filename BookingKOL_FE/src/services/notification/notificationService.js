@@ -47,6 +47,15 @@ const normalizeIdentity = () => {
   return { role, userId };
 };
 
+// Notification bell calls poll frequently; keep them silent to avoid noisy toasts
+const notificationRequestConfig = {
+  skipToast: true,
+  skipSuccessToast: true,
+  skipErrorToast: true,
+  skipAuthErrorToast: true,
+  silent: true,
+};
+
 export const fetchNotifications = async () => {
   const identity = normalizeIdentity();
   if (!identity) {
@@ -58,13 +67,7 @@ export const fetchNotifications = async () => {
     url: `/v1/notification/${encodeURIComponent(role)}/${encodeURIComponent(
       userId
     )}`,
-    // Avoid showing global error toast on 401/null data from this endpoint
-    config: {
-      skipErrorToast: true,
-      skipAuthErrorToast: true,
-      silent: true,
-      skipToast: true,
-    },
+    config: notificationRequestConfig,
   });
   return response?.data ?? response ?? [];
 };
@@ -81,13 +84,7 @@ export const markAllNotificationsAsRead = async () => {
       userId
     )}/markAllAsReaded`,
     data: {},
-    config: {
-      skipSuccessToast: true,
-      skipErrorToast: true,
-      skipAuthErrorToast: true,
-      silent: true,
-      skipToast: true,
-    },
+    config: notificationRequestConfig,
   });
 };
 
@@ -102,13 +99,7 @@ export const deleteAllNotifications = async () => {
     url: `/v1/notification/delete/${encodeURIComponent(
       role
     )}/${encodeURIComponent(userId)}`,
-    config: {
-      skipSuccessToast: true,
-      skipErrorToast: true,
-      skipAuthErrorToast: true,
-      silent: true,
-      skipToast: true,
-    },
+    config: notificationRequestConfig,
   });
 };
 
