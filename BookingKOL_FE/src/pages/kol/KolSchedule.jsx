@@ -9,10 +9,11 @@ import viVN from "antd/locale/vi_VN";
 import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
 
 import SchedulerGrid from "../../components/kol/kol-schedule/SchedulerGrid";
-import {
-  getKolProfileByUserId,
-  fetchDayDuties,
-} from "../../services/kol/KolAPI";
+import { getKolProfileByUserId } from "../../services/kol/KolAPI";
+
+// ✅ IMPORTANT: lấy fetchDayDuties từ ScheduleAPI (file bạn vừa sửa)
+import { fetchDayDuties } from "../../services/kol/ScheduleAPI";
+
 import { useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -93,11 +94,12 @@ export default function KolSchedule() {
     };
   }, [kolIdParam, userId]);
 
-  // Gọi 2 API (free-time + timeline) và gộp
+  // Load lịch
   const load = useCallback(async () => {
     if (!kolId) return;
     setLoading(true);
     try {
+      // ✅ dùng fetchDayDuties từ ScheduleAPI -> slot booking sẽ có workTimeId/kolWorkTimeId
       const data = await fetchDayDuties({ kolId, range, fromDate });
       setDayDuties(data || { goalList: [] });
     } catch (e) {
@@ -186,7 +188,7 @@ export default function KolSchedule() {
           </div>
         </div>
 
-        {/* Lưới lịch: luôn render ngay cả khi rỗng */}
+        {/* Lưới lịch */}
         <SchedulerGrid
           range={range}
           dayDuties={dayDuties}

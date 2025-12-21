@@ -75,9 +75,9 @@ const formatDate = (value, pattern = "DD/MM/YYYY") => {
 };
 
 const formatCurrency = (value, currency = "VND") => {
-  if (value === null || value === undefined || value === "") return "--";
+  if (value === null || value === undefined || value === "") return "0";
   const numeric = typeof value === "number" ? value : Number.parseFloat(value);
-  if (Number.isNaN(numeric)) return "--";
+  if (Number.isNaN(numeric)) return "0";
   return (
     new Intl.NumberFormat("vi-VN", {
       maximumFractionDigits: 0,
@@ -95,6 +95,33 @@ const formatArrayText = (items) => {
     .map((x) => x?.displayName || x?.name || x?.id)
     .filter(Boolean)
     .join(", ");
+};
+
+/** ✅ NEW: packageType label + normalize (giống EditBookingCampain) */
+const PACKAGE_TYPE_LABEL = {
+  normal: "Gói thường",
+  vip: "Gói VIP",
+};
+const normalizePackageType = (value) => {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (raw === "vip") return "vip";
+  if (raw === "basic") return "normal";
+  if (raw === "standard") return "normal";
+  if (raw === "normal") return "normal";
+  return "normal";
+};
+const formatPackageType = (value) => {
+  const key = normalizePackageType(value);
+  return PACKAGE_TYPE_LABEL[key] ?? key;
+};
+
+/** ✅ NEW: Tag VIP/Thường đặt cạnh chữ Booking */
+const PACKAGE_TYPE_TAG = {
+  vip: { label: "VIP", color: "gold" },
+  normal: { label: "Thường", color: "blue" },
 };
 
 /** ===== Repeat type label ===== */
@@ -1290,12 +1317,33 @@ export default function BookingCampaignSchedule() {
                 record?.campaign?.liveStreamAddress ??
                 null;
 
+              // ✅ NEW: packageType (để hiển thị tag cạnh chữ Booking + field trong Descriptions)
+              const packageTypeRaw =
+                record?.packageType ??
+                record?.campaign?.packageType ??
+                bookingDetail?.packageType ??
+                bookingDetail?.campaign?.packageType ??
+                null;
+
+              const pkgKey = normalizePackageType(packageTypeRaw); // vip | normal
+              const pkgTag =
+                PACKAGE_TYPE_TAG[pkgKey] ?? PACKAGE_TYPE_TAG.normal;
+
               return (
                 <Card
                   key={record?.id ?? index}
                   type="inner"
                   className="mb-4 last:mb-0"
-                  title={`Booking ${record?.bookingNumber ?? `#${index + 1}`}`}
+                  title={
+                    <Space wrap size={8}>
+                      <span>{`Booking ${
+                        record?.bookingNumber ?? `#${index + 1}`
+                      }`}</span>
+
+                      {/* ✅ Tag VIP/Thường nằm cạnh chữ Booking */}
+                      <Tag color={pkgTag.color}>{pkgTag.label}</Tag>
+                    </Space>
+                  }
                 >
                   <Descriptions
                     bordered
@@ -1320,6 +1368,13 @@ export default function BookingCampaignSchedule() {
                         </Tag>
                       </Descriptions.Item>
                     )}
+
+                    {/* ✅ NEW: packageType giống EditBookingCampain */}
+                    {/* <Descriptions.Item label="Gói dịch vụ">
+                      <Tag color={pkgTag.color}>
+                        {formatPackageType(packageTypeRaw)}
+                      </Tag>
+                    </Descriptions.Item> */}
 
                     <Descriptions.Item
                       label="Mục tiêu chiến dịch"
