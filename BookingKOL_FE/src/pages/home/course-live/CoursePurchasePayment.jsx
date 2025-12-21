@@ -263,7 +263,7 @@ const CoursePurchasePayment = () => {
 
       <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         <Stack spacing={4}>
-          <Button
+          {/* <Button
             onClick={handleBack}
             startIcon={<ArrowBackRoundedIcon />}
             sx={{
@@ -283,7 +283,7 @@ const CoursePurchasePayment = () => {
             }}
           >
             Quay lại
-          </Button>
+          </Button> */}
 
           <Typography
             variant="h4"
@@ -535,18 +535,24 @@ const CoursePurchasePayment = () => {
                   )}
                 </Stack>
 
-                <Alert
-                  severity="warning"
-                  sx={{
-                    borderRadius: "18px",
-                    backgroundColor: "#fff8e1",
-                    color: BOOKING_FLOW_STYLE.textPrimary,
-                    fontSize: 15,
-                  }}
-                >
-                  Sau khi chuyển khoản thành công, vui lòng giữ nguyên trang
-                  này. Hệ thống sẽ tự động kiểm tra và đưa bạn đến trang “Thanh
-                  toán thành công” khi đã xác nhận giao dịch.
+                <Alert severity="warning" sx={{ borderRadius: 3 }}>
+                  <Stack spacing={1}>
+                    <Typography fontWeight={600}>
+                      Lưu ý khi thanh toán
+                    </Typography>
+                    <Typography variant="body2">
+                      - Không thay đổi <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển
+                      khoản.
+                    </Typography>
+                    <Typography variant="body2">
+                      - Mã QR chỉ sử dụng <b>một lần duy nhất</b>. Nếu dùng lại,
+                      hệ thống sẽ không xử lý.
+                    </Typography>
+                    <Typography variant="body2">
+                      - Trang web <b>không hỗ trợ hoàn tiền</b> nếu thay đổi
+                      thông tin. Vui lòng kiểm tra kỹ trước khi chuyển.
+                    </Typography>
+                  </Stack>
                 </Alert>
 
                 <Divider
