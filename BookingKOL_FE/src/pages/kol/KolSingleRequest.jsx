@@ -25,7 +25,7 @@ dayjs.updateLocale("vi", {
   weekdaysMin: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
 });
 
-/* ===== Nhãn trạng thái booking request ===== */
+/* ===== Nhãn trạng thái (bookingStatus) ===== */
 const BOOKING_STATUS_OPTIONS = [
   { label: "Chờ Thanh Toán", value: "DRAFT" },
   { label: "Đã yêu cầu", value: "REQUESTED" },
@@ -34,6 +34,7 @@ const BOOKING_STATUS_OPTIONS = [
   { label: "Đã hết hạn", value: "EXPIRED" },
   { label: "Đã hủy", value: "CANCELLED" },
   { label: "Đang chờ thực hiện", value: "PAID" },
+  { label: "Đang chờ thực hiện", value: "ACCEPTED" },
   { label: "Đã hoàn tiền", value: "REFUNDED" },
 ];
 
@@ -46,9 +47,10 @@ const STATUS_TAG_COLOR = {
   CANCELLED: "error",
   PAID: "processing",
   REFUNDED: "error",
+  ACCEPTED: "processing",
 };
 
-/* ===== Worktime status (campaign-worktimes) ===== */
+/* ===== Worktime status (status trong campaign-worktimes) ===== */
 const WORKTIME_STATUS_META = {
   PENDING: { label: "Chờ xác nhận", color: "gold" },
   APPROVED: { label: "Đã xác nhận", color: "processing" },
@@ -85,15 +87,14 @@ const getBookingType = (r) =>
       ""
   );
 
-/* Lấy requestId dùng chung (SINGLE) */
+/* SINGLE request id */
 const getRequestId = (record) =>
   record?.id ?? record?.requestId ?? record?.bookingRequestId ?? null;
 
-/* Lấy workTimeId (CAMPAIGN worktimes) */
+/* CAMPAIGN workTimeId */
 const getWorkTimeId = (record) =>
   record?.workTimeId ?? record?.id ?? record?.worktimeId ?? null;
 
-/* Helpers */
 const formatDateTime = (value, pattern = "DD/MM/YYYY HH:mm") => {
   if (!value) return "--";
   const parsed = dayjs(value);
@@ -108,10 +109,12 @@ const composeExecutionTime = (rec) => {
   const e = formatDateTime(end);
   if (!start) return e;
   if (!end) return s;
+
   const sameDay =
     dayjs(start).isValid() &&
     dayjs(end).isValid() &&
     dayjs(start).isSame(dayjs(end), "day");
+
   return sameDay
     ? `${dayjs(start).format("DD/MM/YYYY HH:mm")} -> ${dayjs(end).format(
         "HH:mm"
@@ -127,42 +130,20 @@ const pickValue = (record, keys, fallback = "--") => {
   return fallback;
 };
 
-const extractKolIdFromAuth = (auth) => {
-  return (
-    auth?.kolId ??
-    auth?.user?.kolId ??
-    auth?.user?.kolProfileId ??
-    auth?.user?.kol_profile_id ??
-    auth?.profile?.kolId ??
-    auth?.profile?.kolProfileId ??
-    auth?.userInfo?.kolId ??
-    null
-  );
-};
-
-// ✅ lấy kolId từ response getKolProfileByUserId()
-const pickKolIdFromProfileResp = (resp) => {
-  const raw = resp?.data ?? resp ?? {};
-  return (
-    raw?.kolId ??
-    raw?.id ?? // nhiều BE dùng id = kolId/kolProfileId
-    raw?.kolProfileId ??
-    raw?.kolProfile?.id ??
-    raw?.profile?.id ??
-    null
-  );
-};
-
 export default function KolSingleRequest() {
   const navigate = useNavigate();
   const auth = useAuth?.() || {};
+
   const token = auth?.token || null;
   const authLoading = auth?.loading ?? false;
+
+  // ✅ GIỐNG KolProfile.jsx: userId nằm ở auth.user.id
+  const userId = auth?.user?.id || null;
 
   // ✅ 2 tab: SINGLE / CAMPAIGN
   const [activeTab, setActiveTab] = useState("SINGLE");
 
-  // ✅ Lưu pagination riêng cho từng tab
+  // ✅ pagination riêng cho từng tab
   const [paging, setPaging] = useState({
     SINGLE: { page: 0, size: 20 },
     CAMPAIGN: { page: 0, size: 20 },
@@ -171,65 +152,37 @@ export default function KolSingleRequest() {
   const page = paging?.[activeTab]?.page ?? 0;
   const size = paging?.[activeTab]?.size ?? 20;
 
-  const isCampaignTab = activeTab === "CAMPAIGN";
+  const buildParams = useCallback(() => ({ page, size }), [page, size]);
 
-  // ✅ ưu tiên lấy kolId từ auth context
-  const kolIdFromAuth = extractKolIdFromAuth(auth);
-
-  // ✅ nếu không có kolId trong auth, thì lấy theo token giống “đơn lẻ”
+  // ✅ Lấy KOL profile theo userId (CHỈ khi tab CAMPAIGN)
   const {
-    data: myKolProfileResp,
-    isLoading: myKolProfileLoading,
-    error: myKolProfileError,
+    data: kolProfile,
+    isLoading: kolProfileLoading,
+    error: kolProfileError,
+    refetch: refetchKolProfile,
   } = useQuery({
-    queryKey: ["kol-my-profile", token],
-    queryFn: () => getKolProfileByUserId(),
-    enabled: !!token && !authLoading && isCampaignTab && !kolIdFromAuth,
+    queryKey: ["kol-profile-by-userId-for-campaign", token, userId],
+    queryFn: () => getKolProfileByUserId(userId),
+    enabled: !!token && !authLoading && activeTab === "CAMPAIGN" && !!userId,
     staleTime: 60_000,
-    retry: (failureCount, err) => {
-      const code = err?.response?.status || err?.status || 0;
-      if (code === 401) return false;
-      return failureCount < 2;
-    },
   });
 
-  const kolIdResolved =
-    kolIdFromAuth || pickKolIdFromProfileResp(myKolProfileResp);
+  // ✅ kolId chính là kolProfile.id (KolProfile.jsx cũng hiển thị ID: kol.id)
+  const kolId = kolProfile?.id ?? null;
 
-  const buildParams = useCallback(() => {
-    // SINGLE: ưu tiên nhờ BE filter theo bookingType nếu có support
-    if (!isCampaignTab) return { page, size, bookingType: "SINGLE" };
-    // CAMPAIGN: tuỳ BE support page/size hay không, cứ truyền để an toàn
-    return { page, size };
-  }, [page, size, isCampaignTab]);
-
+  // ===== SINGLE LIST (BE tự theo token) =====
   const {
-    data: resp,
-    isLoading,
-    isFetching,
-    refetch,
-    error,
+    data: singleResp,
+    isLoading: singleLoading,
+    isFetching: singleFetching,
+    error: singleError,
+    refetch: refetchSingle,
   } = useQuery({
-    queryKey: [
-      "kol-my-booking-requests",
-      token,
-      activeTab,
-      kolIdResolved,
-      page,
-      size,
-    ],
-    queryFn: () => {
-      if (isCampaignTab) {
-        return getKolCampaignWorktimes(kolIdResolved, {
-          params: buildParams(),
-        });
-      }
-      return getMySingleBookingRequests({ params: buildParams() });
-    },
+    queryKey: ["kol-my-single-requests", token, page, size],
+    queryFn: () => getMySingleBookingRequests({ params: buildParams() }),
     keepPreviousData: true,
     staleTime: 30_000,
-    enabled:
-      !!token && !authLoading && (isCampaignTab ? !!kolIdResolved : true),
+    enabled: !!token && !authLoading && activeTab === "SINGLE",
     retry: (failureCount, err) => {
       const code = err?.response?.status || err?.status || err?.appStatus || 0;
       if (code === 401) return false;
@@ -237,14 +190,40 @@ export default function KolSingleRequest() {
     },
   });
 
-  useEffect(() => {
-    if (token && !authLoading && (isCampaignTab ? !!kolIdResolved : true)) {
-      refetch();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, authLoading, activeTab, kolIdResolved]);
+  // ===== CAMPAIGN LIST (bắt buộc kolId) =====
+  const {
+    data: campaignResp,
+    isLoading: campaignLoading,
+    isFetching: campaignFetching,
+    error: campaignError,
+    refetch: refetchCampaign,
+  } = useQuery({
+    queryKey: ["kol-campaign-worktimes", token, kolId, page, size],
+    queryFn: () => getKolCampaignWorktimes({ kolId, params: buildParams() }),
+    keepPreviousData: true,
+    staleTime: 30_000,
+    enabled: !!token && !authLoading && activeTab === "CAMPAIGN" && !!kolId,
+    retry: (failureCount, err) => {
+      const code = err?.response?.status || err?.status || err?.appStatus || 0;
+      if (code === 401) return false;
+      return failureCount < 2;
+    },
+  });
+
+  // ===== bind theo tab =====
+  const resp = activeTab === "SINGLE" ? singleResp : campaignResp;
+  const isLoading =
+    activeTab === "SINGLE"
+      ? singleLoading
+      : campaignLoading || kolProfileLoading;
+
+  const isFetching = activeTab === "SINGLE" ? singleFetching : campaignFetching;
+
+  const error =
+    activeTab === "SINGLE" ? singleError : campaignError || kolProfileError;
 
   const raw = resp?.data ?? resp ?? {};
+
   const serverList = Array.isArray(raw?.content)
     ? raw.content
     : Array.isArray(raw)
@@ -253,46 +232,114 @@ export default function KolSingleRequest() {
     ? raw.items
     : [];
 
-  const hasServerPaging =
-    Array.isArray(raw?.content) ||
-    typeof raw?.totalElements === "number" ||
-    typeof raw?.total === "number";
-
-  const totalFromServer =
+  const totalElementsFromServer =
     (typeof raw?.totalElements === "number" && raw.totalElements) ||
     (typeof raw?.total === "number" && raw.total) ||
     0;
 
-  // ✅ lọc theo tab + ẩn trạng thái không muốn hiển thị
-  const filteredList = useMemo(() => {
-    if (isCampaignTab) {
-      return serverList
-        .filter((r) => getBookingType(r) === "CAMPAIGN")
-        .filter((r) => !["DRAFT", "EXPIRED"].includes(getStatus(r)));
-    }
+  // ✅ SINGLE: ẩn DRAFT/EXPIRED (giữ như bạn đang làm)
+  const dataSource = useMemo(() => {
+    if (activeTab === "CAMPAIGN") return serverList;
     return serverList
       .filter((r) => getBookingType(r) === "SINGLE")
       .filter((r) => !["DRAFT", "EXPIRED"].includes(getStatus(r)));
-  }, [serverList, isCampaignTab]);
+  }, [serverList, activeTab]);
 
-  // ✅ nếu BE không paging (trả array), paging client để Pagination chạy đúng
-  const totalElements = hasServerPaging ? totalFromServer : filteredList.length;
+  const totalElements = totalElementsFromServer;
 
-  const dataSource = useMemo(() => {
-    if (hasServerPaging) return filteredList;
-    const start = page * size;
-    return filteredList.slice(start, start + size);
-  }, [filteredList, hasServerPaging, page, size]);
+  const columns = useMemo(() => {
+    if (activeTab === "CAMPAIGN") {
+      return [
+        {
+          title: "STT",
+          key: "stt",
+          width: 80,
+          render: (_, __, index) => (
+            <div className="font-bold">#{page * size + index + 1}</div>
+          ),
+        },
+        {
+          title: "Mã yêu cầu",
+          key: "requestNumber",
+          width: 160,
+          render: (_, r) => pickValue(r, ["requestNumber", "bookingNumber"]),
+        },
+        {
+          title: "Chiến dịch",
+          key: "campaign",
+          width: 280,
+          render: (_, r) => (
+            <div className="min-w-[220px]">
+              <div className="font-semibold">
+                {pickValue(r, ["campaignName"], "--")}
+              </div>
+            </div>
+          ),
+        },
+        {
+          title: "Thời gian thực hiện",
+          key: "worktime",
+          width: 260,
+          render: (_, r) => composeExecutionTime(r),
+        },
+        {
+          title: "Ghi chú",
+          key: "note",
+          width: 220,
+          render: (_, r) => pickValue(r, ["note"], "--"),
+        },
 
-  const getDetailBasePath = (record) => {
-    const type = getBookingType(record);
-    if (type === "CAMPAIGN") return "/kol/booking/campaign-worktimes/detail";
-    return "/kol/booking/single-requests/detail";
-  };
+        {
+          title: "Trạng thái đơn đặt",
+          key: "bookingStatus",
+          width: 180,
+          render: (_, r) => {
+            const s = toUpper(r?.bookingStatus);
+            const meta =
+              BOOKING_STATUS_OPTIONS.find((x) => x.value === s) || null;
+            const label = meta?.label ?? s ?? "--";
+            return <Tag color={STATUS_TAG_COLOR[s] ?? "default"}>{label}</Tag>;
+          },
+        },
+        {
+          title: "Ngày tạo",
+          key: "bookingCreatedAt",
+          width: 200,
+          render: (_, r) => formatDateTime(r?.bookingCreatedAt),
+        },
+        {
+          title: "Thao tác",
+          key: "action",
+          align: "center",
+          width: 200,
+          render: (_, record) => {
+            const workTimeId = getWorkTimeId(record);
+            return (
+              <div className="w-full flex justify-center">
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!workTimeId) return;
+                    navigate(
+                      `/kol/booking/campaign-worktimes/detail/${workTimeId}`,
+                      {
+                        state: { record },
+                      }
+                    );
+                  }}
+                  className="!h-9 !px-3 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
+                >
+                  Xem chi tiết
+                </Button>
+              </div>
+            );
+          },
+        },
+      ];
+    }
 
-  /* ===== Columns SINGLE ===== */
-  const columnsSingle = useMemo(
-    () => [
+    // ===== SINGLE =====
+    return [
       {
         title: "STT",
         key: "stt",
@@ -308,18 +355,7 @@ export default function KolSingleRequest() {
         render: (_, record) =>
           pickValue(record, ["requestNumber", "code", "bookingCode", "id"]),
       },
-      {
-        title: "Loại booking",
-        key: "bookingType",
-        width: 190,
-        render: (_, record) => {
-          const type = getBookingType(record);
-          const label = BOOKING_TYPE_LABEL[type] ?? (type || "--");
-          return (
-            <Tag color={BOOKING_TYPE_COLOR[type] ?? "default"}>{label}</Tag>
-          );
-        },
-      },
+
       {
         title: "Trạng thái",
         key: "status",
@@ -335,7 +371,7 @@ export default function KolSingleRequest() {
         },
       },
       {
-        title: "Thực hiện",
+        title: "Thời gian thực hiện",
         key: "time",
         width: 260,
         render: (_, record) => composeExecutionTime(record),
@@ -354,141 +390,13 @@ export default function KolSingleRequest() {
         width: 220,
         render: (_, record) => {
           const requestId = getRequestId(record);
-          const status = getStatus(record);
-          const isInProgress = status === "IN_PROGRESS";
-          const basePath = getDetailBasePath(record);
-
-          const goDetail = () => {
-            if (!requestId) return;
-            navigate(`${basePath}/${requestId}`);
-          };
-
-          return (
-            <div className="w-full flex justify-center">
-              <div className="flex flex-col items-center gap-2">
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    goDetail();
-                  }}
-                  className="!h-9 !px-3 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
-                >
-                  Xem chi tiết
-                </Button>
-
-                {isInProgress && requestId && (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`${basePath}/${requestId}?metrics=1`);
-                    }}
-                    className="!h-9 !px-3 !bg-emerald-600 !text-white !border-none hover:!bg-emerald-700 transition-all"
-                  >
-                    Báo Cáo Livestream
-                  </Button>
-                )}
-              </div>
-            </div>
-          );
-        },
-      },
-    ],
-    [navigate, page, size]
-  );
-
-  /* ===== Columns CAMPAIGN (campaign-worktimes) ===== */
-  const columnsCampaign = useMemo(
-    () => [
-      {
-        title: "STT",
-        key: "stt",
-        width: 80,
-        render: (_, __, index) => (
-          <div className="font-bold">#{page * size + index + 1}</div>
-        ),
-      },
-      {
-        title: "Mã yêu cầu",
-        key: "requestNumber",
-        width: 160,
-        render: (_, r) => pickValue(r, ["requestNumber", "bookingNumber"]),
-      },
-      {
-        title: "Chiến dịch",
-        key: "campaign",
-        width: 260,
-        render: (_, r) => (
-          <div className="min-w-[220px]">
-            <div className="font-semibold">
-              {pickValue(r, ["campaignName"], "--")}
-            </div>
-            <div className="text-xs text-gray-500">
-              {formatDateTime(r?.campaignStartDate, "DD/MM/YYYY")} →{" "}
-              {formatDateTime(r?.campaignEndDate, "DD/MM/YYYY")}
-            </div>
-          </div>
-        ),
-      },
-      {
-        title: "Thời gian làm",
-        key: "worktime",
-        width: 260,
-        render: (_, r) => composeExecutionTime(r),
-      },
-      {
-        title: "Ghi chú",
-        key: "note",
-        width: 220,
-        render: (_, r) => pickValue(r, ["note"], "--"),
-      },
-      {
-        title: "Trạng thái lịch",
-        key: "worktimeStatus",
-        width: 170,
-        render: (_, r) => {
-          const s = toUpper(r?.status);
-          const meta = WORKTIME_STATUS_META[s];
-          return (
-            <Tag color={meta?.color ?? "default"}>
-              {meta?.label ?? s ?? "--"}
-            </Tag>
-          );
-        },
-      },
-      {
-        title: "Trạng thái booking",
-        key: "bookingStatus",
-        width: 180,
-        render: (_, r) => {
-          const s = toUpper(r?.bookingStatus);
-          const meta =
-            BOOKING_STATUS_OPTIONS.find((x) => x.value === s) || null;
-          const label = meta?.label ?? s ?? "--";
-          return <Tag color={STATUS_TAG_COLOR[s] ?? "default"}>{label}</Tag>;
-        },
-      },
-      {
-        title: "Ngày tạo",
-        key: "bookingCreatedAt",
-        width: 200,
-        render: (_, r) => formatDateTime(r?.bookingCreatedAt),
-      },
-      {
-        title: "Thao tác",
-        key: "action",
-        align: "center",
-        width: 200,
-        render: (_, record) => {
-          const workTimeId = getWorkTimeId(record);
-          const basePath = getDetailBasePath(record);
-
           return (
             <div className="w-full flex justify-center">
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!workTimeId) return;
-                  navigate(`${basePath}/${workTimeId}`, { state: { record } });
+                  if (!requestId) return;
+                  navigate(`/kol/booking/single-requests/detail/${requestId}`);
                 }}
                 className="!h-9 !px-3 !bg-blue-600 !text-white !border-none hover:!bg-blue-700 transition-all"
               >
@@ -498,35 +406,36 @@ export default function KolSingleRequest() {
           );
         },
       },
-    ],
-    [navigate, page, size]
-  );
+    ];
+  }, [activeTab, navigate, page, size]);
 
-  const columns = isCampaignTab ? columnsCampaign : columnsSingle;
+  const onRefresh = () => {
+    if (activeTab === "SINGLE") return refetchSingle();
+    // CAMPAIGN: nếu chưa có kolProfile thì gọi lấy profile trước
+    if (!userId) return refetchKolProfile();
+    if (!kolId) return refetchKolProfile();
+    return refetchCampaign();
+  };
 
   const tableBlock = (
     <>
-      {/* ✅ cảnh báo chỉ hiện khi đã cố lấy kolId mà vẫn fail */}
-      {!isLoading &&
-        isCampaignTab &&
-        !kolIdResolved &&
-        !myKolProfileLoading && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Không tìm thấy kolId"
-            description="Tab Chiến dịch cần kolId để gọi API /campaign-worktimes/{kolId}. Không lấy được kolId từ auth context và cũng không lấy được từ API KOL profile."
-            className="mb-3"
-          />
-        )}
-
-      {myKolProfileError && isCampaignTab && (
+      {activeTab === "CAMPAIGN" && !userId && (
         <Alert
-          type="error"
+          type="warning"
           showIcon
-          message="Lỗi lấy KOL profile"
-          description={String(myKolProfileError?.message || "Unknown error")}
           className="mb-3"
+          message="Không tìm thấy userId trong auth context"
+          description="Bạn đang login nhưng AuthContext chưa có auth.user.id. Hãy kiểm tra useAuth() trả về user chưa."
+        />
+      )}
+
+      {activeTab === "CAMPAIGN" && userId && !kolId && (
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-3"
+          message="Chưa lấy được kolId"
+          description="Đang gọi getKolProfileByUserId(userId) để lấy kolProfile.id làm kolId."
         />
       )}
 
@@ -534,47 +443,38 @@ export default function KolSingleRequest() {
         <Alert
           type="error"
           showIcon
+          className="mb-3"
           message="Lỗi tải dữ liệu"
           description={String(error?.message || "Unknown error")}
-          className="mb-3"
         />
       )}
 
       <Table
         columns={columns}
         dataSource={dataSource}
-        loading={isLoading || (isCampaignTab && myKolProfileLoading)}
+        loading={isLoading}
         pagination={false}
-        rowKey={(r) => {
-          if (isCampaignTab) {
-            return (
-              getWorkTimeId(r) ??
-              r?.requestNumber ??
-              `${r?.bookingRequestId}-${r?.startAt}-${r?.endAt}`
-            );
-          }
-          return (
-            getRequestId(r) ??
-            r?.requestNumber ??
-            r?.code ??
-            r?.bookingCode ??
-            `${r?.createdAt}-${r?.startAt}-${r?.endAt}`
-          );
-        }}
+        rowKey={(r) =>
+          (activeTab === "CAMPAIGN" ? getWorkTimeId(r) : getRequestId(r)) ??
+          r?.requestNumber ??
+          r?.code ??
+          `${r?.createdAt}-${r?.startAt}-${r?.endAt}`
+        }
         scroll={{ x: "max-content" }}
-        locale={{ emptyText: "Không có dữ liệu hợp lệ trên trang này." }}
+        locale={{ emptyText: "Không có dữ liệu trên trang này." }}
         onRow={(record) => ({
           onClick: () => {
-            const basePath = getDetailBasePath(record);
-            if (isCampaignTab) {
+            if (activeTab === "SINGLE") {
+              const requestId = getRequestId(record);
+              if (!requestId) return;
+              navigate(`/kol/booking/single-requests/detail/${requestId}`);
+            } else {
               const workTimeId = getWorkTimeId(record);
               if (!workTimeId) return;
-              navigate(`${basePath}/${workTimeId}`, { state: { record } });
-              return;
+              navigate(`/kol/booking/campaign-worktimes/detail/${workTimeId}`, {
+                state: { record },
+              });
             }
-            const requestId = getRequestId(record);
-            if (!requestId) return;
-            navigate(`${basePath}/${requestId}`);
           },
           style: { cursor: "pointer" },
         })}
@@ -589,10 +489,7 @@ export default function KolSingleRequest() {
           onChange={(pageNumber, sizeNumber) => {
             setPaging((prev) => ({
               ...prev,
-              [activeTab]: {
-                page: pageNumber - 1,
-                size: sizeNumber,
-              },
+              [activeTab]: { page: pageNumber - 1, size: sizeNumber },
             }));
           }}
           total={totalElements}
@@ -621,7 +518,7 @@ export default function KolSingleRequest() {
         <div className="ml-auto">
           <Button
             icon={<RefreshCcw size={16} />}
-            onClick={() => refetch()}
+            onClick={onRefresh}
             loading={isFetching}
           >
             Làm mới

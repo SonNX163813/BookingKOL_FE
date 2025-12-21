@@ -2,6 +2,8 @@
 import * as React from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
+import isoWeek from "dayjs/plugin/isoWeek";
+
 import {
   Box,
   Button,
@@ -25,6 +27,7 @@ import {
 } from "../../services/kol/KolAPI";
 import { adminRegisterKolSchedule } from "../../services/admin/AdminScheduleAPI";
 
+dayjs.extend(isoWeek);
 dayjs.locale("vi");
 
 const MIN_GAP_MINUTES = 60;
@@ -35,10 +38,8 @@ function computeMinRule() {
   const now = dayjs();
   const minAllowed = now.add(7, "day"); // BE rule (exact 7 days)
 
-  // Base min date is that day (startOf day)
   let minDate = minAllowed.startOf("day");
 
-  // Because UI selects only hours (minute=0), we must round up to next hour if now has minutes/seconds
   let firstHour = minAllowed.hour();
   const hasMinutePart =
     minAllowed.minute() !== 0 ||
@@ -47,13 +48,11 @@ function computeMinRule() {
 
   if (hasMinutePart) firstHour += 1;
 
-  // If rounding pushes hour >= 24 => shift to next day 00:00
   if (firstHour >= 24) {
     minDate = minDate.add(1, "day").startOf("day");
     firstHour = 0;
   }
 
-  // Ensure there is at least one valid start hour on minDate given MIN_DURATION (avoid end spilling to next day)
   const latestStart = minDate
     .hour(23)
     .minute(0)
@@ -61,7 +60,6 @@ function computeMinRule() {
     .millisecond(0)
     .subtract(MIN_DURATION_MINUTES, "minute");
 
-  // If firstHour is later than latestStart hour => no valid slot on that minDate, bump minDate to next day
   if (firstHour > latestStart.hour()) {
     minDate = minDate.add(1, "day").startOf("day");
     firstHour = 0;
@@ -197,9 +195,18 @@ export default function KolWorkRegistrationMui({
   const [blocked, setBlocked] = React.useState([]);
   const [loadingBlocked, setLoadingBlocked] = React.useState(false);
 
+  // ===== Month schedule =====
   const [monthAnchor, setMonthAnchor] = React.useState(MIN_DATE);
   const [monthSchedule, setMonthSchedule] = React.useState([]);
   const [loadingMonthSchedule, setLoadingMonthSchedule] = React.useState(false);
+
+  // ===== Week schedule (7 ngày + nút < >) =====
+  const [scheduleView, setScheduleView] = React.useState("week"); // "week" | "month"
+  const [weekAnchor, setWeekAnchor] = React.useState(
+    MIN_DATE.startOf("isoWeek")
+  );
+  const [weekSchedule, setWeekSchedule] = React.useState([]);
+  const [loadingWeekSchedule, setLoadingWeekSchedule] = React.useState(false);
 
   const [pickedDate, setPickedDate] = React.useState(null);
   const [shifts, setShifts] = React.useState([]);
@@ -284,7 +291,7 @@ export default function KolWorkRegistrationMui({
           const me = await getKolProfileByUserId(uIdFromAuth);
           if (!mounted) return;
           if (me?.id) setResolvedKolId(me.id);
-          if (!resolvedUserId && me?.userId) setResolvedUserId(me.userId);
+          if (me?.userId) setResolvedUserId(me.userId);
         }
       } catch (e) {
         console.warn("[Register] Resolve ids failed:", e);
@@ -344,6 +351,34 @@ export default function KolWorkRegistrationMui({
     };
   }, [resolvedKolId, pickedDate]);
 
+  /* -------- Parse freeTimes -> events -------- */
+  const parseFreeTimesToEvents = React.useCallback((freeTimes) => {
+    const events = [];
+    (freeTimes || []).forEach((item) => {
+      if (Array.isArray(item.workTimes) && item.workTimes.length) {
+        item.workTimes.forEach((w) => {
+          if (!w.startAt || !w.endAt) return;
+          events.push({
+            id: w.id || `${w.startAt}_${w.endAt}`,
+            startAt: w.startAt,
+            endAt: w.endAt,
+          });
+        });
+      } else if (item.startAt && item.endAt) {
+        events.push({
+          id: item.id || `${item.startAt}_${item.endAt}`,
+          startAt: item.startAt,
+          endAt: item.endAt,
+        });
+      }
+    });
+
+    events.sort(
+      (a, b) => dayjs(a.startAt).valueOf() - dayjs(b.startAt).valueOf()
+    );
+    return events;
+  }, []);
+
   /* -------- Lịch RẢNH trong tháng -------- */
   const reloadMonthSchedule = React.useCallback(async () => {
     if (!resolvedKolId || !monthAnchor) {
@@ -363,44 +398,52 @@ export default function KolWorkRegistrationMui({
         size: 1000,
       });
 
-      const events = [];
-
-      (freeTimes || []).forEach((item) => {
-        if (Array.isArray(item.workTimes) && item.workTimes.length) {
-          item.workTimes.forEach((w) => {
-            if (!w.startAt || !w.endAt) return;
-            events.push({
-              id: w.id || `${w.startAt}_${w.endAt}`,
-              startAt: w.startAt,
-              endAt: w.endAt,
-            });
-          });
-        } else if (item.startAt && item.endAt) {
-          events.push({
-            id: item.id || `${item.startAt}_${item.endAt}`,
-            startAt: item.startAt,
-            endAt: item.endAt,
-          });
-        }
-      });
-
-      events.sort(
-        (a, b) => dayjs(a.startAt).valueOf() - dayjs(b.startAt).valueOf()
-      );
-      setMonthSchedule(events);
+      setMonthSchedule(parseFreeTimesToEvents(freeTimes));
     } catch (e) {
-      console.warn("[Register] load free-time failed:", e);
+      console.warn("[Register] load free-time (month) failed:", e);
       setMonthSchedule([]);
     } finally {
       setLoadingMonthSchedule(false);
     }
-  }, [resolvedKolId, monthAnchor]);
+  }, [resolvedKolId, monthAnchor, parseFreeTimesToEvents]);
 
   React.useEffect(() => {
     reloadMonthSchedule();
   }, [reloadMonthSchedule]);
 
-  /* -------- Group lịch rảnh theo ngày -------- */
+  /* -------- Lịch RẢNH theo tuần (7 ngày) -------- */
+  const reloadWeekSchedule = React.useCallback(async () => {
+    if (!resolvedKolId || !weekAnchor) {
+      setWeekSchedule([]);
+      return;
+    }
+    setLoadingWeekSchedule(true);
+    try {
+      const start = weekAnchor.startOf("isoWeek");
+      const end = weekAnchor.endOf("isoWeek");
+
+      const freeTimes = await getKolFreeTime({
+        kolId: resolvedKolId,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        page: 0,
+        size: 1000,
+      });
+
+      setWeekSchedule(parseFreeTimesToEvents(freeTimes));
+    } catch (e) {
+      console.warn("[Register] load free-time (week) failed:", e);
+      setWeekSchedule([]);
+    } finally {
+      setLoadingWeekSchedule(false);
+    }
+  }, [resolvedKolId, weekAnchor, parseFreeTimesToEvents]);
+
+  React.useEffect(() => {
+    reloadWeekSchedule();
+  }, [reloadWeekSchedule]);
+
+  /* -------- Group lịch tháng theo ngày -------- */
   const monthScheduleByDay = React.useMemo(() => {
     if (!monthSchedule.length) return [];
     const map = new Map();
@@ -596,6 +639,7 @@ export default function KolWorkRegistrationMui({
       setOpenEndIdx(null);
 
       if (resolvedKolId) await reloadMonthSchedule();
+      if (resolvedKolId) await reloadWeekSchedule();
       if (onSuccess) onSuccess();
     } catch (e) {
       // no UI message
@@ -646,7 +690,10 @@ export default function KolWorkRegistrationMui({
                     setPickedDate(d);
                     setShifts([]);
                     setOpenEndIdx(null);
-                    if (d) setMonthAnchor(d.startOf("month"));
+                    if (d) {
+                      setMonthAnchor(d.startOf("month"));
+                      setWeekAnchor(d.startOf("isoWeek"));
+                    }
                   }}
                   onMonthChange={(month) => {
                     if (month) setMonthAnchor(month.startOf("month"));
@@ -797,7 +844,7 @@ export default function KolWorkRegistrationMui({
               </Card>
             </Stack>
 
-            {/* Lịch RẢNH trong tháng */}
+            {/* ===== LỊCH ĐÃ ĐĂNG KÝ: THEO TUẦN (7 ngày) + NÚT < > SAU NGÀY ===== */}
             <Card
               sx={{
                 mt: 2,
@@ -806,11 +853,168 @@ export default function KolWorkRegistrationMui({
                 borderRadius: 2,
               }}
             >
-              <Typography fontWeight={700} mb={1}>
-                Lịch đã đăng ký trong tháng {monthAnchor.format("MM/YYYY")}
-              </Typography>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                justifyContent="space-between"
+                mb={1}
+              >
+                <Typography fontWeight={700}>
+                  {scheduleView === "week"
+                    ? "Lịch làm theo tuần (7 ngày)"
+                    : `Lịch đã đăng ký trong tháng ${monthAnchor.format(
+                        "MM/YYYY"
+                      )}`}
+                </Typography>
 
-              {loadingMonthSchedule ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    size="small"
+                    variant={scheduleView === "week" ? "contained" : "outlined"}
+                    onClick={() => setScheduleView("week")}
+                  >
+                    Theo tuần
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={
+                      scheduleView === "month" ? "contained" : "outlined"
+                    }
+                    onClick={() => setScheduleView("month")}
+                  >
+                    Theo tháng
+                  </Button>
+                </Stack>
+              </Stack>
+
+              {scheduleView === "week" ? (
+                (() => {
+                  const ws = weekAnchor.startOf("isoWeek");
+                  const we = weekAnchor.endOf("isoWeek");
+                  const days = Array.from({ length: 7 }, (_, i) =>
+                    ws.add(i, "day")
+                  );
+
+                  // group schedule theo ngày
+                  const map = new Map();
+                  (weekSchedule || []).forEach((ev) => {
+                    const key = dayjs(ev.startAt).format("YYYY-MM-DD");
+                    if (!map.has(key)) map.set(key, []);
+                    map.get(key).push(ev);
+                  });
+                  map.forEach((list) =>
+                    list.sort(
+                      (a, b) =>
+                        dayjs(a.startAt).valueOf() - dayjs(b.startAt).valueOf()
+                    )
+                  );
+
+                  return (
+                    <>
+                      {/* Header tuần: 15/12 – 21/12/2025  <  > */}
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        sx={{ flexWrap: "wrap" }}
+                        mb={1}
+                      >
+                        <Typography fontWeight={600}>
+                          {ws.format("DD/MM")} – {we.format("DD/MM/YYYY")}
+                        </Typography>
+
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() =>
+                              setWeekAnchor((w) => w.subtract(1, "week"))
+                            }
+                            disabled={loadingWeekSchedule}
+                            sx={{ minWidth: 36, px: 0 }}
+                          >
+                            {"<"}
+                          </Button>
+
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() =>
+                              setWeekAnchor((w) => w.add(1, "week"))
+                            }
+                            disabled={loadingWeekSchedule}
+                            sx={{ minWidth: 36, px: 0 }}
+                          >
+                            {">"}
+                          </Button>
+                        </Stack>
+                      </Stack>
+
+                      {loadingWeekSchedule ? (
+                        <Typography color="text.secondary">
+                          Đang tải lịch tuần...
+                        </Typography>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: "grid",
+                            gridTemplateColumns: {
+                              xs: "1fr",
+                              md: "repeat(7, 1fr)",
+                            },
+                            gap: 1,
+                          }}
+                        >
+                          {days.map((d) => {
+                            const key = d.format("YYYY-MM-DD");
+                            const items = map.get(key) || [];
+                            return (
+                              <Box
+                                key={key}
+                                sx={{
+                                  p: 1,
+                                  borderRadius: 1,
+                                  border: "1px solid #e3f0ff",
+                                  backgroundColor: "#f8fbff",
+                                  minHeight: 92,
+                                }}
+                              >
+                                <Typography fontWeight={700} variant="body2">
+                                  {d.format("ddd")} • {d.format("DD/MM")}
+                                </Typography>
+
+                                {items.length ? (
+                                  <Stack spacing={0.5} mt={0.5}>
+                                    {items.map((ev) => (
+                                      <Typography
+                                        key={ev.id}
+                                        variant="body2"
+                                        color="text.secondary"
+                                      >
+                                        {dayjs(ev.startAt).format("HH:mm")}–
+                                        {dayjs(ev.endAt).format("HH:mm")}
+                                      </Typography>
+                                    ))}
+                                  </Stack>
+                                ) : (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    mt={0.5}
+                                  >
+                                    Không có
+                                  </Typography>
+                                )}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                    </>
+                  );
+                })()
+              ) : loadingMonthSchedule ? (
                 <Typography color="text.secondary">
                   Đang tải lịch đã đăng ký...
                 </Typography>
