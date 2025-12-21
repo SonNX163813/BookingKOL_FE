@@ -627,7 +627,8 @@ const CampaignBookingDetailPage = () => {
     })();
     const isParentCancelled =
       typeof parentRequest?.status === "string" &&
-      parentRequest.status.toUpperCase() === "CANCELLED";
+      (parentRequest.status.toUpperCase() === "CANCELLED" ||
+        parentRequest.status.toUpperCase() === "NEGOTIATING");
 
     return (
       <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">

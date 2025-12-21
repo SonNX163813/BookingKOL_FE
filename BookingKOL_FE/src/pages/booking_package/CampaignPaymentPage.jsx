@@ -438,15 +438,14 @@ const CampaignPaymentPage = () => {
             <Stack spacing={1}>
               <Typography fontWeight={600}>Lưu ý khi thanh toán</Typography>
               <Typography variant="body2">
-                - Nhập đúng <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển khoản để hệ
-                thống tự động kiểm tra trong vòng 1 - 5 phút.
+                - Không thay đổi <b>SỐ TIỀN</b> và <b>NỘI DUNG</b> chuyển khoản.
               </Typography>
               <Typography variant="body2">
-                - Thông tin ở trên chỉ sử dụng <b>một lần duy nhất</b>. Nếu dùng
-                lại, hệ thống sẽ không xử lý.
+                - Mã QR chỉ sử dụng <b>một lần duy nhất</b>. Nếu dùng lại, hệ
+                thống sẽ không xử lý.
               </Typography>
               <Typography variant="body2">
-                - Trang web <b>không hỗ trợ hoàn tiền</b> nếu nhập sai thông
+                - Trang web <b>không hỗ trợ hoàn tiền</b> nếu thay đổi thông
                 tin. Vui lòng kiểm tra kỹ trước khi chuyển.
               </Typography>
             </Stack>

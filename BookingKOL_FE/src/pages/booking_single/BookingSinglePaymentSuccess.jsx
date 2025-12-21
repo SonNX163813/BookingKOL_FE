@@ -16,17 +16,38 @@ const dinhDangTien = (value) =>
     maximumFractionDigits: 0,
   }).format(Number(value) || 0) + " VND";
 
+const normalizeIdentifier = (value) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (
+    value !== null &&
+    value !== undefined &&
+    (typeof value === "number" || typeof value === "bigint")
+  ) {
+    return String(value);
+  }
+  return null;
+};
+
 const BookingSinglePaymentSuccess = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const paymentInfo = location.state?.payment;
+  const bookingRequest =
+    location.state?.bookingRequest &&
+    typeof location.state.bookingRequest === "object"
+      ? location.state.bookingRequest
+      : null;
+  const bookingSingleReqDTO =
+    location.state?.bookingSingleReqDTO &&
+    typeof location.state.bookingSingleReqDTO === "object"
+      ? location.state.bookingSingleReqDTO
+      : null;
   const stateContracts = Array.isArray(location.state?.contracts)
     ? location.state.contracts
     : [];
-  const stateContractNumber =
-    typeof location.state?.contractNumber === "string"
-      ? location.state.contractNumber.trim()
-      : null;
   const [countdown, setCountdown] = useState(15);
 
   useEffect(() => {
@@ -66,37 +87,17 @@ const BookingSinglePaymentSuccess = () => {
         (contract.contractNumber || contract.contractCode || contract.code)
     ) ?? mergedContracts[0];
 
-  const contractCandidates = [
-    stateContractNumber,
-    paymentInfo?.contractNumber,
-    paymentInfo?.contract?.contractNumber,
-    primaryContract?.contractNumber,
-    // paymentInfo?.contractCode,
-    // paymentInfo?.contract?.code,
-    // primaryContract?.contractCode,
-    // primaryContract?.code,
-    // paymentInfo?.contract?.number,
-    // paymentInfo?.contract?.id,
-    // primaryContract?.id,
-    // paymentInfo?.contractId,
+  const requestNumberCandidates = [
+    bookingRequest?.requestNumber,
+    bookingSingleReqDTO?.requestNumber,
+    paymentInfo?.bookingRequest?.requestNumber,
+    paymentInfo?.requestNumber,
+    primaryContract?.requestNumber,
   ];
 
-  const contractNumber =
-    contractCandidates
-      .map((value) => {
-        if (typeof value === "string") {
-          const trimmed = value.trim();
-          return trimmed.length > 0 ? trimmed : null;
-        }
-        if (
-          value !== null &&
-          value !== undefined &&
-          (typeof value === "number" || typeof value === "bigint")
-        ) {
-          return String(value);
-        }
-        return null;
-      })
+  const requestNumber =
+    requestNumberCandidates
+      .map((value) => normalizeIdentifier(value))
       .find((value) => value !== null) ?? null;
 
   const detailRows = [
@@ -109,8 +110,8 @@ const BookingSinglePaymentSuccess = () => {
       value: paymentInfo.transferContent,
     },
     {
-      label: "Mã hợp đồng",
-      value: contractNumber,
+      label: "Mã yêu cầu",
+      value: requestNumber,
     },
   ].filter((row) => Boolean(row.value));
 

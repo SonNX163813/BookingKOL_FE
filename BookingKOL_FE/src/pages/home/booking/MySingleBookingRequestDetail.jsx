@@ -1317,7 +1317,7 @@ const MySingleBookingRequestDetail = () => {
                   <div className="rounded-2xl border border-slate-100 bg-white p-4 md:p-5">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <span className="text-sm font-semibold text-slate-800">
-                        Thông tin làm việc gần nhất
+                        Thời gian làm việc
                       </span>
                     </div>
 
