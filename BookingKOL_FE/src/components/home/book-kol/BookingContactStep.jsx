@@ -577,9 +577,9 @@ const BookingContactStep = ({
             <Divider />
 
             <Stack spacing={0.5}>
-              <Typography sx={{ color: STYLE.textSecondary, fontWeight: 500 }}>
+              {/* <Typography sx={{ color: STYLE.textSecondary, fontWeight: 500 }}>
                 Tạm tính: {formatCurrency(summary.subtotal)}
-              </Typography>
+              </Typography> */}
               {summary.extra > 0 && (
                 <Typography sx={{ color: STYLE.textSecondary }}>
                   Phụ phí thêm: +{formatCurrency(summary.extra)}

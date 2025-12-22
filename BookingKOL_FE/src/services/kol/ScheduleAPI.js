@@ -6,7 +6,43 @@ import { CLIENT_API_PATHS } from "../../constants/apiPathClient";
 /** ======= CẤU HÌNH BUSINESS RULE (buffer ± phút quanh booking) ======= */
 export const BOOKING_BUFFER_MINUTES = 60;
 
-/* ================== UTIL: unwrap các dạng envelope khác nhau ================== */
+/** ✅ ĐỔI CHỮ HIỂN THỊ "Booking" Ở LIST */
+export const DEFAULT_BOOKING_TEXT = "Đã đặt lịch"; // <-- bạn đổi chữ ở đây
+
+/** ===== Worktime status (GIỐNG BẠN GỬI) ===== */
+export const WORKTIME_STATUS_LABEL = {
+  AVAILABLE: "Sẵn sàng",
+  ASSIGNED: "Đã gán",
+  IN_PROGRESS: "Đang thực hiện",
+  DELIVERED: "Đã giao",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  PENDING_ASSIGNMENT: "Chưa có KOL",
+  PENDING: "Chờ thực hiện",
+};
+
+export const WORKTIME_STATUS_COLOR = {
+  AVAILABLE: "processing",
+  ASSIGNED: "blue",
+  IN_PROGRESS: "processing",
+  DELIVERED: "gold",
+  COMPLETED: "success",
+  CANCELLED: "error",
+  PENDING_ASSIGNMENT: "default",
+  PENDING: "blue",
+};
+
+/** ✅ Map Tag color (antd) -> HEX để tô nền (SchedulerGrid hay dùng HEX) */
+const TAG_COLOR_HEX = {
+  processing: "#1677ff",
+  blue: "#1677ff",
+  gold: "#faad14",
+  success: "#1677ff",
+  error: "#ff4d4f",
+  default: "#8c8c8c",
+};
+
+/* ================== UTIL: unwrap envelope ================== */
 const asArray = (payload) => {
   const d = payload?.data ?? payload ?? [];
   if (Array.isArray(d)) return d;
@@ -15,23 +51,27 @@ const asArray = (payload) => {
   return [];
 };
 
-/* ================== COLOR theo status ================== */
-const statusColor = (status) => {
-  const s = String(status || "").toUpperCase();
-  switch (s) {
-    case "IN_PROGRESS":
-      return "#f59e0b"; // amber
-    case "COMPLETED":
-    case "DONE":
-      return "#10b981"; // green
-    case "PENDING":
-      return "#60a5fa"; // light blue
-    default:
-      return "#4a74da"; // default blue
-  }
+const asObject = (payload) => {
+  const body = payload?.data ?? payload;
+  const data = body?.data ?? body;
+  if (Array.isArray(data)) return data[0] ?? null;
+  return data ?? null;
 };
 
-const isCancelled = (st) => String(st || "").toUpperCase() === "CANCELLED";
+/* ================== STATUS helpers ================== */
+const normalizeStatus = (status) => String(status || "").toUpperCase();
+
+const statusTagColor = (status) => {
+  const s = normalizeStatus(status);
+  return WORKTIME_STATUS_COLOR[s] || "default";
+};
+
+const statusColor = (status) => {
+  const tag = statusTagColor(status);
+  return TAG_COLOR_HEX[tag] || "#4a74da";
+};
+
+const isCancelled = (st) => normalizeStatus(st) === "CANCELLED";
 
 /* ================== API THÔ ================== */
 
@@ -71,7 +111,7 @@ export const getKolTimeline = async ({
   return asArray(payload);
 };
 
-/** GET /v1/availabilities/time-line/{availabilityId} */
+/** GET /v1/availabilities/time-line/{availabilityId} (cũ) */
 export const getAvailabilityTimelineById = async (
   availabilityId,
   { signal } = {}
@@ -81,11 +121,22 @@ export const getAvailabilityTimelineById = async (
     url: `/v1/availabilities/time-line/${encodeURIComponent(availabilityId)}`,
     config: signal ? { signal } : undefined,
   });
-  const body = payload?.data ?? payload;
-  const data = body?.data ?? body;
-  // Một số BE trả mảng → lấy phần tử đầu
-  if (Array.isArray(data)) return data[0] ?? null;
-  return data ?? null;
+  return asObject(payload);
+};
+
+/** ✅ NEW: GET /v1/user/bookings/requests/by-worktime/{kolWorkTimeId} */
+export const getBookingRequestByWorktimeId = async (
+  kolWorkTimeId,
+  { signal } = {}
+) => {
+  if (!kolWorkTimeId) throw new Error("kolWorkTimeId is required");
+  const payload = await get({
+    url: `/v1/user/bookings/requests/by-worktime/${encodeURIComponent(
+      kolWorkTimeId
+    )}`,
+    config: signal ? { signal } : undefined,
+  });
+  return asObject(payload);
 };
 
 /* ================== CHUẨN HOÁ & TÍNH TOÁN LỊCH ================== */
@@ -202,10 +253,23 @@ const expandWorkTimes = (item) => {
     .filter((w) => !isCancelled(w?.status))
     .map((w) => ({
       availabilityId: item?.id || item?.availabilityId,
+
+      // ✅ IMPORTANT: đây chính là kolWorkTimeId để gọi API mới
       workTimeId: w?.id,
+      kolWorkTimeId: w?.id, // ✅ alias cho rõ nghĩa
       bookingRequestId: w?.bookingRequestId,
 
-      title: item?.requestNumber || item?.title || item?.note || "Booking",
+      // ✅ thêm vài field để UI dùng nhanh (nếu timeline có)
+      bookingType: w?.bookingType || item?.bookingType || null,
+      bookingStatus: w?.bookingStatus || item?.bookingStatus || null,
+      requestNumber: item?.requestNumber || w?.requestNumber || null,
+
+      // ✅ nếu không có requestNumber/title/note -> dùng DEFAULT_BOOKING_TEXT
+      title:
+        item?.requestNumber ||
+        item?.title ||
+        item?.note ||
+        DEFAULT_BOOKING_TEXT,
       note: w?.note ?? item?.note,
       status: w?.status,
 
@@ -228,31 +292,49 @@ const normalizeSlot = (slot, { isBooking, meta } = {}) => {
   const s = dayjs(startISO);
   const e = dayjs(endISO);
 
+  // ✅ text hiển thị ở list
   const titleLike =
     slot?.title ||
     meta?.title ||
     slot?.description ||
     meta?.note ||
-    (isBooking ? "Booking" : "Lịch rảnh");
+    (isBooking ? DEFAULT_BOOKING_TEXT : "Lịch rảnh");
 
   const statusLike = isBooking
-    ? slot?.status || meta?.status || "BOOKED"
+    ? slot?.status || meta?.status || "PENDING"
     : "FREE";
+
+  const tagColor = isBooking ? statusTagColor(statusLike) : "success";
 
   return {
     id:
       meta?.workTimeId ||
       slot?.id ||
       `${isBooking ? "B" : "F"}_${startISO}_${endISO}`,
+
     availabilityId:
       meta?.availabilityId || meta?.parentId || meta?.bookingId || null,
+
+    // ✅ IMPORTANT: giữ workTimeId & alias kolWorkTimeId để popup gọi API mới
     workTimeId: meta?.workTimeId || null,
+    kolWorkTimeId: meta?.kolWorkTimeId || meta?.workTimeId || null,
+
     bookingRequestId: meta?.bookingRequestId || null,
 
+    // ✅ meta loại booking (nếu có)
+    bookingType: meta?.bookingType || null,
+    bookingStatus: meta?.bookingStatus || null,
+    requestNumber: meta?.requestNumber || null,
+
     description: titleLike,
+
+    // ✅ colorCode = HEX để tô nền; tagColor = token để dùng AntD Tag nếu cần
     colorCode:
       slot?.colorCode || (isBooking ? statusColor(statusLike) : "#34c759"),
+    tagColor,
+
     status: statusLike,
+    statusLabel: WORKTIME_STATUS_LABEL[normalizeStatus(statusLike)] || null,
     isBooking: !!isBooking,
 
     startISO,
@@ -276,6 +358,7 @@ export const fetchDayDuties = async ({
 }) => {
   const base = dayjs(fromDate || dayjs());
   let start, end;
+
   if (range === "day") {
     start = base.startOf("day");
     end = base.endOf("day");
@@ -356,6 +439,7 @@ export const fetchDayDuties = async ({
     const k = dayjs(desc.startISO).format("DD");
     if (map.has(k)) map.get(k).push(desc);
   };
+
   freeDescs.forEach(put);
   bookedDescs.forEach(put);
 

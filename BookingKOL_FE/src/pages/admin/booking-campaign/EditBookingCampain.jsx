@@ -47,6 +47,9 @@ import {
   adminGetCampaignBookingDetail,
 } from "../../../services/admin/AdminBookingCampaignAPI";
 
+// ✅ NEW: lấy đơn giá theo gói (giống ServicePackagePage)
+import { getServicePackages } from "../../../services/service-package/ServicePackageAPI";
+
 dayjs.locale("vi");
 
 const { Text } = Typography;
@@ -114,6 +117,36 @@ const CAMPAIGN_STATUS_COLOR = {
   ACCEPTED: "cyan",
   REJECTED: "red",
   COMPLETED: "blue",
+};
+
+/** ✅ NEW: packageType label ngay trong file */
+const PACKAGE_TYPE_LABEL = {
+  normal: "Gói thường",
+  vip: "Gói VIP",
+};
+const normalizePackageType = (value) => {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  // BE có thể dùng vip/normal hoặc vip/basic -> map về vip/normal
+  if (raw === "vip") return "vip";
+  if (raw === "basic") return "normal";
+  if (raw === "standard") return "normal";
+  return "normal"; // default
+};
+const formatPackageType = (value) => {
+  const key = normalizePackageType(value);
+  return PACKAGE_TYPE_LABEL[key] ?? key;
+};
+
+/** ✅ NEW: map list service packages -> { vipPrice, normalPrice } */
+const extractPackagesArray = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw?.content)) return raw.content;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
 };
 
 /** Tag render */
@@ -339,6 +372,56 @@ export default function EditBookingCampain() {
   const campaignIdFromQuery = search.get("campaignId");
   const campaignId = campaignIdFromState || campaignIdFromQuery || "";
 
+  // ✅ NEW: load service packages (để lấy đơn giá theo gói)
+  const [packagePriceMap, setPackagePriceMap] = useState({
+    vip: null,
+    normal: null,
+  });
+  const [loadingPackagePrice, setLoadingPackagePrice] = useState(false);
+  const [packagePriceError, setPackagePriceError] = useState(null);
+
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+
+    const fetchPackages = async () => {
+      try {
+        setLoadingPackagePrice(true);
+        setPackagePriceError(null);
+
+        const res = await getServicePackages({ signal: controller.signal });
+        const list = extractPackagesArray(res);
+
+        const nextMap = { vip: null, normal: null };
+        for (const pkg of list) {
+          const key = normalizePackageType(pkg?.packageType); // vip | normal
+          const price = Number(pkg?.price);
+          if (!Number.isFinite(price)) continue;
+
+          // ưu tiên lấy cái đầu tiên theo type
+          if (key === "vip" && nextMap.vip == null) nextMap.vip = price;
+          if (key === "normal" && nextMap.normal == null)
+            nextMap.normal = price;
+        }
+
+        if (!ignore) setPackagePriceMap(nextMap);
+      } catch (err) {
+        if (!ignore) {
+          console.error("Fetch service packages error:", err);
+          setPackagePriceError(err);
+        }
+      } finally {
+        if (!ignore) setLoadingPackagePrice(false);
+      }
+    };
+
+    fetchPackages();
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, []);
+
   // Campaign info
   const {
     data: campaignResponse,
@@ -451,6 +534,12 @@ export default function EditBookingCampain() {
       intro,
       experience: "",
 
+      // ✅ NEW: packageType lấy từ campaign info (ưu tiên stateRow nếu có)
+      packageType:
+        stateRow.packageType ||
+        campaignInfo?.packageType ||
+        normalizePackageType(campaignInfo?.packageType),
+
       // ✅ livestreamAddress
       livestreamAddress:
         stateRow.livestreamAddress || campaignInfo?.livestreamAddress || "",
@@ -463,7 +552,7 @@ export default function EditBookingCampain() {
       installments: [{ amount: "", dueDate: null }],
 
       liveHours: "",
-      unitPrice: "",
+      unitPrice: "", // ✅ sẽ auto fill theo gói
       discountPercent: "",
       totalAmount: "",
       attachments: [],
@@ -474,14 +563,24 @@ export default function EditBookingCampain() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, mode]);
 
-  // ✅ nếu campaignInfo load sau, auto fill livestreamAddress khi đang create & field đang trống
+  // ✅ nếu campaignInfo load sau, auto fill livestreamAddress + packageType khi đang create & field đang trống
   useEffect(() => {
     if (mode !== "create") return;
-    const cur = String(form.getFieldValue("livestreamAddress") || "").trim();
-    if (cur) return;
-    const addr = String(campaignInfo?.livestreamAddress || "").trim();
-    if (addr) form.setFieldValue("livestreamAddress", addr);
-  }, [mode, campaignInfo?.livestreamAddress, form]);
+
+    const curAddr = String(
+      form.getFieldValue("livestreamAddress") || ""
+    ).trim();
+    if (!curAddr) {
+      const addr = String(campaignInfo?.livestreamAddress || "").trim();
+      if (addr) form.setFieldValue("livestreamAddress", addr);
+    }
+
+    const curPkg = form.getFieldValue("packageType");
+    if (!curPkg) {
+      const pkg = campaignInfo?.packageType;
+      if (pkg) form.setFieldValue("packageType", pkg);
+    }
+  }, [mode, campaignInfo?.livestreamAddress, campaignInfo?.packageType, form]);
 
   // Prefill edit mode from targetBookingRecord
   useEffect(() => {
@@ -530,6 +629,7 @@ export default function EditBookingCampain() {
       source?.live_duration_hours ??
       "";
 
+    // ✅ unitPrice sẽ auto theo gói (nhưng vẫn prefill tạm từ BE để không trống)
     const unitPrice =
       source?.unitPrice ??
       source?.pricePerHour ??
@@ -551,6 +651,12 @@ export default function EditBookingCampain() {
       campaignId: source?.campaignId || campaignId,
       intro,
       experience,
+
+      // ✅ NEW: packageType ưu tiên campaignInfo (đúng “yêu cầu từ khách hàng”)
+      packageType:
+        campaignInfo?.packageType ||
+        source?.packageType ||
+        normalizePackageType(campaignInfo?.packageType),
 
       // ✅ livestreamAddress (ưu tiên booking, fallback campaign)
       livestreamAddress:
@@ -580,7 +686,10 @@ export default function EditBookingCampain() {
       liveHours: liveHours
         ? normalizeDecimalInput(liveHours, { maxIntDigits: 4, maxDecDigits: 2 })
         : "",
+
+      // ✅ tạm set theo BE, lát nữa effect sẽ override theo gói vip/thuong
       unitPrice: unitPrice ? formatNumberWithCommas(unitPrice) : "",
+
       discountPercent: discountPercent
         ? normalizeDecimalInput(discountPercent, {
             maxIntDigits: 3,
@@ -604,7 +713,37 @@ export default function EditBookingCampain() {
     form.setFieldValue("attachments", serverFileList);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, targetBookingRecord]);
+  }, [mode, targetBookingRecord, campaignInfo?.packageType]);
+
+  // ✅ NEW: auto fill ĐƠN GIÁ theo gói vip/thuong (giống cách lấy price trong ServicePackagePage)
+  useEffect(() => {
+    if (!campaignInfo) return;
+
+    const pkgKey = normalizePackageType(campaignInfo?.packageType);
+    const price =
+      pkgKey === "vip" ? packagePriceMap.vip : packagePriceMap.normal;
+
+    // set packageType vào form (hidden)
+    const currentPkg = form.getFieldValue("packageType");
+    if (!currentPkg) {
+      form.setFieldValue("packageType", campaignInfo?.packageType || pkgKey);
+    }
+
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) return;
+
+    const digits = String(price).replace(/\D/g, "").slice(0, 13);
+    const formatted = formatNumberWithCommas(digits);
+
+    const curDigits = String(form.getFieldValue("unitPrice") || "")
+      .replace(/,/g, "")
+      .trim();
+
+    // luôn đồng bộ theo gói (create + edit)
+    if (curDigits !== digits) {
+      form.setFieldValue("unitPrice", formatted);
+      setUnitPriceAtLimit(digits.length >= 13);
+    }
+  }, [campaignInfo, packagePriceMap, form]);
 
   // Load KOL/LIVE
   useEffect(() => {
@@ -734,6 +873,11 @@ export default function EditBookingCampain() {
   const livestreamAddrLen = String(watchLivestreamAddress || "").length;
   const livestreamAddrAtLimit = livestreamAddrLen >= MAX_LIVESTREAM_ADDR_LEN;
 
+  const unitPriceReady = useMemo(() => {
+    const n = parseAmount(watchUnitPriceRaw);
+    return typeof n === "number" && Number.isFinite(n) && n > 0;
+  }, [watchUnitPriceRaw]);
+
   // soft validate (giảm lag)
   const validateTimerRef = useRef(null);
   const softValidateSumGuard = () => {
@@ -803,6 +947,7 @@ export default function EditBookingCampain() {
 
   const disableSave =
     isBusy ||
+    !unitPriceReady || // ✅ đơn giá auto, chưa có giá thì không cho submit
     sumState.sumMismatch ||
     (mode === "edit" &&
       (isLoadingCampaignBooking ||
@@ -849,7 +994,7 @@ export default function EditBookingCampain() {
       );
 
       const liveHours = parseDecimal(values.liveHours);
-      const unitPrice = parseAmount(values.unitPrice);
+      const unitPrice = parseAmount(values.unitPrice); // ✅ auto
       const discountPercent = parseDecimal(values.discountPercent);
       const totalAmount = parseAmount(values.totalAmount);
 
@@ -863,10 +1008,16 @@ export default function EditBookingCampain() {
 
       const livestreamAddress = String(values.livestreamAddress || "").trim();
 
+      // ✅ NEW: packageType lấy từ yêu cầu khách hàng
+      const packageType = values.packageType ?? campaignInfo?.packageType;
+
       if (mode === "create") {
         const bookingPayload = {
           campaignId: values.campaignId,
           description,
+
+          // ✅ NEW
+          packageType,
 
           livestreamAddress: livestreamAddress || undefined,
 
@@ -930,7 +1081,6 @@ export default function EditBookingCampain() {
           }
         }
 
-        // ✅ NEW: tạo xong -> quay lại trang list yêu cầu
         message.success("Tạo yêu cầu chiến dịch thành công ");
         navigate(BOOKING_CAMPAIGN_LIST_PATH, { replace: true });
         return;
@@ -951,6 +1101,9 @@ export default function EditBookingCampain() {
 
       await adminEditBookingRequest(bookingRequestId, {
         description,
+
+        // ✅ NEW
+        packageType,
 
         livestreamAddress: livestreamAddress || undefined,
 
@@ -1124,6 +1277,12 @@ export default function EditBookingCampain() {
                   <Descriptions.Item label="Tên Campaign">
                     {campaignInfo?.name ?? "--"}
                   </Descriptions.Item>
+
+                  {/* ✅ packageType */}
+                  <Descriptions.Item label="Gói dịch vụ">
+                    {formatPackageType(campaignInfo?.packageType ?? "normal")}
+                  </Descriptions.Item>
+
                   <Descriptions.Item label="Thời gian">
                     {formatDate(campaignInfo?.startDate)} -{" "}
                     {formatDate(campaignInfo?.endDate)}
@@ -1152,6 +1311,12 @@ export default function EditBookingCampain() {
                   <Descriptions.Item label="Tên Campaign">
                     {campaignInfo?.name ?? "--"}
                   </Descriptions.Item>
+
+                  {/* ✅ packageType */}
+                  <Descriptions.Item label="Gói dịch vụ">
+                    {formatPackageType(campaignInfo?.packageType ?? "normal")}
+                  </Descriptions.Item>
+
                   <Descriptions.Item label="Họ và tên người đặt">
                     {campaignInfo?.ordererFullName ?? "--"}
                   </Descriptions.Item>
@@ -1257,6 +1422,11 @@ export default function EditBookingCampain() {
               hidden
               rules={[{ required: true, message: "Thiếu campaignId" }]}
             >
+              <Input />
+            </Form.Item>
+
+            {/* ✅ NEW: packageType (hidden) */}
+            <Form.Item name="packageType" hidden>
               <Input />
             </Form.Item>
 
@@ -1420,13 +1590,12 @@ export default function EditBookingCampain() {
                   help={
                     unitPriceAtLimit
                       ? "Đơn giá đã đạt tối đa 13 chữ số."
-                      : undefined
+                      : loadingPackagePrice
+                      ? "Đang tự lấy đơn giá theo gói dịch vụ..."
+                      : packagePriceError && !unitPriceReady
+                      ? "Không lấy được đơn giá theo gói. Vui lòng tải lại trang."
+                      : "Đơn giá tự động theo gói VIP/Thường (không cần nhập)."
                   }
-                  normalize={(val) => {
-                    const digits = String(val || "").replace(/\D/g, "");
-                    const limited = digits.slice(0, 13);
-                    return formatNumberWithCommas(limited);
-                  }}
                   rules={[
                     { required: true, message: "Bắt buộc" },
                     {
@@ -1447,15 +1616,9 @@ export default function EditBookingCampain() {
                   ]}
                 >
                   <Input
-                    placeholder="VD: 500,000"
+                    placeholder="Đơn giá tự động theo gói"
                     inputMode="numeric"
-                    onChange={(e) => {
-                      const digits = String(e?.target?.value || "").replace(
-                        /\D/g,
-                        ""
-                      );
-                      setUnitPriceAtLimit(digits.length >= 13);
-                    }}
+                    readOnly
                   />
                 </Form.Item>
               </Col>
@@ -1750,17 +1913,33 @@ export default function EditBookingCampain() {
                                     const raw = String(v || "")
                                       .replace(/,/g, "")
                                       .trim();
+
                                     if (!raw) return Promise.resolve();
-                                    if (!/^\d+$/.test(raw))
+
+                                    // chỉ cho phép số nguyên dương
+                                    if (!/^\d+$/.test(raw)) {
                                       return Promise.reject(
                                         new Error("Số tiền không hợp lệ")
                                       );
-                                    if (raw.length > 13)
+                                    }
+
+                                    if (raw.length > 13) {
                                       return Promise.reject(
                                         new Error(
                                           "Chỉ có thể nhập tối đa 13 chữ số"
                                         )
                                       );
+                                    }
+
+                                    // ✅ NEW: phải > 0
+                                    if (Number(raw) <= 0) {
+                                      return Promise.reject(
+                                        new Error(
+                                          "Số tiền đợt thanh toán phải > 0"
+                                        )
+                                      );
+                                    }
+
                                     return Promise.resolve();
                                   },
                                 },

@@ -77,6 +77,10 @@ export const CLIENT_API_PATHS = {
     kolCancelBookingRequest: "/v1/requests/kol/request",
     kolCancelRequestDetail: (workTimeId) =>
       `/v1/requests/cancel/detail/${encodeURIComponent(workTimeId)}`,
+    kolCampaignWorktimes: (kolId) =>
+      `/v1/kol/requests/worktime/campaign-worktimes/${encodeURIComponent(
+        kolId
+      )}`,
   },
   BOOKINGPACKAGE: {
     createBookingPackage: "/v1/bookings/packages",

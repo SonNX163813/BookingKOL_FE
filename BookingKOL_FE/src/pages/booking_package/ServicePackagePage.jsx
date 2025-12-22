@@ -312,8 +312,10 @@ const ServicePackageCard = ({ data, onSelect, theme }) => {
       label: "Chọn KOL theo ý muốn",
       available: Boolean(data?.allowKolSelection),
     },
-    { label: "Gợi ý KOL tự động", available: Boolean(data?.allowKolSelection) },
-    { label: "Báo cáo nâng cao", available: isVip },
+    // { label: "Gợi ý KOL tự động", available: Boolean(data?.allowKolSelection) },
+    // { label: "Báo cáo nâng cao", available: isVip },
+    { label: "Tư vấn setup livestream chuyên nghiệp", available: isVip },
+    { label: "Hỗ trợ lên kịch bản, nội dung cho chiến dịch", available: isVip },
   ];
 
   return (
@@ -333,7 +335,7 @@ const ServicePackageCard = ({ data, onSelect, theme }) => {
         sx={{
           backgroundColor: headerColor,
           clipPath: "polygon(0 0, 100% 0, 100% 82%, 0 100%)",
-          width: { xs: "auto", md: 350, lg: 350 },
+          width: { xs: "auto", md: "100%" },
           height: { xs: 110, md: 120 },
           display: "flex",
           alignItems: "flex-end",
@@ -601,7 +603,7 @@ const ServicePackagePage = () => {
             sx={{ px: { xs: 1, md: 6 } }}
           >
             <Typography
-              variant="overline"
+              variant="h6"
               sx={{ letterSpacing: 2, color: "#4a74da", fontWeight: 700 }}
             >
               Danh sách gói chiến dịch

@@ -813,7 +813,7 @@ const HistoryBookingPackagePage = () => {
                               )}
                             </span>
                           </div>
-                          <div className="flex items-start justify-between gap-3">
+                          {/* <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">
                               Số Host Chính tham gia
                             </span>
@@ -828,7 +828,7 @@ const HistoryBookingPackagePage = () => {
                             <span className="text-right font-semibold text-indigo-600">
                               {liveNames.length}
                             </span>
-                          </div>
+                          </div> */}
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">
                               Mục tiêu chiến dịch
@@ -845,12 +845,12 @@ const HistoryBookingPackagePage = () => {
                               {safeDisplay(record?.livestreamHours)}
                             </span>
                           </div>
-                          <div className="flex items-start justify-between gap-3">
+                          {/* <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">Kiểu lặp</span>
                             <span className="text-right font-medium text-slate-900">
                               {safeDisplay(record?.repeatType)}
                             </span>
-                          </div>
+                          </div> */}
                           <div className="flex items-start justify-between gap-3">
                             <span className="text-slate-500">
                               Địa điểm livestream

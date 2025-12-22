@@ -183,15 +183,6 @@ function toIso(v) {
   return typeof v === "string" ? v : "";
 }
 
-// ✅ DatePicker: chỉ cho chọn phút = 00, giây = 00
-// ❗ FIX OK bị disable: không disable giây 0
-const disabledTimeOnlyHour = () => ({
-  disabledMinutes: () =>
-    Array.from({ length: 60 }, (_, i) => i).filter((m) => m !== 0),
-  disabledSeconds: () =>
-    Array.from({ length: 60 }, (_, i) => i).filter((s) => s !== 0),
-});
-
 // =====================
 // API: CANCEL REQUESTS
 // =====================
@@ -341,13 +332,19 @@ export default function ManagementKolWorkSchedule() {
   // ✅ USERS: dùng hook giống ManagementCustomer (BỎ SEARCH, chỉ phân trang)
   // =========================
   const [userPage, setUserPage] = useState(0);
-  const [userSize, setUserSize] = useState(50);
+  const [userSize, setUserSize] = useState(500); // ✅ default 500
 
   const {
     isLoadingGetAllBrands: userLoading,
     ResponseGetAllBrands: usersResponse,
     refetchGetAllBrands: refetchUsers,
   } = useGetAllBrands(userPage, userSize, undefined);
+
+  // 🔥 nếu hook không auto-refetch theo params, bật thêm effect này (an toàn):
+  useEffect(() => {
+    refetchUsers?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userPage, userSize]);
 
   const userList = usersResponse?.data?.content || [];
   const userTotal = usersResponse?.data?.totalElements || 0;
@@ -418,25 +415,19 @@ export default function ManagementKolWorkSchedule() {
     return current.isBefore(dayjs().startOf("day"));
   };
 
-  // do phút fix = 00:
-  // - nếu now có phút > 0 thì giờ hiện tại (HH:00) đã qua -> phải lên giờ + 1
-  // - nếu đang 23:xx -> minHour có thể = 24 => disable toàn bộ giờ hôm nay
   const minHourFromNow = () => {
     const now = dayjs();
     const needNextHour = now.minute() > 0 || now.second() > 0;
     return now.hour() + (needNextHour ? 1 : 0); // 0..24
   };
 
+  // ✅ CHỈ disable HOURS (tránh bug OK/Now disable)
   const disabledTimeStart = (current) => {
-    const base = disabledTimeOnlyHour();
-    if (!current) return base;
-
+    if (!current) return {};
     const isToday = dayjs(current).isSame(dayjs(), "day");
-    if (!isToday) return base;
-
+    if (!isToday) return {};
     const minH = minHourFromNow();
     return {
-      ...base,
       disabledHours: () =>
         Array.from({ length: 24 }, (_, h) => h).filter((h) => h < minH),
     };
@@ -450,7 +441,6 @@ export default function ManagementKolWorkSchedule() {
 
     const minDay = startDay && startDay.isAfter(today) ? startDay : today;
 
-    // nếu startAt là 23:00 thì endAt không thể cùng ngày
     if (
       startAtWatch &&
       dayjs(current).isSame(dayjs(startAtWatch), "day") &&
@@ -463,29 +453,30 @@ export default function ManagementKolWorkSchedule() {
   };
 
   const disabledTimeEnd = (current) => {
-    const base = disabledTimeOnlyHour();
-    if (!current) return base;
-
+    if (!current) return {};
     let minH = 0;
 
-    // rule theo "hiện tại"
     if (dayjs(current).isSame(dayjs(), "day")) {
       minH = Math.max(minH, minHourFromNow());
     }
 
-    // rule theo startAt: end phải sau start (tối thiểu +1 giờ vì phút = 00)
     if (startAtWatch && dayjs(current).isSame(dayjs(startAtWatch), "day")) {
       minH = Math.max(minH, dayjs(startAtWatch).hour() + 1);
     }
 
     return {
-      ...base,
       disabledHours: () =>
         Array.from({ length: 24 }, (_, h) => h).filter((h) => h < minH),
     };
   };
 
-  // ===== load KOL options: HIỂN THỊ TẤT CẢ ROLE (label role theo yêu cầu) =====
+  const timePanelDefault = useMemo(() => {
+    const now = dayjs();
+    const addH = now.minute() > 0 || now.second() > 0 ? 1 : 0;
+    return now.add(addH, "hour").minute(0).second(0).millisecond(0);
+  }, []);
+
+  // ===== load KOL options: HIỂN THỊ TẤT CẢ ROLE =====
   useEffect(() => {
     let ignore = false;
     const controller = new AbortController();
@@ -716,7 +707,7 @@ export default function ManagementKolWorkSchedule() {
     });
   }, [cancelList, cancelKeyword]);
 
-  // ✅ Mutation tạo lịch làm việc (single request) - sẽ gửi multipart/FormData ở service
+  // ✅ Mutation tạo lịch làm việc (single request)
   const createSingleBookingMutation = useMutation({
     mutationFn: async ({ payload, signal }) =>
       adminCreateBookingSingleRequest(payload, { signal }),
@@ -726,11 +717,18 @@ export default function ManagementKolWorkSchedule() {
       cancelQuery.refetch();
       timelineQuery.refetch();
     },
-    onError: (err) => message.error(extractErrMsg(err)),
-    onSettled: () => setCreateLoading(false),
+    onError: (err) => {
+      // ✅ lỗi là stop loading ngay để tạo lại
+      message.error(extractErrMsg(err));
+      setCreateLoading(false);
+    },
+    onSettled: () => {
+      // ✅ luôn đảm bảo không bị kẹt loading
+      setCreateLoading(false);
+    },
   });
 
-  // ✅ Mutation: thêm lịch đăng ký (availability) theo API mới
+  // ✅ Mutation: thêm lịch đăng ký
   const addRegisterMutation = useMutation({
     mutationFn: async ({ cancelRow, signal }) => {
       const workTimeId = getCancelWorkTimeId(cancelRow);
@@ -843,7 +841,7 @@ export default function ManagementKolWorkSchedule() {
     createForm.resetFields();
 
     setUserPage(0);
-    setUserSize(50);
+    setUserSize(500); // ✅ default 500 khi mở
     refetchUsers?.();
 
     createForm.setFieldsValue({
@@ -867,7 +865,7 @@ export default function ManagementKolWorkSchedule() {
     setFileList([]);
   };
 
-  // ✅ Submit tạo lịch làm việc (single request) - attachedFiles là File[]
+  // ✅ Submit tạo lịch làm việc
   const handleCreate = async () => {
     try {
       const values = await createForm.validateFields();
@@ -877,25 +875,28 @@ export default function ManagementKolWorkSchedule() {
 
       if (!start?.isValid() || !end?.isValid()) {
         message.error("Thời gian bắt đầu/kết thúc không hợp lệ.");
+        setCreateLoading(false);
         return;
       }
       if (!end.isAfter(start)) {
         message.error("Thời gian kết thúc phải lớn hơn thời gian bắt đầu.");
+        setCreateLoading(false);
         return;
       }
 
-      // ✅ đảm bảo startAt >= now (theo rule phút=00)
       const now = dayjs();
       const minStartTodayHour = minHourFromNow();
       if (start.isSame(now, "day")) {
         const minStart = now.startOf("day").hour(minStartTodayHour).minute(0);
         if (start.isBefore(minStart)) {
           message.error("Chỉ được chọn từ thời điểm hiện tại trở đi.");
+          setCreateLoading(false);
           return;
         }
       }
       if (start.isBefore(now.startOf("day"))) {
         message.error("Không được chọn ngày trước hôm nay.");
+        setCreateLoading(false);
         return;
       }
 
@@ -914,7 +915,7 @@ export default function ManagementKolWorkSchedule() {
           description: safeText(values.description),
           location: safeText(values.location),
         },
-        attachedFiles, // ✅ File[]
+        attachedFiles,
       };
 
       const controller = new AbortController();
@@ -928,13 +929,16 @@ export default function ManagementKolWorkSchedule() {
         clearTimeout(timer);
       }
     } catch (e) {
-      if (e?.errorFields?.length) return;
+      // ✅ dù lỗi validate hay lỗi khác cũng đảm bảo stop loading
+      if (e?.errorFields?.length) {
+        setCreateLoading(false);
+        return;
+      }
       message.error(e?.message || "Tạo lịch thất bại.");
       setCreateLoading(false);
     }
   };
 
-  // ✅ CLICK: thêm lịch đăng ký theo API mới
   const onClickAddRegister = () => {
     const row = ensureCancelRowSelected();
     if (!row) return;
@@ -1035,7 +1039,6 @@ export default function ManagementKolWorkSchedule() {
         fixed: "right",
         render: (_, record) => {
           const wtId = getCancelWorkTimeId(record);
-
           const loadingThisRow =
             viewDetailMutation.isPending &&
             viewingWorktimeId &&
@@ -1279,14 +1282,18 @@ export default function ManagementKolWorkSchedule() {
             onOk={handleCreate}
             okText="Tạo"
             cancelText="Hủy"
-            confirmLoading={createSingleBookingMutation.isPending}
+            confirmLoading={
+              createSingleBookingMutation.isPending || createLoading
+            }
             destroyOnClose
-            maskClosable={!createSingleBookingMutation.isPending}
+            maskClosable={
+              !(createSingleBookingMutation.isPending || createLoading)
+            }
           >
             <Form form={createForm} layout="vertical" disabled={createLoading}>
               {/* ✅ userId: CHỈ LIST, KHÔNG SEARCH */}
               <Form.Item
-                label="Khách hàng (User)"
+                label="Khách hàng"
                 name="userId"
                 rules={[
                   { required: true, message: "Vui lòng chọn khách hàng" },
@@ -1306,21 +1313,6 @@ export default function ManagementKolWorkSchedule() {
                 />
               </Form.Item>
 
-              {/* ✅ Pagination user (để lật trang danh sách) */}
-              <div style={{ marginTop: -6, marginBottom: 12 }}>
-                <Pagination
-                  current={userPage + 1}
-                  pageSize={userSize}
-                  pageSizeOptions={["10", "20", "50", "100"]}
-                  onChange={(pageNumber, sizeNumber) => {
-                    setUserPage(pageNumber - 1);
-                    setUserSize(sizeNumber);
-                  }}
-                  total={userTotal}
-                  showSizeChanger
-                />
-              </div>
-
               {/* ✅ KOL list tất cả role (CHỈ LIST, KHÔNG SEARCH) */}
               <Form.Item
                 label="Chọn người thực hiện"
@@ -1328,6 +1320,7 @@ export default function ManagementKolWorkSchedule() {
                 rules={[
                   { required: true, message: "Vui lòng chọn người thực hiện" },
                 ]}
+                style={{ marginTop: 12 }}
               >
                 <Select
                   allowClear
@@ -1401,7 +1394,7 @@ export default function ManagementKolWorkSchedule() {
                         format: "HH:mm",
                         minuteStep: 60,
                         showSecond: false,
-                        defaultValue: dayjs().minute(0).second(0),
+                        defaultValue: timePanelDefault,
                       }}
                       disabledTime={disabledTimeStart}
                       format="DD/MM/YYYY HH:mm"
@@ -1411,7 +1404,6 @@ export default function ManagementKolWorkSchedule() {
                         const d = dayjs(val).minute(0).second(0).millisecond(0);
                         createForm.setFieldValue("startAt", d);
 
-                        // nếu endAt <= startAt thì clear để chọn lại
                         const endVal = createForm.getFieldValue("endAt");
                         if (endVal && !dayjs(endVal).isAfter(d)) {
                           createForm.setFieldValue("endAt", null);
@@ -1435,7 +1427,7 @@ export default function ManagementKolWorkSchedule() {
                         format: "HH:mm",
                         minuteStep: 60,
                         showSecond: false,
-                        defaultValue: dayjs().minute(0).second(0),
+                        defaultValue: timePanelDefault,
                       }}
                       disabledTime={disabledTimeEnd}
                       format="DD/MM/YYYY HH:mm"
@@ -1467,7 +1459,7 @@ export default function ManagementKolWorkSchedule() {
                 <Upload
                   multiple
                   fileList={fileList}
-                  beforeUpload={() => false} // ✅ quan trọng
+                  beforeUpload={() => false}
                   onChange={({ fileList: fl }) => setFileList(fl)}
                   onRemove={(file) => {
                     setFileList((prev) =>
