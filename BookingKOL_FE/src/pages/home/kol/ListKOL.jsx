@@ -14,10 +14,13 @@ import {
   Skeleton,
   Stack,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import dayjs from "dayjs";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import { useNavigate } from "react-router-dom";
 import KOLCard from "../../../components/home/kol/KOLCard";
 import KolFilters from "../../../components/home/kol/KolFilters";
@@ -458,32 +461,242 @@ const KOLEmptyState = ({ onRetry }) => (
   </Box>
 );
 
-const KOLGrid = ({ kols, onSelectKol }) => (
-  <Grid
-    container
-    spacing={{ xs: 2, sm: 2.5, md: 3 }}
-    justifyContent={{ xs: "center", sm: "center" }}
-    alignItems="stretch"
-  >
-    {kols.map((kol) => {
-      const { slug, ...cardProps } = kol;
-      return (
-        <Grid
-          item
-          xs={12}
-          sm={6}
-          md={4}
-          lg={3}
-          xl={3}
-          key={kol.id}
-          sx={{ display: "flex" }}
+const MobileKolCard = ({ kol, onSelectKol }) => {
+  const ratingValue = Number.isFinite(Number(kol?.rating))
+    ? Number(kol.rating)
+    : 0;
+  const reviewValue = Number.isFinite(Number(kol?.reviewCount))
+    ? Number(kol.reviewCount)
+    : null;
+  const priceLabel = kol?.price || "Liên hệ";
+  const isLiveRole =
+    typeof kol?.role === "string" && kol.role.trim().toUpperCase() === "LIVE";
+  const label = isLiveRole ? "Trợ Live" : "Host Chính";
+
+  const handleClick = () => {
+    if (onSelectKol) {
+      onSelectKol(kol.id, kol.slug);
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleClick();
+    }
+  };
+
+  return (
+    <Box
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      sx={{
+        position: "relative",
+        display: "flex",
+        gap: 1.5,
+        p: 2,
+        borderRadius: 3,
+        border: "2px solid rgba(132, 94, 247, 0.45)",
+        boxShadow: "0 14px 32px rgba(132, 94, 247, 0.18)",
+        background: "linear-gradient(135deg, #ffffff 0%, #f7f2ff 100%)",
+        cursor: "pointer",
+        overflow: "hidden",
+      }}
+    >
+      {/* <Typography
+        aria-hidden
+        sx={{
+          position: "absolute",
+          right: 14,
+          bottom: 8,
+          fontWeight: 800,
+          fontSize: 56,
+          letterSpacing: 2,
+          color: "rgba(132, 94, 247, 0.08)",
+          userSelect: "none",
+        }}
+      >
+        VIP
+      </Typography> */}
+      <Box sx={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
+        <Box
+          component="img"
+          src={kol?.image}
+          alt={kol?.name}
+          sx={{
+            width: "100%",
+            height: "100%",
+            borderRadius: 2,
+            objectFit: "cover",
+            border: "3px solid rgba(132, 94, 247, 0.35)",
+            boxShadow: "0 8px 18px rgba(15, 23, 42, 0.16)",
+            backgroundColor: "#f8fafc",
+          }}
+          draggable={false}
+        />
+        {/* <Box
+          sx={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            backgroundColor: "#22c55e",
+            border: "2px solid #ffffff",
+          }}
+        /> */}
+      </Box>
+      <Stack spacing={0.6} sx={{ flex: 1, minWidth: 0, position: "relative" }}>
+        {/* <Typography
+          variant="caption"
+          sx={{
+            color: "#e75f2f",
+            fontWeight: 700,
+            letterSpacing: 0.2,
+          }}
         >
-          <KOLCard {...cardProps} onClick={() => onSelectKol(kol.id, slug)} />
-        </Grid>
-      );
-    })}
-  </Grid>
-);
+          {label}
+        </Typography> */}
+        <Box
+          sx={{
+            minHeight: 28,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <Chip
+            icon={<BadgeRoundedIcon sx={{ fontSize: 18 }} />}
+            label={label}
+            size="small"
+            sx={{
+              background: isLiveRole
+                ? "rgba(255, 161, 218, 0.25)" // LIVE = Trợ Live
+                : "rgba(147, 206, 246, 0.18)", // KOL = Host Chính
+              color: "#1e2767",
+              borderRadius: "999px",
+              fontWeight: 600,
+              border: "1px solid rgba(74, 116, 218, 0.24)",
+            }}
+          />
+        </Box>
+        <Typography
+          variant="subtitle1"
+          sx={{
+            fontWeight: 800,
+            color: "#111827",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {kol?.name}
+        </Typography>
+        {kol?.field ? (
+          <Typography
+            variant="body2"
+            sx={{
+              color: "#4b5563",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {kol.field}
+          </Typography>
+        ) : null}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "right",
+            mt: 0.25,
+            gap: 1,
+          }}
+        >
+          {/* <Typography
+            variant="subtitle1"
+            sx={{
+              color: "#ef4179",
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "baseline",
+              gap: 0.4,
+            }}
+          >
+            {priceLabel}
+            <Box component="span" sx={{ color: "#7c3aed", fontWeight: 700 }}>
+              /H
+            </Box>
+          </Typography> */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Chip
+              icon={<StarRoundedIcon sx={{ fontSize: 18, color: "#fbbf24" }} />}
+              label={ratingValue.toFixed(1)}
+              size="small"
+              sx={{
+                backgroundColor: "#fff",
+                border: "1px solid rgba(132, 94, 247, 0.35)",
+                color: "#7c3aed",
+                fontWeight: 700,
+                px: 0.5,
+              }}
+            />
+            {reviewValue !== null ? (
+              <Chip
+                label={`(${reviewValue.toLocaleString("vi-VN")})`}
+                size="small"
+                sx={{
+                  backgroundColor: "rgba(132, 94, 247, 0.12)",
+                  color: "#4338ca",
+                  fontWeight: 600,
+                  px: 0.5,
+                }}
+              />
+            ) : null}
+          </Box>
+        </Box>
+      </Stack>
+    </Box>
+  );
+};
+
+const KOLGrid = ({ kols, onSelectKol, isMobile }) =>
+  isMobile ? (
+    <Stack spacing={2.25}>
+      {kols.map((kol) => (
+        <MobileKolCard key={kol.id} kol={kol} onSelectKol={onSelectKol} />
+      ))}
+    </Stack>
+  ) : (
+    <Grid
+      container
+      spacing={{ xs: 2, sm: 2.5, md: 3 }}
+      justifyContent={{ xs: "center", sm: "center" }}
+      alignItems="stretch"
+    >
+      {kols.map((kol) => {
+        const { slug, ...cardProps } = kol;
+        return (
+          <Grid
+            item
+            xs={12}
+            sm={6}
+            md={4}
+            lg={3}
+            xl={3}
+            key={kol.id}
+            sx={{ display: "flex" }}
+          >
+            <KOLCard {...cardProps} onClick={() => onSelectKol(kol.id, slug)} />
+          </Grid>
+        );
+      })}
+    </Grid>
+  );
 
 const backgroundLayers = `
   radial-gradient(90% 90% at 15% 50%, rgba(74, 116, 218, 0.45) 0%, rgba(147, 206, 246, 0.1) 60%, rgba(147, 206, 246, 0) 80%),
@@ -493,6 +706,7 @@ const backgroundLayers = `
 
 const ListKOL = () => {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down("sm"));
   const [kolProfiles, setKolProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -884,6 +1098,7 @@ const ListKOL = () => {
                   <KOLGrid
                     kols={decoratedKols}
                     onSelectKol={handleNavigateDetail}
+                    isMobile={isMobile}
                   />
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
