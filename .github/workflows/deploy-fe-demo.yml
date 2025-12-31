@@ -1,53 +1,53 @@
-name: Deploy FE (DEMO_BookingKOL)
+# name: Deploy FE (DEMO_BookingKOL)
 
-on:
-  push:
-    branches: ["DEMO_BookingKOL"]
-    paths:
-      - ".github/workflows/deploy-fe-demo.yml"
-      - "BookingKOL_FE/**"
-      - "nginx/**"
-      - "docker-compose.yml"
-      - "Dockerfile"
-      - "README.md"
-  workflow_dispatch:
+# on:
+#   push:
+#     branches: ["DEMO_BookingKOL"]
+#     paths:
+#       - ".github/workflows/deploy-fe-demo.yml"
+#       - "BookingKOL_FE/**"
+#       - "nginx/**"
+#       - "docker-compose.yml"
+#       - "Dockerfile"
+#       - "README.md"
+#   workflow_dispatch:
 
-concurrency:
-  group: deploy-fe-demo
-  cancel-in-progress: true
+# concurrency:
+#   group: deploy-fe-demo
+#   cancel-in-progress: true
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: SSH & deploy FE (rebuild nginx only)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST || vars.SSH_HOST }}
-          username: ${{ secrets.SSH_USER || vars.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || vars.SSH_PORT }}
-          script_stop: true
-          script: |
-            set -euxo pipefail
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: SSH & deploy FE (rebuild nginx only)
+#         uses: appleboy/ssh-action@v1.0.3
+#         with:
+#           host: ${{ secrets.SSH_HOST || vars.SSH_HOST }}
+#           username: ${{ secrets.SSH_USER || vars.SSH_USER }}
+#           key: ${{ secrets.SSH_KEY }}
+#           port: ${{ secrets.SSH_PORT || vars.SSH_PORT }}
+#           script_stop: true
+#           script: |
+#             set -euxo pipefail
 
-            ROOT="${{ secrets.WORKDIR || vars.WORKDIR }}"   # /home/ubuntu/bookingkol/bookingkol-deploy
-            FE_REPO="$ROOT/BookingKOL_FE"
+#             ROOT="${{ secrets.WORKDIR || vars.WORKDIR }}"   # /home/ubuntu/bookingkol/bookingkol-deploy
+#             FE_REPO="$ROOT/BookingKOL_FE"
 
-            # ✅ Pull đúng repo FE (có .git)
-            if [ -d "$FE_REPO/.git" ]; then
-              cd "$FE_REPO"
-              git fetch --all --prune
-              git checkout DEMO_BookingKOL
-              git pull --ff-only
-              git log -1 --oneline
-            else
-              echo "ERROR: FE repo not found or not a git repo: $FE_REPO"
-              exit 1
-            fi
+#             # ✅ Pull đúng repo FE (có .git)
+#             if [ -d "$FE_REPO/.git" ]; then
+#               cd "$FE_REPO"
+#               git fetch --all --prune
+#               git checkout DEMO_BookingKOL
+#               git pull --ff-only
+#               git log -1 --oneline
+#             else
+#               echo "ERROR: FE repo not found or not a git repo: $FE_REPO"
+#               exit 1
+#             fi
 
-            # ✅ Rebuild + restart chỉ nginx (FE) theo docker-compose ở ROOT
-            cd "$ROOT"
-            docker compose build --pull nginx
-            docker compose up -d --no-deps --force-recreate nginx
-            docker compose ps nginx
+#             # ✅ Rebuild + restart chỉ nginx (FE) theo docker-compose ở ROOT
+#             cd "$ROOT"
+#             docker compose build --pull nginx
+#             docker compose up -d --no-deps --force-recreate nginx
+#             docker compose ps nginx
