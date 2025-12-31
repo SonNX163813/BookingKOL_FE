@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Container, Stack } from "@mui/material";
+import {
+  Box,
+  Chip,
+  Container,
+  Stack,
+  Typography,
+  useMediaQuery,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
 import CourseHeroSection from "../../../components/home/course/CourseHeroSection";
@@ -19,6 +26,16 @@ import { slugify } from "../../../utils/slugify";
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
+
+const formatPrice = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  try {
+    return currencyFormatter.format(numeric);
+  } catch (_error) {
+    return numeric.toLocaleString("vi-VN");
+  }
+};
 
 const BASE_QUERY_PARAMS = {
   page: 0,
@@ -101,8 +118,154 @@ const sanitizeFilters = (rawFilters) => {
   return params;
 };
 
+const MobileCourseCard = ({ course, onSelectCourse }) => {
+  const basePrice = formatPrice(course?.price);
+  const promoPrice = formatPrice(course?.currentPrice);
+  const hasDiscount =
+    Number.isFinite(Number(course?.discount)) && Number(course.discount) > 0;
+  const priceLabel = hasDiscount ? promoPrice || basePrice : basePrice;
+  const fallbackLabel = priceLabel || "Liên hệ";
+
+  const handleClick = () => {
+    if (onSelectCourse) {
+      onSelectCourse(course?.id, course?.slug);
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleClick();
+    }
+  };
+
+  return (
+    <Box
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      sx={{
+        position: "relative",
+        display: "flex",
+        gap: 1.5,
+        p: 2,
+        borderRadius: 3,
+        border: "2px solid rgba(74, 116, 218, 0.3)",
+        boxShadow: "0 14px 32px rgba(74, 116, 218, 0.16)",
+        background: "linear-gradient(135deg, #ffffff 0%, #f4f6ff 100%)",
+        cursor: "pointer",
+        overflow: "hidden",
+      }}
+    >
+      <Box sx={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
+        <Box
+          component="img"
+          src={course?.cover}
+          alt={course?.name}
+          sx={{
+            width: "100%",
+            height: "100%",
+            borderRadius: 2,
+            objectFit: "cover",
+            border: "3px solid rgba(74, 116, 218, 0.3)",
+            boxShadow: "0 8px 18px rgba(15, 23, 42, 0.16)",
+            backgroundColor: "#f8fafc",
+          }}
+          draggable={false}
+        />
+        {hasDiscount ? (
+          <Chip
+            label={`-${Number(course.discount).toLocaleString("vi-VN")}%`}
+            size="small"
+            sx={{
+              position: "absolute",
+              top: 6,
+              right: 6,
+              backgroundColor: "#f97316",
+              color: "#fff",
+              fontWeight: 700,
+              borderRadius: "12px",
+              height: 22,
+              ".MuiChip-label": { px: 0.8, fontSize: "0.72rem" },
+            }}
+          />
+        ) : null}
+      </Box>
+      <Stack spacing={0.7} sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            color: "#4a74da",
+            fontWeight: 700,
+            letterSpacing: 0.2,
+          }}
+        >
+          Khóa học Livestream
+        </Typography>
+        <Typography
+          variant="subtitle1"
+          sx={{
+            fontWeight: 800,
+            color: "#111827",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {course?.name}
+        </Typography>
+        {course?.description ? (
+          <Typography
+            variant="body2"
+            sx={{
+              color: "#4b5563",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {course.description}
+          </Typography>
+        ) : null}
+        <Typography
+          variant="subtitle1"
+          sx={{
+            color: "#ef4179",
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "baseline",
+            gap: 0.4,
+            mt: 0.2,
+          }}
+        >
+          {fallbackLabel}
+          <Box component="span" sx={{ color: "#7c3aed", fontWeight: 700 }}>
+            /gói
+          </Box>
+        </Typography>
+        {hasDiscount && basePrice ? (
+          <Typography
+            variant="body2"
+            sx={{
+              color: "#9ca3af",
+              fontWeight: 600,
+              textDecoration: "line-through",
+              ml: 0.2,
+            }}
+          >
+            {basePrice}
+          </Typography>
+        ) : null}
+      </Stack>
+    </Box>
+  );
+};
+
 const CourseLivesteam = () => {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down("sm"));
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -316,10 +479,24 @@ const CourseLivesteam = () => {
               ) : decoratedCourses.length === 0 ? (
                 <EmptyState />
               ) : (
-                <CoursesGrid
-                  courses={decoratedCourses}
-                  onSelectCourse={handleNavigateDetail}
-                />
+                <>
+                  {isMobile ? (
+                    <Stack spacing={2.25}>
+                      {decoratedCourses.map((course) => (
+                        <MobileCourseCard
+                          key={course.id}
+                          course={course}
+                          onSelectCourse={handleNavigateDetail}
+                        />
+                      ))}
+                    </Stack>
+                  ) : (
+                    <CoursesGrid
+                      courses={decoratedCourses}
+                      onSelectCourse={handleNavigateDetail}
+                    />
+                  )}
+                </>
               )}
             </Box>
           </Box>
