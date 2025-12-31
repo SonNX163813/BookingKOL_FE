@@ -11,6 +11,8 @@ import {
   IconButton,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { renderAsync } from "docx-preview";
@@ -21,6 +23,8 @@ const ContractDocPreview = ({ url }) => {
   const previewRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
     if (!url) {
@@ -48,7 +52,7 @@ const ContractDocPreview = ({ url }) => {
         await renderAsync(buffer, previewRef.current, undefined, {
           className: "docx-preview-content",
           inWrapper: true,
-          ignoreWidth: false,
+          ignoreWidth: isMobile,
           ignoreHeight: true,
           breakPages: true,
           ignoreLastRenderedPageBreak: false,
@@ -86,7 +90,7 @@ const ContractDocPreview = ({ url }) => {
   }
 
   return (
-    <Box sx={{ minHeight: 260 }}>
+    <Box sx={{ minHeight: { xs: 220, sm: 260 }, px: { xs: 1, sm: 0 } }}>
       {status === "loading" ? (
         <Typography sx={{ color: BOOKING_FLOW_STYLE.textSecondary }}>
           Đang tải file hợp đồng...
@@ -98,16 +102,28 @@ const ContractDocPreview = ({ url }) => {
       <Box
         ref={previewRef}
         sx={{
-          "& .docx-wrapper": { backgroundColor: "transparent" },
+          "& .docx-wrapper": {
+            backgroundColor: "transparent",
+            ...(isMobile ? { padding: "0 !important" } : {}),
+          },
           "& .docx": {
             backgroundColor: "transparent",
             color: BOOKING_FLOW_STYLE.textPrimary,
+            maxWidth: "100%",
+            width: isMobile ? "100% !important" : undefined,
+            boxSizing: "border-box",
+            ...(isMobile ? { padding: "0 !important" } : {}),
           },
-          "& .docx p": { color: BOOKING_FLOW_STYLE.textPrimary },
+          "& .docx p": {
+            color: BOOKING_FLOW_STYLE.textPrimary,
+            ...(isMobile ? { fontSize: "0.95rem", lineHeight: 1.4 } : {}),
+          },
           "& p[class^='docx-preview-content-num'] > span:empty": {
             display: "none",
           },
-
+          "& .docx-preview-content": {
+            padding: isMobile ? "30px !important" : undefined,
+          },
           // Nếu muốn ẩn luôn container p
           "& p[class^='docx-preview-content-num']:has(span:empty)": {
             display: "none",
