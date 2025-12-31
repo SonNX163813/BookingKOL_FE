@@ -229,35 +229,48 @@ const MobileCourseCard = ({ course, onSelectCourse }) => {
             {course.description}
           </Typography>
         ) : null}
-        <Typography
-          variant="subtitle1"
+        <Box
           sx={{
-            color: "#ef4179",
-            fontWeight: 800,
             display: "flex",
-            alignItems: "baseline",
-            gap: 0.4,
-            mt: 0.2,
+            flexDirection: "column", // ⬅️ quan trọng
+            alignItems: "flex-end", // canh phải
+            ml: "auto",
+            mt: 0.25,
+            gap: 0.2,
           }}
         >
-          {fallbackLabel}
-          <Box component="span" sx={{ color: "#7c3aed", fontWeight: 700 }}>
-            /gói
-          </Box>
-        </Typography>
-        {hasDiscount && basePrice ? (
+          {/* Giá sau giảm */}
           <Typography
-            variant="body2"
+            variant="subtitle1"
             sx={{
-              color: "#9ca3af",
-              fontWeight: 600,
-              textDecoration: "line-through",
-              ml: 0.2,
+              color: "#ef4179",
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "baseline",
+              gap: 0.4,
             }}
           >
-            {basePrice}
+            {fallbackLabel}
+            <Box component="span" sx={{ color: "#7c3aed", fontWeight: 700 }}>
+              VND
+            </Box>
           </Typography>
-        ) : null}
+
+          {/* Giá gốc (nằm dưới) */}
+          {hasDiscount && basePrice && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#9ca3af",
+                fontWeight: 600,
+                textDecoration: "line-through",
+              }}
+            >
+              {basePrice}
+              <Box component="span"> VND</Box>
+            </Typography>
+          )}
+        </Box>
       </Stack>
     </Box>
   );
