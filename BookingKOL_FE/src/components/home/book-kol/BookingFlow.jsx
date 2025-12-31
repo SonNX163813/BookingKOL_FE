@@ -737,9 +737,9 @@ const BookingFlow = ({
             }}
           >
             <Stack
-              direction={{ xs: "column", sm: "row" }}
+              direction={{ xs: "row", sm: "row" }}
               justifyContent="space-between"
-              alignItems={{ xs: "flex-start", sm: "center" }}
+              alignItems={{ xs: "center", sm: "center" }}
               sx={{ width: "100%" }}
               spacing={1.5}
             >

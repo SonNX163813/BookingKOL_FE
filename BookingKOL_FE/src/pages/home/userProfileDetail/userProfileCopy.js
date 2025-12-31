@@ -107,8 +107,7 @@ export const USER_PROFILE_SECTIONS = [
         multiline: true,
         minRows: 5,
         icon: DescriptionRoundedIcon,
-        helperText:
-          "Gioi thieu toi da 100 ky tu de thong tin gon gang va de doc.",
+        helperText: "Giới thiệu ngắn gọn giúp đối tác hiểu rõ hơn về bạn.",
       },
     ],
   },

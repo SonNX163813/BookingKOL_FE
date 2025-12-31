@@ -704,7 +704,7 @@ const MySingleBookingRequestDetail = () => {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Mở
+              Tải về
             </Typography.Link>
           ) : (
             "--"

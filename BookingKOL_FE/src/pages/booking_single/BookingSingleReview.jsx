@@ -642,9 +642,9 @@ const BookingSingleReview = () => {
                 }}
               >
                 <Stack
-                  direction={{ xs: "column", sm: "row" }}
+                  direction={{ xs: "row", sm: "row" }}
                   justifyContent="space-between"
-                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  alignItems={{ xs: "center", sm: "center" }}
                   sx={{ width: "100%" }}
                   spacing={1.5}
                 >
@@ -692,9 +692,9 @@ const BookingSingleReview = () => {
               >
                 <Stack spacing={3}>
                   <Stack
-                    direction={{ xs: "column", md: "row" }}
+                    direction={{ xs: "row", md: "row" }}
                     spacing={{ xs: 3, md: 4 }}
-                    alignItems={{ xs: "flex-start", md: "center" }}
+                    alignItems={{ xs: "center", md: "center" }}
                   >
                     <Stack
                       direction="row"
@@ -1138,12 +1138,12 @@ const BookingSingleReview = () => {
                                   <Stack spacing={0.75}>
                                     <Stack
                                       direction={{
-                                        xs: "column",
+                                        xs: "row",
                                         sm: "row",
                                       }}
                                       justifyContent="space-between"
                                       alignItems={{
-                                        xs: "flex-start",
+                                        xs: "center",
                                         sm: "center",
                                       }}
                                     >
@@ -1156,7 +1156,10 @@ const BookingSingleReview = () => {
                                         Hợp đồng
                                       </Typography>
                                       <Stack
-                                        direction="row"
+                                        direction={{
+                                          xs: "column-reverse",
+                                          sm: "row",
+                                        }}
                                         spacing={1}
                                         alignItems="center"
                                       >
