@@ -1115,14 +1115,6 @@ export default function ManagementKolWorkSchedule() {
                 >
                   Thêm lịch làm việc
                 </Button>
-
-                <Button
-                  onClick={onClickAddRegister}
-                  disabled={isAnyActionLoading}
-                  loading={addRegisterMutation.isPending}
-                >
-                  Thêm lịch đăng ký
-                </Button>
               </Space>
             </div>
           </div>

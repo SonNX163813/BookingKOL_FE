@@ -1168,15 +1168,6 @@ const AdminDashBoard = () => {
         {/* (Mình không động vào layout/logic trong các mục bên dưới) */}
 
         <div className="space-y-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500 font-semibold">
-              Báo cáo hệ thống
-            </p>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Booking, doanh thu và khóa học
-            </h2>
-          </div>
-
           <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {[
               { label: "Tổng booking", value: summary.stats.totalBookings },
@@ -1188,17 +1179,17 @@ const AdminDashBoard = () => {
                 formatter: formatCurrency,
               },
               {
-                label: "Đã thu",
+                label: "Đã được thanh toán",
                 value: summary.stats.earnedRevenue,
                 formatter: formatCurrency,
               },
               {
-                label: "Chờ thu",
+                label: "Chờ thanh toán",
                 value: summary.stats.pendingRevenue,
                 formatter: formatCurrency,
               },
               {
-                label: "Hủy / thất thoát",
+                label: "Đã hủy",
                 value: summary.stats.cancelledLoss,
                 formatter: formatCurrency,
               },
@@ -1209,8 +1200,7 @@ const AdminDashBoard = () => {
 
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <ChartCard
-              title="Trạng thái hợp đồng"
-              subtitle="Phân bổ hợp đồng theo trạng thái"
+              title="Trạng thái tất cả đơn hàng"
               className="xl:col-span-2"
             >
               <div className="h-80">
