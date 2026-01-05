@@ -126,8 +126,9 @@ export default function IntroSection() {
               sx={{
                 height: { xs: 520, md: 600 },
                 objectFit: "contain",
-                transform: { xs: "scale(4)", md: "scale(4)" }, // ✅ phóng to
+                transform: { xs: "scale(3)", md: "scale(4)" }, // ✅ phóng to
                 transformOrigin: "center",
+                ml: "40px",
               }}
             />
           </Box>

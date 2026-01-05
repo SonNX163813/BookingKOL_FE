@@ -161,22 +161,18 @@ const KolDashboard = () => {
       {
         title: "Giờ khả dụng",
         value: formatHour(summary.timeAndValue.totalHoursAvailable),
-        hint: "Tổng thời gian rảnh nhận job",
       },
       {
-        title: "Giờ đã hoàn thành",
+        title: "Số giờ live đã hoàn thành",
         value: formatHour(summary.timeAndValue.totalHoursCompleted),
-        hint: "Đã thực hiện cho khách",
       },
       {
-        title: "Giờ sắp tới",
+        title: "Số giờ live cần thực hiện",
         value: formatHour(summary.timeAndValue.totalHoursUpcoming),
-        hint: "Đã lên lịch tương lai gần",
       },
       {
         title: "Tỷ lệ sử dụng",
         value: formatPercent(summary.timeAndValue.utilizationRate, 0),
-        hint: "Giờ bận / tổng giờ khả dụng",
       },
     ],
     [summary.timeAndValue]
@@ -267,12 +263,6 @@ const KolDashboard = () => {
             <h1 className="text-3xl font-bold text-slate-900 mt-1">
               Bảng điều khiển KOL
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Cập nhật lần cuối:{" "}
-              {summary.timestamp
-                ? formatDateTime(summary.timestamp)
-                : "Chưa có dữ liệu"}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <RangePicker
@@ -304,13 +294,10 @@ const KolDashboard = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
-                      Thông tin theo thời gian thực
+                      Thông tin lịch làm việc
                     </p>
                     <p className="text-4xl font-black mt-2">
                       {formatHour(summary.timeAndValue.totalHoursAvailable)}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      Tổng giờ bạn sẵn sàng nhận booking
                     </p>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
@@ -349,32 +336,6 @@ const KolDashboard = () => {
 
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <MetricTile
-                    title="Giờ rảnh mỗi ngày"
-                    value={formatHour(
-                      summary.timeAndValue.averageTimeAvailablePerDay
-                    )}
-                    hint="Trung bình theo lịch"
-                  />
-                  <MetricTile
-                    title="Giờ làm việc mỗi ngày"
-                    value={formatHour(
-                      summary.timeAndValue.averageWorkTimePerDay
-                    )}
-                    hint="Đã hoặc sẽ thực hiện"
-                  />
-                  <MetricTile
-                    title="Hiệu suất"
-                    value={formatPercent(
-                      summary.timeAndValue.utilizationRate,
-                      0
-                    )}
-                    hint="Tối ưu thời gian cho booking"
-                    accent="Real-time"
-                  />
-                </div>
-
                 <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
