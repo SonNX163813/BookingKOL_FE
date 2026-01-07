@@ -57,7 +57,7 @@ export const USER_PROFILE_SECTIONS = [
         fullWidthRow: true,
         minRows: 2,
         icon: HomeRoundedIcon,
-        helperText: "Toi da 100 ky tu.",
+        helperText: "Tối đa 100 ký tự.",
       },
     ],
   },

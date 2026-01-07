@@ -219,7 +219,7 @@ const Navbar = () => {
               display: "grid",
               gridTemplateColumns: isMobile ? "auto 1fr auto" : "auto 1fr auto",
               alignItems: "center",
-              gap: 2,
+              // gap: 2,
             }}
           >
             {/* Logo */}
@@ -457,26 +457,80 @@ const Navbar = () => {
             borderRadius: 2,
             border: "1px solid rgba(2,6,23,0.06)",
             boxShadow: "0 12px 40px rgba(2,6,23,0.12)",
+            overflow: "hidden",
           },
         }}
       >
-        <Button onClick={handleAccountClick} sx={{ ...accountBtnSx, px: 1 }}>
-          <Avatar
-            src={avatarUrl}
-            alt={fullName}
-            sx={{ width: 26, height: 26, fontSize: 13 }}
-          >
-            {initial}
-          </Avatar>
-          {shortName}
-        </Button>
+        {/* ✅ Account section (mobile): HIỆN LUÔN, KHÔNG CLICK */}
+        {loggedIn && (
+          <Box sx={{ px: 1.5, pt: 1.25, pb: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+              <Avatar
+                src={avatarUrl}
+                alt={fullName}
+                sx={{ width: 26, height: 26, fontSize: 13 }}
+              >
+                {initial}
+              </Avatar>
+              <Box sx={{ fontWeight: 800, color: "#0f172a" }}>{fullName}</Box>
+            </Box>
+
+            <Box sx={{ mt: 1 }}>
+              <MenuItem
+                component={Link}
+                to="/userprofile"
+                onClick={handleClose}
+                sx={{ fontWeight: 700, py: 1.1, borderRadius: 1.5 }}
+              >
+                Tài khoản của tôi
+              </MenuItem>
+              <MenuItem
+                component={Link}
+                to="/don-booking-kol"
+                onClick={handleClose}
+                sx={{ fontWeight: 700, py: 1.1, borderRadius: 1.5 }}
+              >
+                Đơn đặt KOL
+              </MenuItem>
+              <MenuItem
+                component={Link}
+                to="/don-dat-khoa-hoc"
+                onClick={handleClose}
+                sx={{ fontWeight: 700, py: 1.1, borderRadius: 1.5 }}
+              >
+                Đơn đặt khóa học
+              </MenuItem>
+              <MenuItem
+                component={Link}
+                to="/don-booking-chien-dich"
+                onClick={handleClose}
+                sx={{ fontWeight: 700, py: 1.1, borderRadius: 1.5 }}
+              >
+                Đơn đặt chiến dịch
+              </MenuItem>
+
+              <Divider sx={{ my: 0.75 }} />
+
+              <MenuItem
+                onClick={() => {
+                  handleClose();
+                  handleLogout();
+                }}
+                sx={{ fontWeight: 800, py: 1.1, borderRadius: 1.5 }}
+              >
+                Đăng xuất
+              </MenuItem>
+            </Box>
+
+            <Divider sx={{ mt: 1 }} />
+          </Box>
+        )}
+
+        {/* Nav items */}
         {navItems.map((item) =>
           item.hasDropdown ? (
             <Box key={item.label}>
-              <MenuItem
-                disabled
-                sx={{ py: 1.25, opacity: 0.9, fontWeight: 800 }}
-              >
+              <MenuItem sx={{ py: 1.25, opacity: 0.9, fontWeight: 700 }}>
                 {item.label}
               </MenuItem>
               {item.subItems.map((subItem) => (
@@ -485,7 +539,13 @@ const Navbar = () => {
                   onClick={handleClose}
                   component={Link}
                   to={subItem.to}
-                  sx={{ py: 1.25, pl: 4, fontWeight: 700 }}
+                  sx={{
+                    py: 1.25,
+                    pl: 4,
+                    fontWeight: 700,
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
+                  }}
                 >
                   {subItem.label}
                 </MenuItem>
@@ -503,7 +563,6 @@ const Navbar = () => {
             </MenuItem>
           )
         )}
-        <Divider sx={{ my: 0.5 }} />
       </Menu>
 
       {/* Hover dropdown (desktop) */}
@@ -556,69 +615,71 @@ const Navbar = () => {
       </Popover>
 
       {/* Account dropdown (hover để mở tạm, click để ghim) */}
-      <Menu
-        anchorEl={accountEl}
-        open={Boolean(accountEl)}
-        onClose={closeAccount}
-        disableRestoreFocus
-        keepMounted
-        PaperProps={{
-          onMouseEnter: () => {}, // giữ mở khi rê trên menu
-          onMouseLeave: () => {
-            if (!accountPinned) closeAccount(); // chỉ đóng nếu chưa ghim
-          },
-          sx: {
-            mt: 1,
-            width: 240,
-            borderRadius: 2,
-            border: "1px solid rgba(2,6,23,0.06)",
-            boxShadow: "0 12px 40px rgba(2,6,23,0.12)",
-          },
-        }}
-      >
-        <MenuItem
-          component={Link}
-          to="/userprofile"
-          onClick={closeAccount}
-          sx={{ fontWeight: 700, py: 1.25 }}
-        >
-          Tài khoản của tôi
-        </MenuItem>
-        <MenuItem
-          component={Link}
-          to="/don-booking-kol"
-          onClick={closeAccount}
-          sx={{ fontWeight: 700, py: 1.25 }}
-        >
-          Đơn đặt KOL
-        </MenuItem>
-        <MenuItem
-          component={Link}
-          to="/don-dat-khoa-hoc"
-          onClick={closeAccount}
-          sx={{ fontWeight: 700, py: 1.25 }}
-        >
-          Đơn đặt khóa học
-        </MenuItem>
-        <MenuItem
-          component={Link}
-          to="/don-booking-chien-dich"
-          onClick={closeAccount}
-          sx={{ fontWeight: 700, py: 1.25 }}
-        >
-          Đơn đặt chiến dịch
-        </MenuItem>
-        <Divider sx={{ my: 0.5 }} />
-        <MenuItem
-          onClick={() => {
-            closeAccount();
-            handleLogout();
+      {loggedIn && (
+        <Menu
+          anchorEl={accountEl}
+          open={Boolean(accountEl)}
+          onClose={closeAccount}
+          disableRestoreFocus
+          keepMounted
+          PaperProps={{
+            onMouseEnter: () => {}, // giữ mở khi rê trên menu
+            onMouseLeave: () => {
+              if (!accountPinned) closeAccount(); // chỉ đóng nếu chưa ghim
+            },
+            sx: {
+              mt: 1,
+              width: 240,
+              borderRadius: 2,
+              border: "1px solid rgba(2,6,23,0.06)",
+              boxShadow: "0 12px 40px rgba(2,6,23,0.12)",
+            },
           }}
-          sx={{ fontWeight: 700, py: 1.25 }}
         >
-          Đăng xuất
-        </MenuItem>
-      </Menu>
+          <MenuItem
+            component={Link}
+            to="/userprofile"
+            onClick={closeAccount}
+            sx={{ fontWeight: 700, py: 1.25 }}
+          >
+            Tài khoản của tôi
+          </MenuItem>
+          <MenuItem
+            component={Link}
+            to="/don-booking-kol"
+            onClick={closeAccount}
+            sx={{ fontWeight: 700, py: 1.25 }}
+          >
+            Đơn đặt KOL
+          </MenuItem>
+          <MenuItem
+            component={Link}
+            to="/don-dat-khoa-hoc"
+            onClick={closeAccount}
+            sx={{ fontWeight: 700, py: 1.25 }}
+          >
+            Đơn đặt khóa học
+          </MenuItem>
+          <MenuItem
+            component={Link}
+            to="/don-booking-chien-dich"
+            onClick={closeAccount}
+            sx={{ fontWeight: 700, py: 1.25 }}
+          >
+            Đơn đặt chiến dịch
+          </MenuItem>
+          <Divider sx={{ my: 0.5 }} />
+          <MenuItem
+            onClick={() => {
+              closeAccount();
+              handleLogout();
+            }}
+            sx={{ fontWeight: 700, py: 1.25 }}
+          >
+            Đăng xuất
+          </MenuItem>
+        </Menu>
+      )}
     </AppBar>
   );
 };

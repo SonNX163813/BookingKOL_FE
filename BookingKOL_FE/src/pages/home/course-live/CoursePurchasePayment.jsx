@@ -399,7 +399,17 @@ const CoursePurchasePayment = () => {
                       <InfoRow label="Số tiền" value={amount} highlight />
                       <InfoRow
                         label="Nội dung chuyển khoản"
-                        value={transferContent}
+                        value={
+                          <span
+                            style={{
+                              wordBreak: "break-word",
+                              overflowWrap: "break-word",
+                              whiteSpace: "normal",
+                            }}
+                          >
+                            {transferContent}
+                          </span>
+                        }
                       />
                       <Divider
                         sx={{ borderColor: `${BOOKING_FLOW_STYLE.border}99` }}
