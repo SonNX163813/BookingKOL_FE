@@ -1,9 +1,8 @@
-﻿import React, { useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import {
   Box,
   Button,
   Checkbox,
-  Chip,
   Container,
   FormControl,
   FormControlLabel,
@@ -34,12 +33,6 @@ const serviceOptions = [
   "Affiliate & MCN",
 ];
 
-const highlightStats = [
-  { title: "500+", subtitle: "Chiến dịch đa ngành" },
-  { title: "250+", subtitle: "Đối tác KOL/KOC" },
-  { title: "24h", subtitle: "Phản hồi & chăm sóc" },
-];
-
 const initialLeadState = {
   name: "",
   email: "",
@@ -55,28 +48,29 @@ const initialKolState = {
   platform: "",
   experience: "",
   followerCount: "",
+  agree: false,
+};
+
+const LIMITS = {
+  LEAD_NAME: 80,
+  LEAD_EMAIL: 120,
+  LEAD_PHONE: 15,
+  LEAD_NOTE: 500,
+
+  KOL_NAME: 80,
+  KOL_MAJOR: 80,
+  KOL_PLATFORM: 60,
+  KOL_EXPERIENCE: 700,
+
+  // ✅ follower tối đa 12 chữ số
+  KOL_FOLLOWER_DIGITS: 12,
+  KOL_FOLLOWER_MAX: 999999999999,
 };
 
 const sectionSx = {
   overflow: "hidden",
-  // backgroundColor: "#f4f7ff",
-  // backgroundImage: `
-  //   radial-gradient(circle at 18% 18%, rgba(141, 226, 237, 0.55), rgba(255, 255, 255, 0) 60%),
-  //   radial-gradient(circle at 82% 0%, rgba(147, 206, 246, 0.45), rgba(255, 255, 255, 0) 55%),
-  //   radial-gradient(circle at 50% 100%, rgba(74, 116, 218, 0.25), rgba(255, 255, 255, 0.85) 70%)
-  // `,
-  // boxShadow: "0 24px 48px rgba(74, 116, 218, 0.14)",
   color: "#0f172a",
   justifyContent: "center",
-};
-
-const infoCardSx = {
-  backgroundColor: "rgba(255, 255, 255, 0.94)",
-  borderRadius: 4,
-  p: { xs: 3, md: 4 },
-  border: "1px solid rgba(147, 206, 246, 0.4)",
-  boxShadow: "0 24px 40px rgba(74, 116, 218, 0.12)",
-  backdropFilter: "blur(6px)",
 };
 
 const formWrapperSx = {
@@ -108,36 +102,12 @@ const tabListSx = {
     color: "#ffffff !important",
     boxShadow: "0 14px 30px rgba(74, 116, 218, 0.25)",
   },
-  "& .MuiTabs-indicator": {
-    display: "none",
-  },
+  "& .MuiTabs-indicator": { display: "none" },
 };
 
 const tabPanelSx = {
   display: "grid",
   gap: { xs: 2.5, md: 3 },
-};
-
-const statCardSx = {
-  textAlign: "center",
-  px: 3,
-  py: 2.5,
-  borderRadius: 3,
-  border: "1px solid rgba(147, 206, 246, 0.45)",
-  backgroundColor: "rgba(255, 255, 255, 0.92)",
-  boxShadow: "0 16px 32px rgba(74, 116, 218, 0.1)",
-};
-
-const contactCardSx = {
-  display: "flex",
-  flexDirection: { xs: "column", sm: "row" },
-  alignItems: { xs: "flex-start", sm: "center" },
-  gap: { xs: 1.5, sm: 2.5 },
-  p: { xs: 2.5, md: 3 },
-  borderRadius: 3,
-  background:
-    "linear-gradient(135deg, rgba(147, 206, 246, 0.18), rgba(141, 226, 237, 0.28))",
-  border: "1px solid rgba(147, 206, 246, 0.35)",
 };
 
 const labelSx = { sx: { color: "rgba(15, 23, 42, 0.62)" } };
@@ -178,140 +148,369 @@ const secondaryButtonSx = {
   boxShadow: "0px 18px 34px rgba(74, 116, 218, 0.22)",
 };
 
+const isBlank = (v) => !v?.toString().trim();
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// validate nhẹ trên UI (validate chặt ở phoneRule onBlur/submit)
+const phoneSoftRegex = /^[0-9+\s-]{8,15}$/;
+
+// ✅ format dấu chấm hàng nghìn (vi-VN)
+const formatThousandsVi = (digits) => {
+  if (!digits) return "";
+  const n = Number(digits);
+  if (!Number.isFinite(n)) return digits;
+  return n.toLocaleString("vi-VN"); // 1.234.567
+};
+
 const LeadFormsSection = () => {
   const { submitLead } = useSubmitLead();
-  const [leadForm, setLeadForm] = useState(initialLeadState);
-  const [kolForm, setKolForm] = useState(initialKolState);
-  const [leadErrors, setLeadErrors] = useState({ agree: false });
-  const [kolErrors, setKolErrors] = useState({ agree: false });
-  const [leadFieldErrors, setLeadFieldErrors] = useState({});
-  const [kolFieldErrors, setKolFieldErrors] = useState({});
+
   const [activeForm, setActiveForm] = useState("lead");
 
-  const handleLeadChange = (field) => (event) => {
-    const value = field === "agree" ? event.target.checked : event.target.value;
-    setLeadForm((prev) => ({ ...prev, [field]: value }));
-    if (field === "agree" && value) {
-      setLeadErrors((prev) => ({ ...prev, agree: false }));
+  const [leadForm, setLeadForm] = useState(initialLeadState);
+  const [kolForm, setKolForm] = useState(initialKolState);
+
+  const [leadTouched, setLeadTouched] = useState({});
+  const [kolTouched, setKolTouched] = useState({});
+
+  const [leadFieldErrors, setLeadFieldErrors] = useState({});
+  const [kolFieldErrors, setKolFieldErrors] = useState({});
+
+  const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+  const [isSubmittingKol, setIsSubmittingKol] = useState(false);
+
+  // ✅ để tránh nhảy con trỏ: focus thì show số thuần, blur thì show format
+  const [isFollowerFocused, setIsFollowerFocused] = useState(false);
+
+  const isBusy = useMemo(
+    () => isSubmittingLead || isSubmittingKol,
+    [isSubmittingLead, isSubmittingKol]
+  );
+
+  // ✅ helper khi chạm max
+  const leadNoteHelper = useMemo(() => {
+    const len = (leadForm.note || "").length;
+    if (len >= LIMITS.LEAD_NOTE)
+      return `Đã đạt tối đa ${LIMITS.LEAD_NOTE} ký tự.`;
+    return "";
+  }, [leadForm.note]);
+
+  const kolExpHelper = useMemo(() => {
+    const len = (kolForm.experience || "").length;
+    if (len >= LIMITS.KOL_EXPERIENCE)
+      return `Đã đạt tối đa ${LIMITS.KOL_EXPERIENCE} ký tự.`;
+    return "";
+  }, [kolForm.experience]);
+
+  const kolFollowerHelper = useMemo(() => {
+    const len = (kolForm.followerCount || "").toString().length;
+    if (len >= LIMITS.KOL_FOLLOWER_DIGITS)
+      return `Đã đạt tối đa ${LIMITS.KOL_FOLLOWER_DIGITS} chữ số.`;
+    return "";
+  }, [kolForm.followerCount]);
+
+  // ✅ thông báo dưới form (gần nút submit)
+  const kolFormMaxNotice = useMemo(() => {
+    if (
+      (kolForm.followerCount || "").toString().length >=
+      LIMITS.KOL_FOLLOWER_DIGITS
+    ) {
+      return `Quy mô follower tối đa ${LIMITS.KOL_FOLLOWER_DIGITS} chữ số.`;
     }
-    if (leadFieldErrors[field]) {
-      setLeadFieldErrors((prev) => ({ ...prev, [field]: "" }));
+    if ((kolForm.experience || "").length >= LIMITS.KOL_EXPERIENCE) {
+      return `Kinh nghiệm tối đa ${LIMITS.KOL_EXPERIENCE} ký tự.`;
     }
+    return "";
+  }, [kolForm.followerCount, kolForm.experience]);
+
+  const leadFormMaxNotice = useMemo(() => {
+    if ((leadForm.note || "").length >= LIMITS.LEAD_NOTE) {
+      return `Ghi chú tối đa ${LIMITS.LEAD_NOTE} ký tự.`;
+    }
+    return "";
+  }, [leadForm.note]);
+
+  const validateLeadFieldSync = (field, value) => {
+    const v = value?.toString() ?? "";
+
+    if (field === "name") {
+      if (isBlank(v)) return requiredRule("Tên").message;
+      if (v.length > LIMITS.LEAD_NAME)
+        return `Tên tối đa ${LIMITS.LEAD_NAME} ký tự`;
+    }
+
+    if (field === "email") {
+      if (isBlank(v)) return requiredRule("Email").message;
+      if (v.length > LIMITS.LEAD_EMAIL)
+        return `Email tối đa ${LIMITS.LEAD_EMAIL} ký tự`;
+      if (!emailRegex.test(v)) return emailRule.message;
+    }
+
+    if (field === "phone") {
+      if (isBlank(v)) return requiredRule("Số điện thoại").message;
+      if (v.length > LIMITS.LEAD_PHONE)
+        return `Số điện thoại tối đa ${LIMITS.LEAD_PHONE} ký tự`;
+      if (!phoneSoftRegex.test(v)) return "Số điện thoại không đúng định dạng";
+    }
+
+    if (field === "service") {
+      if (isBlank(v)) return requiredRule("Dịch vụ quan tâm").message;
+    }
+
+    if (field === "note") {
+      if (v.length > LIMITS.LEAD_NOTE)
+        return `Ghi chú tối đa ${LIMITS.LEAD_NOTE} ký tự`;
+    }
+
+    if (field === "agree") {
+      if (!leadForm.agree) return "Vui lòng đồng ý điều khoản.";
+    }
+
+    return "";
   };
 
-  const handleKolChange = (field) => (event) => {
-    const value = field === "agree" ? event.target.checked : event.target.value;
-    setKolForm((prev) => ({ ...prev, [field]: event.target.value }));
-    if (field === "agree" && value) {
-      setKolErrors((prev) => ({ ...prev, agree: false }));
-    }
-    if (kolFieldErrors[field]) {
-      setKolFieldErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-  };
+  const validateKolFieldSync = (field, value) => {
+    const v = value?.toString() ?? "";
 
-  const handleTabChange = (event, newValue) => {
-    setActiveForm(newValue);
+    if (field === "name") {
+      if (isBlank(v)) return requiredRule("Họ tên").message;
+      if (v.length > LIMITS.KOL_NAME)
+        return `Họ tên tối đa ${LIMITS.KOL_NAME} ký tự`;
+    }
+
+    if (field === "major") {
+      if (isBlank(v)) return requiredRule("Lĩnh vực").message;
+      if (v.length > LIMITS.KOL_MAJOR)
+        return `Lĩnh vực tối đa ${LIMITS.KOL_MAJOR} ký tự`;
+    }
+
+    if (field === "platform") {
+      if (isBlank(v)) return requiredRule("Nền tảng").message;
+      if (v.length > LIMITS.KOL_PLATFORM)
+        return `Nền tảng tối đa ${LIMITS.KOL_PLATFORM} ký tự`;
+    }
+
+    if (field === "experience") {
+      if (isBlank(v)) return requiredRule("Kinh nghiệm").message;
+      if (v.length > LIMITS.KOL_EXPERIENCE)
+        return `Kinh nghiệm tối đa ${LIMITS.KOL_EXPERIENCE} ký tự`;
+    }
+
+    if (field === "followerCount") {
+      if (isBlank(v)) return requiredRule("Quy mô follower").message;
+
+      if (v.length > LIMITS.KOL_FOLLOWER_DIGITS)
+        return `Quy mô follower tối đa ${LIMITS.KOL_FOLLOWER_DIGITS} chữ số`;
+
+      const n = Number(v);
+      if (Number.isNaN(n)) return "Quy mô follower phải là số";
+      if (n < 0) return "Quy mô follower phải >= 0";
+      if (n > LIMITS.KOL_FOLLOWER_MAX)
+        return `Quy mô follower tối đa ${LIMITS.KOL_FOLLOWER_MAX.toLocaleString(
+          "vi-VN"
+        )}`;
+    }
+
+    if (field === "agree") {
+      if (!kolForm.agree) return "Vui lòng đồng ý điều khoản.";
+    }
+
+    return "";
   };
 
   const validateLeadForm = async () => {
     const errors = {};
 
-    const requiredFields = [
-      { key: "name", label: "Tên" },
-      { key: "email", label: "Email" },
-      { key: "phone", label: "Số điện thoại" },
-      { key: "service", label: "Dịch vụ quan tâm" },
-    ];
-
-    requiredFields.forEach(({ key, label }) => {
-      if (!leadForm[key]?.toString().trim()) {
-        errors[key] = requiredRule(label).message;
-      }
+    ["name", "email", "phone", "service", "note"].forEach((key) => {
+      const msg = validateLeadFieldSync(key, leadForm[key]);
+      if (msg) errors[key] = msg;
     });
 
-    if (leadForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadForm.email)) {
-      errors.email = emailRule.message;
+    // strict phone validate (async)
+    if (!errors.phone && leadForm.phone?.toString().trim()) {
+      try {
+        await phoneRule.validator(null, leadForm.phone);
+      } catch (error) {
+        errors.phone = error?.message || "Số điện thoại không hợp lệ";
+      }
     }
 
-    try {
-      await phoneRule.validator(null, leadForm.phone);
-    } catch (error) {
-      errors.phone = error?.message || "Số điện thoại không hợp lệ";
-    }
+    if (!leadForm.agree) errors.agree = "Vui lòng đồng ý điều khoản.";
 
     return errors;
   };
 
   const validateKolForm = () => {
     const errors = {};
-
-    const requiredFields = [
-      { key: "name", label: "Họ tên" },
-      { key: "major", label: "Lĩnh vực" },
-      { key: "platform", label: "Nền tảng" },
-      { key: "experience", label: "Kinh nghiệm" },
-      { key: "followerCount", label: "Quy mô follower" },
-    ];
-
-    requiredFields.forEach(({ key, label }) => {
-      if (!kolForm[key]?.toString().trim()) {
-        errors[key] = requiredRule(label).message;
+    ["name", "major", "platform", "experience", "followerCount"].forEach(
+      (key) => {
+        const msg = validateKolFieldSync(key, kolForm[key]);
+        if (msg) errors[key] = msg;
       }
-    });
+    );
 
-    if (
-      kolForm.followerCount?.toString().trim() &&
-      Number.isNaN(Number(kolForm.followerCount))
-    ) {
-      errors.followerCount = "Quy mô follower phải là số";
-    }
+    if (!kolForm.agree) errors.agree = "Vui lòng đồng ý điều khoản.";
 
     return errors;
   };
 
+  const touchAllLead = () => {
+    setLeadTouched({
+      name: true,
+      email: true,
+      phone: true,
+      service: true,
+      note: true,
+      agree: true,
+    });
+  };
+
+  const touchAllKol = () => {
+    setKolTouched({
+      name: true,
+      major: true,
+      platform: true,
+      experience: true,
+      followerCount: true,
+      agree: true,
+    });
+  };
+
+  const handleLeadChange = (field) => async (event) => {
+    const value = field === "agree" ? event.target.checked : event.target.value;
+
+    setLeadForm((prev) => ({ ...prev, [field]: value }));
+
+    setLeadFieldErrors((prev) => {
+      if (!leadTouched[field]) return prev;
+      const msg =
+        field === "agree"
+          ? !value
+            ? "Vui lòng đồng ý điều khoản."
+            : ""
+          : validateLeadFieldSync(field, value);
+      return { ...prev, [field]: msg };
+    });
+
+    if (field === "phone" && leadTouched.phone && value?.toString().trim()) {
+      try {
+        await phoneRule.validator(null, value);
+        setLeadFieldErrors((prev) => ({ ...prev, phone: "" }));
+      } catch (e) {
+        setLeadFieldErrors((prev) => ({
+          ...prev,
+          phone: e?.message || "Số điện thoại không hợp lệ",
+        }));
+      }
+    }
+  };
+
+  const handleKolChange = (field) => (event) => {
+    let value = field === "agree" ? event.target.checked : event.target.value;
+
+    // ✅ follower: cho phép paste có dấu chấm, cuối cùng strip về số thuần
+    if (field === "followerCount") {
+      value = (value ?? "")
+        .toString()
+        .replace(/\D/g, "")
+        .slice(0, LIMITS.KOL_FOLLOWER_DIGITS);
+    }
+
+    setKolForm((prev) => ({ ...prev, [field]: value }));
+
+    setKolFieldErrors((prev) => {
+      if (!kolTouched[field]) return prev;
+      const msg =
+        field === "agree"
+          ? !value
+            ? "Vui lòng đồng ý điều khoản."
+            : ""
+          : validateKolFieldSync(field, value);
+      return { ...prev, [field]: msg };
+    });
+  };
+
+  const handleLeadBlur = (field) => async () => {
+    setLeadTouched((prev) => ({ ...prev, [field]: true }));
+
+    let msg = validateLeadFieldSync(field, leadForm[field]);
+
+    if (field === "phone" && leadForm.phone?.toString().trim()) {
+      try {
+        await phoneRule.validator(null, leadForm.phone);
+        msg = "";
+      } catch (e) {
+        msg = e?.message || "Số điện thoại không hợp lệ";
+      }
+    }
+
+    setLeadFieldErrors((prev) => ({ ...prev, [field]: msg }));
+  };
+
+  const handleKolBlur = (field) => () => {
+    setKolTouched((prev) => ({ ...prev, [field]: true }));
+    const msg = validateKolFieldSync(field, kolForm[field]);
+    setKolFieldErrors((prev) => ({ ...prev, [field]: msg }));
+  };
+
+  const handleTabChange = (_, newValue) => {
+    if (isBusy) return;
+    setActiveForm(newValue);
+  };
+
   const handleLeadSubmit = async (event) => {
     event.preventDefault();
+    if (isSubmittingLead) return;
+
+    touchAllLead();
 
     const fieldErrors = await validateLeadForm();
     setLeadFieldErrors(fieldErrors);
-    if (Object.keys(fieldErrors).length > 0) {
-      return;
-    }
 
-    if (!leadForm.agree) {
-      setLeadErrors({ agree: true });
-      return;
-    }
+    if (Object.keys(fieldErrors).length > 0) return;
+
     try {
+      setIsSubmittingLead(true);
       await submitLead({ type: "client", payload: leadForm });
+
       setLeadForm(initialLeadState);
-      setLeadErrors({ agree: false });
+      setLeadTouched({});
+      setLeadFieldErrors({});
+
       toast.success("Gửi yêu cầu tư vấn thành công!");
     } catch (error) {
       console.error("Failed to submit lead form", error);
+      toast.error("Gửi yêu cầu thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsSubmittingLead(false);
     }
   };
 
   const handleKolSubmit = async (event) => {
     event.preventDefault();
+    if (isSubmittingKol) return;
+
+    touchAllKol();
 
     const fieldErrors = validateKolForm();
     setKolFieldErrors(fieldErrors);
-    if (Object.keys(fieldErrors).length > 0) {
-      return;
-    }
-    if (!leadForm.agree) {
-      setKolErrors({ agree: true });
-      return;
-    }
+
+    if (Object.keys(fieldErrors).length > 0) return;
+
     try {
+      setIsSubmittingKol(true);
       await submitLead({ type: "kol", payload: kolForm });
+
       setKolForm(initialKolState);
-      setKolErrors({ agree: false });
+      setKolTouched({});
+      setKolFieldErrors({});
+
       toast.success("Gửi thông tin KOL/KOC thành công!");
     } catch (error) {
       console.error("Failed to submit KOL/KOC form", error);
+      toast.error("Gửi thông tin thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsSubmittingKol(false);
     }
   };
 
@@ -337,85 +536,6 @@ const LeadFormsSection = () => {
           alignItems="stretch"
           justifyContent={"center"}
         >
-          {/* <Grid item xs={12} md={5}>
-            <Stack spacing={{ xs: 3, md: 4 }} sx={{ height: "100%" }}>
-              <Box sx={infoCardSx}>
-                <Stack spacing={{ xs: 2.5, md: 3 }}>
-                  <Chip
-                    label="Giải pháp tăng trưởng thương hiệu"
-                    sx={
-                      {
-                        alignSelf: "flex-start",
-                        backgroundColor: "rgba(74, 116, 218, 0.1)",
-                        color: "#3155c0",
-                        fontWeight: 600,
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 2,
-                      }
-                    }
-                  />
-                  <Stack spacing={1.5}>
-                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      Đội ngũ tư vấn luôn sẵn sàng đồng hành
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{ color: "rgba(15, 23, 42, 0.68)" }}
-                    >
-                      Nexus hỗ trợ toàn diện từ xây dựng chiến lược, booking KOL/KOC tới vận hành
-                      livestream với quy trình khép kín.
-                    </Typography>
-                  </Stack>
-                  <Box sx={contactCardSx}>
-                    <Stack spacing={0.5}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 600, color: "#0f172a" }}
-                      >
-                        Cần tư vấn nhanh?
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "rgba(15, 23, 42, 0.7)" }}
-                      >
-                        Gọi hotline{" "}
-                        <Box
-                          component="span"
-                          sx={{ fontWeight: 600, color: "#4a74da" }}
-                        >
-                          0868 999 888
-                        </Box>{" "}
-                        hoặc để lại thông tin, đội ngũ Nexus sẽ liên hệ trong vòng 24 giờ.
-                      </Typography>
-                    </Stack>
-                  </Box>
-                </Stack>
-              </Box>
-
-              <Grid container spacing={2.5}>
-                {highlightStats.map((item) => (
-                  <Grid item xs={12} sm={4} key={item.title}>
-                    <Box sx={statCardSx}>
-                      <Typography
-                        variant="h5"
-                        sx={{ fontWeight: 700, color: "#4a74da" }}
-                      >
-                        {item.title}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "rgba(15, 23, 42, 0.68)" }}
-                      >
-                        {item.subtitle}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                ))}
-              </Grid>
-            </Stack>
-          </Grid> */}
-
           <Grid
             item
             xs={12}
@@ -446,8 +566,14 @@ const LeadFormsSection = () => {
                   disableRipple
                   label="Doanh nghiệp cần tư vấn"
                   value="lead"
+                  disabled={isBusy}
                 />
-                <Tab disableRipple label="KOL / KOC hợp tác" value="kol" />
+                <Tab
+                  disableRipple
+                  label="KOL / KOC hợp tác"
+                  value="kol"
+                  disabled={isBusy}
+                />
               </Tabs>
 
               {activeForm === "lead" && (
@@ -460,46 +586,57 @@ const LeadFormsSection = () => {
                     label="Tên"
                     value={leadForm.name}
                     onChange={handleLeadChange("name")}
-                    required
+                    onBlur={handleLeadBlur("name")}
                     error={!!leadFieldErrors.name}
-                    helperText={leadFieldErrors.name}
+                    helperText={leadFieldErrors.name || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.LEAD_NAME }}
                     sx={inputFieldSx}
                   />
+
                   <TextField
                     label="Email"
                     value={leadForm.email}
                     onChange={handleLeadChange("email")}
+                    onBlur={handleLeadBlur("email")}
                     type="email"
-                    required
                     error={!!leadFieldErrors.email}
-                    helperText={leadFieldErrors.email}
+                    helperText={leadFieldErrors.email || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.LEAD_EMAIL }}
                     sx={inputFieldSx}
                   />
+
                   <TextField
                     label="Số điện thoại"
                     value={leadForm.phone}
                     onChange={handleLeadChange("phone")}
-                    required
+                    onBlur={handleLeadBlur("phone")}
                     error={!!leadFieldErrors.phone}
-                    helperText={leadFieldErrors.phone}
+                    helperText={leadFieldErrors.phone || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.LEAD_PHONE }}
                     sx={inputFieldSx}
                   />
-                  <FormControl required fullWidth sx={inputFieldSx}>
+
+                  <FormControl
+                    required
+                    fullWidth
+                    sx={inputFieldSx}
+                    error={!!leadFieldErrors.service}
+                  >
                     <InputLabel {...labelSx}>Dịch vụ quan tâm</InputLabel>
                     <Select
                       value={leadForm.service}
                       onChange={handleLeadChange("service")}
+                      onBlur={handleLeadBlur("service")}
                       label="Dịch vụ quan tâm"
-                      error={!!leadFieldErrors.service}
                     >
                       {serviceOptions.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -507,52 +644,68 @@ const LeadFormsSection = () => {
                         </MenuItem>
                       ))}
                     </Select>
-                    {leadFieldErrors.service && (
-                      <FormHelperText error>
-                        {leadFieldErrors.service}
-                      </FormHelperText>
-                    )}
+                    <FormHelperText>
+                      {leadFieldErrors.service || " "}
+                    </FormHelperText>
                   </FormControl>
+
                   <TextField
                     label="Ghi chú"
                     value={leadForm.note}
                     onChange={handleLeadChange("note")}
+                    onBlur={handleLeadBlur("note")}
                     multiline
                     minRows={3}
+                    error={!!leadFieldErrors.note}
+                    helperText={leadFieldErrors.note || leadNoteHelper || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.LEAD_NOTE }}
                     sx={inputFieldSx}
                   />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={leadForm.agree}
-                        onChange={handleLeadChange("agree")}
-                        sx={checkboxSx}
-                      />
-                    }
-                    label={
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "rgba(15, 23, 42, 0.7)" }}
-                      >
-                        Tôi đã đọc đồng ý điều khoản & chính sách quyền riêng
-                        tư, đồng ý nhận thông tin từ Nexus.
-                      </Typography>
-                    }
-                  />
-                  {leadErrors.agree && (
-                    <FormHelperText sx={{ color: "#d32f2f" }}>
-                      Vui lòng đồng ý điều khoản.
+
+                  <Box>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={leadForm.agree}
+                          onChange={handleLeadChange("agree")}
+                          sx={checkboxSx}
+                        />
+                      }
+                      label={
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "rgba(15, 23, 42, 0.7)" }}
+                        >
+                          Tôi đã đọc đồng ý điều khoản & chính sách quyền riêng
+                          tư, đồng ý nhận thông tin từ Nexus.
+                        </Typography>
+                      }
+                    />
+                    {leadFieldErrors.agree && (
+                      <FormHelperText sx={{ color: "#d32f2f", mt: 0.5 }}>
+                        {leadFieldErrors.agree}
+                      </FormHelperText>
+                    )}
+                  </Box>
+
+                  {leadFormMaxNotice && (
+                    <FormHelperText
+                      sx={{ mt: -0.5, color: "rgba(15, 23, 42, 0.65)" }}
+                    >
+                      {leadFormMaxNotice}
                     </FormHelperText>
                   )}
+
                   <Button
                     type="submit"
                     variant="contained"
                     sx={primaryButtonSx}
+                    disabled={isSubmittingLead}
                   >
-                    Gửi yêu cầu
+                    {isSubmittingLead ? "Đang gửi..." : "Gửi yêu cầu"}
                   </Button>
                 </Box>
               )}
@@ -567,94 +720,135 @@ const LeadFormsSection = () => {
                     label="Họ tên"
                     value={kolForm.name}
                     onChange={handleKolChange("name")}
-                    required
+                    onBlur={handleKolBlur("name")}
                     error={!!kolFieldErrors.name}
-                    helperText={kolFieldErrors.name}
+                    helperText={kolFieldErrors.name || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.KOL_NAME }}
                     sx={inputFieldSx}
                   />
+
                   <TextField
                     label="Lĩnh vực"
                     value={kolForm.major}
                     onChange={handleKolChange("major")}
-                    required
+                    onBlur={handleKolBlur("major")}
                     error={!!kolFieldErrors.major}
-                    helperText={kolFieldErrors.major}
+                    helperText={kolFieldErrors.major || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.KOL_MAJOR }}
                     sx={inputFieldSx}
                   />
+
                   <TextField
                     label="Nền tảng"
                     value={kolForm.platform}
                     onChange={handleKolChange("platform")}
-                    required
+                    onBlur={handleKolBlur("platform")}
                     error={!!kolFieldErrors.platform}
-                    helperText={kolFieldErrors.platform}
+                    helperText={kolFieldErrors.platform || " "}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.KOL_PLATFORM }}
                     sx={inputFieldSx}
                   />
+
                   <TextField
                     label="Kinh nghiệm"
                     value={kolForm.experience}
                     onChange={handleKolChange("experience")}
-                    required
+                    onBlur={handleKolBlur("experience")}
                     error={!!kolFieldErrors.experience}
-                    helperText={kolFieldErrors.experience}
+                    helperText={
+                      kolFieldErrors.experience || kolExpHelper || " "
+                    }
                     multiline
                     minRows={3}
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{ maxLength: LIMITS.KOL_EXPERIENCE }}
                     sx={inputFieldSx}
                   />
+
+                  {/* ✅ follower: hiển thị có dấu chấm khi blur */}
                   <TextField
                     label="Quy mô follower"
-                    value={kolForm.followerCount}
+                    value={
+                      isFollowerFocused
+                        ? kolForm.followerCount
+                        : formatThousandsVi(kolForm.followerCount)
+                    }
                     onChange={handleKolChange("followerCount")}
-                    type="number"
+                    onFocus={() => setIsFollowerFocused(true)}
+                    onBlur={() => {
+                      setIsFollowerFocused(false);
+                      handleKolBlur("followerCount")();
+                    }}
+                    type="text"
                     required
                     error={!!kolFieldErrors.followerCount}
-                    helperText={kolFieldErrors.followerCount}
+                    helperText={
+                      kolFieldErrors.followerCount || kolFollowerHelper || " "
+                    }
                     variant="outlined"
                     fullWidth
                     InputLabelProps={labelSx}
+                    inputProps={{
+                      inputMode: "numeric",
+                      pattern: "[0-9.]*",
+                      // nới nhẹ vì có thể paste số có dấu chấm, onChange sẽ strip
+                      maxLength: LIMITS.KOL_FOLLOWER_DIGITS + 4,
+                    }}
                     sx={inputFieldSx}
                   />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={leadForm.agree}
-                        onChange={handleLeadChange("agree")}
-                        sx={checkboxSx}
-                      />
-                    }
-                    label={
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "rgba(15, 23, 42, 0.7)" }}
-                      >
-                        Tôi đã đọc đồng ý điều khoản & chính sách quyền riêng
-                        tư, đồng ý nhận thông tin từ Nexus.
-                      </Typography>
-                    }
-                  />
-                  {kolErrors.agree && (
-                    <FormHelperText sx={{ color: "#d32f2f" }}>
-                      Vui lòng đồng ý điều khoản.
+
+                  <Box>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={kolForm.agree}
+                          onChange={handleKolChange("agree")}
+                          sx={checkboxSx}
+                        />
+                      }
+                      label={
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "rgba(15, 23, 42, 0.7)" }}
+                        >
+                          Tôi đã đọc đồng ý điều khoản & chính sách quyền riêng
+                          tư, đồng ý nhận thông tin từ Nexus.
+                        </Typography>
+                      }
+                    />
+                    {kolFieldErrors.agree && (
+                      <FormHelperText sx={{ color: "#d32f2f", mt: 0.5 }}>
+                        {kolFieldErrors.agree}
+                      </FormHelperText>
+                    )}
+                  </Box>
+
+                  {kolFormMaxNotice && (
+                    <FormHelperText
+                      sx={{ mt: -0.5, color: "rgba(15, 23, 42, 0.65)" }}
+                    >
+                      {kolFormMaxNotice}
                     </FormHelperText>
                   )}
+
                   <Button
                     type="submit"
                     variant="contained"
                     sx={secondaryButtonSx}
+                    disabled={isSubmittingKol}
                   >
-                    Gửi thông tin
+                    {isSubmittingKol ? "Đang gửi..." : "Gửi thông tin"}
                   </Button>
                 </Box>
               )}
