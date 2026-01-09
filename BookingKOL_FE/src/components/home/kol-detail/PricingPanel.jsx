@@ -133,7 +133,13 @@ const PricingPanel = ({ pricing = {}, platforms = [] }) => {
             <Stack direction="row" spacing={1.5} alignItems="baseline">
               <Typography
                 variant="h3"
-                sx={{ fontWeight: 700, letterSpacing: "0.02em" }}
+                sx={{
+                  fontWeight: 700,
+                  letterSpacing: "0.02em",
+                  maxWidth: "300px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
                 aria-label="Đơn giá theo giờ"
               >
                 {hourlyText}

@@ -481,8 +481,7 @@ export default function LoginPage() {
           <div className="terms">
             <label>
               <input type="checkbox" defaultChecked disabled={loading} />
-              Tôi đồng ý <a href="#">Điều Khoản Dịch Vụ</a> và{" "}
-              <a href="#">Thoả Thuận Riêng Tư</a>
+              Tôi đồng ý Điều Khoản Dịch Vụ và Thoả Thuận Riêng Tư
             </label>
           </div>
         </form>

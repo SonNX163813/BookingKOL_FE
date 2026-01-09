@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Badge,
@@ -95,11 +95,8 @@ const formatTimestamp = (value) => {
   if (diffMonths < 12) return `${diffMonths} tháng trước`;
   return `${diffYears} năm trước`;
 };
-const MAX_BACKOFF = 5 * 60 * 1000;
-
 const NotificationBell = ({
   loggedIn,
-  pollInterval = 3000,
   iconButtonSx,
   badgeProps,
   anchorOrigin = { vertical: "bottom", horizontal: "right" },
@@ -111,7 +108,6 @@ const NotificationBell = ({
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const failureCountRef = useRef(0);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item?.read).length,
@@ -138,21 +134,12 @@ const NotificationBell = ({
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId = null;
-
-    const scheduleNext = (delay) => {
-      if (!mounted) return;
-      timeoutId = window.setTimeout(() => {
-        load({ initial: false });
-      }, delay);
-    };
 
     const load = async ({ initial = false } = {}) => {
       if (!mounted) return;
 
       if (!loggedIn) {
         setNotifications([]);
-        failureCountRef.current = 0;
         return;
       }
 
@@ -162,8 +149,6 @@ const NotificationBell = ({
         const data = await fetchNotifications();
         if (!mounted) return;
 
-        failureCountRef.current = 0;
-
         const list = Array.isArray(data)
           ? data
           : Array.isArray(data?.data)
@@ -171,49 +156,43 @@ const NotificationBell = ({
           : [];
 
         setNotifications(list);
-        scheduleNext(pollInterval);
       } catch (error) {
         console.error("Lỗi khi tải thông báo", error);
-        failureCountRef.current += 1;
-
-        const backoffDelay = Math.min(
-          pollInterval * 2 ** failureCountRef.current,
-          MAX_BACKOFF
-        );
-        scheduleNext(backoffDelay);
       } finally {
         if (initial && mounted) setLoading(false);
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (!mounted) return;
-      if (!document.hidden && loggedIn) {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        load({ initial: false });
-      }
-    };
-
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-    }
-
     load({ initial: true });
 
     return () => {
       mounted = false;
-      if (timeoutId) clearTimeout(timeoutId);
-      if (typeof document !== "undefined") {
-        document.removeEventListener(
-          "visibilitychange",
-          handleVisibilityChange
-        );
-      }
     };
-  }, [loggedIn, pollInterval]);
+  }, [loggedIn]);
+
+  const loadNotifications = async ({ initial = false } = {}) => {
+    if (!loggedIn) {
+      setNotifications([]);
+      return;
+    }
+
+    if (initial) setLoading(true);
+
+    try {
+      const data = await fetchNotifications();
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+      setNotifications(list);
+    } catch (error) {
+      console.error("Lỗi khi tải thông báo", error);
+    } finally {
+      if (initial) setLoading(false);
+    }
+  };
 
   const handleMarkAllAsRead = async () => {
     if (!notifications.length || updating) return;
@@ -246,8 +225,27 @@ const NotificationBell = ({
 
   const handleBellClick = async (event) => {
     setAnchorEl(event.currentTarget);
-    if (!notifications.length || !hasUnread || updating) return;
-    await handleMarkAllAsRead();
+
+    setLoading(true);
+    try {
+      const data = await fetchNotifications();
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+      setNotifications(list);
+
+      const unread = list.filter((x) => !x?.read).length;
+      if (unread > 0 && !updating) {
+        await markAllNotificationsAsRead();
+        setNotifications((prev) => prev.map((x) => ({ ...x, read: true })));
+      }
+    } catch (e) {
+      console.error("Lỗi khi tải thông báo", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNotificationClick = (item) => {

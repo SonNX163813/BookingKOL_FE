@@ -19,20 +19,44 @@ export const getMyUserProfile = async ({ signal } = {}) => {
   return response?.data ?? response ?? null;
 };
 
-export const updateMyUserProfile = async ({ data, config } = {}) => {
+export const updateMyUserProfile = async ({
+  data,
+  fileAvatar,
+  config,
+} = {}) => {
+  const formData = new FormData();
+
+  // JSON request
+  formData.append(
+    "request",
+    new Blob([JSON.stringify(data)], {
+      type: "application/json",
+    })
+  );
+
+  // Avatar (chỉ ảnh)
+  if (fileAvatar instanceof File) {
+    if (!fileAvatar.type.startsWith("image/")) {
+      throw new Error("fileAvatar phải là hình ảnh");
+    }
+    formData.append("fileAvatar", fileAvatar);
+  }
+
   const response = await patch({
     url: CLIENT_API_PATHS.USER.updateProfile,
-    data,
-    config,
+    data: formData,
+    config: {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      ...config,
+    },
   });
+
   return response?.data ?? response ?? null;
 };
 
-export const createKolFeedback = async ({
-  contractId,
-  data,
-  config,
-} = {}) => {
+export const createKolFeedback = async ({ contractId, data, config } = {}) => {
   if (!contractId) {
     throw new Error("contractId is required to create KOL feedback");
   }
@@ -45,11 +69,7 @@ export const createKolFeedback = async ({
   return response?.data ?? response ?? null;
 };
 
-export const updateKolFeedback = async ({
-  feedbackId,
-  data,
-  config,
-} = {}) => {
+export const updateKolFeedback = async ({ feedbackId, data, config } = {}) => {
   if (!feedbackId) {
     throw new Error("feedbackId is required to update KOL feedback");
   }

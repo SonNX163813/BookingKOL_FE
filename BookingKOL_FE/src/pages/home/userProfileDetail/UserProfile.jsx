@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -27,6 +27,8 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 
 import defaultImg from "../../../assets/default.png";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
@@ -36,6 +38,8 @@ import {
   changeMyPassword,
 } from "../../../services/user/UserService";
 import { USER_PROFILE_COPY, USER_PROFILE_SECTIONS } from "./userProfileCopy";
+
+dayjs.extend(customParseFormat);
 
 const MotionBox = motion(Box);
 
@@ -139,6 +143,25 @@ const deriveFormValues = (profile) => {
 const sanitizeString = (value) =>
   typeof value === "string" ? value.trim() : value ?? "";
 
+/**
+ * Parse ngày sinh cho phép user gõ tay:
+ * - DD/MM/YYYY
+ * - DD-MM-YYYY
+ * - YYYY-MM-DD
+ */
+const parseFlexibleDate = (value) => {
+  const raw = sanitizeString(value);
+  if (!raw) return { iso: "", isValid: true };
+
+  const formats = ["DD/MM/YYYY", "DD-MM-YYYY", "YYYY-MM-DD"];
+  const parsed = dayjs(raw, formats, true); // strict
+
+  if (!parsed.isValid()) return { iso: raw, isValid: false };
+  if (parsed.isAfter(dayjs(), "day")) return { iso: raw, isValid: false };
+
+  return { iso: parsed.format("YYYY-MM-DD"), isValid: true };
+};
+
 const buildUserProfileUpdatePayload = (values = {}) => {
   const pick = (key) => sanitizeString(values[key] ?? "");
   const payload = {
@@ -153,10 +176,8 @@ const buildUserProfileUpdatePayload = (values = {}) => {
 
   const dateValue = sanitizeString(values.dateOfBirth ?? "");
   if (dateValue) {
-    const parsed = dayjs(dateValue);
-    payload.dateOfBirth = parsed.isValid()
-      ? parsed.format("YYYY-MM-DD")
-      : dateValue;
+    const { iso, isValid } = parseFlexibleDate(dateValue);
+    payload.dateOfBirth = isValid ? iso : dateValue;
   } else {
     payload.dateOfBirth = "";
   }
@@ -202,7 +223,7 @@ const validateProfileField = (name, rawValue) => {
   const value = sanitizeString(rawValue || "");
   const maxLength = FIELD_MAX_LENGTHS[name];
   if (maxLength && value.length > maxLength) {
-    return `Toi da ${maxLength} ky tu`;
+    return `Tối đa ${maxLength} ký tự`;
   }
 
   switch (name) {
@@ -221,12 +242,9 @@ const validateProfileField = (name, rawValue) => {
       break;
     case "dateOfBirth":
       if (value) {
-        const parsed = dayjs(value);
-        if (!parsed.isValid()) {
-          return "Ngày sinh không hợp lệ";
-        }
-        if (parsed.isAfter(dayjs())) {
-          return "Ngày sinh không được vượt quá hiện tại";
+        const { isValid } = parseFlexibleDate(value);
+        if (!isValid) {
+          return "Ngày sinh không hợp lệ (VD: 12/01/2000)";
         }
       }
       break;
@@ -282,6 +300,8 @@ export default function UserProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const avatarInputRef = useRef(null);
 
   const [passwordValues, setPasswordValues] = useState({
     oldPassword: "",
@@ -385,39 +405,35 @@ export default function UserProfile() {
     setFormErrors({});
     setEditing(false);
   };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!editing || saving) return;
+
     const errors = validateProfileForm(formValues);
     setFormErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
+    if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     try {
       const payload = buildUserProfileUpdatePayload(formValues);
-      const updatedProfile = await updateMyUserProfile({ data: payload });
-      const nextProfile = mergeProfileWithUpdate(
-        profile,
-        payload,
-        updatedProfile
-      );
-      setProfile(nextProfile);
-      setFormValues(deriveFormValues(nextProfile));
-      setFormErrors({});
-      setEditing(false);
-      setError(null);
-      setShowErrorSnackbar(false);
+
+      // ✅ Update profile (kèm avatar nếu có)
+      await updateMyUserProfile({
+        data: payload,
+        fileAvatar: avatarFile || undefined,
+      });
+
+      // ✅ Fetch lại profile từ server để đồng bộ UI
       await fetchProfile({ showGlobalLoading: false });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("user-profile-updated"));
-      }
+      window.dispatchEvent(new Event("user-profile-updated"));
+
+      setEditing(false);
+      setAvatarFile(null);
     } catch (err) {
       const message =
-        err?.response?.data?.message ??
-        err?.message ??
-        "Không thể cập nhật hồ sơ. Vui lòng thử lại.";
+        err?.response?.data?.message ||
+        err?.message ||
+        "Cập nhật hồ sơ thất bại. Vui lòng thử lại.";
       setError(message);
       setShowErrorSnackbar(true);
     } finally {
@@ -517,10 +533,9 @@ export default function UserProfile() {
   ]);
 
   const avatarSrc =
-    normalizedProfile.avatarUrl ??
-    normalizedProfile.avatar ??
-    normalizedProfile.profileImage ??
-    normalizedProfile.imageUrl ??
+    profile?.avatarUrl ||
+    profile?.avatar ||
+    profile?.profileImage ||
     defaultImg;
 
   const [contactSection = {}, personalSection = {}, bioSection = {}] =
@@ -539,23 +554,36 @@ export default function UserProfile() {
   const renderField = (fieldConfig, gridProps = {}) => {
     if (!fieldConfig) return null;
 
+    const isDobField = fieldConfig.name === "dateOfBirth";
+
     const rawValue = fieldConfig.name ? formValues[fieldConfig.name] ?? "" : "";
+
+    // DOB: giữ nguyên rawValue để user gõ (12/01/2000, 12-01-2000, 2000-01-12)
+    // Các field date khác (nếu có): vẫn dùng format YYYY-MM-DD cho input type="date"
     const value =
-      fieldConfig.type === "date" ? toDateInputValue(rawValue) : rawValue;
+      fieldConfig.type === "date" && !isDobField
+        ? toDateInputValue(rawValue)
+        : rawValue;
+
     const StartIcon = fieldConfig.icon;
     const disabled =
       loading || saving || !editing || Boolean(fieldConfig.readOnly);
     const errorText = formErrors[fieldConfig.name];
+
     const helperText =
       errorText ??
       (!editing && !rawValue
         ? fallbackText
+        : isDobField
+        ? "VD: 12/01/2000 hoặc 12-01-2000 hoặc 2000-01-12"
         : fieldConfig.helperText ?? undefined);
+
     const maxLength = FIELD_MAX_LENGTHS[fieldConfig.name];
     const inputProps =
       maxLength || fieldConfig.inputProps
         ? { maxLength, ...(fieldConfig.inputProps || {}) }
         : undefined;
+
     const gridDefaults = {
       xs: 12,
       md: fieldConfig.fullWidthRow || fieldConfig.multiline ? 12 : 6,
@@ -575,17 +603,24 @@ export default function UserProfile() {
           fullWidth
           label={fieldConfig.label}
           name={fieldConfig.name}
-          type={fieldConfig.type || "text"}
+          // DOB: dùng text để gõ tay
+          type={isDobField ? "text" : fieldConfig.type || "text"}
           value={value}
           onChange={handleChange}
-          placeholder={fieldConfig.placeholder}
+          placeholder={
+            isDobField
+              ? "VD: 12/01/2000 hoặc 12-01-2000"
+              : fieldConfig.placeholder
+          }
           disabled={disabled}
           required={Boolean(fieldConfig.required)}
           multiline={Boolean(fieldConfig.multiline)}
           minRows={fieldConfig.minRows}
           select={Boolean(fieldConfig.select)}
           InputLabelProps={
-            fieldConfig.type === "date" ? { shrink: true } : undefined
+            fieldConfig.type === "date" && !isDobField
+              ? { shrink: true }
+              : undefined
           }
           inputProps={inputProps}
           InputProps={{
@@ -716,16 +751,72 @@ export default function UserProfile() {
               spacing={{ xs: 3, md: 4 }}
               alignItems={{ xs: "flex-start", md: "center" }}
             >
-              <Avatar
-                src={avatarSrc}
-                alt={fullName}
+              <Box
                 sx={{
+                  position: "relative",
                   width: { xs: 96, md: 120 },
                   height: { xs: 96, md: 120 },
-                  border: "3px solid rgba(255,255,255,0.9)",
-                  boxShadow: "0 18px 36px rgba(74, 116, 218, 0.28)",
+                  borderRadius: "50%",
+                  cursor: editing ? "pointer" : "default",
+                  "&:hover .avatar-overlay": {
+                    opacity: editing ? 1 : 0,
+                  },
                 }}
-              />
+                onClick={() => {
+                  if (editing) avatarInputRef.current?.click();
+                }}
+              >
+                <Avatar
+                  src={
+                    avatarFile
+                      ? URL.createObjectURL(avatarFile) // preview khi vừa chọn
+                      : avatarSrc
+                  }
+                  alt={fullName}
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    border: "3px solid rgba(255, 255, 255, 0.9)",
+                    boxShadow: "0 18px 36px rgba(74, 116, 218, 0.28)",
+                  }}
+                />
+
+                {/* Overlay edit */}
+                {editing && (
+                  <Box
+                    className="avatar-overlay"
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(0,0,0,0.45)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      opacity: 0,
+                      transition: "opacity 0.25s ease",
+                    }}
+                  >
+                    <PhotoCameraRoundedIcon sx={{ fontSize: 32 }} />
+                  </Box>
+                )}
+
+                {/* Input file ẩn */}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith("image/")) return;
+                    setAvatarFile(file);
+                  }}
+                />
+              </Box>
+
               <Stack spacing={1.5} flex={1}>
                 {loading ? (
                   <>
@@ -933,6 +1024,7 @@ export default function UserProfile() {
                   </Stack>
                   <Grid container spacing={2.5} alignItems="stretch">
                     {renderField(personalGenderField)}
+                    {/* DOB giờ có thể tự gõ ngày/tháng/năm */}
                     {renderField(personalDateOfBirthField)}
                     {renderField(personalCountryField)}
                     {renderField(bioIntroductionField, {
@@ -1194,13 +1286,6 @@ export default function UserProfile() {
             <Button
               type="submit"
               variant="contained"
-              // startIcon={
-              //   changingPassword ? (
-              //     <CircularProgress size={18} thickness={4} />
-              //   ) : (
-              //     <SaveRoundedIcon />
-              //   )
-              // }
               disabled={changingPassword}
               sx={{
                 textTransform: "none",
