@@ -133,7 +133,7 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
-    closeAccount();
+    // closeAccount();
     logout?.();
     navigate("/", { replace: true });
   };

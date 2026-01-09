@@ -157,7 +157,7 @@ const NotificationBell = ({
 
         setNotifications(list);
       } catch (error) {
-        console.error("L?i khi t?i th“ng b o", error);
+        console.error("Lỗi khi tải thông báo", error);
       } finally {
         if (initial && mounted) setLoading(false);
       }

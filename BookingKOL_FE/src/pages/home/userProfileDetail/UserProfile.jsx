@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -28,6 +28,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 
 import defaultImg from "../../../assets/default.png";
 import AppSnackbar from "../../../components/UI/AppSnackbar";
@@ -299,6 +300,8 @@ export default function UserProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showErrorSnackbar, setShowErrorSnackbar] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const avatarInputRef = useRef(null);
 
   const [passwordValues, setPasswordValues] = useState({
     oldPassword: "",
@@ -402,39 +405,35 @@ export default function UserProfile() {
     setFormErrors({});
     setEditing(false);
   };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!editing || saving) return;
+
     const errors = validateProfileForm(formValues);
     setFormErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
+    if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     try {
       const payload = buildUserProfileUpdatePayload(formValues);
-      const updatedProfile = await updateMyUserProfile({ data: payload });
-      const nextProfile = mergeProfileWithUpdate(
-        profile,
-        payload,
-        updatedProfile
-      );
-      setProfile(nextProfile);
-      setFormValues(deriveFormValues(nextProfile));
-      setFormErrors({});
+
+      // ✅ Update profile (kèm avatar nếu có)
+      await updateMyUserProfile({
+        data: payload,
+        fileAvatar: avatarFile || undefined,
+      });
+
+      // ✅ Fetch lại profile từ server để đồng bộ UI
+      await fetchProfile({ showGlobalLoading: false });
+      window.dispatchEvent(new Event("user-profile-updated"));
+
       setEditing(false);
-      setError(null);
-      setShowErrorSnackbar(false);
-      // await fetchProfile({ showGlobalLoading: false });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("user-profile-updated"));
-      }
+      setAvatarFile(null);
     } catch (err) {
       const message =
-        err?.response?.data?.message ??
-        err?.message ??
-        "Không thể cập nhật hồ sơ. Vui lòng thử lại.";
+        err?.response?.data?.message ||
+        err?.message ||
+        "Cập nhật hồ sơ thất bại. Vui lòng thử lại.";
       setError(message);
       setShowErrorSnackbar(true);
     } finally {
@@ -534,10 +533,9 @@ export default function UserProfile() {
   ]);
 
   const avatarSrc =
-    normalizedProfile.avatarUrl ??
-    normalizedProfile.avatar ??
-    normalizedProfile.profileImage ??
-    normalizedProfile.imageUrl ??
+    profile?.avatarUrl ||
+    profile?.avatar ||
+    profile?.profileImage ||
     defaultImg;
 
   const [contactSection = {}, personalSection = {}, bioSection = {}] =
@@ -753,16 +751,72 @@ export default function UserProfile() {
               spacing={{ xs: 3, md: 4 }}
               alignItems={{ xs: "flex-start", md: "center" }}
             >
-              <Avatar
-                src={avatarSrc}
-                alt={fullName}
+              <Box
                 sx={{
+                  position: "relative",
                   width: { xs: 96, md: 120 },
                   height: { xs: 96, md: 120 },
-                  border: "3px solid rgba(255,255,255,0.9)",
-                  boxShadow: "0 18px 36px rgba(74, 116, 218, 0.28)",
+                  borderRadius: "50%",
+                  cursor: editing ? "pointer" : "default",
+                  "&:hover .avatar-overlay": {
+                    opacity: editing ? 1 : 0,
+                  },
                 }}
-              />
+                onClick={() => {
+                  if (editing) avatarInputRef.current?.click();
+                }}
+              >
+                <Avatar
+                  src={
+                    avatarFile
+                      ? URL.createObjectURL(avatarFile) // preview khi vừa chọn
+                      : avatarSrc
+                  }
+                  alt={fullName}
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    border: "3px solid rgba(255, 255, 255, 0.9)",
+                    boxShadow: "0 18px 36px rgba(74, 116, 218, 0.28)",
+                  }}
+                />
+
+                {/* Overlay edit */}
+                {editing && (
+                  <Box
+                    className="avatar-overlay"
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(0,0,0,0.45)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      opacity: 0,
+                      transition: "opacity 0.25s ease",
+                    }}
+                  >
+                    <PhotoCameraRoundedIcon sx={{ fontSize: 32 }} />
+                  </Box>
+                )}
+
+                {/* Input file ẩn */}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith("image/")) return;
+                    setAvatarFile(file);
+                  }}
+                />
+              </Box>
+
               <Stack spacing={1.5} flex={1}>
                 {loading ? (
                   <>
