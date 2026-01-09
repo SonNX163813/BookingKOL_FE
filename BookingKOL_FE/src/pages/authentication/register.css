@@ -51,3 +51,20 @@
     top: 0;
   }
 }
+@media (max-width: 768px) {
+  .right-card.register {
+    padding-left: 24px;
+    padding-right: 24px;
+    top: 0;
+
+    /* ✅ reset cái kéo lên desktop */
+    margin-top: 0; /* hoặc 12px / 16px nếu muốn hạ thêm */
+    padding-top: 16px; /* ✅ tạo khoảng trống trên cùng -> logo xuống dưới */
+  }
+
+  /* ✅ nếu bạn muốn đẩy RIÊNG logo xuống thêm nữa */
+  .register-page .login-logo-top {
+    margin-top: 10px;
+    display: block;
+  }
+}
